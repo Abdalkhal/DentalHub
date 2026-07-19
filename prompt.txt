@@ -1,0 +1,17 @@
+Please implement the final operational views and components (e.g., `src/routes/finance.tsx`, `src/routes/settings.tsx`, and `src/components/NewOrderModal.tsx`) within our standard mobile-first centered layout (`max-w-md mx-auto`) and premium Blue/White theme:
+
+1. Finance Ledger View (`المالية`):
+   - Implement a clean visual double-entry dashboard optimized for mobile screens.
+   - Display a running balance card showing: Total Invoiced (المبالغ المفوترة), Collected/Paid (المستحصلة), and Outstanding Balance (المتبقي بذمة العيادات).
+   - Include a scrollable list tracking individual clinic billing updates and general lab operational expenses.
+
+2. Settings & Pricing Configuration (`الإعدادات`):
+   - Build a control panel screen for managing lab data.
+   - Include a comprehensive dynamic list for Service Pricing Management (إدارة أسعار الخدمات) where the lab can view and modify the unit cost for different work types (e.g., Zirconia, E-max, Implants).
+
+3. New Order Form Modal (`إضافة طلب جديد`):
+   - Design a premium full-screen or slide-up modal overlay triggered from the dashboard's "+" button.
+   - Fields required: Patient Name (اسم المريض), Clinic/Doctor Selector (العيادة/الطبيب), Work Type Dropdown (نوع العمل), Shade/Color (اللون), and Dynamic Delivery Date picker.
+   - Ensure form validation handles missing text inputs gracefully and wires directly into our primary state array.
+
+Review all components to ensure they bind seamlessly to the reactive routing architecture and dark/light layout contexts built in the previous phases.

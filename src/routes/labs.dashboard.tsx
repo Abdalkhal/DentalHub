@@ -1,0 +1,969 @@
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useState, useEffect, useMemo } from "react";
+import { auth, db } from "@/integrations/firebase/client";
+import { signOut } from "firebase/auth";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  onSnapshot,
+  doc,
+  updateDoc,
+  Timestamp,
+  orderBy,
+} from "firebase/firestore";
+import { useI18n } from "@/lib/i18n";
+import { useSession } from "@/lib/useAuth";
+import { cn } from "@/lib/utils";
+import type { UserRoleDoc } from "@/integrations/firebase/types";
+import {
+  Search,
+  Bell,
+  MessageSquare,
+  Plus,
+  List,
+  Users,
+  CreditCard,
+  ChevronLeft,
+  Eye,
+  Edit3,
+  Crown,
+  Sparkles,
+  Syringe,
+  Layers,
+  Clock,
+  TrendingUp,
+  TrendingDown,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  BarChart3,
+  DollarSign,
+  Target,
+  LogOut,
+  ChevronDown,
+  X,
+  Loader2,
+  Globe,
+  type LucideIcon,
+} from "lucide-react";
+
+export const Route = createFileRoute("/labs/dashboard")({
+  component: LabDashboard,
+});
+
+type CaseStatus = "in_progress" | "completed" | "delayed";
+
+type LabCase = {
+  id: string;
+  orderNumber: string;
+  patient: string;
+  doctor: string;
+  doctorId: string;
+  workType: "crown" | "veneer" | "implant" | "clear_aligner";
+  dateReceived: Timestamp;
+  status: CaseStatus;
+};
+
+const WORK_TYPES: Record<
+  LabCase["workType"],
+  { ar: string; en: string; icon: LucideIcon; color: string }
+> = {
+  crown: { ar: "تاج", en: "Crown", icon: Crown, color: "text-amber-500 bg-amber-50" },
+  veneer: { ar: "قشرة", en: "Veneer", icon: Sparkles, color: "text-sky-500 bg-sky-50" },
+  implant: { ar: "زرعة", en: "Implant", icon: Syringe, color: "text-emerald-500 bg-emerald-50" },
+  clear_aligner: {
+    ar: "مصفف شفاف",
+    en: "Clear Aligner",
+    icon: Layers,
+    color: "text-violet-500 bg-violet-50",
+  },
+};
+
+const STATUS_META: Record<CaseStatus, { ar: string; en: string; color: string; dot: string }> = {
+  in_progress: {
+    ar: "قيد التنفيذ",
+    en: "In Progress",
+    color: "bg-amber-100 text-amber-700 border-amber-200",
+    dot: "bg-amber-500",
+  },
+  completed: {
+    ar: "مكتمل",
+    en: "Completed",
+    color: "bg-emerald-100 text-emerald-700 border-emerald-200",
+    dot: "bg-emerald-500",
+  },
+  delayed: {
+    ar: "متأخر",
+    en: "Delayed",
+    color: "bg-rose-100 text-rose-700 border-rose-200",
+    dot: "bg-rose-500",
+  },
+};
+
+const NAV_ITEMS = [
+  { key: "home", ar: "الرئيسية", en: "Home", icon: BarChart3, path: "/labs/dashboard" },
+  { key: "orders", ar: "الطلبات", en: "Orders", icon: List, path: "/orders" },
+  { key: "cases", ar: "حالات العمل", en: "Work Cases", icon: Layers, path: "/production" },
+  { key: "patients", ar: "المرضى", en: "Patients", icon: Users, path: "/patients" },
+  { key: "doctors", ar: "الأطباء", en: "Doctors", icon: Users, path: "/doctors" },
+  { key: "reports", ar: "التقارير", en: "Reports", icon: BarChart3, path: "/reports" },
+  { key: "finance", ar: "المالية", en: "Finance", icon: CreditCard, path: "/finance" },
+  { key: "messages", ar: "الرسائل", en: "Messages", icon: MessageSquare, path: "/messages" },
+  { key: "settings", ar: "الإعدادات", en: "Settings", icon: Edit3, path: "/account/settings" },
+];
+
+const MOCK_CASES: LabCase[] = [];
+
+function formatDate(date: Date, lang: "ar" | "en"): string {
+  const opts: Intl.DateTimeFormatOptions = {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  };
+  return date.toLocaleDateString(lang === "ar" ? "ar-SA" : "en-US", opts);
+}
+
+function formatShortDate(ts: Timestamp): string {
+  const d = ts.toDate();
+  return `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}/${d.getFullYear()}`;
+}
+
+function StatCard({
+  label,
+  value,
+  trend,
+  trendUp,
+  icon: Icon,
+  color,
+  onClick,
+}: {
+  label: string;
+  value: string | number;
+  trend: string;
+  trendUp: boolean;
+  icon: LucideIcon;
+  color: string;
+  onClick?: () => void;
+}) {
+  const Comp = onClick ? "button" : "div";
+  return (
+    <Comp
+      onClick={onClick}
+      className={cn(
+        "bg-white rounded-2xl border border-slate-100 p-5 shadow-sm hover:shadow-md transition-shadow duration-300",
+        onClick && "cursor-pointer active:scale-[0.98]",
+      )}
+    >
+      <div className="flex items-start justify-between mb-3">
+        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+          {label}
+        </span>
+        <span className={cn("size-10 rounded-xl flex items-center justify-center", color)}>
+          <Icon className="size-5" />
+        </span>
+      </div>
+      <p className="text-3xl font-extrabold text-slate-900 tracking-tight font-display">{value}</p>
+      <div className="flex items-center gap-1 mt-2">
+        {trendUp ? (
+          <TrendingUp className="size-3.5 text-emerald-500" />
+        ) : (
+          <TrendingDown className="size-3.5 text-rose-500" />
+        )}
+        <span
+          className={cn("text-xs font-semibold", trendUp ? "text-emerald-600" : "text-rose-600")}
+        >
+          {trend}
+        </span>
+      </div>
+    </Comp>
+  );
+}
+
+function WorkTypeBadge({ type }: { type: LabCase["workType"] }) {
+  const wt = WORK_TYPES[type];
+  const Icon = wt.icon;
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold",
+        wt.color,
+      )}
+    >
+      <Icon className="size-3.5" />
+      {wt.ar}
+    </span>
+  );
+}
+
+function StatusBadge({ status }: { status: CaseStatus }) {
+  const sm = STATUS_META[status];
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border",
+        sm.color,
+      )}
+    >
+      <span className={cn("size-1.5 rounded-full", sm.dot)} />
+      {sm.ar}
+    </span>
+  );
+}
+
+function OrderDetailsModal({
+  order,
+  onClose,
+  onStatusChange,
+  ar,
+}: {
+  order: LabCase;
+  onClose: () => void;
+  onStatusChange: (id: string, status: CaseStatus) => void;
+  ar: boolean;
+}) {
+  const sm = STATUS_META[order.status];
+  const wt = WORK_TYPES[order.workType];
+  const statusOptions: CaseStatus[] = ["in_progress", "completed", "delayed"];
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white w-full max-w-lg rounded-3xl p-6 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="font-display font-extrabold text-lg">
+            {ar ? `تفاصيل الطلب ${order.orderNumber}` : `Order ${order.orderNumber}`}
+          </h3>
+          <button
+            onClick={onClose}
+            className="size-9 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-400"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs font-semibold text-slate-500 mb-1">
+                {ar ? "رقم الطلب" : "Order #"}
+              </p>
+              <p className="font-bold text-slate-900">{order.orderNumber}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-500 mb-1">
+                {ar ? "تاريخ الاستلام" : "Date Received"}
+              </p>
+              <p className="font-bold text-slate-900">{formatShortDate(order.dateReceived)}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-500 mb-1">
+                {ar ? "المريض" : "Patient"}
+              </p>
+              <p className="font-bold text-slate-900">{order.patient}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-500 mb-1">
+                {ar ? "الطبيب" : "Doctor"}
+              </p>
+              <p className="font-bold text-slate-900">{order.doctor}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-500 mb-1">
+                {ar ? "نوع العمل" : "Work Type"}
+              </p>
+              <WorkTypeBadge type={order.workType} />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-500 mb-1">
+                {ar ? "الحالة" : "Status"}
+              </p>
+              <StatusBadge status={order.status} />
+            </div>
+          </div>
+
+          <div className="pt-3 border-t border-slate-100">
+            <p className="text-xs font-semibold text-slate-500 mb-2">
+              {ar ? "تغيير الحالة" : "Change Status"}
+            </p>
+            <div className="flex gap-2">
+              {statusOptions.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => onStatusChange(order.id, s)}
+                  className={cn(
+                    "flex-1 h-10 rounded-xl text-xs font-bold border-2 transition-all",
+                    order.status === s
+                      ? `${STATUS_META[s].color} scale-105`
+                      : "border-slate-200 text-slate-500 hover:border-slate-300",
+                  )}
+                >
+                  {ar ? STATUS_META[s].ar : STATUS_META[s].en}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LabDashboard() {
+  const { lang, setLang } = useI18n();
+  const ar = lang === "ar";
+  const navigate = useNavigate();
+  const { user } = useSession();
+
+  const [profile, setProfile] = useState<UserRoleDoc | null>(null);
+  const [cases, setCases] = useState<LabCase[]>(MOCK_CASES);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activeNav, setActiveNav] = useState("home");
+  const [selectedOrder, setSelectedOrder] = useState<LabCase | null>(null);
+  const [showAllOrders, setShowAllOrders] = useState(false);
+  const [showPromoModal, setShowPromoModal] = useState(false);
+  const [showNewOrder, setShowNewOrder] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    const unsub = onSnapshot(doc(db, "user_roles", user.uid), (snap) => {
+      if (snap.exists()) setProfile(snap.data() as UserRoleDoc);
+    });
+    return unsub;
+  }, [user]);
+
+  const labName = profile?.name || (ar ? "مختبر دنتال هب" : "Dental Hub Lab");
+
+  const stats = useMemo(() => {
+    const total = cases.length;
+    const inProgress = cases.filter((c) => c.status === "in_progress").length;
+    const completed = cases.filter((c) => c.status === "completed").length;
+    const delayed = cases.filter((c) => c.status === "delayed").length;
+    return { total, inProgress, completed, delayed };
+  }, [cases]);
+
+  const filteredCases = useMemo(() => {
+    if (!searchQuery.trim()) return cases;
+    const q = searchQuery.toLowerCase();
+    return cases.filter(
+      (c) =>
+        c.orderNumber.toLowerCase().includes(q) ||
+        c.patient.toLowerCase().includes(q) ||
+        c.doctor.toLowerCase().includes(q),
+    );
+  }, [cases, searchQuery]);
+
+  const displayedCases = showAllOrders ? filteredCases : filteredCases.slice(0, 5);
+
+  const handleStatusChange = async (id: string, newStatus: CaseStatus) => {
+    setCases((prev) => prev.map((c) => (c.id === id ? { ...c, status: newStatus } : c)));
+    setSelectedOrder((prev) => (prev?.id === id ? { ...prev, status: newStatus } : prev));
+  };
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    navigate({ to: "/auth" });
+  };
+
+  const today = new Date();
+
+  return (
+    <div className="min-h-svh bg-slate-50" dir={ar ? "rtl" : "ltr"}>
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/30 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      <div className="flex mx-auto max-w-lg w-full">
+        {/* ===== LEFT SIDEBAR ===== */}
+        <aside
+          className={cn(
+            "fixed lg:sticky top-0 z-50 h-svh w-64 bg-white border-l border-slate-200 flex flex-col transition-transform duration-300 lg:translate-x-0",
+            ar ? "right-0 border-l" : "left-0 border-r",
+            sidebarOpen ? "translate-x-0" : ar ? "translate-x-full" : "-translate-x-full",
+            "lg:block",
+          )}
+        >
+          {/* Logo */}
+          <div className="flex items-center gap-2.5 px-5 h-16 border-b border-slate-100 shrink-0">
+            <div className="size-8 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 text-white flex items-center justify-center shadow-md">
+              <span className="font-extrabold text-sm">DH</span>
+            </div>
+            <span className="font-display font-extrabold text-lg">
+              <span className="text-sky-500">Dental</span>
+              <span className="text-slate-800">Hub</span>
+            </span>
+          </div>
+
+          {/* Quick Access */}
+          <div className="p-4 space-y-1.5 border-b border-slate-100">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-3 mb-2">
+              {ar ? "الوصول السريع" : "Quick Access"}
+            </p>
+            <QuickAccessButton
+              icon={Plus}
+              label={ar ? "طلب جديد" : "New Order"}
+              color="bg-sky-500 text-white hover:bg-sky-600"
+              onClick={() => setShowNewOrder(true)}
+            />
+            <QuickAccessButton
+              icon={List}
+              label={ar ? "عرض الطلبات" : "View Orders"}
+              onClick={() => navigate({ to: "/orders" })}
+            />
+            <QuickAccessButton
+              icon={Users}
+              label={ar ? "الأطباء" : "Doctors"}
+              onClick={() => navigate({ to: "/doctors" })}
+            />
+            <QuickAccessButton
+              icon={CreditCard}
+              label={ar ? "الحسابات" : "Accounts"}
+              onClick={() => navigate({ to: "/finance" })}
+            />
+
+            {/* Promo card */}
+            <button
+              onClick={() => setShowPromoModal(true)}
+              className="relative mt-4 w-full rounded-2xl overflow-hidden bg-gradient-to-br from-sky-500 to-indigo-600 p-4 text-white text-right shadow-lg group"
+            >
+              <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_30%_50%,white_0%,transparent_60%)]" />
+              <p className="font-display font-bold text-sm leading-tight relative">
+                {ar ? "تقنيات حديثة لنتائج دقيقة" : "Modern Tech for Precise Results"}
+              </p>
+              <p className="text-[11px] opacity-80 mt-1 relative">
+                {ar ? "اعرف المزيد" : "Learn more"}
+              </p>
+            </button>
+          </div>
+
+          {/* Navigation */}
+          <nav className="flex-1 overflow-y-auto p-3 space-y-0.5">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-3 mb-2">
+              {ar ? "القائمة" : "Menu"}
+            </p>
+            {NAV_ITEMS.map((item) => {
+              const Icon = item.icon;
+              const active = activeNav === item.key;
+              return (
+                <button
+                  key={item.key}
+                  onClick={() => {
+                    setActiveNav(item.key);
+                    navigate({ to: item.path as any });
+                  }}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-3 h-11 rounded-xl text-sm font-semibold transition-all",
+                    active
+                      ? "bg-sky-50 text-sky-700 shadow-sm"
+                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-800",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "size-8 rounded-lg flex items-center justify-center",
+                      active ? "bg-sky-100 text-sky-600" : "text-slate-400",
+                    )}
+                  >
+                    <Icon className="size-4" />
+                  </span>
+                  {ar ? item.ar : item.en}
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* Profile widget */}
+          <div className="p-4 border-t border-slate-100 shrink-0">
+            <div className="flex items-center gap-3">
+              <span className="size-10 rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 text-white flex items-center justify-center font-display font-bold shadow-md shrink-0">
+                {labName.charAt(0)}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-slate-900 truncate">{labName}</p>
+                <p className="text-[11px] text-slate-500">{ar ? "مدير النظام" : "Administrator"}</p>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="size-8 rounded-lg hover:bg-rose-50 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors"
+                title={ar ? "تسجيل الخروج" : "Logout"}
+              >
+                <LogOut className="size-4" />
+              </button>
+            </div>
+          </div>
+        </aside>
+
+        {/* ===== MAIN CONTENT ===== */}
+        <main className="flex-1 min-w-0">
+          {/* Top bar */}
+          <header className="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-slate-200">
+            <div className="flex items-center justify-between px-4 lg:px-6 h-16">
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="lg:hidden size-9 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-500"
+              >
+                <Plus className="size-4" />
+              </button>
+
+              <div className="hidden lg:flex items-center gap-3">
+                <span className="text-2xl">👋</span>
+                <div>
+                  <p className="text-sm font-bold text-slate-900">
+                    {ar ? `مرحباً بك، ${labName}` : `Welcome, ${labName}`}
+                  </p>
+                  <p className="text-xs text-slate-500">{formatDate(today, lang)}</p>
+                </div>
+              </div>
+
+              {/* Mobile greeting */}
+              <div className="lg:hidden flex items-center gap-2">
+                <span className="text-xl">👋</span>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-slate-900 truncate">{labName}</p>
+                  <p className="text-[10px] text-slate-500">{formatDate(today, lang)}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="relative hidden sm:block">
+                  <Search className="size-4 absolute top-1/2 -translate-y-1/2 start-3 text-slate-400 pointer-events-none" />
+                  <input
+                    type="search"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder={
+                      ar ? "بحث عن طلب، طبيب، مريض..." : "Search orders, doctors, patients..."
+                    }
+                    className="w-56 lg:w-72 h-10 bg-slate-50 rounded-xl border border-slate-200 ps-9 pe-3 text-sm outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition"
+                  />
+                </div>
+                <button
+                  onClick={() => setLang(lang === "ar" ? "en" : "ar")}
+                  className="size-10 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-500"
+                  title={ar ? "English" : "العربية"}
+                >
+                  <Globe className="size-5" />
+                </button>
+                <button className="relative size-10 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-500">
+                  <Bell className="size-5" />
+                  <span className="absolute top-2 end-2 size-2 rounded-full bg-rose-500 ring-2 ring-white" />
+                </button>
+                <button className="size-10 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-500">
+                  <MessageSquare className="size-5" />
+                </button>
+              </div>
+            </div>
+            {/* Mobile search */}
+            <div className="sm:hidden px-4 pb-3">
+              <div className="relative">
+                <Search className="size-4 absolute top-1/2 -translate-y-1/2 start-3 text-slate-400 pointer-events-none" />
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={ar ? "بحث..." : "Search..."}
+                  className="w-full h-10 bg-slate-50 rounded-xl border border-slate-200 ps-9 pe-3 text-sm outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition"
+                />
+              </div>
+            </div>
+          </header>
+
+          <div className="p-4 lg:p-6 space-y-6">
+            {/* Stats row */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <StatCard
+                label={ar ? "إجمالي الطلبات" : "Total Orders"}
+                value={stats.total}
+                trend={ar ? "+15% عن الشهر الماضي" : "+15% vs last month"}
+                trendUp
+                icon={BarChart3}
+                color="bg-sky-50 text-sky-600"
+                onClick={() => navigate({ to: "/orders", search: { status: "all" } })}
+              />
+              <StatCard
+                label={ar ? "قيد التنفيذ" : "In Production"}
+                value={stats.inProgress}
+                trend={ar ? "+8% عن الشهر الماضي" : "+8% vs last month"}
+                trendUp
+                icon={Clock}
+                color="bg-amber-50 text-amber-600"
+                onClick={() => navigate({ to: "/orders", search: { status: "in_progress" } })}
+              />
+              <StatCard
+                label={ar ? "مكتملة" : "Completed"}
+                value={stats.completed}
+                trend={ar ? "+22% عن الشهر الماضي" : "+22% vs last month"}
+                trendUp
+                icon={CheckCircle2}
+                color="bg-emerald-50 text-emerald-600"
+                onClick={() => navigate({ to: "/orders", search: { status: "completed" } })}
+              />
+              <StatCard
+                label={ar ? "متأخرة" : "Delayed"}
+                value={stats.delayed}
+                trend={ar ? "-3% عن الشهر الماضي" : "-3% vs last month"}
+                trendUp={false}
+                icon={AlertCircle}
+                color="bg-rose-50 text-rose-600"
+                onClick={() => navigate({ to: "/orders", search: { status: "delayed" } })}
+              />
+            </div>
+
+            {/* Orders table */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+                <h2 className="font-display font-extrabold text-lg text-slate-800">
+                  {ar ? "الطلبات الأخيرة" : "Recent Orders"}
+                </h2>
+                <span className="text-xs text-slate-400 bg-slate-50 px-2.5 py-1 rounded-full font-semibold">
+                  {filteredCases.length} {ar ? "طلب" : "orders"}
+                </span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50/50">
+                      {[
+                        ar ? "رقم الطلب" : "Order #",
+                        ar ? "المريض" : "Patient",
+                        ar ? "الطبيب" : "Doctor",
+                        ar ? "نوع العمل" : "Work Type",
+                        ar ? "تاريخ الاستلام" : "Date Received",
+                        ar ? "الحالة" : "Status",
+                        ar ? "الإجراء" : "Actions",
+                      ].map((h) => (
+                        <th
+                          key={h}
+                          className="text-right px-4 py-3 text-xs font-bold text-slate-500 whitespace-nowrap"
+                        >
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {displayedCases.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="text-center py-12 text-sm text-slate-400">
+                          {ar ? "لا توجد طلبات مطابقة" : "No matching orders"}
+                        </td>
+                      </tr>
+                    ) : (
+                      displayedCases.map((c) => (
+                        <tr
+                          key={c.id}
+                          className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors"
+                        >
+                          <td className="px-4 py-3.5 font-mono text-xs font-bold text-slate-700">
+                            {c.orderNumber}
+                          </td>
+                          <td className="px-4 py-3.5 font-semibold text-slate-800">{c.patient}</td>
+                          <td className="px-4 py-3.5 text-slate-600">{c.doctor}</td>
+                          <td className="px-4 py-3.5">
+                            <WorkTypeBadge type={c.workType} />
+                          </td>
+                          <td className="px-4 py-3.5 text-xs text-slate-500">
+                            {formatShortDate(c.dateReceived)}
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <StatusBadge status={c.status} />
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => setSelectedOrder(c)}
+                                className="h-8 px-3 rounded-lg text-xs font-bold text-sky-600 hover:bg-sky-50 flex items-center gap-1"
+                              >
+                                <Eye className="size-3.5" />
+                                {ar ? "عرض" : "View"}
+                              </button>
+                              <button
+                                onClick={() => setSelectedOrder(c)}
+                                className="h-8 px-3 rounded-lg text-xs font-bold text-slate-500 hover:bg-slate-100 flex items-center gap-1"
+                              >
+                                <Edit3 className="size-3.5" />
+                                {ar ? "تعديل" : "Edit"}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              {filteredCases.length > 5 && (
+                <div className="px-5 py-3 border-t border-slate-100">
+                  <button
+                    onClick={() => setShowAllOrders(!showAllOrders)}
+                    className="text-sm font-bold text-sky-600 hover:text-sky-700 flex items-center gap-1"
+                  >
+                    {showAllOrders
+                      ? ar
+                        ? "عرض أقل"
+                        : "Show less"
+                      : ar
+                        ? "عرض جميع الطلبات"
+                        : "View All Orders"}
+                    <ChevronDown
+                      className={cn("size-4 transition-transform", showAllOrders && "rotate-180")}
+                    />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Analytics row */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    {ar ? "الجودة والدقة" : "Quality & Accuracy"}
+                  </span>
+                  <Target className="size-4 text-sky-500" />
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="relative size-20">
+                    <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                      <circle
+                        cx="18"
+                        cy="18"
+                        r="15.5"
+                        fill="none"
+                        stroke="#e2e8f0"
+                        strokeWidth="2.5"
+                      />
+                      <circle
+                        cx="18"
+                        cy="18"
+                        r="15.5"
+                        fill="none"
+                        stroke="#0ea5e9"
+                        strokeWidth="2.5"
+                        strokeDasharray="100"
+                        strokeDashoffset={100 - 98}
+                        strokeLinecap="round"
+                        className="transition-all duration-1000"
+                      />
+                    </svg>
+                    <span className="absolute inset-0 flex items-center justify-center font-display font-extrabold text-lg text-slate-800">
+                      98%
+                    </span>
+                  </div>
+                  <div>
+                    <p className="font-bold text-slate-800 text-sm">
+                      {ar ? "رضا الأطباء" : "Doctor Satisfaction"}
+                    </p>
+                    <p className="text-xs text-emerald-600 font-semibold flex items-center gap-1 mt-1">
+                      <TrendingUp className="size-3" />
+                      +2.5% {ar ? "عن الربع السابق" : "vs last quarter"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    {ar ? "متوسط مدة الإنجاز" : "Avg. Turnaround"}
+                  </span>
+                  <Clock className="size-4 text-amber-500" />
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-4xl font-display font-extrabold text-slate-800">3.2</span>
+                  <div>
+                    <p className="font-bold text-slate-800 text-sm">{ar ? "يوم" : "Days"}</p>
+                    <p className="text-xs text-emerald-600 font-semibold flex items-center gap-1 mt-1">
+                      <TrendingUp className="size-3" />
+                      -0.5 {ar ? "يوم عن الشهر الماضي" : "day vs last month"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    {ar ? "إجمالي الإيرادات" : "Total Revenue"}
+                  </span>
+                  <DollarSign className="size-4 text-emerald-500" />
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl font-display font-extrabold text-slate-800">
+                    $24,560
+                  </span>
+                  <div>
+                    <p className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
+                      <TrendingUp className="size-3" />
+                      +18% {ar ? "عن الشهر الماضي" : "vs last month"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+
+      {/* Order detail modal */}
+      {selectedOrder && (
+        <OrderDetailsModal
+          order={selectedOrder}
+          onClose={() => setSelectedOrder(null)}
+          onStatusChange={handleStatusChange}
+          ar={ar}
+        />
+      )}
+
+      {/* New Order Modal */}
+      {showNewOrder && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-4"
+          onClick={() => setShowNewOrder(false)}
+        >
+          <div
+            className="bg-white w-full max-w-lg rounded-3xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="font-display font-extrabold text-lg">
+                {ar ? "طلب جديد" : "New Order"}
+              </h3>
+              <button
+                onClick={() => setShowNewOrder(false)}
+                className="size-9 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-400"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <label className="block">
+                <span className="block text-xs font-bold text-slate-500 mb-1.5">
+                  {ar ? "المريض" : "Patient"}
+                </span>
+                <input
+                  className="w-full bg-slate-50 rounded-xl px-3 h-11 outline-none text-sm focus:ring-2 focus:ring-sky-300"
+                  placeholder={ar ? "اسم المريض" : "Patient name"}
+                />
+              </label>
+              <label className="block">
+                <span className="block text-xs font-bold text-slate-500 mb-1.5">
+                  {ar ? "الطبيب" : "Doctor"}
+                </span>
+                <select className="w-full bg-slate-50 rounded-xl px-3 h-11 outline-none text-sm focus:ring-2 focus:ring-sky-300">
+                  <option value="">{ar ? "اختر الطبيب" : "Select doctor"}</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="block text-xs font-bold text-slate-500 mb-1.5">
+                  {ar ? "نوع العمل" : "Work Type"}
+                </span>
+                <select className="w-full bg-slate-50 rounded-xl px-3 h-11 outline-none text-sm focus:ring-2 focus:ring-sky-300">
+                  <option>{ar ? "تاج" : "Crown"}</option>
+                  <option>{ar ? "قشرة" : "Veneer"}</option>
+                  <option>{ar ? "زرعة" : "Implant"}</option>
+                  <option>{ar ? "مصفف شفاف" : "Clear Aligner"}</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="block text-xs font-bold text-slate-500 mb-1.5">
+                  {ar ? "ملاحظات" : "Notes"}
+                </span>
+                <textarea
+                  rows={3}
+                  className="w-full bg-slate-50 rounded-xl px-3 py-2.5 outline-none text-sm focus:ring-2 focus:ring-sky-300 resize-none"
+                  placeholder={ar ? "أضف تفاصيل..." : "Add details..."}
+                />
+              </label>
+              <button className="w-full h-12 rounded-xl bg-sky-500 text-white font-bold hover:bg-sky-600 transition">
+                {ar ? "إنشاء الطلب" : "Create Order"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Promo modal */}
+      {showPromoModal && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setShowPromoModal(false)}
+        >
+          <div
+            className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display font-extrabold text-lg">
+                {ar ? "تقنيات حديثة لنتائج دقيقة" : "Modern Tech for Precise Results"}
+              </h3>
+              <button
+                onClick={() => setShowPromoModal(false)}
+                className="size-9 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-400"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+            <div className="rounded-2xl overflow-hidden bg-gradient-to-br from-sky-500 to-indigo-600 p-6 text-white mb-4">
+              <p className="font-display font-bold text-xl leading-tight">
+                {ar
+                  ? "نستخدم أحدث تقنيات المسح الرقمي والطباعة ثلاثية الأبعاد"
+                  : "We use the latest digital scanning & 3D printing technology"}
+              </p>
+            </div>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              {ar
+                ? "مختبر دنتال هب مجهز بأحدث الأجهزة الرقمية لضمان أعلى دقة في التركيبات السنية. نقدم خدمات التيجان، القشور، الزرعات، والمصففات الشفافة بأعلى معايير الجودة."
+                : "Dental Hub Lab is equipped with the latest digital devices to ensure the highest precision in dental prosthetics. We offer crowns, veneers, implants, and clear aligners with the highest quality standards."}
+            </p>
+            <button
+              onClick={() => setShowPromoModal(false)}
+              className="mt-4 w-full h-12 rounded-xl bg-sky-500 text-white font-bold hover:bg-sky-600 transition"
+            >
+              {ar ? "فهمت" : "Got it"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function QuickAccessButton({
+  icon: Icon,
+  label,
+  color,
+  onClick,
+}: {
+  icon: LucideIcon;
+  label: string;
+  color?: string;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "w-full flex items-center gap-3 px-3 h-11 rounded-xl text-sm font-semibold transition-all",
+        color || "text-slate-600 hover:bg-slate-50 hover:text-slate-800",
+      )}
+    >
+      <span className="size-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500">
+        <Icon className="size-4" />
+      </span>
+      {label}
+    </button>
+  );
+}

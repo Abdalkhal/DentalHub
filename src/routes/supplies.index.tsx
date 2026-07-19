@@ -1,0 +1,2152 @@
+﻿import { createFileRoute, Link } from "@tanstack/react-router";
+import { useMemo, useState, useRef } from "react";
+import { MobileShell } from "@/components/MobileShell";
+import { TopBar } from "@/components/TopBar";
+import { RoleGuard } from "@/components/RoleGuard";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { CITIES } from "@/data/offices";
+import { useAdminStore } from "@/lib/adminStore";
+import {
+  useProducts,
+  useUpsertProduct,
+  useDeleteProduct,
+  uploadProductImage,
+  removeProductImage,
+  useSignedImageUrls,
+  MAX_PRODUCT_IMAGES,
+  type Product,
+} from "@/lib/products";
+import { useOffers, useUpsertOffer, useDeleteOffer, type Offer } from "@/lib/offers";
+import { useUserRole } from "@/lib/useAuth";
+import { auth } from "@/integrations/firebase/client";
+import { useI18n } from "@/lib/i18n";
+import {
+  MapPin,
+  Star,
+  ChevronLeft,
+  ChevronRight,
+  SearchX,
+  Package,
+  Sparkles,
+  Activity,
+  Stethoscope,
+  Scissors,
+  AlignCenter,
+  Baby,
+  HeartPulse,
+  Plus,
+  X,
+  Upload,
+  Trash2,
+  Loader2,
+  DollarSign,
+  Layers,
+  Pencil,
+  Megaphone,
+  ClipboardList,
+  Calendar,
+  ImageOff,
+  UserCircle2,
+  LogOut,
+  Phone,
+  FileText,
+  Download,
+  Link2,
+  Cpu,
+  BookOpen,
+  Shield,
+  Wrench,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import type { Currency } from "@/lib/products";
+import imgGeneral from "@/assets/branch-general.png";
+import imgOperative from "@/assets/branch-operative.png";
+import imgEndodontic from "@/assets/branch-endodontic.png";
+import imgProsthodontic from "@/assets/branch-prosthodontic.png";
+import imgSurgery from "@/assets/branch-surgery.png";
+import imgOrthopedic from "@/assets/branch-orthopedic.png";
+import imgPedodontic from "@/assets/branch-pedodontic.png";
+import imgPeriodontic from "@/assets/branch-periodontic.png";
+
+const BRANCH_IMAGES: Record<string, string> = {
+  general: imgGeneral,
+  operative: imgOperative,
+  endodontic: imgEndodontic,
+  prosthodontic: imgProsthodontic,
+  surgery: imgSurgery,
+  orthopedic: imgOrthopedic,
+  pedodontic: imgPedodontic,
+  periodontic: imgPeriodontic,
+};
+
+const BRANCH_BADGE: Record<string, typeof Package> = {
+  general: Package,
+  operative: Sparkles,
+  endodontic: Activity,
+  prosthodontic: Stethoscope,
+  surgery: Scissors,
+  orthopedic: AlignCenter,
+  pedodontic: Baby,
+  periodontic: HeartPulse,
+};
+
+export const Route = createFileRoute("/supplies/")({
+  component: SuppliesIndex,
+});
+
+function SuppliesIndex() {
+  const { role, loading: roleLoading } = useUserRole();
+
+  if (roleLoading) {
+    return (
+      <MobileShell>
+        <TopBar title="" />
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="size-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      </MobileShell>
+    );
+  }
+
+  if (role?.accountType === "supply") {
+    return (
+      <RoleGuard allowedRoles={["supply"]}>
+        <SupplyDashboard />
+      </RoleGuard>
+    );
+  }
+  if (role?.accountType === "implant") {
+    return (
+      <RoleGuard allowedRoles={["implant"]}>
+        <ImplantDashboard />
+      </RoleGuard>
+    );
+  }
+  return <BrowseSupplies />;
+}
+
+function getMapsUrl(role: {
+  latitude?: number | null;
+  longitude?: number | null;
+  mapUrl?: string | null;
+  address?: string | null;
+}): string {
+  if (role.mapUrl) return role.mapUrl;
+  if (role.latitude != null && role.longitude != null) {
+    return `https://www.google.com/maps?q=${role.latitude},${role.longitude}`;
+  }
+  const addr = role.address || "Mosul, Iraq";
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`;
+}
+
+function SupplyDashboard() {
+  const { lang, toggle } = useI18n();
+  const ar = lang === "ar";
+  const { role } = useUserRole();
+  const supplierId = role?.userId ?? "";
+  const [activeTab, setActiveTab] = useState<"products" | "offers" | "orders">("products");
+
+  const mapsUrl = getMapsUrl(role ?? {});
+
+  const storeLabel = role?.accountType
+    ? {
+        supply: { ar: "متجر مستلزمات", en: "Supply Store" },
+        implant: { ar: "شركة زرعات", en: "Implant Co." },
+        lab: { ar: "مختبر", en: "Lab" },
+        dentist: { ar: "طبيب أسنان", en: "Dentist" },
+      }[role.accountType]
+    : { ar: "", en: "" };
+
+  return (
+    <MobileShell hideBottomNav>
+      {/* Profile Header */}
+      <div className="px-4 pt-4 pb-2">
+        <div className="flex items-center justify-between">
+          <Link
+            to="/account"
+            className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition"
+          >
+            <div className="size-12 rounded-full bg-primary/10 ring-2 ring-primary/20 flex items-center justify-center overflow-hidden">
+              <UserCircle2 className="size-7 text-primary" />
+            </div>
+            <div>
+              <p className="font-display font-bold text-sm text-foreground">
+                {role?.name || (ar ? "المستخدم" : "User")}
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                {ar ? storeLabel?.ar : storeLabel?.en}
+              </p>
+              <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                <Phone className="size-3 shrink-0" />
+                {role?.phone || (ar ? "لم يتم إضافة رقم هاتف" : "No phone number added")}
+              </p>
+            </div>
+          </Link>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={toggle}
+              className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-sky-100 hover:text-sky-600 text-xs font-bold transition"
+            >
+              {lang === "ar" ? "EN" : "AR"}
+            </button>
+          </div>
+        </div>
+        {role &&
+        (role.latitude != null || role.longitude != null || role.mapUrl || role.address) ? (
+          <a
+            href={mapsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="text-[11px] text-muted-foreground flex items-center gap-1 mt-1 hover:text-primary transition-colors cursor-pointer z-50 pointer-events-auto"
+          >
+            <MapPin className="size-3 shrink-0" />
+            {role?.address || (ar ? "عرض الموقع على الخريطة" : "View on map")}
+          </a>
+        ) : (
+          <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-1">
+            <MapPin className="size-3 shrink-0" />
+            {ar ? "لم يتم تحديد العنوان بعد" : "No address set yet"}
+          </p>
+        )}
+      </div>
+
+      {/* Tab navigation */}
+      <div className="px-4">
+        <div className="flex bg-slate-100 rounded-2xl p-1 mt-2">
+          {[
+            { key: "products" as const, ar: "المنتجات", en: "Products", icon: Package },
+            { key: "offers" as const, ar: "العروض", en: "Offers", icon: Megaphone },
+            { key: "orders" as const, ar: "الطلبات", en: "Orders", icon: ClipboardList },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className={cn(
+                "flex-1 h-11 rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 transition-all",
+                activeTab === tab.key
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700",
+              )}
+            >
+              <tab.icon className="size-4" />
+              {ar ? tab.ar : tab.en}
+            </button>
+          ))}
+        </div>{" "}
+      </div>
+
+      {/* Tab content */}
+      <div className="px-4 pt-4 pb-6">
+        {activeTab === "products" && <ProductsPanel />}
+        {activeTab === "offers" && <OffersPanel supplierId={supplierId} />}
+        {activeTab === "orders" && <OrdersPanel />}
+      </div>
+    </MobileShell>
+  );
+}
+
+function ProductsPanel() {
+  const { lang } = useI18n();
+  const ar = lang === "ar";
+  const { data: allProducts = [], isLoading } = useProducts();
+  const upsert = useUpsertProduct();
+  const remove = useDeleteProduct();
+
+  const myProducts = allProducts;
+
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<Product | null>(null);
+  const [nameAr, setNameAr] = useState("");
+  const [nameEn, setNameEn] = useState("");
+  const [brand, setBrand] = useState("");
+  const [price, setPrice] = useState("");
+  const [currency, setCurrency] = useState<Currency>("USD");
+  const [stock, setStock] = useState("0");
+  const [branch, setBranch] = useState("general");
+  const [busy, setBusy] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+
+  const branchOptions = [
+    { value: "general", ar: "مواد عامة", en: "General" },
+    { value: "operative", ar: "معالجة الأسنان", en: "Operative" },
+    { value: "endodontic", ar: "علاج الجذور", en: "Endodontics" },
+    { value: "prosthodontic", ar: "التركيبات", en: "Prosthodontics" },
+    { value: "surgery", ar: "جراحة الفم", en: "Surgery" },
+    { value: "orthopedic", ar: "تقويم الأسنان", en: "Orthodontics" },
+    { value: "pedodontic", ar: "أسنان الأطفال", en: "Pedodontics" },
+    { value: "periodontic", ar: "علاج اللثة", en: "Periodontics" },
+  ];
+
+  const openAdd = () => {
+    setEditing(null);
+    setNameAr("");
+    setNameEn("");
+    setBrand("");
+    setPrice("");
+    setCurrency("USD");
+    setStock("0");
+    setBranch("general");
+    setImageFiles([]);
+    setImagePreviews([]);
+    setFormError("");
+    setShowForm(true);
+  };
+
+  const openEdit = (p: Product) => {
+    setEditing(p);
+    setNameAr(p.ar);
+    setNameEn(p.en);
+    setBrand(p.brand);
+    setPrice(String(p.price));
+    setCurrency(p.currency || "USD");
+    setStock(String(p.stock ?? 0));
+    setBranch(p.branch);
+    setImageFiles([]);
+    setImagePreviews([]);
+    setFormError("");
+    setShowForm(true);
+  };
+
+  const handleFiles = (files: FileList | null) => {
+    if (!files) return;
+    const incoming = Array.from(files).slice(0, MAX_PRODUCT_IMAGES - imageFiles.length);
+    if (incoming.length === 0) return;
+    const newPreviews = incoming.map((f) => URL.createObjectURL(f));
+    setImageFiles((prev) => [...prev, ...incoming]);
+    setImagePreviews((prev) => [...prev, ...newPreviews]);
+  };
+
+  const removePreview = (idx: number) => {
+    setImageFiles((prev) => prev.filter((_, i) => i !== idx));
+    setImagePreviews((prev) => {
+      URL.revokeObjectURL(prev[idx]);
+      return prev.filter((_, i) => i !== idx);
+    });
+  };
+
+  const removeExistingImage = async (path: string) => {
+    if (!editing) return;
+    await removeProductImage(path);
+    const updated = editing.images.filter((img) => img !== path);
+    setEditing({ ...editing, images: updated });
+  };
+
+  const submit = async () => {
+    setFormError("");
+
+    if (!nameAr.trim()) {
+      setFormError(
+        ar ? "الرجاء إدخال اسم المنتج بالعربية" : "Please enter the Arabic product name",
+      );
+      return;
+    }
+    if (!nameEn.trim() && !nameAr.trim()) {
+      setFormError(ar ? "الرجاء إدخال اسم المنتج" : "Please enter a product name");
+      return;
+    }
+    if (!price.trim() || Number(price) <= 0) {
+      setFormError(ar ? "الرجاء إدخال سعر صحيح" : "Please enter a valid price");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const productId = editing?.id ?? crypto.randomUUID();
+
+      const uploadedPaths: string[] = [];
+      for (const file of imageFiles) {
+        try {
+          const path = await uploadProductImage(productId, file);
+          uploadedPaths.push(path);
+        } catch (uploadErr: any) {
+          alert(
+            ar
+              ? `فشل رفع الصورة: ${uploadErr.message || uploadErr}. تحقق من صلاحيات Firebase Storage.`
+              : `Image upload failed: ${uploadErr.message || uploadErr}. Check Firebase Storage permissions.`,
+          );
+          setBusy(false);
+          return;
+        }
+      }
+
+      const allImages = [...(editing?.images ?? []), ...uploadedPaths];
+
+      await upsert.mutateAsync({
+        id: productId,
+        branch,
+        ar: nameAr.trim(),
+        en: nameEn.trim() || nameAr.trim(),
+        brand: brand.trim(),
+        price: Number(price) || 0,
+        currency,
+        stock: Number(stock) || 0,
+        inStock: Number(stock) > 0,
+        images: allImages,
+      });
+
+      setShowForm(false);
+    } catch (e: any) {
+      const msg = e?.message || String(e);
+      alert(ar ? `فشل حفظ المنتج: ${msg}` : `Failed to save product: ${msg}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDelete = async (p: Product) => {
+    if (!confirm(ar ? "حذف هذا المنتج؟" : "Delete this product?")) return;
+    await remove.mutateAsync(p.id);
+  };
+
+  const fmtPrice = (p: Product) => {
+    const isIQD = p.currency === "IQD";
+    const val = isIQD ? Number(p.price).toLocaleString() : p.price.toFixed(2);
+    const sym = isIQD ? "د.ع" : "$";
+    return isIQD ? `${val} ${sym}` : `${sym}${val}`;
+  };
+
+  const allImagePaths = myProducts.flatMap((p) => p.images);
+  const { data: imageUrlMap = {} } = useSignedImageUrls(allImagePaths);
+
+  const editingImagePaths = editing?.images ?? [];
+  const { data: editUrlMap = {} } = useSignedImageUrls(editingImagePaths);
+
+  return (
+    <div className="space-y-4">
+      {/* Add button */}
+      {!showForm && (
+        <button
+          onClick={openAdd}
+          className="w-full h-14 rounded-2xl bg-primary text-primary-foreground font-display font-bold flex items-center justify-center gap-2 hover:opacity-90 transition shadow-card"
+        >
+          <Plus className="size-5" />
+          {ar ? "إضافة منتج جديد" : "Add new product"}
+        </button>
+      )}
+
+      {/* Product form card */}
+      {showForm && (
+        <div className="bg-card border border-border rounded-3xl p-5 shadow-card space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="font-display font-bold text-lg">
+              {editing ? (ar ? "تعديل منتج" : "Edit product") : ar ? "منتج جديد" : "New product"}
+            </h3>
+            <button
+              onClick={() => setShowForm(false)}
+              className="size-9 rounded-xl bg-muted hover:bg-slate-200 flex items-center justify-center transition"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+
+          {/* Category */}
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+              {ar ? "الفئة" : "Category"}
+            </label>
+            <select
+              value={branch}
+              onChange={(e) => setBranch(e.target.value)}
+              className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+            >
+              {branchOptions.map((b) => (
+                <option key={b.value} value={b.value}>
+                  {ar ? b.ar : b.en}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Name ar */}
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+              {ar ? "اسم المنتج (عربي)" : "Product name (Arabic)"}
+            </label>
+            <input
+              value={nameAr}
+              onChange={(e) => setNameAr(e.target.value)}
+              placeholder={ar ? "مثال: كومبوزيت ضوئي" : "e.g. Light-cured composite"}
+              className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+            />
+          </div>
+
+          {/* Name en */}
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+              {ar ? "اسم المنتج (انكليزي)" : "Product name (English)"}
+            </label>
+            <input
+              value={nameEn}
+              onChange={(e) => setNameEn(e.target.value)}
+              placeholder={ar ? "اختياري" : "Optional"}
+              className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+            />
+          </div>
+
+          {/* Brand */}
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+              {ar ? "الماركة" : "Brand"}
+            </label>
+            <input
+              value={brand}
+              onChange={(e) => setBrand(e.target.value)}
+              placeholder={ar ? "مثال: 3M" : "e.g. 3M"}
+              className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+            />
+          </div>
+
+          {/* Price + Currency row */}
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+              {ar ? "السعر" : "Price"}
+            </label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <input
+                  type="number"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  placeholder="0"
+                  dir="ltr"
+                  className="w-full h-12 rounded-xl bg-slate-50 border border-border pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+                />
+                <DollarSign className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
+              </div>
+              <div className="flex rounded-xl bg-slate-50 border border-border overflow-hidden shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setCurrency("USD")}
+                  className={cn(
+                    "px-3.5 text-sm font-semibold transition",
+                    currency === "USD"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-slate-500 hover:text-slate-700",
+                  )}
+                >
+                  $
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrency("IQD")}
+                  className={cn(
+                    "px-3.5 text-sm font-semibold transition",
+                    currency === "IQD"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-slate-500 hover:text-slate-700",
+                  )}
+                >
+                  {ar ? "د.ع" : "IQD"}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Stock */}
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+              {ar ? "الكمية المتوفرة" : "Available quantity"}
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                value={stock}
+                onChange={(e) => setStock(e.target.value)}
+                placeholder="0"
+                dir="ltr"
+                className="w-full h-12 rounded-xl bg-slate-50 border border-border pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+              />
+              <Layers className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
+            </div>
+          </div>
+
+          {/* Product images */}
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+              {ar ? "صور المنتج" : "Product images"}
+            </label>
+
+            {/* Existing images (editing) */}
+            {editing && editing.images.length > 0 && (
+              <div className="flex gap-2 flex-wrap mb-3">
+                {editing.images.map((path, idx) => (
+                  <div
+                    key={path}
+                    className="relative size-16 rounded-xl bg-slate-50 border border-border overflow-hidden group"
+                  >
+                    {editUrlMap[path] ? (
+                      <img src={editUrlMap[path]} alt="" className="size-full object-cover" />
+                    ) : (
+                      <div className="size-full flex items-center justify-center">
+                        <Package className="size-5 text-slate-300" />
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeExistingImage(path)}
+                      className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition"
+                    >
+                      <Trash2 className="size-4 text-white" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* New image upload zone */}
+            {imageFiles.length + (editing?.images.length ?? 0) < MAX_PRODUCT_IMAGES && (
+              <label className="w-full h-32 rounded-xl border-2 border-dashed border-border bg-slate-50 flex flex-col items-center justify-center gap-1.5 cursor-pointer hover:border-primary/40 hover:bg-sky-50/30 transition group">
+                <Upload className="size-6 text-slate-400 group-hover:text-primary transition" />
+                <p className="text-xs text-slate-400 group-hover:text-primary transition font-medium">
+                  {ar ? "اضغط لرفع صورة المنتج" : "Tap to upload product image"}
+                </p>
+                <p className="text-[10px] text-slate-300">
+                  {imageFiles.length}/{MAX_PRODUCT_IMAGES} · JPG, PNG
+                </p>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => handleFiles(e.target.files)}
+                />
+              </label>
+            )}
+
+            {/* Image previews */}
+            {imagePreviews.length > 0 && (
+              <div className="flex gap-2 flex-wrap mt-3">
+                {imagePreviews.map((url, idx) => (
+                  <div
+                    key={idx}
+                    className="relative size-16 rounded-xl bg-slate-50 border border-border overflow-hidden shadow-sm"
+                  >
+                    <img src={url} alt="" className="size-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => removePreview(idx)}
+                      className="absolute top-0.5 end-0.5 size-5 rounded-full bg-black/60 text-white flex items-center justify-center"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Error message */}
+          {formError && (
+            <p className="text-sm text-rose-600 bg-rose-50 rounded-xl px-4 py-2.5 text-center font-semibold">
+              {formError}
+            </p>
+          )}
+
+          {/* Submit */}
+          <button
+            type="button"
+            onClick={submit}
+            disabled={busy}
+            className={cn(
+              "w-full h-14 rounded-2xl font-display font-bold flex items-center justify-center gap-2 transition shadow-card",
+              busy
+                ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                : "bg-primary text-primary-foreground hover:opacity-90",
+            )}
+          >
+            {busy ? <Loader2 className="size-5 animate-spin" /> : null}
+            {busy
+              ? ar
+                ? "جارٍ الحفظ..."
+                : "Saving..."
+              : editing
+                ? ar
+                  ? "حفظ التعديلات"
+                  : "Save changes"
+                : ar
+                  ? "إضافة المنتج"
+                  : "Add product"}
+          </button>
+        </div>
+      )}
+
+      {/* Product list */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="size-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : myProducts.length === 0 ? (
+        <div className="py-20 flex flex-col items-center text-center text-muted-foreground">
+          <Package className="size-14 mb-4 opacity-20" />
+          <p className="font-display font-bold text-lg text-slate-400">
+            {ar ? "لا توجد منتجات بعد" : "No products yet"}
+          </p>
+          <p className="text-sm mt-1 max-w-xs text-slate-400">
+            {ar
+              ? "اضغط على زر 'إضافة منتج جديد' لإضافة أول منتج لك"
+              : "Tap 'Add new product' to add your first product"}
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          {myProducts.map((p) => {
+            const isOut = (p.stock ?? 0) === 0;
+            return (
+              <div
+                key={p.id}
+                className="bg-card border border-border rounded-2xl p-3.5 shadow-soft hover:shadow-card transition relative overflow-hidden group"
+              >
+                {/* Badge */}
+                {isOut && (
+                  <span className="absolute top-2.5 end-2.5 text-[10px] font-bold bg-rose-100 text-rose-600 px-2 py-0.5 rounded-full">
+                    {ar ? "نفد" : "Out"}
+                  </span>
+                )}
+
+                {/* Image or icon */}
+                {p.images.length > 0 && imageUrlMap[p.images[0]] ? (
+                  <div className="w-full aspect-[4/3] rounded-xl bg-slate-100 overflow-hidden mb-2.5">
+                    <img src={imageUrlMap[p.images[0]]} alt="" className="size-full object-cover" />
+                  </div>
+                ) : (
+                  <div className="size-10 rounded-xl bg-slate-100 flex items-center justify-center mb-2.5">
+                    <Package className="size-5 text-slate-400" />
+                  </div>
+                )}
+
+                {/* Product name */}
+                <p className="font-display font-bold text-sm leading-snug line-clamp-2">
+                  {ar ? p.ar || p.en : p.en || p.ar}
+                </p>
+
+                {/* Brand */}
+                {p.brand && (
+                  <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{p.brand}</p>
+                )}
+
+                {/* Price */}
+                <p className="mt-1.5 font-display font-extrabold text-lg text-primary">
+                  {fmtPrice(p)}
+                </p>
+
+                {/* Stock */}
+                <div className="flex items-center gap-1.5 mt-1.5">
+                  <Layers className="size-3 text-slate-400" />
+                  <span
+                    className={cn(
+                      "text-[11px] font-semibold",
+                      isOut ? "text-rose-500" : "text-emerald-600",
+                    )}
+                  >
+                    {ar ? "المخزون:" : "Stock:"} {p.stock ?? 0}
+                  </span>
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-1 mt-2.5 pt-2.5 border-t border-border">
+                  <button
+                    onClick={() => openEdit(p)}
+                    className="flex-1 h-8 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-sky-100 hover:text-sky-600 flex items-center justify-center gap-1 transition"
+                  >
+                    <Pencil className="size-3" />
+                    {ar ? "تعديل" : "Edit"}
+                  </button>
+                  <button
+                    onClick={() => handleDelete(p)}
+                    className="w-8 h-8 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-rose-100 hover:text-rose-600 flex items-center justify-center transition"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OffersPanel({ supplierId }: { supplierId: string }) {
+  const { lang } = useI18n();
+  const ar = lang === "ar";
+  const { data: offers = [], isLoading } = useOffers(supplierId);
+  const upsertOffer = useUpsertOffer();
+  const deleteOffer = useDeleteOffer();
+  const { user } = useUserRole();
+
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<Offer | null>(null);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [expiryDate, setExpiryDate] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [formError, setFormError] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const openAdd = () => {
+    setEditing(null);
+    setTitle("");
+    setDescription("");
+    setExpiryDate("");
+    setImageFile(null);
+    setImagePreview("");
+    setFormError("");
+    setShowForm(true);
+  };
+
+  const handleFile = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
+  const submit = async () => {
+    setFormError("");
+    if (!title.trim()) {
+      setFormError(ar ? "الرجاء إدخال عنوان العرض" : "Please enter an offer title");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const offerId = editing?.id ?? crypto.randomUUID();
+      let imageUrl = editing?.imageUrl ?? "";
+
+      if (imageFile) {
+        try {
+          const path = await uploadProductImage(offerId, imageFile);
+          imageUrl = path;
+        } catch (uploadErr: any) {
+          alert(
+            ar
+              ? `فشل رفع الصورة: ${uploadErr.message || uploadErr}`
+              : `Image upload failed: ${uploadErr.message || uploadErr}`,
+          );
+          setBusy(false);
+          return;
+        }
+      }
+
+      await upsertOffer.mutateAsync({
+        id: offerId,
+        supplierId,
+        title: title.trim(),
+        description: description.trim(),
+        imageUrl,
+        expiryDate,
+      });
+
+      setShowForm(false);
+    } catch (e: any) {
+      alert(ar ? `فشل حفظ العرض: ${e.message || e}` : `Failed to save offer: ${e.message || e}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDelete = async (offer: Offer) => {
+    if (!confirm(ar ? "حذف هذا العرض؟" : "Delete this offer?")) return;
+    await deleteOffer.mutateAsync(offer.id);
+  };
+
+  const allPaths = offers.filter((o) => o.imageUrl).map((o) => o.imageUrl);
+  const { data: urlMap = {} } = useSignedImageUrls(allPaths);
+
+  return (
+    <>
+      {!showForm && (
+        <button
+          onClick={openAdd}
+          className="w-full h-14 rounded-2xl bg-primary text-primary-foreground font-display font-bold flex items-center justify-center gap-2 hover:opacity-90 transition shadow-card"
+        >
+          <Plus className="size-5" />
+          <Megaphone className="size-5" />
+          {ar ? "إضافة عرض / إعلان" : "Add Offer / Ad"}
+        </button>
+      )}
+
+      {showForm && (
+        <div className="bg-card border border-border rounded-3xl p-5 shadow-card space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="font-display font-bold text-lg">
+              {editing ? (ar ? "تعديل عرض" : "Edit offer") : ar ? "عرض جديد" : "New offer"}
+            </h3>
+            <button
+              onClick={() => setShowForm(false)}
+              className="size-9 rounded-xl bg-muted hover:bg-slate-200 flex items-center justify-center transition"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+              {ar ? "العنوان" : "Title"}
+            </label>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder={ar ? "مثال: خصم 20% على الكومبوزيت" : "e.g. 20% off composites"}
+              className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+              {ar ? "الوصف" : "Description"}
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder={ar ? "تفاصيل العرض..." : "Offer details..."}
+              rows={3}
+              className="w-full rounded-xl bg-slate-50 border border-border px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition resize-none"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+              {ar ? "تاريخ الانتهاء" : "Expiry date"}
+            </label>
+            <div className="relative">
+              <input
+                type="date"
+                value={expiryDate}
+                onChange={(e) => setExpiryDate(e.target.value)}
+                className="w-full h-12 rounded-xl bg-slate-50 border border-border pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+              />
+              <Calendar className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+              {ar ? "صورة العرض" : "Offer image"}
+            </label>
+            {imagePreview ? (
+              <div className="relative w-full h-40 rounded-xl bg-slate-50 border border-border overflow-hidden">
+                <img src={imagePreview} alt="" className="size-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setImageFile(null);
+                    setImagePreview("");
+                  }}
+                  className="absolute top-2 end-2 size-7 rounded-full bg-black/60 text-white flex items-center justify-center"
+                >
+                  <X className="size-3.5" />
+                </button>
+              </div>
+            ) : editing?.imageUrl ? (
+              <div className="relative w-full h-40 rounded-xl bg-slate-50 border border-border overflow-hidden">
+                {urlMap[editing.imageUrl] ? (
+                  <img src={urlMap[editing.imageUrl]} alt="" className="size-full object-cover" />
+                ) : (
+                  <div className="size-full flex items-center justify-center">
+                    <ImageOff className="size-8 text-slate-300" />
+                  </div>
+                )}
+              </div>
+            ) : (
+              <label className="w-full h-32 rounded-xl border-2 border-dashed border-border bg-slate-50 flex flex-col items-center justify-center gap-1.5 cursor-pointer hover:border-primary/40 hover:bg-sky-50/30 transition group">
+                <Upload className="size-6 text-slate-400 group-hover:text-primary transition" />
+                <p className="text-xs text-slate-400 group-hover:text-primary transition font-medium">
+                  {ar ? "اضغط لرفع صورة" : "Tap to upload image"}
+                </p>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={(e) => handleFile(e.target.files)}
+                />
+              </label>
+            )}
+          </div>
+
+          {formError && (
+            <p className="text-sm text-rose-600 bg-rose-50 rounded-xl px-4 py-2.5 text-center font-semibold">
+              {formError}
+            </p>
+          )}
+
+          <button
+            type="button"
+            onClick={submit}
+            disabled={busy}
+            className={cn(
+              "w-full h-14 rounded-2xl font-display font-bold flex items-center justify-center gap-2 transition shadow-card",
+              busy
+                ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                : "bg-primary text-primary-foreground hover:opacity-90",
+            )}
+          >
+            {busy ? <Loader2 className="size-5 animate-spin" /> : null}
+            {busy
+              ? ar
+                ? "جارٍ الحفظ..."
+                : "Saving..."
+              : editing
+                ? ar
+                  ? "حفظ التعديلات"
+                  : "Save changes"
+                : ar
+                  ? "إضافة العرض"
+                  : "Add offer"}
+          </button>
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="size-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : offers.length === 0 ? (
+        <div className="py-20 flex flex-col items-center text-center text-muted-foreground">
+          <Megaphone className="size-14 mb-4 opacity-20" />
+          <p className="font-display font-bold text-lg text-slate-400">
+            {ar ? "لا توجد عروض بعد" : "No offers yet"}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {offers.map((offer) => (
+            <div
+              key={offer.id}
+              className="bg-card border border-border rounded-2xl p-3.5 shadow-soft"
+            >
+              <div className="flex gap-3">
+                <div className="size-16 rounded-xl bg-slate-100 overflow-hidden shrink-0">
+                  {offer.imageUrl && urlMap[offer.imageUrl] ? (
+                    <img src={urlMap[offer.imageUrl]} alt="" className="size-full object-cover" />
+                  ) : (
+                    <div className="size-full flex items-center justify-center">
+                      <Megaphone className="size-6 text-slate-300" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-display font-bold text-sm">{offer.title}</p>
+                  {offer.description && (
+                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                      {offer.description}
+                    </p>
+                  )}
+                  {offer.expiryDate && (
+                    <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
+                      <Calendar className="size-3" />
+                      {ar ? "ينتهي:" : "Expires:"} {offer.expiryDate}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-1 mt-2.5 pt-2.5 border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => handleDelete(offer)}
+                  className="flex-1 h-8 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-rose-100 hover:text-rose-600 flex items-center justify-center gap-1 transition"
+                >
+                  <Trash2 className="size-3" />
+                  {ar ? "حذف" : "Delete"}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+function OrdersPanel() {
+  const { lang } = useI18n();
+  const ar = lang === "ar";
+  return (
+    <div className="py-20 flex flex-col items-center text-center text-muted-foreground">
+      <ClipboardList className="size-14 mb-4 opacity-20" />
+      <p className="font-display font-bold text-lg text-slate-400">
+        {ar ? "لا توجد طلبات بعد" : "No orders yet"}
+      </p>
+      <p className="text-sm mt-1 max-w-xs text-slate-400">
+        {ar ? "ستظهر الطلبات هنا عند استلامها" : "Orders will appear here when received"}
+      </p>
+    </div>
+  );
+}
+
+function ImplantDashboard() {
+  const { lang, toggle } = useI18n();
+  const ar = lang === "ar";
+  const { role } = useUserRole();
+  const companyId = auth.currentUser?.uid ?? role?.userId ?? "";
+  const [activeTab, setActiveTab] = useState<"products" | "offers" | "orders">("products");
+
+  const mapsUrl = getMapsUrl(role ?? {});
+
+  return (
+    <MobileShell hideBottomNav>
+      {/* Header — mirrors SupplyDashboard layout */}
+      <div className="px-4 pt-4 pb-2">
+        <div className="flex items-center justify-between">
+          <Link
+            to="/account"
+            className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition"
+          >
+            <div className="size-12 rounded-full bg-primary/10 ring-2 ring-primary/20 flex items-center justify-center overflow-hidden">
+              <UserCircle2 className="size-7 text-primary" />
+            </div>
+            <div>
+              <p className="font-display font-bold text-sm text-foreground">
+                {role?.name || (ar ? "المستخدم" : "User")}
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                {ar ? "شركة زرعات" : "Implant Company"}
+              </p>
+              <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                <Phone className="size-3 shrink-0" />
+                {role?.phone || (ar ? "لم يتم إضافة رقم هاتف" : "No phone number added")}
+              </p>
+            </div>
+          </Link>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={toggle}
+              className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-sky-100 hover:text-sky-600 text-xs font-bold transition"
+            >
+              {lang === "ar" ? "EN" : "AR"}
+            </button>
+            <button
+              type="button"
+              onClick={() => auth.signOut()}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-rose-100 hover:text-rose-600 text-xs font-semibold transition"
+            >
+              <LogOut className="size-4" />
+              {ar ? "خروج" : "Logout"}
+            </button>
+          </div>
+        </div>
+        {role &&
+        (role.latitude != null || role.longitude != null || role.mapUrl || role.address) ? (
+          <a
+            href={mapsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="text-[11px] text-muted-foreground flex items-center gap-1 mt-1 hover:text-primary transition-colors cursor-pointer z-50 pointer-events-auto"
+          >
+            <MapPin className="size-3 shrink-0" />
+            {role?.address || (ar ? "عرض الموقع على الخريطة" : "View on map")}
+          </a>
+        ) : (
+          <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-1">
+            <MapPin className="size-3 shrink-0" />
+            {ar ? "لم يتم تحديد العنوان بعد" : "No address set yet"}
+          </p>
+        )}
+      </div>
+
+      {/* Dashboard title — mirrored from supplies */}
+      <div className="px-4 pb-1">
+        <h2 className="font-display font-extrabold text-lg text-foreground/90">
+          {ar ? "لوحة تحكم شركة الزرعات" : "Implant Company Dashboard"}
+        </h2>
+      </div>
+
+      {/* Tabs — mirror SupplyDashboard exactly */}
+      <div className="px-4">
+        <div className="flex bg-slate-100 rounded-2xl p-1 mt-2">
+          {[
+            { key: "products" as const, ar: "المنتجات", en: "Products", icon: Package },
+            { key: "offers" as const, ar: "العروض", en: "Offers", icon: Megaphone },
+            { key: "orders" as const, ar: "الطلبات", en: "Orders", icon: ClipboardList },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className={cn(
+                "flex-1 h-11 rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 transition-all",
+                activeTab === tab.key
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700",
+              )}
+            >
+              <tab.icon className="size-4" />
+              {ar ? tab.ar : tab.en}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Tab content */}
+      <div className="px-4 pt-4 pb-6">
+        {activeTab === "products" && <ImplantProductsPanel />}
+        {activeTab === "offers" && <OffersPanel supplierId={companyId} />}
+        {activeTab === "orders" && <OrdersPanel />}
+      </div>
+    </MobileShell>
+  );
+}
+
+function ImplantProductsPanel() {
+  const { lang } = useI18n();
+  const ar = lang === "ar";
+  const { data: allProducts = [], isLoading } = useProducts();
+  const upsert = useUpsertProduct();
+  const remove = useDeleteProduct();
+
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<Product | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [formError, setFormError] = useState("");
+
+  const [nameAr, setNameAr] = useState("");
+  const [nameEn, setNameEn] = useState("");
+  const [brand, setBrand] = useState("");
+  const [materialGrade, setMaterialGrade] = useState("");
+  const [surfaceTreatment, setSurfaceTreatment] = useState("");
+  const [diametersStr, setDiametersStr] = useState("");
+  const [lengthsStr, setLengthsStr] = useState("");
+  const [connectionType, setConnectionType] = useState("Internal Hex");
+  const [recommendedTorque, setRecommendedTorque] = useState("");
+  const [kitType, setKitType] = useState<"implant" | "surgical_kit">("implant");
+  const [country, setCountry] = useState("KR");
+  const [implantType, setImplantType] = useState<"immediate" | "non-immediate">("immediate");
+  const [price, setPrice] = useState("");
+  const [catalogUrl, setCatalogUrl] = useState("");
+  const [certificationsStr, setCertificationsStr] = useState("");
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+
+  const implantProducts = allProducts.filter(
+    (p) => p.category === "implant" && p.companyId === auth.currentUser?.uid,
+  );
+
+  const connectionOptions = ["Internal Hex", "Conical Connection", "External Hex", "Morse Taper"];
+
+  const countryOptions = [
+    { value: "KR", ar: "كورية", en: "Korean" },
+    { value: "CH", ar: "سويسرية", en: "Swiss" },
+    { value: "DE", ar: "ألمانية", en: "German" },
+    { value: "IT", ar: "إيطالية", en: "Italian" },
+  ];
+
+  const clearForm = () => {
+    setEditing(null);
+    setNameAr("");
+    setNameEn("");
+    setBrand("");
+    setPrice("");
+    setMaterialGrade("");
+    setSurfaceTreatment("");
+    setDiametersStr("");
+    setLengthsStr("");
+    setConnectionType("Internal Hex");
+    setRecommendedTorque("");
+    setKitType("implant");
+    setCountry("KR");
+    setImplantType("immediate");
+    setCatalogUrl("");
+    setCertificationsStr("");
+    setImageFiles([]);
+    setImagePreviews([]);
+    setFormError("");
+  };
+
+  const openAdd = () => {
+    clearForm();
+    setShowForm(true);
+  };
+
+  const openEdit = (p: Product) => {
+    setEditing(p);
+    setNameAr(p.ar);
+    setNameEn(p.en);
+    setBrand(p.brand);
+    setPrice(p.price ? String(p.price) : "");
+    setMaterialGrade(p.implantSpec?.materialGrade ?? "");
+    setSurfaceTreatment(p.implantSpec?.surfaceTreatment ?? "");
+    setDiametersStr((p.implantSpec?.diameters ?? []).join(", "));
+    setLengthsStr((p.implantSpec?.lengths ?? []).join(", "));
+    setConnectionType(p.implantSpec?.connectionType ?? "Internal Hex");
+    setRecommendedTorque(p.implantSpec?.recommendedTorque ?? "");
+    setKitType(p.implantSpec?.kitType ?? "implant");
+    setCountry(p.country || p.implantSpec?.country || "KR");
+    setImplantType(p.implantSpec?.implantType ?? "immediate");
+    setCatalogUrl(p.implantSpec?.catalogUrl ?? "");
+    setCertificationsStr((p.implantSpec?.certifications ?? []).join(", "));
+    setImageFiles([]);
+    setImagePreviews([]);
+    setFormError("");
+    setShowForm(true);
+  };
+
+  const handleFiles = (files: FileList | null) => {
+    if (!files) return;
+    const incoming = Array.from(files).slice(0, MAX_PRODUCT_IMAGES - imageFiles.length);
+    if (incoming.length === 0) return;
+    setImageFiles((prev) => [...prev, ...incoming]);
+    setImagePreviews((prev) => [...prev, ...incoming.map((f) => URL.createObjectURL(f))]);
+  };
+
+  const removePreview = (idx: number) => {
+    setImageFiles((prev) => prev.filter((_, i) => i !== idx));
+    setImagePreviews((prev) => {
+      URL.revokeObjectURL(prev[idx]);
+      return prev.filter((_, i) => i !== idx);
+    });
+  };
+
+  const removeExistingImage = async (path: string) => {
+    if (!editing) return;
+    await removeProductImage(path);
+    setEditing({ ...editing, images: editing.images.filter((img) => img !== path) });
+  };
+
+  const parseNumbers = (str: string): number[] =>
+    str
+      .split(/[,،\s]+/)
+      .map((s) => parseFloat(s.trim()))
+      .filter((n) => !isNaN(n) && n > 0);
+
+  const submit = async () => {
+    setFormError("");
+    if (!nameAr.trim() || !brand.trim()) {
+      setFormError(
+        ar ? "الرجاء إدخال اسم المنتج والعلامة التجارية" : "Please enter product name and brand",
+      );
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const productId = editing?.id ?? crypto.randomUUID();
+
+      const uploadedPaths: string[] = [];
+      for (const file of imageFiles) {
+        try {
+          uploadedPaths.push(await uploadProductImage(productId, file));
+        } catch {
+          setBusy(false);
+          return;
+        }
+      }
+
+      await upsert.mutateAsync({
+        id: productId,
+        branch: "implant",
+        ar: nameAr.trim(),
+        en: nameEn.trim() || nameAr.trim(),
+        brand: brand.trim(),
+        price: Math.max(0, parseFloat(price) || 0),
+        currency: "USD",
+        stock: 1,
+        inStock: true,
+        images: [...(editing?.images ?? []), ...uploadedPaths],
+        category: "implant",
+        country,
+        companyId: auth.currentUser?.uid ?? editing?.companyId ?? "",
+        implantSpec: {
+          materialGrade: materialGrade.trim() || undefined,
+          surfaceTreatment: surfaceTreatment.trim() || undefined,
+          diameters: parseNumbers(diametersStr),
+          lengths: parseNumbers(lengthsStr),
+          connectionType: connectionType.trim() || undefined,
+          recommendedTorque: recommendedTorque.trim() || undefined,
+          kitType,
+          implantType,
+          country,
+          catalogUrl: catalogUrl.trim() || undefined,
+          certifications: certificationsStr
+            .split(/[,،\n]+/)
+            .map((s) => s.trim())
+            .filter(Boolean),
+        },
+      });
+
+      setShowForm(false);
+    } catch (e: any) {
+      setFormError(e?.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDelete = async (p: Product) => {
+    if (!confirm(ar ? "حذف هذا المنتج؟" : "Delete this product?")) return;
+    await remove.mutateAsync(p.id);
+  };
+
+  const implantPaths = implantProducts.flatMap((p) => p.images);
+  const { data: imageUrlMap = {} } = useSignedImageUrls(implantPaths);
+  const editingPaths = editing?.images ?? [];
+  const { data: editUrlMap = {} } = useSignedImageUrls(editingPaths);
+
+  return (
+    <>
+      {/* Add button */}
+      {!showForm && (
+        <button
+          onClick={openAdd}
+          className="w-full h-14 rounded-2xl bg-primary text-primary-foreground font-display font-bold flex items-center justify-center gap-2 hover:opacity-90 transition shadow-card mb-4"
+        >
+          <Plus className="size-5" />
+          {ar ? "إضافة منتج زرعات جديد" : "Add new implant product"}
+        </button>
+      )}
+
+      {/* Modal form */}
+      <Dialog open={showForm} onOpenChange={setShowForm}>
+        <DialogContent className="max-w-lg max-h-[90svh] overflow-y-auto rounded-3xl p-5 sm:rounded-3xl [&>button]:hidden">
+          <DialogHeader className="p-0">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="font-display font-bold text-lg">
+                {editing
+                  ? ar
+                    ? "تعديل منتج"
+                    : "Edit product"
+                  : ar
+                    ? "منتج زرعات جديد"
+                    : "New implant product"}
+              </DialogTitle>
+              <button
+                onClick={() => setShowForm(false)}
+                className="size-9 rounded-xl bg-muted hover:bg-slate-200 flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+            <DialogDescription className="sr-only">
+              {editing
+                ? ar
+                  ? "تعديل تفاصيل المنتج"
+                  : "Edit product details"
+                : ar
+                  ? "إضافة زرعة جديدة"
+                  : "إضافة زرعة جديدة"}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+              {ar ? "اسم المنتج (عربي)" : "Product name (Arabic)"}
+            </label>
+            <input
+              value={nameAr}
+              onChange={(e) => setNameAr(e.target.value)}
+              placeholder={ar ? "مثال: AnyRidge" : "e.g. AnyRidge"}
+              className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+              {ar ? "اسم المنتج (انكليزي)" : "Product name (English)"}
+            </label>
+            <input
+              value={nameEn}
+              onChange={(e) => setNameEn(e.target.value)}
+              placeholder="Optional"
+              className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+              {ar ? "العلامة التجارية" : "Brand"}
+            </label>
+            <input
+              value={brand}
+              onChange={(e) => setBrand(e.target.value)}
+              placeholder={ar ? "مثال: MegaGen" : "e.g. MegaGen"}
+              className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+              {ar ? "السعر الابتدائي (دولار)" : "Starting price (USD)"}
+            </label>
+            <input
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="0.00"
+              dir="ltr"
+              className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+              {ar ? "نوع المنتج" : "Product type"}
+            </label>
+            <div className="flex gap-2">
+              {(["implant", "surgical_kit"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setKitType(t)}
+                  className={cn(
+                    "flex-1 h-11 rounded-xl text-sm font-semibold border-2 transition-all duration-300",
+                    kitType === t
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-transparent bg-slate-50 text-slate-500 hover:bg-slate-100",
+                  )}
+                >
+                  {t === "implant"
+                    ? ar
+                      ? "زرعة"
+                      : "Implant"
+                    : ar
+                      ? "حقيبة جراحية"
+                      : "Surgical Kit"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+              {ar ? "درجة المادة" : "Material grade"}
+            </label>
+            <input
+              value={materialGrade}
+              onChange={(e) => setMaterialGrade(e.target.value)}
+              placeholder={ar ? "مثال: Titanium Grade 5" : "e.g. Titanium Grade 5"}
+              className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+              {ar ? "معالجة السطح" : "Surface treatment"}
+            </label>
+            <input
+              value={surfaceTreatment}
+              onChange={(e) => setSurfaceTreatment(e.target.value)}
+              placeholder={ar ? "مثال: SLA" : "e.g. SLA Surface"}
+              className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+              {ar ? "نوع الاتصال" : "Connection type"}
+            </label>
+            <select
+              value={connectionType}
+              onChange={(e) => setConnectionType(e.target.value)}
+              className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+            >
+              {connectionOptions.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+              {ar ? "بلد الصنع" : "Manufacturing country"}
+            </label>
+            <select
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+              className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+            >
+              {countryOptions.map((c) => (
+                <option key={c.value} value={c.value}>
+                  {ar ? c.ar : c.en} ({c.value})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+              {ar ? "التصنيف" : "Classification"}
+            </label>
+            <div className="flex gap-2">
+              {(
+                [
+                  { value: "immediate" as const, ar: "فورية", en: "Immediate" },
+                  { value: "non-immediate" as const, ar: "غير فورية", en: "Non-immediate" },
+                ] as const
+              ).map((t) => (
+                <button
+                  key={t.value}
+                  type="button"
+                  onClick={() => setImplantType(t.value)}
+                  className={cn(
+                    "flex-1 h-11 rounded-xl text-sm font-semibold border-2 transition-all duration-300",
+                    implantType === t.value
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-transparent bg-slate-50 text-slate-500 hover:bg-slate-100",
+                  )}
+                >
+                  {ar ? t.ar : t.en}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+                {ar ? "الأقطار (مم)" : "Diameters (mm)"}
+              </label>
+              <input
+                value={diametersStr}
+                onChange={(e) => setDiametersStr(e.target.value)}
+                placeholder="3.5, 4.0, 4.5"
+                dir="ltr"
+                className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+                {ar ? "الأطوال (مم)" : "Lengths (mm)"}
+              </label>
+              <input
+                value={lengthsStr}
+                onChange={(e) => setLengthsStr(e.target.value)}
+                placeholder="8.5, 10, 11.5"
+                dir="ltr"
+                className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+              />
+            </div>
+          </div>
+
+          {kitType === "surgical_kit" && (
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+                {ar ? "عزم الدوران الموصى به" : "Recommended torque"}
+              </label>
+              <input
+                value={recommendedTorque}
+                onChange={(e) => setRecommendedTorque(e.target.value)}
+                placeholder={ar ? "مثال: 35-45 Ncm" : "e.g. 35-45 Ncm"}
+                dir="ltr"
+                className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+              />
+            </div>
+          )}
+
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+              {ar ? "رابط الكتالوج" : "Catalog URL"}
+            </label>
+            <input
+              value={catalogUrl}
+              onChange={(e) => setCatalogUrl(e.target.value)}
+              placeholder="https://..."
+              dir="ltr"
+              className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+              {ar ? "الشهادات (ISO/FDA)" : "Certifications (ISO/FDA)"}
+            </label>
+            <input
+              value={certificationsStr}
+              onChange={(e) => setCertificationsStr(e.target.value)}
+              placeholder={ar ? "مثال: ISO 13485, FDA" : "e.g. ISO 13485, FDA"}
+              className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+            />
+          </div>
+
+          {/* Images */}
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+              {ar ? "صور المنتج" : "Product images"}
+            </label>
+            {editing && editing.images.length > 0 && (
+              <div className="flex gap-2 flex-wrap mb-3">
+                {editing.images.map((path) => (
+                  <div
+                    key={path}
+                    className="relative size-16 rounded-xl bg-slate-50 border border-border overflow-hidden group"
+                  >
+                    {editUrlMap[path] ? (
+                      <img src={editUrlMap[path]} alt="" className="size-full object-cover" />
+                    ) : (
+                      <div className="size-full flex items-center justify-center">
+                        <Package className="size-5 text-slate-300" />
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeExistingImage(path)}
+                      className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition"
+                    >
+                      <Trash2 className="size-4 text-white" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {imageFiles.length + (editing?.images.length ?? 0) < MAX_PRODUCT_IMAGES && (
+              <label className="w-full h-32 rounded-xl border-2 border-dashed border-border bg-slate-50 flex flex-col items-center justify-center gap-1.5 cursor-pointer hover:border-primary/40 hover:bg-sky-50/30 transition group">
+                <Upload className="size-6 text-slate-400 group-hover:text-primary transition" />
+                <p className="text-xs text-slate-400 group-hover:text-primary transition font-medium">
+                  {ar ? "اضغط لرفع صورة" : "Tap to upload image"}
+                </p>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => handleFiles(e.target.files)}
+                />
+              </label>
+            )}
+            {imagePreviews.length > 0 && (
+              <div className="flex gap-2 flex-wrap mt-3">
+                {imagePreviews.map((url, idx) => (
+                  <div
+                    key={idx}
+                    className="relative size-16 rounded-xl bg-slate-50 border border-border overflow-hidden shadow-sm"
+                  >
+                    <img src={url} alt="" className="size-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => removePreview(idx)}
+                      className="absolute top-0.5 end-0.5 size-5 rounded-full bg-black/60 text-white flex items-center justify-center"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {formError && (
+            <p className="text-sm text-rose-600 bg-rose-50 rounded-xl px-4 py-2.5 text-center font-semibold">
+              {formError}
+            </p>
+          )}
+
+          <button
+            type="button"
+            onClick={submit}
+            disabled={busy}
+            className={cn(
+              "w-full h-14 rounded-2xl font-display font-bold flex items-center justify-center gap-2 transition shadow-card",
+              busy
+                ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                : "bg-primary text-primary-foreground hover:opacity-90",
+            )}
+          >
+            {busy ? <Loader2 className="size-5 animate-spin" /> : null}
+            {busy
+              ? ar
+                ? "جارٍ الحفظ..."
+                : "Saving..."
+              : editing
+                ? ar
+                  ? "حفظ التعديلات"
+                  : "Save changes"
+                : ar
+                  ? "إضافة المنتج"
+                  : "Add product"}
+          </button>
+        </DialogContent>
+      </Dialog>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="size-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : implantProducts.length === 0 && !showForm ? (
+        <div className="py-20 flex flex-col items-center text-center text-muted-foreground">
+          <Package className="size-14 mb-4 opacity-20" />
+          <p className="font-display font-bold text-lg text-slate-400">
+            {ar ? "لا توجد منتجات زرعات بعد" : "No implant products yet"}
+          </p>
+          <p className="text-sm mt-1 max-w-xs text-slate-400">
+            {ar
+              ? "اضغط على 'إضافة منتج' لإضافة أول منتج زرعات"
+              : "Tap 'Add new implant product' to add your first product"}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {implantProducts.map((p) => {
+            const spec = p.implantSpec;
+            const isKit = spec?.kitType === "surgical_kit";
+            const imgUrl =
+              p.images.length > 0 && imageUrlMap[p.images[0]] ? imageUrlMap[p.images[0]] : null;
+            const diams = spec?.diameters ?? [];
+            const lens = spec?.lengths ?? [];
+            const countryLabel = countryOptions.find(
+              (c) => c.value === (p.country || spec?.country),
+            );
+            return (
+              <div
+                key={p.id}
+                className="bg-card border border-border rounded-2xl p-4 shadow-soft space-y-3"
+              >
+                <div className="flex gap-3">
+                  <div className="size-14 rounded-xl bg-slate-100 overflow-hidden shrink-0 flex items-center justify-center">
+                    {imgUrl ? (
+                      <img src={imgUrl} alt="" className="size-full object-cover" />
+                    ) : (
+                      <Package className="size-6 text-slate-400" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-display font-bold text-sm">
+                      {ar ? p.ar || p.en : p.en || p.ar}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{p.brand}</p>
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      {countryLabel && (
+                        <span className="inline-block text-[10px] font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+                          {ar ? countryLabel.ar : countryLabel.en}
+                        </span>
+                      )}
+                      {spec?.implantType && (
+                        <span
+                          className={cn(
+                            "inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full",
+                            spec.implantType === "immediate"
+                              ? "bg-[oklch(0.93_0.06_30)] text-[oklch(0.5_0.18_30)]"
+                              : "bg-[oklch(0.93_0.06_250)] text-[oklch(0.45_0.18_256)]",
+                          )}
+                        >
+                          {spec.implantType === "immediate"
+                            ? ar
+                              ? "فورية"
+                              : "Immediate"
+                            : ar
+                              ? "غير فورية"
+                              : "Non-immediate"}
+                        </span>
+                      )}
+                      {isKit && (
+                        <span className="inline-block text-[10px] font-semibold bg-violet-50 text-violet-700 px-2 py-0.5 rounded-full">
+                          {ar ? "حقيبة جراحية" : "Surgical Kit"}
+                        </span>
+                      )}
+                      {spec?.connectionType && !isKit && (
+                        <span className="inline-block text-[10px] font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+                          {spec.connectionType}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {(spec?.materialGrade || spec?.surfaceTreatment) && (
+                  <div className="flex gap-2 flex-wrap">
+                    {spec.materialGrade && (
+                      <span className="text-[10px] font-semibold bg-sky-50 text-sky-700 px-2.5 py-1 rounded-full border border-sky-200">
+                        {spec.materialGrade}
+                      </span>
+                    )}
+                    {spec.surfaceTreatment && (
+                      <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full border border-emerald-200">
+                        {spec.surfaceTreatment}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {(diams.length > 0 || lens.length > 0) && (
+                  <div className="grid grid-cols-2 gap-2 bg-slate-50 rounded-xl p-3 text-xs">
+                    {diams.length > 0 && (
+                      <div>
+                        <span className="font-bold text-muted-foreground">
+                          {ar ? "القطر:" : "Diameter:"}
+                        </span>
+                        <span className="text-foreground ml-1.5">{diams.join(", ")} mm</span>
+                      </div>
+                    )}
+                    {lens.length > 0 && (
+                      <div>
+                        <span className="font-bold text-muted-foreground">
+                          {ar ? "الطول:" : "Length:"}
+                        </span>
+                        <span className="text-foreground ml-1.5">{lens.join(", ")} mm</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {isKit && spec?.recommendedTorque && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs flex items-center gap-2">
+                    <Shield className="size-4 text-amber-600" />
+                    <span className="font-bold text-amber-800">
+                      {ar ? "عزم الدوران الموصى به:" : "Recommended torque:"}{" "}
+                      {spec.recommendedTorque}
+                    </span>
+                  </div>
+                )}
+
+                {(spec?.catalogUrl || spec?.certifications?.length) && (
+                  <div className="space-y-1.5 pt-1 border-t border-border">
+                    {spec?.catalogUrl && (
+                      <a
+                        href={spec.catalogUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 bg-sky-50 border border-sky-200 rounded-xl p-3 text-xs text-sky-700 font-semibold hover:bg-sky-100 transition"
+                      >
+                        <Download className="size-4" />
+                        {ar ? "تحميل الكتالوج الرسمي (PDF)" : "Download official catalog (PDF)"}
+                        <Link2 className="size-3 ml-auto" />
+                      </a>
+                    )}
+                    {spec?.certifications && spec.certifications.length > 0 && (
+                      <div className="flex gap-2 flex-wrap">
+                        <Shield className="size-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                        {spec.certifications.map((cert, idx) => (
+                          <span
+                            key={idx}
+                            className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full border border-emerald-200"
+                          >
+                            {cert}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {p.price > 0 && (
+                  <div className="flex items-center gap-1.5 pt-1">
+                    <DollarSign className="size-3.5 text-green-600" />
+                    <span className="text-sm font-bold text-green-700">${p.price.toFixed(2)}</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {ar ? "السعر الابتدائي" : "starting price"}
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex gap-1 pt-2 border-t border-border">
+                  <button
+                    onClick={() => openEdit(p)}
+                    className="flex-1 h-8 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-sky-100 hover:text-sky-600 flex items-center justify-center gap-1 transition"
+                  >
+                    <Pencil className="size-3" />
+                    {ar ? "تعديل" : "Edit"}
+                  </button>
+                  <button
+                    onClick={() => handleDelete(p)}
+                    className="w-8 h-8 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-rose-100 hover:text-rose-600 flex items-center justify-center transition"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
+}
+
+function BrowseSupplies() {
+  const { t, lang, dir } = useI18n();
+  const Chevron = dir === "rtl" ? ChevronLeft : ChevronRight;
+  const { offices: OFFICES, branches: BRANCHES } = useAdminStore();
+  const { data: PRODUCTS = [] } = useProducts();
+  const [q, setQ] = useState("");
+  const [sort, setSort] = useState<"default" | "rating" | "items">("default");
+  const [city, setCity] = useState<string>("all");
+
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    let list = OFFICES.filter((o) => {
+      if (city !== "all" && o.city.en.toLowerCase() !== city) return false;
+      if (!needle) return true;
+      return (
+        o.ar.toLowerCase().includes(needle) ||
+        o.en.toLowerCase().includes(needle) ||
+        o.area.ar.toLowerCase().includes(needle) ||
+        o.area.en.toLowerCase().includes(needle) ||
+        o.city.ar.toLowerCase().includes(needle) ||
+        o.city.en.toLowerCase().includes(needle)
+      );
+    });
+    if (sort === "rating") list = [...list].sort((a, b) => b.rating - a.rating);
+    if (sort === "items") list = [...list].sort((a, b) => b.itemsCount - a.itemsCount);
+    return list;
+  }, [q, sort, city]);
+
+  const chips: { key: typeof sort; ar: string; en: string }[] = [
+    { key: "default", ar: "الكل", en: "All" },
+    { key: "rating", ar: "الأعلى تقييماً", en: "Top rated" },
+    { key: "items", ar: "الأكثر تنوعاً", en: "Most items" },
+  ];
+
+  return (
+    <MobileShell>
+      <TopBar
+        title={t("supplies")}
+        showBack
+        showSearch
+        searchValue={q}
+        onSearchChange={setQ}
+        searchPlaceholder={lang === "ar" ? "ابحث عن مكتب أو منطقة…" : "Search office or area…"}
+      />
+      <div className="px-4 pt-4">
+        <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 mb-2">
+          <button
+            onClick={() => setCity("all")}
+            className={`shrink-0 h-8 px-3 rounded-full text-xs font-semibold border transition ${
+              city === "all"
+                ? "bg-foreground text-background border-foreground"
+                : "bg-card text-foreground border-border hover:bg-accent"
+            }`}
+          >
+            {lang === "ar" ? "كل المدن" : "All cities"}
+          </button>
+          {CITIES.map((c) => {
+            const active = city === c.en.toLowerCase();
+            return (
+              <button
+                key={c.id}
+                onClick={() => setCity(c.en.toLowerCase())}
+                className={`shrink-0 h-8 px-3 rounded-full text-xs font-semibold border transition ${
+                  active
+                    ? "bg-foreground text-background border-foreground"
+                    : "bg-card text-foreground border-border hover:bg-accent"
+                }`}
+              >
+                {lang === "ar" ? c.ar : c.en}
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 mb-1">
+          {chips.map((c) => (
+            <button
+              key={c.key}
+              onClick={() => setSort(c.key)}
+              className={`shrink-0 h-8 px-3 rounded-full text-xs font-semibold border transition ${
+                sort === c.key
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-card text-foreground border-border hover:bg-accent"
+              }`}
+            >
+              {lang === "ar" ? c.ar : c.en}
+            </button>
+          ))}
+        </div>
+        <h2 className="font-display font-bold text-base mb-3">
+          {lang === "ar" ? "فروع طب الأسنان" : "Dental specialties"}
+        </h2>
+        <ul className="grid grid-cols-2 gap-3 mb-6">
+          {BRANCHES.map((b) => {
+            const Badge = BRANCH_BADGE[b.slug] ?? Package;
+            const image = BRANCH_IMAGES[b.slug];
+            const count = PRODUCTS.filter((p) => p.branch === b.slug).length;
+            return (
+              <li key={b.slug}>
+                <Link
+                  to="/supplies/branch/$branchSlug"
+                  params={{ branchSlug: b.slug }}
+                  className="block bg-card border border-border rounded-2xl p-3 h-full shadow-soft hover:shadow-card transition relative overflow-hidden"
+                >
+                  <span className="absolute top-2.5 end-2.5 size-8 rounded-full bg-primary-soft text-primary flex items-center justify-center">
+                    <Badge className="size-4" />
+                  </span>
+                  <div className="h-24 flex items-center justify-center -mt-1 mb-1">
+                    {image ? (
+                      <img
+                        src={image}
+                        alt=""
+                        loading="lazy"
+                        width={1024}
+                        height={1024}
+                        className="h-24 w-auto object-contain"
+                      />
+                    ) : (
+                      <Badge className="size-10 text-primary" />
+                    )}
+                  </div>
+                  <p className="font-display font-bold text-sm leading-tight">
+                    {lang === "ar" ? b.ar : b.en}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    {count} {lang === "ar" ? "صنف" : "items"}
+                  </p>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+
+        <h2 className="font-display font-bold text-base mb-3">{t("offices_title")}</h2>
+        {filtered.length === 0 ? (
+          <div className="py-12 flex flex-col items-center text-center text-muted-foreground">
+            <SearchX className="size-8 mb-2" />
+            <p className="text-sm">{lang === "ar" ? "لا توجد نتائج" : "No results"}</p>
+          </div>
+        ) : (
+          <ul className="space-y-3">
+            {filtered.map((o) => (
+              <li key={o.id}>
+                <Link
+                  to="/supplies/$officeId"
+                  params={{ officeId: o.id }}
+                  className="flex items-center gap-3 bg-card border border-border rounded-2xl p-3.5 shadow-soft hover:shadow-card transition"
+                >
+                  <span className="size-12 rounded-2xl bg-primary-soft text-primary font-display font-extrabold flex items-center justify-center text-lg">
+                    {(lang === "ar" ? o.ar : o.en).slice(0, 1)}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-display font-bold text-foreground truncate">
+                      {lang === "ar" ? o.ar : o.en}
+                    </p>
+                    <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
+                      <span className="inline-flex items-center gap-1">
+                        <MapPin className="size-3" />
+                        {lang === "ar" ? o.area.ar : o.area.en}
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-amber-500">
+                        <Star className="size-3 fill-current" />
+                        <span className="font-semibold">{o.rating}</span>
+                      </span>
+                      <span>
+                        {o.itemsCount}+ {lang === "ar" ? "صنف" : "items"}
+                      </span>
+                    </div>
+                  </div>
+                  <Chevron className="size-4 text-muted-foreground" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </MobileShell>
+  );
+}
