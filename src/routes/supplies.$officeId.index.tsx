@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
@@ -17,6 +17,7 @@ import {
   AlignCenter,
   Baby,
   HeartPulse,
+  EyeOff,
 } from "lucide-react";
 import imgGeneral from "@/assets/branch-general.png";
 import imgOperative from "@/assets/branch-operative.png";
@@ -72,6 +73,11 @@ function OfficePage() {
   const { data: PRODUCTS = [] } = useProducts();
   const office = OFFICES.find((o) => o.id === officeId);
   const { t, lang } = useI18n();
+  const isVisitor = useRouterState({
+    select: (s) =>
+      s.location.state != null &&
+      (s.location.state as unknown as Record<string, unknown>)?.isVisitor === true,
+  });
   const [q, setQ] = useState("");
   const [branchFilter, setBranchFilter] = useState<string>("all");
   const [promos, setPromos] = useState<Promo[]>([]);
@@ -132,6 +138,14 @@ function OfficePage() {
         onSearchChange={setQ}
         searchPlaceholder={lang === "ar" ? "ابحث عن مادة أو فرع…" : "Search material or branch…"}
       />
+      {isVisitor && (
+        <div className="mx-4 mt-3 flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold rounded-xl px-4 py-2.5">
+          <EyeOff className="size-4 shrink-0" />
+          {lang === "ar"
+            ? "وضع القراءة فقط — لا يمكنك تعديل أو إضافة محتوى"
+            : "Read-only mode — you cannot edit or add content"}
+        </div>
+      )}
       <div className="px-4 pt-4">
         <p className="text-xs text-muted-foreground mb-3">
           {lang === "ar" ? office.area.ar : office.area.en}

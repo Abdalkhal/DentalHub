@@ -20,6 +20,7 @@ import { Route as MoreRouteImport } from './routes/more'
 import { Route as MessagesRouteImport } from './routes/messages'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as FinanceRouteImport } from './routes/finance'
+import { Route as ExploreRouteImport } from './routes/explore'
 import { Route as DoctorsRouteImport } from './routes/doctors'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as AuthRouteImport } from './routes/auth'
@@ -29,6 +30,8 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as SuppliesIndexRouteImport } from './routes/supplies.index'
 import { Route as LabsIndexRouteImport } from './routes/labs.index'
 import { Route as ImplantsIndexRouteImport } from './routes/implants.index'
+import { Route as ProfileAccountIdRouteImport } from './routes/profile.$accountId'
+import { Route as LabsExploreRouteImport } from './routes/labs.explore'
 import { Route as LabsDashboardRouteImport } from './routes/labs.dashboard'
 import { Route as LabsCasesRouteImport } from './routes/labs.cases'
 import { Route as LabsLabIdRouteImport } from './routes/labs.$labId'
@@ -98,6 +101,11 @@ const FinanceRoute = FinanceRouteImport.update({
   path: '/finance',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ExploreRoute = ExploreRouteImport.update({
+  id: '/explore',
+  path: '/explore',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DoctorsRoute = DoctorsRouteImport.update({
   id: '/doctors',
   path: '/doctors',
@@ -141,6 +149,16 @@ const LabsIndexRoute = LabsIndexRouteImport.update({
 const ImplantsIndexRoute = ImplantsIndexRouteImport.update({
   id: '/implants/',
   path: '/implants/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileAccountIdRoute = ProfileAccountIdRouteImport.update({
+  id: '/profile/$accountId',
+  path: '/profile/$accountId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LabsExploreRoute = LabsExploreRouteImport.update({
+  id: '/labs/explore',
+  path: '/labs/explore',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LabsDashboardRoute = LabsDashboardRouteImport.update({
@@ -218,6 +236,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/dashboard': typeof DashboardRoute
   '/doctors': typeof DoctorsRoute
+  '/explore': typeof ExploreRoute
   '/finance': typeof FinanceRoute
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
@@ -237,6 +256,8 @@ export interface FileRoutesByFullPath {
   '/labs/$labId': typeof LabsLabIdRouteWithChildren
   '/labs/cases': typeof LabsCasesRoute
   '/labs/dashboard': typeof LabsDashboardRoute
+  '/labs/explore': typeof LabsExploreRoute
+  '/profile/$accountId': typeof ProfileAccountIdRoute
   '/implants/': typeof ImplantsIndexRoute
   '/labs/': typeof LabsIndexRoute
   '/supplies/': typeof SuppliesIndexRoute
@@ -253,6 +274,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/dashboard': typeof DashboardRoute
   '/doctors': typeof DoctorsRoute
+  '/explore': typeof ExploreRoute
   '/finance': typeof FinanceRoute
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
@@ -272,6 +294,8 @@ export interface FileRoutesByTo {
   '/labs/$labId': typeof LabsLabIdRouteWithChildren
   '/labs/cases': typeof LabsCasesRoute
   '/labs/dashboard': typeof LabsDashboardRoute
+  '/labs/explore': typeof LabsExploreRoute
+  '/profile/$accountId': typeof ProfileAccountIdRoute
   '/implants': typeof ImplantsIndexRoute
   '/labs': typeof LabsIndexRoute
   '/supplies': typeof SuppliesIndexRoute
@@ -289,6 +313,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/dashboard': typeof DashboardRoute
   '/doctors': typeof DoctorsRoute
+  '/explore': typeof ExploreRoute
   '/finance': typeof FinanceRoute
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
@@ -308,6 +333,8 @@ export interface FileRoutesById {
   '/labs/$labId': typeof LabsLabIdRouteWithChildren
   '/labs/cases': typeof LabsCasesRoute
   '/labs/dashboard': typeof LabsDashboardRoute
+  '/labs/explore': typeof LabsExploreRoute
+  '/profile/$accountId': typeof ProfileAccountIdRoute
   '/implants/': typeof ImplantsIndexRoute
   '/labs/': typeof LabsIndexRoute
   '/supplies/': typeof SuppliesIndexRoute
@@ -326,6 +353,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/dashboard'
     | '/doctors'
+    | '/explore'
     | '/finance'
     | '/login'
     | '/messages'
@@ -345,6 +373,8 @@ export interface FileRouteTypes {
     | '/labs/$labId'
     | '/labs/cases'
     | '/labs/dashboard'
+    | '/labs/explore'
+    | '/profile/$accountId'
     | '/implants/'
     | '/labs/'
     | '/supplies/'
@@ -361,6 +391,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/dashboard'
     | '/doctors'
+    | '/explore'
     | '/finance'
     | '/login'
     | '/messages'
@@ -380,6 +411,8 @@ export interface FileRouteTypes {
     | '/labs/$labId'
     | '/labs/cases'
     | '/labs/dashboard'
+    | '/labs/explore'
+    | '/profile/$accountId'
     | '/implants'
     | '/labs'
     | '/supplies'
@@ -396,6 +429,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/dashboard'
     | '/doctors'
+    | '/explore'
     | '/finance'
     | '/login'
     | '/messages'
@@ -415,6 +449,8 @@ export interface FileRouteTypes {
     | '/labs/$labId'
     | '/labs/cases'
     | '/labs/dashboard'
+    | '/labs/explore'
+    | '/profile/$accountId'
     | '/implants/'
     | '/labs/'
     | '/supplies/'
@@ -432,6 +468,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   DashboardRoute: typeof DashboardRoute
   DoctorsRoute: typeof DoctorsRoute
+  ExploreRoute: typeof ExploreRoute
   FinanceRoute: typeof FinanceRoute
   LoginRoute: typeof LoginRoute
   MessagesRoute: typeof MessagesRoute
@@ -447,6 +484,8 @@ export interface RootRouteChildren {
   LabsLabIdRoute: typeof LabsLabIdRouteWithChildren
   LabsCasesRoute: typeof LabsCasesRoute
   LabsDashboardRoute: typeof LabsDashboardRoute
+  LabsExploreRoute: typeof LabsExploreRoute
+  ProfileAccountIdRoute: typeof ProfileAccountIdRoute
   ImplantsIndexRoute: typeof ImplantsIndexRoute
   LabsIndexRoute: typeof LabsIndexRoute
   SuppliesIndexRoute: typeof SuppliesIndexRoute
@@ -534,6 +573,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FinanceRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/explore': {
+      id: '/explore'
+      path: '/explore'
+      fullPath: '/explore'
+      preLoaderRoute: typeof ExploreRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/doctors': {
       id: '/doctors'
       path: '/doctors'
@@ -595,6 +641,20 @@ declare module '@tanstack/react-router' {
       path: '/implants'
       fullPath: '/implants/'
       preLoaderRoute: typeof ImplantsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile/$accountId': {
+      id: '/profile/$accountId'
+      path: '/profile/$accountId'
+      fullPath: '/profile/$accountId'
+      preLoaderRoute: typeof ProfileAccountIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/labs/explore': {
+      id: '/labs/explore'
+      path: '/labs/explore'
+      fullPath: '/labs/explore'
+      preLoaderRoute: typeof LabsExploreRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/labs/dashboard': {
@@ -739,6 +799,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   DashboardRoute: DashboardRoute,
   DoctorsRoute: DoctorsRoute,
+  ExploreRoute: ExploreRoute,
   FinanceRoute: FinanceRoute,
   LoginRoute: LoginRoute,
   MessagesRoute: MessagesRoute,
@@ -754,6 +815,8 @@ const rootRouteChildren: RootRouteChildren = {
   LabsLabIdRoute: LabsLabIdRouteWithChildren,
   LabsCasesRoute: LabsCasesRoute,
   LabsDashboardRoute: LabsDashboardRoute,
+  LabsExploreRoute: LabsExploreRoute,
+  ProfileAccountIdRoute: ProfileAccountIdRoute,
   ImplantsIndexRoute: ImplantsIndexRoute,
   LabsIndexRoute: LabsIndexRoute,
   SuppliesIndexRoute: SuppliesIndexRoute,

@@ -1,4 +1,4 @@
-import { createFileRoute, notFound } from "@tanstack/react-router";
+import { createFileRoute, notFound, useRouterState } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
@@ -6,7 +6,7 @@ import { COUNTRIES } from "@/data/implants";
 import { useProductsByCountry, useSignedImageUrls, type Product } from "@/lib/products";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { Cpu, Loader2 } from "lucide-react";
+import { Cpu, EyeOff, Loader2 } from "lucide-react";
 
 type ImplantFilter = "all" | "immediate" | "non-immediate";
 
@@ -37,6 +37,11 @@ function CountryPage() {
   const { t, lang } = useI18n();
   const ar = lang === "ar";
   const [filter, setFilter] = useState<ImplantFilter>("all");
+  const isVisitor = useRouterState({
+    select: (s) =>
+      s.location.state != null &&
+      (s.location.state as unknown as Record<string, unknown>)?.isVisitor === true,
+  });
 
   const { data: products = [], isLoading } = useProductsByCountry(country.slug);
 
@@ -63,6 +68,14 @@ function CountryPage() {
   return (
     <MobileShell>
       <TopBar title={`${t("implants")} ${lang === "ar" ? country.ar : country.en}`} showBack />
+      {isVisitor && (
+        <div className="mx-4 mt-3 flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold rounded-xl px-4 py-2.5">
+          <EyeOff className="size-4 shrink-0" />
+          {ar
+            ? "وضع القراءة فقط — لا يمكنك تعديل أو إضافة محتوى"
+            : "Read-only mode — you cannot edit or add content"}
+        </div>
+      )}
       <div className="px-4 pt-4">
         <div className="flex items-center gap-3 mb-4">
           <div className="text-5xl">{country.flag}</div>

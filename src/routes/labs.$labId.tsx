@@ -1,9 +1,10 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouterState } from "@tanstack/react-router";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { CASES } from "@/data/labs";
 import { useAdminStore } from "@/lib/adminStore";
 import { useI18n } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import { CaseTimeline } from "@/components/CaseTimeline";
 import { Send, Star, Clock, FileText } from "lucide-react";
 
@@ -16,6 +17,11 @@ function LabPage() {
   const { labs: LABS } = useAdminStore();
   const lab = LABS.find((l) => l.id === labId);
   const { t, lang } = useI18n();
+  const isVisitor = useRouterState({
+    select: (s) =>
+      s.location.state != null &&
+      (s.location.state as unknown as Record<string, unknown>)?.isVisitor === true,
+  });
   const labCases = lab ? CASES.filter((c) => c.labId === lab.id).slice(0, 2) : [];
 
   if (!lab) {
@@ -51,11 +57,13 @@ function LabPage() {
               {lab.deliveryDays} {t("delivery_days")}
             </span>
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <button className="h-11 rounded-xl bg-primary text-primary-foreground font-display font-bold inline-flex items-center justify-center gap-2">
-              <Send className="size-4" />
-              {t("send_case")}
-            </button>
+          <div className={cn("grid gap-2", isVisitor ? "grid-cols-1" : "grid-cols-2")}>
+            {!isVisitor && (
+              <button className="h-11 rounded-xl bg-primary text-primary-foreground font-display font-bold inline-flex items-center justify-center gap-2">
+                <Send className="size-4" />
+                {t("send_case")}
+              </button>
+            )}
             <Link
               to="/labs/$labId/statement"
               params={{ labId: lab.id }}

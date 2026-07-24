@@ -1,23 +1,13 @@
 import { useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import {
-  X,
-  User,
-  Building2,
-  Wrench,
-  Palette,
-  CalendarDays,
-  AlertCircle,
-  CheckCircle2,
-} from "lucide-react";
+import { X, User, Building2, Wrench, AlertCircle, CheckCircle2 } from "lucide-react";
 
 export type NewOrder = {
   patient: string;
-  clinicDoctor: string;
+  doctor: string;
   workType: string;
-  shade: string;
-  deliveryDate: string;
+  notes: string;
 };
 
 type Props = {
@@ -27,43 +17,10 @@ type Props = {
 };
 
 const WORK_TYPES = [
-  { value: "crown", ar: "تاج (زركون)", en: "Crown (Zirconia)" },
-  { value: "emax", ar: "تيجان إيماكس", en: "E-max Crown" },
+  { value: "crown", ar: "تاج", en: "Crown" },
   { value: "veneer", ar: "قشرة تجميلية", en: "Veneer" },
   { value: "implant", ar: "زرعة", en: "Implant" },
-  { value: "pfm", ar: "PFM", en: "PFM" },
   { value: "clear_aligner", ar: "مصفف شفاف", en: "Clear Aligner" },
-];
-
-const SHADES = [
-  "A1",
-  "A2",
-  "A3",
-  "A3.5",
-  "A4",
-  "B1",
-  "B2",
-  "B3",
-  "B4",
-  "C1",
-  "C2",
-  "C3",
-  "C4",
-  "D2",
-  "D3",
-  "D4",
-  "BL1",
-  "BL2",
-  "BL3",
-  "BL4",
-];
-
-const CLINICS = [
-  "عيادة النور — د. أحمد علي",
-  "مجمع عيادات الفارابي — د. نورا سعيد",
-  "عيادة الريان — د. كريم جمال",
-  "عيادة السلام — د. ليلى نصر",
-  "عيادة الزهراء — د. سامي نور",
 ];
 
 export function NewOrderModal({ open, onClose, onSubmit }: Props) {
@@ -71,23 +28,19 @@ export function NewOrderModal({ open, onClose, onSubmit }: Props) {
   const ar = lang === "ar";
 
   const [patient, setPatient] = useState("");
-  const [clinicDoctor, setClinicDoctor] = useState("");
+  const [doctor, setDoctor] = useState("");
   const [workType, setWorkType] = useState("");
-  const [shade, setShade] = useState("");
-  const [deliveryDate, setDeliveryDate] = useState("");
+  const [notes, setNotes] = useState("");
   const [errors, setErrors] = useState<Record<string, boolean>>({});
   const [submitted, setSubmitted] = useState(false);
 
   if (!open) return null;
 
-  const today = new Date().toISOString().split("T")[0];
-
   const validate = () => {
     const errs: Record<string, boolean> = {};
     if (!patient.trim()) errs.patient = true;
-    if (!clinicDoctor) errs.clinicDoctor = true;
+    if (!doctor.trim()) errs.doctor = true;
     if (!workType) errs.workType = true;
-    if (!deliveryDate) errs.deliveryDate = true;
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -97,18 +50,16 @@ export function NewOrderModal({ open, onClose, onSubmit }: Props) {
     setSubmitted(true);
     onSubmit({
       patient: patient.trim(),
-      clinicDoctor,
+      doctor: doctor.trim(),
       workType,
-      shade,
-      deliveryDate,
+      notes: notes.trim(),
     });
     setTimeout(() => {
       setSubmitted(false);
       setPatient("");
-      setClinicDoctor("");
+      setDoctor("");
       setWorkType("");
-      setShade("");
-      setDeliveryDate("");
+      setNotes("");
       setErrors({});
       onClose();
     }, 1200);
@@ -184,32 +135,25 @@ export function NewOrderModal({ open, onClose, onSubmit }: Props) {
                 )}
               </div>
 
-              {/* Clinic/Doctor Selector */}
+              {/* Doctor Name - Free Text */}
               <div>
                 <label className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground mb-1.5">
                   <Building2 className="size-3.5" />
                   {t("clinic_doctor")} <span className="text-destructive">*</span>
                 </label>
-                <select
-                  value={clinicDoctor}
+                <input
+                  value={doctor}
                   onChange={(e) => {
-                    setClinicDoctor(e.target.value);
-                    setErrors((e) => ({ ...e, clinicDoctor: false }));
+                    setDoctor(e.target.value);
+                    setErrors((e) => ({ ...e, doctor: false }));
                   }}
+                  placeholder={ar ? "أدخل اسم العيادة أو الطبيب" : "Enter clinic or doctor name"}
                   className={cn(
                     inputClass,
-                    "appearance-none",
-                    errors.clinicDoctor && "ring-2 ring-destructive/50 border-destructive",
+                    errors.doctor && "ring-2 ring-destructive/50 border-destructive",
                   )}
-                >
-                  <option value="">{t("select_clinic_doctor")}</option>
-                  {CLINICS.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-                {errors.clinicDoctor && (
+                />
+                {errors.doctor && (
                   <p className="text-[11px] text-destructive mt-1 flex items-center gap-1">
                     <AlertCircle className="size-3" />
                     {t("field_required")}
@@ -250,56 +194,19 @@ export function NewOrderModal({ open, onClose, onSubmit }: Props) {
                 )}
               </div>
 
-              {/* Shade/Color */}
+              {/* Notes - Optional */}
               <div>
                 <label className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground mb-1.5">
-                  <Palette className="size-3.5" />
-                  {t("shade_color")}
+                  {ar ? "ملاحظات" : "Notes"}{" "}
+                  <span className="text-muted-foreground/50">({ar ? "اختياري" : "optional"})</span>
                 </label>
-                <div className="flex flex-wrap gap-1.5">
-                  {SHADES.map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => setShade(s === shade ? "" : s)}
-                      className={cn(
-                        "size-8 rounded-lg text-[10px] font-bold border transition-all",
-                        shade === s
-                          ? "bg-primary text-primary-foreground border-primary scale-110"
-                          : "bg-card text-muted-foreground border-border hover:bg-accent",
-                      )}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Dynamic Delivery Date */}
-              <div>
-                <label className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground mb-1.5">
-                  <CalendarDays className="size-3.5" />
-                  {t("delivery_date")} <span className="text-destructive">*</span>
-                </label>
-                <input
-                  type="date"
-                  value={deliveryDate}
-                  min={today}
-                  onChange={(e) => {
-                    setDeliveryDate(e.target.value);
-                    setErrors((e) => ({ ...e, deliveryDate: false }));
-                  }}
-                  className={cn(
-                    inputClass,
-                    errors.deliveryDate && "ring-2 ring-destructive/50 border-destructive",
-                  )}
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={3}
+                  className="w-full bg-card border border-border rounded-xl px-3 py-2.5 outline-none text-sm focus:ring-2 focus:ring-ring/40 resize-none"
+                  placeholder={ar ? "أضف تفاصيل إضافية..." : "Add additional details..."}
                 />
-                {errors.deliveryDate && (
-                  <p className="text-[11px] text-destructive mt-1 flex items-center gap-1">
-                    <AlertCircle className="size-3" />
-                    {t("field_required")}
-                  </p>
-                )}
               </div>
             </>
           )}

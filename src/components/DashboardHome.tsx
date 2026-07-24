@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
   Search,
@@ -19,77 +19,15 @@ import {
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { NewOrderModal, type NewOrder } from "./NewOrderModal";
-
-type OrderStatus = "in_progress" | "completed" | "delayed";
-
-type Order = {
-  id: string;
-  orderNumber: string;
-  patient: string;
-  doctor: string;
-  workType: string;
-  receivedDate: string;
-  status: OrderStatus;
-};
-
-type FilterType = "all" | "delayed" | "completed" | "in_progress";
-
-const SAMPLE_ORDERS: Order[] = [
-  {
-    id: "1",
-    orderNumber: "ORD-001",
-    patient: "سارة محمد",
-    doctor: "د. أحمد علي",
-    workType: "crown",
-    receivedDate: "2026-07-15",
-    status: "in_progress",
-  },
-  {
-    id: "2",
-    orderNumber: "ORD-002",
-    patient: "خالد عمر",
-    doctor: "د. نورا سعيد",
-    workType: "veneer",
-    receivedDate: "2026-07-14",
-    status: "completed",
-  },
-  {
-    id: "3",
-    orderNumber: "ORD-003",
-    patient: "مريم حسن",
-    doctor: "د. كريم جمال",
-    workType: "implant_work",
-    receivedDate: "2026-07-10",
-    status: "delayed",
-  },
-  {
-    id: "4",
-    orderNumber: "ORD-004",
-    patient: "أحمد رضا",
-    doctor: "د. ليلى نصر",
-    workType: "clear_aligner",
-    receivedDate: "2026-07-16",
-    status: "in_progress",
-  },
-  {
-    id: "5",
-    orderNumber: "ORD-005",
-    patient: "نورة فهد",
-    doctor: "د. أحمد علي",
-    workType: "crown",
-    receivedDate: "2026-07-12",
-    status: "delayed",
-  },
-  {
-    id: "6",
-    orderNumber: "ORD-006",
-    patient: "فيصل هاني",
-    doctor: "د. سامي نور",
-    workType: "veneer",
-    receivedDate: "2026-07-17",
-    status: "completed",
-  },
-];
+import { OrderDetailsModal } from "./OrderDetailsModal";
+import {
+  useOrders,
+  addOrder,
+  updateOrderStatus,
+  getNextOrderNumber,
+  type Order,
+  type OrderStatus,
+} from "@/lib/ordersStore";
 
 const STATUS_META: Record<OrderStatus, { ar: string; en: string; badge: string; dot: string }> = {
   in_progress: {
@@ -115,9 +53,11 @@ const STATUS_META: Record<OrderStatus, { ar: string; en: string; badge: string; 
 const WORK_TYPE_LABELS: Record<string, { ar: string; en: string }> = {
   crown: { ar: "تاج", en: "Crown" },
   veneer: { ar: "قشرة", en: "Veneer" },
-  implant_work: { ar: "زرعة", en: "Implant" },
+  implant: { ar: "زرعة", en: "Implant" },
   clear_aligner: { ar: "مصفف شفاف", en: "Clear Aligner" },
 };
+
+type FilterType = "all" | "delayed" | "completed" | "in_progress";
 
 export function DashboardHome() {
   const { lang, t, toggle, dir } = useI18n();
@@ -126,8 +66,18 @@ export function DashboardHome() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [filter, setFilter] = useState<FilterType>("all");
-  const [orders, setOrders] = useState<Order[]>(SAMPLE_ORDERS);
+  const orders = useOrders();
   const [showNewOrder, setShowNewOrder] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+
+  const selectedOrder = useMemo(
+    () => (selectedOrderId ? (orders.find((o) => o.id === selectedOrderId) ?? null) : null),
+    [selectedOrderId, orders],
+  );
+
+  const handleStatusChange = (id: string, newStatus: OrderStatus) => {
+    updateOrderStatus(id, newStatus);
+  };
 
   const hour = new Date().getHours();
   const isMorning = hour >= 5 && hour < 12;
@@ -178,9 +128,9 @@ export function DashboardHome() {
   ];
 
   return (
-    <div className="min-h-svh bg-[oklch(0.98_0.01_250)] flex justify-center">
-      <div className="relative w-full max-w-[440px] min-h-svh bg-background shadow-soft flex flex-col">
-        <div className="flex-1 pb-28">
+    <div className="min-h-screen w-full bg-slate-50 overflow-x-hidden">
+      <div className="relative w-full min-h-screen bg-white flex flex-col shadow-soft">
+        <div className="flex-1 pb-28 md:pb-0">
           {/* ==================== TOP HEADER ==================== */}
           <header className="sticky top-0 z-20 bg-background/90 backdrop-blur border-b border-border px-4 pt-4 pb-3">
             <div className="flex items-center justify-between gap-3 mb-3">
@@ -228,7 +178,14 @@ export function DashboardHome() {
             <section className="bg-gradient-to-br from-primary/10 to-primary-soft/30 rounded-3xl p-5 border border-primary/10">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-2xl font-display font-extrabold text-foreground">{greeting}</p>
+                  <p
+                    className={cn(
+                      "text-2xl font-display font-extrabold text-foreground",
+                      ar && "text-right",
+                    )}
+                  >
+                    {greeting}
+                  </p>
                   <p className="text-sm text-muted-foreground mt-1">
                     {ar ? "اليوم" : "Today"} — {t("thursday")}, 19 يوليو 2026
                   </p>
@@ -415,11 +372,17 @@ export function DashboardHome() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2 pt-1 border-t border-border">
-                          <button className="flex-1 h-9 rounded-xl bg-primary/10 text-primary text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-primary/20 transition-colors">
+                          <button
+                            onClick={() => setSelectedOrderId(order.id)}
+                            className="flex-1 h-9 rounded-xl bg-primary/10 text-primary text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-primary/20 transition-colors"
+                          >
                             <Eye className="size-3.5" />
                             {t("view")}
                           </button>
-                          <button className="flex-1 h-9 rounded-xl bg-accent text-accent-foreground text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-accent/80 transition-colors">
+                          <button
+                            onClick={() => setSelectedOrderId(order.id)}
+                            className="flex-1 h-9 rounded-xl bg-accent text-accent-foreground text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-accent/80 transition-colors"
+                          >
                             <Edit3 className="size-3.5" />
                             {t("edit")}
                           </button>
@@ -453,7 +416,7 @@ export function DashboardHome() {
         </div>
 
         {/* ==================== QUICK ACCESS PANEL ==================== */}
-        <div className="absolute bottom-0 inset-x-0 z-30 bg-card/95 backdrop-blur border-t border-border px-4 pt-3 pb-5">
+        <div className="fixed md:hidden bottom-0 inset-x-0 z-30 bg-card/95 backdrop-blur border-t border-border px-4 pt-3 pb-5">
           <div className="grid grid-cols-4 gap-2">
             <button
               onClick={() => setShowNewOrder(true)}
@@ -498,17 +461,26 @@ export function DashboardHome() {
         onClose={() => setShowNewOrder(false)}
         onSubmit={(order: NewOrder) => {
           const newOrder: Order = {
-            id: `ORD-${String(orders.length + 1).padStart(3, "0")}`,
-            orderNumber: `ORD-${String(orders.length + 1).padStart(3, "0")}`,
+            id: crypto.randomUUID(),
+            orderNumber: getNextOrderNumber(),
             patient: order.patient,
-            doctor: order.clinicDoctor,
+            doctor: order.doctor,
             workType: order.workType,
             receivedDate: new Date().toISOString().split("T")[0],
-            status: "in_progress",
+            status: "delayed",
           };
-          setOrders((prev) => [newOrder, ...prev]);
+          addOrder(newOrder);
         }}
       />
+
+      {/* Order Status Modal */}
+      {selectedOrder && (
+        <OrderDetailsModal
+          order={selectedOrder}
+          onClose={() => setSelectedOrderId(null)}
+          onStatusChange={handleStatusChange}
+        />
+      )}
     </div>
   );
 }

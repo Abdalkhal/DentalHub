@@ -2,20 +2,23 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, useMemo } from "react";
 import { auth, db } from "@/integrations/firebase/client";
 import { signOut } from "firebase/auth";
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  onSnapshot,
-  doc,
-  updateDoc,
-  Timestamp,
-  orderBy,
-} from "firebase/firestore";
+import { onSnapshot, doc } from "firebase/firestore";
 import { useI18n } from "@/lib/i18n";
 import { useSession } from "@/lib/useAuth";
 import { cn } from "@/lib/utils";
+import { NewOrderModal, type NewOrder } from "@/components/NewOrderModal";
+import { OrderDetailsModal } from "@/components/OrderDetailsModal";
+import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
+import { toast } from "sonner";
+import {
+  addOrder,
+  updateOrderStatus,
+  deleteOrder,
+  useOrders,
+  getNextOrderNumber,
+  type Order,
+  type OrderStatus,
+} from "@/lib/ordersStore";
 import type { UserRoleDoc } from "@/integrations/firebase/types";
 import {
   Search,
@@ -28,6 +31,7 @@ import {
   ChevronLeft,
   Eye,
   Edit3,
+  Trash2,
   Crown,
   Sparkles,
   Syringe,
@@ -42,6 +46,8 @@ import {
   DollarSign,
   Target,
   LogOut,
+  Package,
+  Building2,
   ChevronDown,
   X,
   Loader2,
@@ -53,21 +59,10 @@ export const Route = createFileRoute("/labs/dashboard")({
   component: LabDashboard,
 });
 
-type CaseStatus = "in_progress" | "completed" | "delayed";
-
-type LabCase = {
-  id: string;
-  orderNumber: string;
-  patient: string;
-  doctor: string;
-  doctorId: string;
-  workType: "crown" | "veneer" | "implant" | "clear_aligner";
-  dateReceived: Timestamp;
-  status: CaseStatus;
-};
+type WorkType = "crown" | "veneer" | "implant" | "clear_aligner";
 
 const WORK_TYPES: Record<
-  LabCase["workType"],
+  WorkType,
   { ar: string; en: string; icon: LucideIcon; color: string }
 > = {
   crown: { ar: "تاج", en: "Crown", icon: Crown, color: "text-amber-500 bg-amber-50" },
@@ -81,7 +76,7 @@ const WORK_TYPES: Record<
   },
 };
 
-const STATUS_META: Record<CaseStatus, { ar: string; en: string; color: string; dot: string }> = {
+const STATUS_META: Record<OrderStatus, { ar: string; en: string; color: string; dot: string }> = {
   in_progress: {
     ar: "قيد التنفيذ",
     en: "In Progress",
@@ -110,11 +105,11 @@ const NAV_ITEMS = [
   { key: "doctors", ar: "الأطباء", en: "Doctors", icon: Users, path: "/doctors" },
   { key: "reports", ar: "التقارير", en: "Reports", icon: BarChart3, path: "/reports" },
   { key: "finance", ar: "المالية", en: "Finance", icon: CreditCard, path: "/finance" },
+  { key: "supplies", ar: "المكاتب والمستلزمات", en: "Supplies", icon: Package, path: "/supplies" },
+  { key: "labs", ar: "المختبرات", en: "Labs", icon: Building2, path: "/labs" },
   { key: "messages", ar: "الرسائل", en: "Messages", icon: MessageSquare, path: "/messages" },
   { key: "settings", ar: "الإعدادات", en: "Settings", icon: Edit3, path: "/account/settings" },
 ];
-
-const MOCK_CASES: LabCase[] = [];
 
 function formatDate(date: Date, lang: "ar" | "en"): string {
   const opts: Intl.DateTimeFormatOptions = {
@@ -126,8 +121,10 @@ function formatDate(date: Date, lang: "ar" | "en"): string {
   return date.toLocaleDateString(lang === "ar" ? "ar-SA" : "en-US", opts);
 }
 
-function formatShortDate(ts: Timestamp): string {
-  const d = ts.toDate();
+function formatShortDate(dateStr: string): string {
+  if (!dateStr) return "-";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
   return `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}/${d.getFullYear()}`;
 }
 
@@ -182,7 +179,7 @@ function StatCard({
   );
 }
 
-function WorkTypeBadge({ type }: { type: LabCase["workType"] }) {
+function WorkTypeBadge({ type }: { type: WorkType }) {
   const wt = WORK_TYPES[type];
   const Icon = wt.icon;
   return (
@@ -198,7 +195,7 @@ function WorkTypeBadge({ type }: { type: LabCase["workType"] }) {
   );
 }
 
-function StatusBadge({ status }: { status: CaseStatus }) {
+function StatusBadge({ status }: { status: OrderStatus }) {
   const sm = STATUS_META[status];
   return (
     <span
@@ -213,109 +210,6 @@ function StatusBadge({ status }: { status: CaseStatus }) {
   );
 }
 
-function OrderDetailsModal({
-  order,
-  onClose,
-  onStatusChange,
-  ar,
-}: {
-  order: LabCase;
-  onClose: () => void;
-  onStatusChange: (id: string, status: CaseStatus) => void;
-  ar: boolean;
-}) {
-  const sm = STATUS_META[order.status];
-  const wt = WORK_TYPES[order.workType];
-  const statusOptions: CaseStatus[] = ["in_progress", "completed", "delayed"];
-
-  return (
-    <div
-      className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white w-full max-w-lg rounded-3xl p-6 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="font-display font-extrabold text-lg">
-            {ar ? `تفاصيل الطلب ${order.orderNumber}` : `Order ${order.orderNumber}`}
-          </h3>
-          <button
-            onClick={onClose}
-            className="size-9 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-400"
-          >
-            <X className="size-4" />
-          </button>
-        </div>
-
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs font-semibold text-slate-500 mb-1">
-                {ar ? "رقم الطلب" : "Order #"}
-              </p>
-              <p className="font-bold text-slate-900">{order.orderNumber}</p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-slate-500 mb-1">
-                {ar ? "تاريخ الاستلام" : "Date Received"}
-              </p>
-              <p className="font-bold text-slate-900">{formatShortDate(order.dateReceived)}</p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-slate-500 mb-1">
-                {ar ? "المريض" : "Patient"}
-              </p>
-              <p className="font-bold text-slate-900">{order.patient}</p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-slate-500 mb-1">
-                {ar ? "الطبيب" : "Doctor"}
-              </p>
-              <p className="font-bold text-slate-900">{order.doctor}</p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-slate-500 mb-1">
-                {ar ? "نوع العمل" : "Work Type"}
-              </p>
-              <WorkTypeBadge type={order.workType} />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-slate-500 mb-1">
-                {ar ? "الحالة" : "Status"}
-              </p>
-              <StatusBadge status={order.status} />
-            </div>
-          </div>
-
-          <div className="pt-3 border-t border-slate-100">
-            <p className="text-xs font-semibold text-slate-500 mb-2">
-              {ar ? "تغيير الحالة" : "Change Status"}
-            </p>
-            <div className="flex gap-2">
-              {statusOptions.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => onStatusChange(order.id, s)}
-                  className={cn(
-                    "flex-1 h-10 rounded-xl text-xs font-bold border-2 transition-all",
-                    order.status === s
-                      ? `${STATUS_META[s].color} scale-105`
-                      : "border-slate-200 text-slate-500 hover:border-slate-300",
-                  )}
-                >
-                  {ar ? STATUS_META[s].ar : STATUS_META[s].en}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function LabDashboard() {
   const { lang, setLang } = useI18n();
   const ar = lang === "ar";
@@ -323,14 +217,15 @@ function LabDashboard() {
   const { user } = useSession();
 
   const [profile, setProfile] = useState<UserRoleDoc | null>(null);
-  const [cases, setCases] = useState<LabCase[]>(MOCK_CASES);
+  const orders = useOrders();
   const [searchQuery, setSearchQuery] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeNav, setActiveNav] = useState("home");
-  const [selectedOrder, setSelectedOrder] = useState<LabCase | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showAllOrders, setShowAllOrders] = useState(false);
   const [showPromoModal, setShowPromoModal] = useState(false);
   const [showNewOrder, setShowNewOrder] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Order | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -343,29 +238,61 @@ function LabDashboard() {
   const labName = profile?.name || (ar ? "مختبر دنتال هب" : "Dental Hub Lab");
 
   const stats = useMemo(() => {
-    const total = cases.length;
-    const inProgress = cases.filter((c) => c.status === "in_progress").length;
-    const completed = cases.filter((c) => c.status === "completed").length;
-    const delayed = cases.filter((c) => c.status === "delayed").length;
+    const total = orders.length;
+    const inProgress = orders.filter((c) => c.status === "in_progress").length;
+    const completed = orders.filter((c) => c.status === "completed").length;
+    const delayed = orders.filter((c) => c.status === "delayed").length;
     return { total, inProgress, completed, delayed };
-  }, [cases]);
+  }, [orders]);
+
+  const totalRevenue = useMemo(
+    () => orders.reduce((sum, c) => sum + (c.price || 0), 0),
+    [orders],
+  );
+
+  const avgRating = useMemo(() => {
+    const rated = orders.filter((c) => c.rating != null && c.rating > 0);
+    if (rated.length === 0) return null;
+    return rated.reduce((sum, c) => sum + (c.rating ?? 0), 0) / rated.length;
+  }, [orders]);
 
   const filteredCases = useMemo(() => {
-    if (!searchQuery.trim()) return cases;
+    if (!searchQuery.trim()) return orders;
     const q = searchQuery.toLowerCase();
-    return cases.filter(
+    return orders.filter(
       (c) =>
         c.orderNumber.toLowerCase().includes(q) ||
         c.patient.toLowerCase().includes(q) ||
         c.doctor.toLowerCase().includes(q),
     );
-  }, [cases, searchQuery]);
+  }, [orders, searchQuery]);
 
   const displayedCases = showAllOrders ? filteredCases : filteredCases.slice(0, 5);
 
-  const handleStatusChange = async (id: string, newStatus: CaseStatus) => {
-    setCases((prev) => prev.map((c) => (c.id === id ? { ...c, status: newStatus } : c)));
+  const handleStatusChange = (id: string, newStatus: OrderStatus) => {
+    updateOrderStatus(id, newStatus);
     setSelectedOrder((prev) => (prev?.id === id ? { ...prev, status: newStatus } : prev));
+  };
+
+  const handleCreateOrder = (order: NewOrder) => {
+    addOrder({
+      id: crypto.randomUUID(),
+      orderNumber: getNextOrderNumber(),
+      receivedDate: new Date().toISOString(),
+      patient: order.patient,
+      doctor: order.doctor,
+      workType: order.workType,
+      status: "delayed",
+      notes: order.notes,
+      price: 0,
+      rating: 0,
+    });
+  };
+
+  const handleDelete = (target: Order) => {
+    deleteOrder(target.id);
+    setDeleteTarget(null);
+    toast.success(ar ? "تم حذف الطلب بنجاح" : "Order deleted successfully");
   };
 
   const handleLogout = async () => {
@@ -376,7 +303,7 @@ function LabDashboard() {
   const today = new Date();
 
   return (
-    <div className="min-h-svh bg-slate-50" dir={ar ? "rtl" : "ltr"}>
+    <div className="min-h-svh bg-slate-50 overflow-x-hidden" dir={ar ? "rtl" : "ltr"}>
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
@@ -385,7 +312,7 @@ function LabDashboard() {
         />
       )}
 
-      <div className="flex mx-auto max-w-lg w-full">
+      <div className="flex w-full">
         {/* ===== LEFT SIDEBAR ===== */}
         <aside
           className={cn(
@@ -672,10 +599,10 @@ function LabDashboard() {
                           <td className="px-4 py-3.5 font-semibold text-slate-800">{c.patient}</td>
                           <td className="px-4 py-3.5 text-slate-600">{c.doctor}</td>
                           <td className="px-4 py-3.5">
-                            <WorkTypeBadge type={c.workType} />
+                            <WorkTypeBadge type={c.workType as WorkType} />
                           </td>
                           <td className="px-4 py-3.5 text-xs text-slate-500">
-                            {formatShortDate(c.dateReceived)}
+                            {formatShortDate(c.receivedDate)}
                           </td>
                           <td className="px-4 py-3.5">
                             <StatusBadge status={c.status} />
@@ -695,6 +622,13 @@ function LabDashboard() {
                               >
                                 <Edit3 className="size-3.5" />
                                 {ar ? "تعديل" : "Edit"}
+                              </button>
+                              <button
+                                onClick={() => setDeleteTarget(c)}
+                                className="h-8 w-8 rounded-lg text-xs font-bold text-rose-500 hover:bg-rose-50 flex items-center justify-center"
+                                title={ar ? "حذف" : "Delete"}
+                              >
+                                <Trash2 className="size-3.5" />
                               </button>
                             </div>
                           </td>
@@ -753,13 +687,13 @@ function LabDashboard() {
                         stroke="#0ea5e9"
                         strokeWidth="2.5"
                         strokeDasharray="100"
-                        strokeDashoffset={100 - 98}
+                        strokeDashoffset={avgRating != null ? 100 - avgRating * 20 : 100}
                         strokeLinecap="round"
                         className="transition-all duration-1000"
                       />
                     </svg>
                     <span className="absolute inset-0 flex items-center justify-center font-display font-extrabold text-lg text-slate-800">
-                      98%
+                      {avgRating != null ? `${avgRating.toFixed(1)}` : "N/A"}
                     </span>
                   </div>
                   <div>
@@ -802,12 +736,12 @@ function LabDashboard() {
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-3xl font-display font-extrabold text-slate-800">
-                    $24,560
+                    {totalRevenue.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0 })}
                   </span>
                   <div>
                     <p className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
                       <TrendingUp className="size-3" />
-                      +18% {ar ? "عن الشهر الماضي" : "vs last month"}
+                      {ar ? "محدث في الوقت الفعلي" : "Real-time updated"}
                     </p>
                   </div>
                 </div>
@@ -823,77 +757,23 @@ function LabDashboard() {
           order={selectedOrder}
           onClose={() => setSelectedOrder(null)}
           onStatusChange={handleStatusChange}
-          ar={ar}
+        />
+      )}
+
+      {deleteTarget && (
+        <DeleteConfirmModal
+          orderNumber={deleteTarget.orderNumber}
+          onCancel={() => setDeleteTarget(null)}
+          onConfirm={() => handleDelete(deleteTarget)}
         />
       )}
 
       {/* New Order Modal */}
-      {showNewOrder && (
-        <div
-          className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-4"
-          onClick={() => setShowNewOrder(false)}
-        >
-          <div
-            className="bg-white w-full max-w-lg rounded-3xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="font-display font-extrabold text-lg">
-                {ar ? "طلب جديد" : "New Order"}
-              </h3>
-              <button
-                onClick={() => setShowNewOrder(false)}
-                className="size-9 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-400"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-            <div className="space-y-4">
-              <label className="block">
-                <span className="block text-xs font-bold text-slate-500 mb-1.5">
-                  {ar ? "المريض" : "Patient"}
-                </span>
-                <input
-                  className="w-full bg-slate-50 rounded-xl px-3 h-11 outline-none text-sm focus:ring-2 focus:ring-sky-300"
-                  placeholder={ar ? "اسم المريض" : "Patient name"}
-                />
-              </label>
-              <label className="block">
-                <span className="block text-xs font-bold text-slate-500 mb-1.5">
-                  {ar ? "الطبيب" : "Doctor"}
-                </span>
-                <select className="w-full bg-slate-50 rounded-xl px-3 h-11 outline-none text-sm focus:ring-2 focus:ring-sky-300">
-                  <option value="">{ar ? "اختر الطبيب" : "Select doctor"}</option>
-                </select>
-              </label>
-              <label className="block">
-                <span className="block text-xs font-bold text-slate-500 mb-1.5">
-                  {ar ? "نوع العمل" : "Work Type"}
-                </span>
-                <select className="w-full bg-slate-50 rounded-xl px-3 h-11 outline-none text-sm focus:ring-2 focus:ring-sky-300">
-                  <option>{ar ? "تاج" : "Crown"}</option>
-                  <option>{ar ? "قشرة" : "Veneer"}</option>
-                  <option>{ar ? "زرعة" : "Implant"}</option>
-                  <option>{ar ? "مصفف شفاف" : "Clear Aligner"}</option>
-                </select>
-              </label>
-              <label className="block">
-                <span className="block text-xs font-bold text-slate-500 mb-1.5">
-                  {ar ? "ملاحظات" : "Notes"}
-                </span>
-                <textarea
-                  rows={3}
-                  className="w-full bg-slate-50 rounded-xl px-3 py-2.5 outline-none text-sm focus:ring-2 focus:ring-sky-300 resize-none"
-                  placeholder={ar ? "أضف تفاصيل..." : "Add details..."}
-                />
-              </label>
-              <button className="w-full h-12 rounded-xl bg-sky-500 text-white font-bold hover:bg-sky-600 transition">
-                {ar ? "إنشاء الطلب" : "Create Order"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <NewOrderModal
+        open={showNewOrder}
+        onClose={() => setShowNewOrder(false)}
+        onSubmit={handleCreateOrder}
+      />
 
       {/* Promo modal */}
       {showPromoModal && (

@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Home, ShoppingBag, User, Menu } from "lucide-react";
+import { Home, ShoppingBag, User, Menu, Search } from "lucide-react";
 import { type ReactNode } from "react";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -14,12 +14,9 @@ export function MobileShell({
   className?: string;
 }) {
   return (
-    <div className="min-h-screen w-full bg-app-gradient flex justify-center">
+    <div className="min-h-screen w-full bg-slate-50 overflow-x-hidden">
       <div
-        className={cn(
-          "relative w-full max-w-[440px] min-h-screen bg-background shadow-soft flex flex-col",
-          className,
-        )}
+        className={cn("relative w-full min-h-screen bg-white flex flex-col", className)}
       >
         <div className={cn("flex-1", hideBottomNav ? "pb-0" : "pb-24")}>{children}</div>
         {!hideBottomNav && <BottomTabBar />}
@@ -29,11 +26,17 @@ export function MobileShell({
 }
 
 function BottomTabBar() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   const tabs = [
     { to: "/", icon: Home, label: t("tab_home"), match: (p: string) => p === "/" },
+    {
+      to: "/explore",
+      icon: Search,
+      label: lang === "ar" ? "بحث" : "Search",
+      match: (p: string) => p.startsWith("/explore"),
+    },
     {
       to: "/orders",
       icon: ShoppingBag,
@@ -51,7 +54,7 @@ function BottomTabBar() {
 
   return (
     <nav className="absolute bottom-0 inset-x-0 z-30 bg-card/95 backdrop-blur border-t border-border">
-      <ul className="grid grid-cols-4 px-2 py-2">
+      <ul className="grid grid-cols-5 px-2 py-2">
         {tabs.map(({ to, icon: Icon, label, match }) => {
           const active = match(pathname);
           return (
