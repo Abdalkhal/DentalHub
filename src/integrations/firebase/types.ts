@@ -26,6 +26,7 @@ export type UserRoleDoc = {
   email: string;
   phone?: string;
   photoURL?: string;
+  city?: string;
   address?: string;
   latitude?: number;
   longitude?: number;

@@ -1,5 +1,9 @@
 ﻿import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { collection, getDocs, updateDoc } from "firebase/firestore";
+import { db } from "@/integrations/firebase/client";
+import type { UserRoleDoc } from "@/integrations/firebase/types";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { RoleGuard } from "@/components/RoleGuard";
@@ -1972,6 +1976,42 @@ function ImplantProductsPanel() {
   );
 }
 
+const DEFAULT_CITY = "بغداد";
+
+type CompanyCategory = "supplies" | "implants";
+
+type CompanyItem = {
+  id: string;
+  name: { ar: string; en: string };
+  category: CompanyCategory;
+  cityId: string;
+  rating: number;
+  itemsCount: number;
+  area: { ar: string; en: string };
+  route: string;
+  params: Record<string, string>;
+};
+
+function cityIdFromName(nameEn: string): string {
+  const match = CITIES.find((c) => c.en.toLowerCase() === nameEn.toLowerCase());
+  return match ? match.id : "baghdad";
+}
+
+function resolveCityId(cityValue: string | undefined | null): string {
+  if (!cityValue) return "baghdad";
+  const trimmed = cityValue.trim();
+  const lower = trimmed.toLowerCase();
+  const match = CITIES.find(
+    (c) => c.id === lower || c.en.toLowerCase() === lower || c.ar === trimmed,
+  );
+  return match ? match.id : "baghdad";
+}
+
+function getCityName(cityId: string, ar: boolean): string {
+  const match = CITIES.find((c) => c.id === cityId);
+  return match ? (ar ? match.ar : match.en) : ar ? "بغداد" : "Baghdad";
+}
+
 function BrowseSupplies() {
   const { t, lang, dir } = useI18n();
   const Chevron = dir === "rtl" ? ChevronLeft : ChevronRight;
@@ -1980,30 +2020,129 @@ function BrowseSupplies() {
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<"default" | "rating" | "items">("default");
   const [city, setCity] = useState<string>("all");
+  const [category, setCategory] = useState<"all" | CompanyCategory>("all");
+
+  const { data: implantCompanies = [] } = useQuery({
+    queryKey: ["supplies-implant-companies"],
+    queryFn: async (): Promise<CompanyItem[]> => {
+      try {
+        const snap = await getDocs(collection(db, "user_roles"));
+        const results: CompanyItem[] = [];
+        for (const d of snap.docs) {
+          const u = d.data() as UserRoleDoc;
+          const matchesImplant =
+            u.accountType === "implant" || (u.accountType as string) === "dental_implants";
+          if (!matchesImplant) continue;
+
+          if (!u.city) {
+            updateDoc(d.ref, { city: DEFAULT_CITY }).catch(() => {});
+          }
+
+          results.push({
+            id: u.userId,
+            name: { ar: u.name || "", en: u.name || "" },
+            category: "implants" as CompanyCategory,
+            cityId: resolveCityId(u.city || DEFAULT_CITY),
+            rating: 0,
+            itemsCount: 0,
+            area: { ar: "", en: "" },
+            route: "/profile/$accountId",
+            params: { accountId: u.userId },
+          });
+        }
+        return results;
+      } catch {
+        return [];
+      }
+    },
+    staleTime: 30000,
+  });
+
+  const { data: firestoreSupplies = [] } = useQuery({
+    queryKey: ["supplies-firestore-supplies"],
+    queryFn: async (): Promise<CompanyItem[]> => {
+      try {
+        const snap = await getDocs(collection(db, "user_roles"));
+        const results: CompanyItem[] = [];
+        for (const d of snap.docs) {
+          const u = d.data() as UserRoleDoc;
+          const matchesSupply =
+            u.accountType === "supply" || (u.accountType as string) === "medical_supplies";
+          if (!matchesSupply) continue;
+
+          if (!u.city) {
+            updateDoc(d.ref, { city: DEFAULT_CITY }).catch(() => {});
+          }
+
+          results.push({
+            id: u.userId,
+            name: { ar: u.name || "", en: u.name || "" },
+            category: "supplies" as CompanyCategory,
+            cityId: resolveCityId(u.city || DEFAULT_CITY),
+            rating: 0,
+            itemsCount: 0,
+            area: { ar: "", en: "" },
+            route: "/profile/$accountId",
+            params: { accountId: u.userId },
+          });
+        }
+        return results;
+      } catch {
+        return [];
+      }
+    },
+    staleTime: 30000,
+  });
+
+  const suppliesCompanies: CompanyItem[] = useMemo(() => {
+    const fromOffices = OFFICES.map((o) => ({
+      id: o.id,
+      name: { ar: o.ar, en: o.en },
+      category: "supplies" as CompanyCategory,
+      cityId: cityIdFromName(o.city.en),
+      rating: o.rating,
+      itemsCount: o.itemsCount,
+      area: o.area,
+      route: "/supplies/$officeId",
+      params: { officeId: o.id },
+    }));
+    return [...fromOffices, ...firestoreSupplies];
+  }, [OFFICES, firestoreSupplies]);
+
+  const allCompanies = useMemo<CompanyItem[]>(() => {
+    return [...suppliesCompanies, ...implantCompanies];
+  }, [suppliesCompanies, implantCompanies]);
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    let list = OFFICES.filter((o) => {
-      if (city !== "all" && o.city.en.toLowerCase() !== city) return false;
+    let list = allCompanies.filter((item) => {
+      if (city !== "all" && item.cityId !== city) return false;
+      if (category !== "all" && item.category !== category) return false;
       if (!needle) return true;
       return (
-        o.ar.toLowerCase().includes(needle) ||
-        o.en.toLowerCase().includes(needle) ||
-        o.area.ar.toLowerCase().includes(needle) ||
-        o.area.en.toLowerCase().includes(needle) ||
-        o.city.ar.toLowerCase().includes(needle) ||
-        o.city.en.toLowerCase().includes(needle)
+        item.name.ar.toLowerCase().includes(needle) ||
+        item.name.en.toLowerCase().includes(needle) ||
+        getCityName(item.cityId, true).includes(needle) ||
+        getCityName(item.cityId, false).toLowerCase().includes(needle) ||
+        item.area.ar.toLowerCase().includes(needle) ||
+        item.area.en.toLowerCase().includes(needle)
       );
     });
     if (sort === "rating") list = [...list].sort((a, b) => b.rating - a.rating);
     if (sort === "items") list = [...list].sort((a, b) => b.itemsCount - a.itemsCount);
     return list;
-  }, [q, sort, city]);
+  }, [q, sort, city, category, allCompanies]);
 
   const chips: { key: typeof sort; ar: string; en: string }[] = [
     { key: "default", ar: "الكل", en: "All" },
     { key: "rating", ar: "الأعلى تقييماً", en: "Top rated" },
     { key: "items", ar: "الأكثر تنوعاً", en: "Most items" },
+  ];
+
+  const categoryTabs: { id: "all" | CompanyCategory; ar: string; en: string }[] = [
+    { id: "all", ar: "الكل", en: "All" },
+    { id: "implants", ar: "شركات الزرعات", en: "Implant Companies" },
+    { id: "supplies", ar: "شركات المستلزمات", en: "Medical Supplies" },
   ];
 
   return (
@@ -2014,7 +2153,7 @@ function BrowseSupplies() {
         showSearch
         searchValue={q}
         onSearchChange={setQ}
-        searchPlaceholder={lang === "ar" ? "ابحث عن مكتب أو منطقة…" : "Search office or area…"}
+        searchPlaceholder={lang === "ar" ? "ابحث عن شركة أو مدينة…" : "Search company or city…"}
       />
       <div className="px-4 pt-4">
         <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 mb-2">
@@ -2029,11 +2168,11 @@ function BrowseSupplies() {
             {lang === "ar" ? "كل المدن" : "All cities"}
           </button>
           {CITIES.map((c) => {
-            const active = city === c.en.toLowerCase();
+            const active = city === c.id;
             return (
               <button
                 key={c.id}
-                onClick={() => setCity(c.en.toLowerCase())}
+                onClick={() => setCity(c.id)}
                 className={`shrink-0 h-8 px-3 rounded-full text-xs font-semibold border transition ${
                   active
                     ? "bg-foreground text-background border-foreground"
@@ -2045,6 +2184,23 @@ function BrowseSupplies() {
             );
           })}
         </div>
+
+        <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 mb-2">
+          {categoryTabs.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setCategory(t.id)}
+              className={`shrink-0 h-8 px-3 rounded-full text-xs font-semibold border transition ${
+                category === t.id
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-card text-foreground border-border hover:bg-accent"
+              }`}
+            >
+              {lang === "ar" ? t.ar : t.en}
+            </button>
+          ))}
+        </div>
+
         <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 mb-1">
           {chips.map((c) => (
             <button
@@ -2060,6 +2216,7 @@ function BrowseSupplies() {
             </button>
           ))}
         </div>
+
         <h2 className="font-display font-bold text-base mb-3">
           {lang === "ar" ? "فروع طب الأسنان" : "Dental specialties"}
         </h2>
@@ -2112,32 +2269,38 @@ function BrowseSupplies() {
           </div>
         ) : (
           <ul className="space-y-3">
-            {filtered.map((o) => (
-              <li key={o.id}>
+            {filtered.map((item) => (
+              <li key={`${item.category}-${item.id}`}>
                 <Link
-                  to="/supplies/$officeId"
-                  params={{ officeId: o.id }}
+                  to={item.route}
+                  params={item.params}
                   className="flex items-center gap-3 bg-card border border-border rounded-2xl p-3.5 shadow-soft hover:shadow-card transition"
                 >
                   <span className="size-12 rounded-2xl bg-primary-soft text-primary font-display font-extrabold flex items-center justify-center text-lg">
-                    {(lang === "ar" ? o.ar : o.en).slice(0, 1)}
+                    {(lang === "ar" ? item.name.ar : item.name.en).slice(0, 1)}
                   </span>
                   <div className="flex-1 min-w-0">
                     <p className="font-display font-bold text-foreground truncate">
-                      {lang === "ar" ? o.ar : o.en}
+                      {lang === "ar" ? item.name.ar : item.name.en}
                     </p>
                     <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
                       <span className="inline-flex items-center gap-1">
                         <MapPin className="size-3" />
-                        {lang === "ar" ? o.area.ar : o.area.en}
+                        {item.area.ar
+                          ? `${getCityName(item.cityId, lang === "ar")} - ${item.area.ar}`
+                          : getCityName(item.cityId, lang === "ar")}
                       </span>
-                      <span className="inline-flex items-center gap-1 text-amber-500">
-                        <Star className="size-3 fill-current" />
-                        <span className="font-semibold">{o.rating}</span>
-                      </span>
-                      <span>
-                        {o.itemsCount}+ {lang === "ar" ? "صنف" : "items"}
-                      </span>
+                      {item.rating > 0 && (
+                        <span className="inline-flex items-center gap-1 text-amber-500">
+                          <Star className="size-3 fill-current" />
+                          <span className="font-semibold">{item.rating}</span>
+                        </span>
+                      )}
+                      {item.itemsCount > 0 && (
+                        <span>
+                          {item.itemsCount}+ {lang === "ar" ? "صنف" : "items"}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <Chevron className="size-4 text-muted-foreground" />

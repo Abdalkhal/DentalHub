@@ -1,0 +1,15 @@
+export const DENTAL_SPECIALITIES: { ar: string; en: string }[] = [
+  { ar: "طب أسنان عام", en: "General Dentistry" },
+  { ar: "ترميم وتجميل الأسنان", en: "Restorative Dentistry" },
+  { ar: "جراحة الفم والوجه والفكين", en: "Oral and Maxillofacial Surgery" },
+  { ar: "معالجة حشو الجذور", en: "Endodontics" },
+  { ar: "تقويم الأسنان", en: "Orthodontics" },
+  { ar: "الاستعاضة الصناعية وتركيبات الأسنان", en: "Prosthodontics" },
+  { ar: "أمراض وجراحة اللثة", en: "Periodontics" },
+  { ar: "طب أسنان الأطفال", en: "Pedodontics" },
+  { ar: "طب الفم", en: "Oral Medicine" },
+  { ar: "أمراض الفم والوجه والفكين", en: "Oral and Maxillofacial Pathology" },
+  { ar: "أشعة الفم والوجه والفكين", en: "Oral and Maxillofacial Radiology" },
+  { ar: "صحة الفم والأسنان العامة", en: "Dental Public Health" },
+  { ar: "طالب طب أسنان", en: "Dental Student" },
+];

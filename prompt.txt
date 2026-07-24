@@ -1,19 +1,20 @@
-Re-implement the navigation buttons and routes for searching Dentists, Medical Supplies Stores, and Dental Labs/Accounts in the main sidebar based on `31176.jpg`:
+Update the `/supplies` directory page (referenced in image 31193.jpg) to implement dual-filtering by Governorate and Sub-Category (All, Implants Companies, Supplies Companies), while gracefully handling legacy accounts.
 
-### Requirements:
+### 1. Sub-Category Tabs (فئات الشركات):
+- Add a category tab selector bar right under the governorates scrollbar with 3 options:
+  - **الكل** (All) -> Displays both Implants and Supplies companies.
+  - **شركات الزرعات** (Implant Companies) -> Filters accounts with category `implants` or `dental_implants`.
+  - **شركات المستلزمات** (Medical Supplies Companies) -> Filters accounts with category `supplies` or `medical_supplies`.
 
-1. **Update Sidebar Navigation Items (`src/components/MobileShell.tsx` or Sidebar layout component):**
-   - Add explicit navigation links under the "القائمة" section for:
-     - **أطباء الأسنان** (`/doctors`) -> Icon: UserCheck / Users -> Label: "أطباء الأسنان"
-     - **المكاتب والمستلزمات** (`/supplies`) -> Icon: Store / Package -> Label: "المكاتب والمستلزمات"
-     - **المختبرات والحسابات** (`/labs`) -> Icon: Building / Search -> Label: "البحث عن مختبرات/حسابات"
+### 2. Dual-Filtering Logic (`city` + `category`):
+- Maintain two active filter states: `selectedCity` (defaults to "كل المدن") and `selectedCategory` (defaults to "الكل").
+- Filtering logic rules:
+  1. If `selectedCity === "كل المدن"`, show all companies matching the selected category filter regardless of city.
+  2. If a specific governorate is selected (e.g., "نينوى"), only show companies where `account.city === "نينوى"` AND matches the `selectedCategory`.
+  3. Clicking "شركات الزرعات" while "نينوى" is selected must ONLY display implant companies registered in Nineveh.
 
-2. **Route Setup & Search/Filter Functionality:**
-   - **For `/doctors`:** Display a searchable directory/list of registered dentists with filters by city/governorate and specialization.
-   - **For `/supplies`:** Display a search/catalog page for dental supply offices, showing available products, offers, and store details.
-   - **For `/labs`:** Display a directory page allowing users to search and discover other dental labs/accounts registered on DentalHub.
-
-3. **UI Consistency:**
-   - Use standard Lucide React icons matching the sidebar design.
-   - Ensure the active state highlighting (`bg-sky-50 text-sky-600 font-bold`) works correctly when navigating between these pages.
-   - Ensure full RTL support and responsiveness across desktop and mobile menus.
+### 3. Legacy Accounts Handling (Default Governorate):
+- Define a default fallback constant: `DEFAULT_CITY = "بغداد"`.
+- When fetching or mapping companies/users from Firestore:
+  - If `account.city` is missing, `null`, or `undefined`, assign `account.city = "بغداد"` in the client state.
+  - Automatically update the document in Firestore in the background by setting `city: "بغداد"` so that legacy accounts permanently receive this default field without losing data.

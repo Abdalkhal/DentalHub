@@ -10,6 +10,8 @@ import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "fire
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { Loader2, Mail, Lock, ArrowRight, Eye, EyeOff, User } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CITIES } from "@/data/offices";
+import { DENTAL_SPECIALITIES } from "@/lib/constants/dentalSpecialities";
 
 export const Route = createFileRoute("/auth")({
   component: AuthPage,
@@ -239,6 +241,9 @@ function AuthPage() {
   const [title, setTitle] = useState("");
   const [gender, setGender] = useState<"male" | "female" | "">("");
   const [dob, setDob] = useState("");
+  const [city, setCity] = useState("");
+  const [clinicName, setClinicName] = useState("");
+  const [speciality, setSpeciality] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -307,12 +312,15 @@ function AuthPage() {
           accountType,
           name: name.trim(),
           email: email.trim(),
+          city: city || null,
           createdAt: serverTimestamp(),
         };
         if (accountType === "dentist") {
           roleData.surname = title.trim();
           roleData.gender = gender;
           roleData.dob = dob;
+          roleData.clinicName = clinicName.trim() || null;
+          roleData.speciality = speciality || null;
         }
         await setDoc(doc(db, "user_roles", cred.user.uid), roleData);
         navigate({ to: getAccountDashboard(accountType) });
@@ -521,8 +529,66 @@ function AuthPage() {
                       className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition"
                     />
                   </div>
+
+                  <div className="relative animate-in fade-in slide-in-from-top-2 duration-300">
+                    <input
+                      value={clinicName}
+                      onChange={(e) => {
+                        setClinicName(e.target.value);
+                        clearError();
+                      }}
+                      placeholder={ar ? "اسم العيادة" : "Clinic name"}
+                      className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm font-medium placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition"
+                    />
+                  </div>
+
+                  <div className="relative animate-in fade-in slide-in-from-top-2 duration-300">
+                    <select
+                      value={speciality}
+                      onChange={(e) => {
+                        setSpeciality(e.target.value);
+                        clearError();
+                      }}
+                      className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition appearance-none"
+                    >
+                      <option value="">{ar ? "التخصص" : "Speciality"}</option>
+                      {DENTAL_SPECIALITIES.map((s, i) => (
+                        <option key={i} value={s.en}>
+                          {ar ? s.ar : s.en}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </>
               )}
+
+              <div className="relative">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  className="absolute start-3.5 top-1/2 -translate-y-1/2 size-4.5 text-slate-400 pointer-events-none"
+                >
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" />
+                  <circle cx="12" cy="10" r="3" />
+                </svg>
+                <select
+                  value={city}
+                  onChange={(e) => {
+                    setCity(e.target.value);
+                    clearError();
+                  }}
+                  className="w-full h-12 rounded-xl bg-slate-50 border border-border ps-10 pe-4 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition appearance-none"
+                >
+                  <option value="">{ar ? "المحافظة / المدينة" : "Governorate / City"}</option>
+                  {CITIES.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {ar ? c.ar : c.en}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </>
           )}
 

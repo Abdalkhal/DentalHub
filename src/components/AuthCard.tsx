@@ -3,6 +3,8 @@ import { useState, type ReactNode, useEffect } from "react";
 import { Lock, Mail, Loader2, User, ArrowRight, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
+import { CITIES } from "@/data/offices";
+import { DENTAL_SPECIALITIES } from "@/lib/constants/dentalSpecialities";
 import { auth, db } from "@/integrations/firebase/client";
 import type { AccountType } from "@/integrations/firebase/types";
 import { fetchUserRoleDoc, getAccountDashboard } from "@/lib/useAuth";
@@ -158,6 +160,9 @@ export function AuthCard({ defaultMode }: AuthCardProps) {
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [regClinicName, setRegClinicName] = useState("");
   const [regPhone, setRegPhone] = useState("");
+  const [regCity, setRegCity] = useState("");
+  const [regClinicNameDentist, setRegClinicNameDentist] = useState("");
+  const [regSpeciality, setRegSpeciality] = useState("");
 
   const clearError = () => setError(null);
 
@@ -293,11 +298,14 @@ export function AuthCard({ defaultMode }: AuthCardProps) {
         email: regEmail.trim(),
         phone: regPhone.trim() || null,
         clinicName: regClinicName.trim() || null,
+        city: regCity || null,
         createdAt: serverTimestamp(),
       };
       if (isDentist) {
         roleData.surname = regSurname.trim();
         roleData.gender = regGender;
+        roleData.clinicName = regClinicNameDentist.trim() || null;
+        roleData.speciality = regSpeciality || null;
       }
       await setDoc(doc(db, "user_roles", cred.user.uid), roleData);
       navigate({ to: getAccountDashboard(accountType) });
@@ -550,6 +558,36 @@ export function AuthCard({ defaultMode }: AuthCardProps) {
                       </button>
                     ))}
                   </div>
+
+                  <div className="relative">
+                    <input
+                      value={regClinicNameDentist}
+                      onChange={(e) => {
+                        setRegClinicNameDentist(e.target.value);
+                        clearError();
+                      }}
+                      placeholder={ar ? "اسم العيادة" : "Clinic name"}
+                      className="w-full h-14 rounded-2xl bg-slate-50 border border-border ps-12 pe-4 text-sm font-medium placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all duration-200"
+                    />
+                  </div>
+
+                  <div className="relative">
+                    <select
+                      value={regSpeciality}
+                      onChange={(e) => {
+                        setRegSpeciality(e.target.value);
+                        clearError();
+                      }}
+                      className="w-full h-14 rounded-2xl bg-slate-50 border border-border ps-12 pe-4 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all duration-200 appearance-none"
+                    >
+                      <option value="">{ar ? "التخصص" : "Speciality"}</option>
+                      {DENTAL_SPECIALITIES.map((s, i) => (
+                        <option key={i} value={s.en}>
+                          {ar ? s.ar : s.en}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </>
               ) : (
                 <div className="relative">
@@ -602,6 +640,34 @@ export function AuthCard({ defaultMode }: AuthCardProps) {
                   />
                 </div>
               )}
+
+              <div className="relative">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  className="absolute start-4 top-1/2 -translate-y-1/2 size-5 text-slate-400 pointer-events-none"
+                >
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" />
+                  <circle cx="12" cy="10" r="3" />
+                </svg>
+                <select
+                  value={regCity}
+                  onChange={(e) => {
+                    setRegCity(e.target.value);
+                    clearError();
+                  }}
+                  className="w-full h-14 rounded-2xl bg-slate-50 border border-border ps-12 pe-4 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all duration-200 appearance-none"
+                >
+                  <option value="">{ar ? "المحافظة / المدينة" : "Governorate / City"}</option>
+                  {CITIES.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {ar ? c.ar : c.en}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
               <div className="relative">
                 <Mail className="absolute start-4 top-1/2 -translate-y-1/2 size-5 text-slate-400 pointer-events-none" />

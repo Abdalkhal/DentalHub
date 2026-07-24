@@ -159,8 +159,8 @@ function LabsExplore() {
               name_ar: u.name || u.surname || "",
               name_en: u.name || u.surname || "",
               type: normalizedType as AccountType,
-              city_ar: u.address || "",
-              city_en: u.address || "",
+              city_ar: u.city || u.address || "",
+              city_en: u.city || u.address || "",
             } as RegisteredAccount;
           })
           .filter((e): e is RegisteredAccount => e !== null);
