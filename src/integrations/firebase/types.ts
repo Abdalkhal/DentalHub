@@ -33,6 +33,7 @@ export type UserRoleDoc = {
   mapUrl?: string;
   title?: string;
   dob?: string;
+  labDescription?: string;
   notificationsEnabled?: boolean;
   createdAt: Timestamp;
 };

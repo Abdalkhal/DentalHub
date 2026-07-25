@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
+import { useOrders, type Order } from "@/lib/ordersStore";
 import {
   X,
   Phone,
@@ -36,7 +37,12 @@ type Patient = {
   cases: PatientCase[];
 };
 
-const PATIENTS: Patient[] = [];
+const WORK_TYPES: Record<string, { ar: string; en: string }> = {
+  crown: { ar: "تاج", en: "Crown" },
+  veneer: { ar: "قشرة تجميلية", en: "Veneer" },
+  implant: { ar: "زرعة", en: "Implant" },
+  clear_aligner: { ar: "مصفف شفاف", en: "Clear Aligner" },
+};
 
 const STATUS_LABELS: Record<CaseStatus, { ar: string; en: string }> = {
   completed: { ar: "مكتمل", en: "Completed" },
@@ -56,8 +62,24 @@ const STATUS_ICONS: Record<CaseStatus, typeof CheckCircle> = {
   pending: Clock,
 };
 
+function mapOrderStatus(status: string): CaseStatus {
+  if (status === "completed") return "completed";
+  if (status === "in_progress") return "in_progress";
+  return "pending";
+}
+
+function loadManualPatients(): Patient[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem("dental_hub_patients");
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return [];
+}
+
 function formatDate(dateStr: string, lang: "ar" | "en") {
   const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
   const opts: Intl.DateTimeFormatOptions = {
     year: "numeric",
     month: lang === "ar" ? "numeric" : "short",
@@ -66,19 +88,82 @@ function formatDate(dateStr: string, lang: "ar" | "en") {
   return d.toLocaleDateString(lang === "ar" ? "ar-IQ" : "en-US", opts);
 }
 
+function patientIdFromName(name: string): string {
+  return `patient-${name
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9\u0600-\u06FF-]/g, "")}`;
+}
+
 export const Route = createFileRoute("/patients")({
   component: PatientsPage,
 });
 
 function PatientsPage() {
   const { t, lang, dir } = useI18n();
+  const orders = useOrders();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
 
-  const filtered = PATIENTS.filter((p) => {
+  const patients: Patient[] = useMemo(() => {
+    // --- Auto-extract from orders ---
+    const byName = new Map<string, Order[]>();
+    for (const o of orders) {
+      const key = o.patient.trim().toLowerCase();
+      if (!key) continue;
+      const existing = byName.get(key);
+      if (existing) {
+        existing.push(o);
+      } else {
+        byName.set(key, [o]);
+      }
+    }
+
+    const extracted: Patient[] = [];
+    for (const [, group] of byName) {
+      const sorted = [...group].sort(
+        (a, b) => new Date(b.dueDate || b.receivedDate).getTime() - new Date(a.dueDate || a.receivedDate).getTime(),
+      );
+      const name = sorted[0].patient.trim();
+      extracted.push({
+        id: patientIdFromName(name),
+        name: { ar: name, en: name },
+        phone: "",
+        lastVisit: sorted[0].dueDate || sorted[0].receivedDate,
+        totalCases: sorted.length,
+        cases: sorted.map((o) => ({
+          id: String(o.caseId || o.id.slice(0, 8)),
+          date: o.dueDate || o.receivedDate,
+          workType: WORK_TYPES[o.workType] ?? { ar: o.workType, en: o.workType },
+          doctor: o.doctor,
+          status: mapOrderStatus(o.status),
+        })),
+      });
+    }
+
+    // --- Merge with manual patients ---
+    const manualPatients = loadManualPatients();
+    const merged = [...extracted];
+    for (const mp of manualPatients) {
+      if (!merged.find((p) => p.name.ar === mp.name.ar || p.name.en === mp.name.en)) {
+        merged.push(mp);
+      }
+    }
+
+    return merged;
+  }, [orders]);
+
+  const filtered = useMemo(() => {
+    if (!searchQuery.trim()) return patients;
     const q = searchQuery.toLowerCase();
-    return p.name.ar.includes(q) || p.name.en.toLowerCase().includes(q) || p.phone.includes(q);
-  });
+    return patients.filter(
+      (p) =>
+        p.name.ar.toLowerCase().includes(q) ||
+        p.name.en.toLowerCase().includes(q) ||
+        p.phone.includes(q),
+    );
+  }, [patients, searchQuery]);
 
   return (
     <MobileShell>
@@ -108,7 +193,13 @@ function PatientsPage() {
               {lang === "ar" ? "لا يوجد مرضى" : "No patients found"}
             </p>
             <p className="text-sm text-muted-foreground mt-1">
-              {lang === "ar" ? "حاول تغيير عبارة البحث" : "Try a different search term"}
+              {lang === "ar"
+                ? orders.length === 0
+                  ? "أضف طلبات ليظهر المرضى تلقائياً"
+                  : "حاول تغيير عبارة البحث"
+                : orders.length === 0
+                  ? "Add orders to see patients automatically"
+                  : "Try a different search term"}
             </p>
           </div>
         ) : (
@@ -128,11 +219,15 @@ function PatientsPage() {
                         {patient.name[lang === "ar" ? "ar" : "en"]}
                       </p>
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
-                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                          <Phone className="size-3" />
-                          {patient.phone}
-                        </span>
-                        <span className="text-muted-foreground text-[10px]">·</span>
+                        {patient.phone && (
+                          <>
+                            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                              <Phone className="size-3" />
+                              {patient.phone}
+                            </span>
+                            <span className="text-muted-foreground text-[10px]">·</span>
+                          </>
+                        )}
                         <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                           <Calendar className="size-3" />
                           {formatDate(patient.lastVisit, lang)}
@@ -189,7 +284,9 @@ function PatientModal({
               <h2 className="font-bold text-foreground truncate">
                 {patient.name[lang === "ar" ? "ar" : "en"]}
               </h2>
-              <p className="text-xs text-muted-foreground">{patient.phone}</p>
+              {patient.phone && (
+                <p className="text-xs text-muted-foreground">{patient.phone}</p>
+              )}
             </div>
           </div>
           <button

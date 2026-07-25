@@ -7,20 +7,22 @@ export type ProdStageId = "impression" | "design" | "printing" | "ceramic" | "qc
 export type Order = {
   id: string;
   orderNumber: string;
+  caseId: number;
   patient: string;
   doctor: string;
   workType: string;
   receivedDate: string;
+  dueDate: string;
   status: OrderStatus;
   currentStage?: ProdStageId;
-  agent?: string;
-  unitsCount?: number;
-  unitPrice?: number;
+  agent: string;
+  unitsCount: number;
+  unitPrice: number;
   currency?: "USD" | "IQD";
-  discount?: number;
-  price?: number;
+  discount: number;
+  price: number;
   rating?: number;
-  notes?: string;
+  notes: string;
 };
 
 const STORAGE_KEY = "dental_hub_orders";
@@ -113,6 +115,39 @@ export function getNextOrderNumber(): string {
   _counter += 1;
   saveCounter(_counter);
   return `ORD-${String(_counter).padStart(3, "0")}`;
+}
+
+const CASE_COUNTER_KEY = "dental_case_counter";
+
+function loadCaseCounter(): number {
+  try {
+    const v = localStorage.getItem(CASE_COUNTER_KEY);
+    return v ? parseInt(v, 10) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function saveCaseCounter(n: number) {
+  try {
+    localStorage.setItem(CASE_COUNTER_KEY, String(n));
+  } catch {}
+}
+
+let _caseCounter = loadCaseCounter();
+
+function initCaseCounter() {
+  if (_caseCounter > 0) return;
+  const maxCaseId = orders.reduce((max, o) => Math.max(max, o.caseId ?? 0), 0);
+  _caseCounter = Math.max(maxCaseId, 7000);
+  saveCaseCounter(_caseCounter);
+}
+
+export function getNextCaseId(): number {
+  if (_caseCounter === 0) initCaseCounter();
+  _caseCounter += 1;
+  saveCaseCounter(_caseCounter);
+  return _caseCounter;
 }
 
 export function addOrder(order: Order) {

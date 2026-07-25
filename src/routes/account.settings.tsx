@@ -38,6 +38,7 @@ import {
   ChevronRight,
   Camera,
   DollarSign,
+  FileText,
 } from "lucide-react";
 
 export const Route = createFileRoute("/account/settings")({
@@ -54,6 +55,7 @@ function SettingsPage() {
   const [phone, setPhone] = useState("");
   const [phoneError, setPhoneError] = useState("");
   const [address, setAddress] = useState("");
+  const [labDescription, setLabDescription] = useState("");
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
@@ -80,6 +82,7 @@ function SettingsPage() {
       setName(role.name || "");
       setPhone(localDigitsFromStored(role.phone));
       setAddress(role.address || "");
+      setLabDescription(role.labDescription || "");
       setNotificationsEnabled(role.notificationsEnabled !== false);
       setLatitude(role.latitude ?? null);
       setLongitude(role.longitude ?? null);
@@ -121,6 +124,7 @@ function SettingsPage() {
         name: name.trim(),
         phone: cleanPhone,
         address: address.trim() || null,
+        labDescription: labDescription.trim() || null,
         notificationsEnabled,
         latitude: latitude ?? null,
         longitude: longitude ?? null,
@@ -359,6 +363,23 @@ function SettingsPage() {
                   onChange={(e) => setAddress(e.target.value)}
                   placeholder={ar ? "المحافظة، المنطقة / الحي" : "Governorate, Area / District"}
                   className={inputClass}
+                />
+              </Field>
+              <Field
+                icon={FileText}
+                iconTone="bg-violet-100 text-violet-600"
+                label={ar ? "وصف المختبر والتقنيات المستخدمة" : "Lab Description & Technologies"}
+              >
+                <textarea
+                  value={labDescription}
+                  onChange={(e) => setLabDescription(e.target.value)}
+                  rows={3}
+                  placeholder={
+                    ar
+                      ? "اكتب وصفاً لمختبرك والتقنيات التي تستخدمها..."
+                      : "Describe your lab and the technologies you use..."
+                  }
+                  className="w-full bg-card border border-border rounded-xl px-3 py-2.5 outline-none text-sm focus:ring-2 focus:ring-ring/40 resize-none placeholder:text-muted-foreground/60"
                 />
               </Field>
             </div>

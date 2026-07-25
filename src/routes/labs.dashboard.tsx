@@ -16,6 +16,7 @@ import {
   deleteOrder,
   useOrders,
   getNextOrderNumber,
+  getNextCaseId,
   type Order,
   type OrderStatus,
 } from "@/lib/ordersStore";
@@ -126,6 +127,12 @@ function formatShortDate(dateStr: string): string {
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return dateStr;
   return `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}/${d.getFullYear()}`;
+}
+
+function fmtCurrency(amount: number, cur?: "USD" | "IQD"): string {
+  const isIQD = cur === "IQD";
+  if (isIQD) return `${amount.toLocaleString("en-US")} د.ع`;
+  return `$${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function StatCard({
@@ -262,8 +269,10 @@ function LabDashboard() {
     return orders.filter(
       (c) =>
         c.orderNumber.toLowerCase().includes(q) ||
+        String(c.caseId).includes(q) ||
         c.patient.toLowerCase().includes(q) ||
-        c.doctor.toLowerCase().includes(q),
+        c.doctor.toLowerCase().includes(q) ||
+        c.agent.toLowerCase().includes(q),
     );
   }, [orders, searchQuery]);
 
@@ -274,18 +283,28 @@ function LabDashboard() {
     setSelectedOrder((prev) => (prev?.id === id ? { ...prev, status: newStatus } : prev));
   };
 
-  const handleCreateOrder = (order: NewOrder) => {
+  const handleCreateOrder = (newOrder: NewOrder) => {
+    const units = newOrder.unitsCount || 0;
+    const price = newOrder.unitPrice || 0;
+    const disc = newOrder.discount || 0;
+    const total = Math.max(0, units * price - disc);
     addOrder({
       id: crypto.randomUUID(),
       orderNumber: getNextOrderNumber(),
+      caseId: getNextCaseId(),
       receivedDate: new Date().toISOString(),
-      patient: order.patient,
-      doctor: order.doctor,
-      workType: order.workType,
-      status: "delayed",
-      notes: order.notes,
-      price: 0,
-      rating: 0,
+      dueDate: newOrder.date,
+      patient: newOrder.patient,
+      doctor: newOrder.dentist,
+      workType: newOrder.workType,
+      status: "in_progress",
+      agent: newOrder.agent,
+      unitsCount: units,
+      unitPrice: price,
+      currency: newOrder.currency,
+      discount: disc,
+      price: total,
+      notes: newOrder.notes,
     });
   };
 
@@ -366,8 +385,9 @@ function LabDashboard() {
               className="relative mt-4 w-full rounded-2xl overflow-hidden bg-gradient-to-br from-sky-500 to-indigo-600 p-4 text-white text-right shadow-lg group"
             >
               <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_30%_50%,white_0%,transparent_60%)]" />
-              <p className="font-display font-bold text-sm leading-tight relative">
-                {ar ? "تقنيات حديثة لنتائج دقيقة" : "Modern Tech for Precise Results"}
+              <p className="font-display font-bold text-sm leading-tight relative line-clamp-2">
+                {profile?.labDescription
+                  || (ar ? "تقنيات حديثة لنتائج دقيقة" : "Modern Tech for Precise Results")}
               </p>
               <p className="text-[11px] opacity-80 mt-1 relative">
                 {ar ? "اعرف المزيد" : "Learn more"}
@@ -563,17 +583,22 @@ function LabDashboard() {
                   <thead>
                     <tr className="border-b border-slate-100 bg-slate-50/50">
                       {[
-                        ar ? "رقم الطلب" : "Order #",
-                        ar ? "المريض" : "Patient",
-                        ar ? "الطبيب" : "Doctor",
+                        ar ? "تاريخ الإخراج" : "Date",
+                        ar ? "المندوب" : "Agent",
+                        ar ? "رقم الحالة" : "Case ID",
+                        ar ? "اسم الطبيب" : "Dentist Name",
+                        ar ? "اسم المريض" : "Patient Name",
                         ar ? "نوع العمل" : "Work Type",
-                        ar ? "تاريخ الاستلام" : "Date Received",
-                        ar ? "الحالة" : "Status",
-                        ar ? "الإجراء" : "Actions",
-                      ].map((h) => (
+                        ar ? "عدد الوحدات" : "Units Count",
+                        ar ? "السعر" : "Unit Price",
+                        ar ? "الإجمالي" : "Total Price",
+                        ar ? "خصم" : "Discount",
+                        ar ? "السبب" : "Reason",
+                        "",
+                      ].map((h, i) => (
                         <th
-                          key={h}
-                          className="text-right px-4 py-3 text-xs font-bold text-slate-500 whitespace-nowrap"
+                          key={i}
+                          className="text-right px-3 py-3 text-[11px] font-bold text-slate-500 whitespace-nowrap"
                         >
                           {h}
                         </th>
@@ -583,7 +608,7 @@ function LabDashboard() {
                   <tbody>
                     {displayedCases.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="text-center py-12 text-sm text-slate-400">
+                        <td colSpan={12} className="text-center py-12 text-sm text-slate-400">
                           {ar ? "لا توجد طلبات مطابقة" : "No matching orders"}
                         </td>
                       </tr>
@@ -593,42 +618,54 @@ function LabDashboard() {
                           key={c.id}
                           className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors"
                         >
-                          <td className="px-4 py-3.5 font-mono text-xs font-bold text-slate-700">
-                            {c.orderNumber}
+                          <td className="px-3 py-3 text-xs text-slate-600 whitespace-nowrap">
+                            {formatShortDate(c.dueDate || c.receivedDate)}
                           </td>
-                          <td className="px-4 py-3.5 font-semibold text-slate-800">{c.patient}</td>
-                          <td className="px-4 py-3.5 text-slate-600">{c.doctor}</td>
-                          <td className="px-4 py-3.5">
+                          <td className="px-3 py-3 text-xs text-slate-600 whitespace-nowrap font-medium">
+                            {c.agent || "-"}
+                          </td>
+                          <td className="px-3 py-3 font-mono text-xs font-bold text-sky-600 whitespace-nowrap">
+                            {c.caseId || c.orderNumber}
+                          </td>
+                          <td className="px-3 py-3 text-xs font-semibold text-slate-800 whitespace-nowrap">
+                            {c.doctor}
+                          </td>
+                          <td className="px-3 py-3 text-xs text-slate-700 whitespace-nowrap">
+                            {c.patient}
+                          </td>
+                          <td className="px-3 py-3">
                             <WorkTypeBadge type={c.workType as WorkType} />
                           </td>
-                          <td className="px-4 py-3.5 text-xs text-slate-500">
-                            {formatShortDate(c.receivedDate)}
+                          <td className="px-3 py-3 text-xs text-slate-700 whitespace-nowrap text-center">
+                            {c.unitsCount ?? "-"}
                           </td>
-                          <td className="px-4 py-3.5">
-                            <StatusBadge status={c.status} />
+                          <td className="px-3 py-3 text-xs text-slate-700 whitespace-nowrap">
+                            {fmtCurrency(c.unitPrice ?? 0, c.currency)}
                           </td>
-                          <td className="px-4 py-3.5">
+                          <td className="px-3 py-3 text-xs font-bold text-emerald-600 whitespace-nowrap">
+                            {fmtCurrency(c.price ?? 0, c.currency)}
+                          </td>
+                          <td className="px-3 py-3 text-xs text-rose-500 whitespace-nowrap">
+                            {c.discount ? fmtCurrency(c.discount, c.currency) : "-"}
+                          </td>
+                          <td className="px-3 py-3 text-xs text-slate-500 max-w-[120px] truncate whitespace-nowrap">
+                            {c.notes || "-"}
+                          </td>
+                          <td className="px-3 py-3">
                             <div className="flex items-center gap-1">
                               <button
                                 onClick={() => setSelectedOrder(c)}
-                                className="h-8 px-3 rounded-lg text-xs font-bold text-sky-600 hover:bg-sky-50 flex items-center gap-1"
+                                className="h-7 px-2 rounded-lg text-[11px] font-bold text-sky-600 hover:bg-sky-50 flex items-center gap-1 whitespace-nowrap"
                               >
-                                <Eye className="size-3.5" />
+                                <Eye className="size-3" />
                                 {ar ? "عرض" : "View"}
                               </button>
                               <button
-                                onClick={() => setSelectedOrder(c)}
-                                className="h-8 px-3 rounded-lg text-xs font-bold text-slate-500 hover:bg-slate-100 flex items-center gap-1"
-                              >
-                                <Edit3 className="size-3.5" />
-                                {ar ? "تعديل" : "Edit"}
-                              </button>
-                              <button
                                 onClick={() => setDeleteTarget(c)}
-                                className="h-8 w-8 rounded-lg text-xs font-bold text-rose-500 hover:bg-rose-50 flex items-center justify-center"
+                                className="h-7 w-7 rounded-lg text-[11px] font-bold text-rose-500 hover:bg-rose-50 flex items-center justify-center"
                                 title={ar ? "حذف" : "Delete"}
                               >
-                                <Trash2 className="size-3.5" />
+                                <Trash2 className="size-3" />
                               </button>
                             </div>
                           </td>
@@ -786,8 +823,9 @@ function LabDashboard() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-display font-extrabold text-lg">
-                {ar ? "تقنيات حديثة لنتائج دقيقة" : "Modern Tech for Precise Results"}
+              <h3 className="font-display font-extrabold text-lg line-clamp-2">
+                {profile?.labDescription
+                  || (ar ? "تقنيات حديثة لنتائج دقيقة" : "Modern Tech for Precise Results")}
               </h3>
               <button
                 onClick={() => setShowPromoModal(false)}
@@ -798,9 +836,10 @@ function LabDashboard() {
             </div>
             <div className="rounded-2xl overflow-hidden bg-gradient-to-br from-sky-500 to-indigo-600 p-6 text-white mb-4">
               <p className="font-display font-bold text-xl leading-tight">
-                {ar
-                  ? "نستخدم أحدث تقنيات المسح الرقمي والطباعة ثلاثية الأبعاد"
-                  : "We use the latest digital scanning & 3D printing technology"}
+                {profile?.labDescription
+                  || (ar
+                    ? "نستخدم أحدث تقنيات المسح الرقمي والطباعة ثلاثية الأبعاد"
+                    : "We use the latest digital scanning & 3D printing technology")}
               </p>
             </div>
             <p className="text-sm text-slate-600 leading-relaxed">

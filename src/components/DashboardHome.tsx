@@ -25,6 +25,7 @@ import {
   addOrder,
   updateOrderStatus,
   getNextOrderNumber,
+  getNextCaseId,
   type Order,
   type OrderStatus,
 } from "@/lib/ordersStore";
@@ -460,14 +461,27 @@ export function DashboardHome() {
         open={showNewOrder}
         onClose={() => setShowNewOrder(false)}
         onSubmit={(order: NewOrder) => {
+          const units = order.unitsCount || 0;
+          const price = order.unitPrice || 0;
+          const disc = order.discount || 0;
+          const total = Math.max(0, units * price - disc);
           const newOrder: Order = {
             id: crypto.randomUUID(),
             orderNumber: getNextOrderNumber(),
+            caseId: getNextCaseId(),
             patient: order.patient,
-            doctor: order.doctor,
+            doctor: order.dentist,
             workType: order.workType,
             receivedDate: new Date().toISOString().split("T")[0],
-            status: "delayed",
+            dueDate: order.date,
+            status: "in_progress",
+            agent: order.agent,
+            unitsCount: units,
+            unitPrice: price,
+            currency: order.currency,
+            discount: disc,
+            price: total,
+            notes: order.notes,
           };
           addOrder(newOrder);
         }}

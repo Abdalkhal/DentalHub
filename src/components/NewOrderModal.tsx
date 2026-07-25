@@ -1,12 +1,31 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { X, User, Building2, Wrench, AlertCircle, CheckCircle2 } from "lucide-react";
+import {
+  X,
+  User,
+  Building2,
+  Wrench,
+  AlertCircle,
+  CheckCircle2,
+  Calendar,
+  Hash,
+  DollarSign,
+  Percent,
+  FileText,
+  UserCheck,
+} from "lucide-react";
 
 export type NewOrder = {
   patient: string;
-  doctor: string;
+  dentist: string;
+  date: string;
   workType: string;
+  unitsCount: number;
+  unitPrice: number;
+  currency: "USD" | "IQD";
+  agent: string;
+  discount: number;
   notes: string;
 };
 
@@ -23,24 +42,46 @@ const WORK_TYPES = [
   { value: "clear_aligner", ar: "مصفف شفاف", en: "Clear Aligner" },
 ];
 
+const inputClass =
+  "w-full h-11 rounded-xl border border-border bg-card px-4 text-sm font-medium placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-primary transition";
+
+const inputErrorClass = "ring-2 ring-destructive/50 border-destructive";
+
 export function NewOrderModal({ open, onClose, onSubmit }: Props) {
   const { lang, t } = useI18n();
   const ar = lang === "ar";
 
   const [patient, setPatient] = useState("");
-  const [doctor, setDoctor] = useState("");
+  const [dentist, setDentist] = useState("");
+  const [date, setDate] = useState("");
   const [workType, setWorkType] = useState("");
+  const [unitsCount, setUnitsCount] = useState("");
+  const [unitPrice, setUnitPrice] = useState("");
+  const [agent, setAgent] = useState("");
+  const [discount, setDiscount] = useState("");
   const [notes, setNotes] = useState("");
+  const [currency, setCurrency] = useState<"USD" | "IQD">("USD");
   const [errors, setErrors] = useState<Record<string, boolean>>({});
   const [submitted, setSubmitted] = useState(false);
+
+  const totalPrice = useMemo(() => {
+    const units = parseFloat(unitsCount) || 0;
+    const price = parseFloat(unitPrice) || 0;
+    const disc = parseFloat(discount) || 0;
+    return Math.max(0, units * price - disc);
+  }, [unitsCount, unitPrice, discount]);
 
   if (!open) return null;
 
   const validate = () => {
     const errs: Record<string, boolean> = {};
     if (!patient.trim()) errs.patient = true;
-    if (!doctor.trim()) errs.doctor = true;
+    if (!dentist.trim()) errs.dentist = true;
+    if (!date) errs.date = true;
     if (!workType) errs.workType = true;
+    if (!unitsCount.trim() || parseFloat(unitsCount) <= 0) errs.unitsCount = true;
+    if (!unitPrice.trim() || parseFloat(unitPrice) <= 0) errs.unitPrice = true;
+    if (!agent.trim()) errs.agent = true;
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -50,23 +91,36 @@ export function NewOrderModal({ open, onClose, onSubmit }: Props) {
     setSubmitted(true);
     onSubmit({
       patient: patient.trim(),
-      doctor: doctor.trim(),
+      dentist: dentist.trim(),
+      date,
       workType,
+      unitsCount: parseFloat(unitsCount) || 0,
+      unitPrice: parseFloat(unitPrice) || 0,
+      currency,
+      agent: agent.trim(),
+      discount: parseFloat(discount) || 0,
       notes: notes.trim(),
     });
     setTimeout(() => {
       setSubmitted(false);
       setPatient("");
-      setDoctor("");
+      setDentist("");
+      setDate("");
       setWorkType("");
+      setUnitsCount("");
+      setUnitPrice("");
+      setCurrency("USD");
+      setAgent("");
+      setDiscount("");
       setNotes("");
       setErrors({});
       onClose();
     }, 1200);
   };
 
-  const inputClass =
-    "w-full h-11 rounded-xl border border-border bg-card px-4 text-sm font-medium placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-primary transition";
+  const clearError = (field: string) => {
+    setErrors((e) => ({ ...e, [field]: false }));
+  };
 
   return (
     <div
@@ -78,7 +132,7 @@ export function NewOrderModal({ open, onClose, onSubmit }: Props) {
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
       <div
         className={cn(
-          "relative w-full max-w-md bg-background rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[92svh] flex flex-col animate-in slide-in-from-bottom duration-300",
+          "relative w-full max-w-lg bg-background rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[92svh] flex flex-col animate-in slide-in-from-bottom duration-300",
           submitted && "pointer-events-none",
         )}
       >
@@ -113,19 +167,16 @@ export function NewOrderModal({ open, onClose, onSubmit }: Props) {
               <div>
                 <label className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground mb-1.5">
                   <User className="size-3.5" />
-                  {t("patient_name")} <span className="text-destructive">*</span>
+                  {ar ? "اسم المريض" : "Patient Name"} <span className="text-destructive">*</span>
                 </label>
                 <input
                   value={patient}
                   onChange={(e) => {
                     setPatient(e.target.value);
-                    setErrors((e) => ({ ...e, patient: false }));
+                    clearError("patient");
                   }}
                   placeholder={ar ? "أدخل اسم المريض" : "Enter patient name"}
-                  className={cn(
-                    inputClass,
-                    errors.patient && "ring-2 ring-destructive/50 border-destructive",
-                  )}
+                  className={cn(inputClass, errors.patient && inputErrorClass)}
                 />
                 {errors.patient && (
                   <p className="text-[11px] text-destructive mt-1 flex items-center gap-1">
@@ -135,25 +186,22 @@ export function NewOrderModal({ open, onClose, onSubmit }: Props) {
                 )}
               </div>
 
-              {/* Doctor Name - Free Text */}
+              {/* Dentist Name */}
               <div>
                 <label className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground mb-1.5">
                   <Building2 className="size-3.5" />
-                  {t("clinic_doctor")} <span className="text-destructive">*</span>
+                  {ar ? "اسم الطبيب" : "Dentist Name"} <span className="text-destructive">*</span>
                 </label>
                 <input
-                  value={doctor}
+                  value={dentist}
                   onChange={(e) => {
-                    setDoctor(e.target.value);
-                    setErrors((e) => ({ ...e, doctor: false }));
+                    setDentist(e.target.value);
+                    clearError("dentist");
                   }}
-                  placeholder={ar ? "أدخل اسم العيادة أو الطبيب" : "Enter clinic or doctor name"}
-                  className={cn(
-                    inputClass,
-                    errors.doctor && "ring-2 ring-destructive/50 border-destructive",
-                  )}
+                  placeholder={ar ? "أدخل اسم الطبيب" : "Enter dentist name"}
+                  className={cn(inputClass, errors.dentist && inputErrorClass)}
                 />
-                {errors.doctor && (
+                {errors.dentist && (
                   <p className="text-[11px] text-destructive mt-1 flex items-center gap-1">
                     <AlertCircle className="size-3" />
                     {t("field_required")}
@@ -161,7 +209,30 @@ export function NewOrderModal({ open, onClose, onSubmit }: Props) {
                 )}
               </div>
 
-              {/* Work Type Dropdown */}
+              {/* Date / Due Date */}
+              <div>
+                <label className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground mb-1.5">
+                  <Calendar className="size-3.5" />
+                  {ar ? "تاريخ الإخراج" : "Due Date"} <span className="text-destructive">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(e) => {
+                    setDate(e.target.value);
+                    clearError("date");
+                  }}
+                  className={cn(inputClass, errors.date && inputErrorClass)}
+                />
+                {errors.date && (
+                  <p className="text-[11px] text-destructive mt-1 flex items-center gap-1">
+                    <AlertCircle className="size-3" />
+                    {t("field_required")}
+                  </p>
+                )}
+              </div>
+
+              {/* Work Type */}
               <div>
                 <label className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground mb-1.5">
                   <Wrench className="size-3.5" />
@@ -171,12 +242,12 @@ export function NewOrderModal({ open, onClose, onSubmit }: Props) {
                   value={workType}
                   onChange={(e) => {
                     setWorkType(e.target.value);
-                    setErrors((e) => ({ ...e, workType: false }));
+                    clearError("workType");
                   }}
                   className={cn(
                     inputClass,
                     "appearance-none",
-                    errors.workType && "ring-2 ring-destructive/50 border-destructive",
+                    errors.workType && inputErrorClass,
                   )}
                 >
                   <option value="">{t("select_work_type")}</option>
@@ -194,19 +265,158 @@ export function NewOrderModal({ open, onClose, onSubmit }: Props) {
                 )}
               </div>
 
-              {/* Notes - Optional */}
+              {/* Units Count + Unit Price row */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground mb-1.5">
+                    <Hash className="size-3.5" />
+                    {ar ? "عدد الوحدات" : "Units Count"}{" "}
+                    <span className="text-destructive">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={unitsCount}
+                    onChange={(e) => {
+                      setUnitsCount(e.target.value);
+                      clearError("unitsCount");
+                    }}
+                    placeholder="0"
+                    dir="ltr"
+                    className={cn(inputClass, errors.unitsCount && inputErrorClass)}
+                  />
+                  {errors.unitsCount && (
+                    <p className="text-[11px] text-destructive mt-1 flex items-center gap-1">
+                      <AlertCircle className="size-3" />
+                      {t("field_required")}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground mb-1.5">
+                    <DollarSign className="size-3.5" />
+                    {ar ? "سعر الوحدة" : "Unit Price"}{" "}
+                    <span className="text-destructive">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={unitPrice}
+                    onChange={(e) => {
+                      setUnitPrice(e.target.value);
+                      clearError("unitPrice");
+                    }}
+                    placeholder="0.00"
+                    dir="ltr"
+                    className={cn(inputClass, errors.unitPrice && inputErrorClass)}
+                  />
+                  <div className="flex rounded-xl bg-slate-50 border border-border mt-2 overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setCurrency("USD")}
+                      className={cn(
+                        "flex-1 h-9 text-xs font-bold transition",
+                        currency === "USD"
+                          ? "bg-primary text-primary-foreground"
+                          : "text-slate-500 hover:text-slate-700",
+                      )}
+                    >
+                      USD ($)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCurrency("IQD")}
+                      className={cn(
+                        "flex-1 h-9 text-xs font-bold transition",
+                        currency === "IQD"
+                          ? "bg-primary text-primary-foreground"
+                          : "text-slate-500 hover:text-slate-700",
+                      )}
+                    >
+                      IQD (د.ع)
+                    </button>
+                  </div>
+                  {errors.unitPrice && (
+                    <p className="text-[11px] text-destructive mt-1 flex items-center gap-1">
+                      <AlertCircle className="size-3" />
+                      {t("field_required")}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Agent */}
               <div>
                 <label className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground mb-1.5">
-                  {ar ? "ملاحظات" : "Notes"}{" "}
+                  <UserCheck className="size-3.5" />
+                  {ar ? "المندوب" : "Agent"} <span className="text-destructive">*</span>
+                </label>
+                <input
+                  value={agent}
+                  onChange={(e) => {
+                    setAgent(e.target.value);
+                    clearError("agent");
+                  }}
+                  placeholder={ar ? "أدخل اسم المندوب" : "Enter agent name"}
+                  className={cn(inputClass, errors.agent && inputErrorClass)}
+                />
+                {errors.agent && (
+                  <p className="text-[11px] text-destructive mt-1 flex items-center gap-1">
+                    <AlertCircle className="size-3" />
+                    {t("field_required")}
+                  </p>
+                )}
+              </div>
+
+              {/* Discount */}
+              <div>
+                <label className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground mb-1.5">
+                  <Percent className="size-3.5" />
+                  {ar ? "خصم ممنوح" : "Discount"} ({ar ? "اختياري" : "optional"})
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={discount}
+                  onChange={(e) => setDiscount(e.target.value)}
+                  placeholder="0.00"
+                  dir="ltr"
+                  className={inputClass}
+                />
+              </div>
+
+              {/* Reason / Notes */}
+              <div>
+                <label className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground mb-1.5">
+                  <FileText className="size-3.5" />
+                  {ar ? "السبب / ملاحظات" : "Reason / Notes"}{" "}
                   <span className="text-muted-foreground/50">({ar ? "اختياري" : "optional"})</span>
                 </label>
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  rows={3}
+                  rows={2}
                   className="w-full bg-card border border-border rounded-xl px-3 py-2.5 outline-none text-sm focus:ring-2 focus:ring-ring/40 resize-none"
                   placeholder={ar ? "أضف تفاصيل إضافية..." : "Add additional details..."}
                 />
+              </div>
+
+              {/* Auto-calculated Total */}
+              <div className="rounded-2xl bg-sky-50 border border-sky-100 p-4">
+                <p className="text-[11px] font-bold text-sky-600 uppercase tracking-wide mb-1">
+                  {ar ? "الإجمالي التقديري" : "Estimated Total"}
+                </p>
+                <p className="font-display font-extrabold text-2xl text-sky-800">
+                  {currency === "IQD"
+                    ? `${totalPrice.toLocaleString("en-US")} د.ع`
+                    : `$${totalPrice.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                </p>
+                <p className="text-[10px] text-sky-500 mt-0.5">
+                  ({ar ? "عدد الوحدات × سعر الوحدة - الخصم" : "Units × Price - Discount"})
+                </p>
               </div>
             </>
           )}
