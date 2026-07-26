@@ -1,15 +1,72 @@
-import { createFileRoute, useRouterState } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
-import { useProducts } from "@/lib/products";
+import { useProducts, useSignedImageUrls } from "@/lib/products";
 import { useOffers } from "@/lib/offers";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/integrations/firebase/client";
 import type { UserRoleDoc } from "@/integrations/firebase/types";
-import { MapPin, Phone, Package, Megaphone, Eye } from "lucide-react";
+import {
+  MapPin,
+  Phone,
+  Package,
+  Megaphone,
+  Eye,
+  Sparkles,
+  Activity,
+  Stethoscope,
+  Scissors,
+  AlignCenter,
+  Baby,
+  HeartPulse,
+  ShoppingCart,
+  Layers,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import imgGeneral from "@/assets/branch-general.png";
+import imgOperative from "@/assets/branch-operative.png";
+import imgEndodontic from "@/assets/branch-endodontic.png";
+import imgProsthodontic from "@/assets/branch-prosthodontic.png";
+import imgSurgery from "@/assets/branch-surgery.png";
+import imgOrthopedic from "@/assets/branch-orthopedic.png";
+import imgPedodontic from "@/assets/branch-pedodontic.png";
+import imgPeriodontic from "@/assets/branch-periodontic.png";
+
+const BRANCH_IMAGES: Record<string, string> = {
+  general: imgGeneral,
+  operative: imgOperative,
+  endodontic: imgEndodontic,
+  prosthodontic: imgProsthodontic,
+  surgery: imgSurgery,
+  orthopedic: imgOrthopedic,
+  pedodontic: imgPedodontic,
+  periodontic: imgPeriodontic,
+};
+
+const BRANCH_BADGE: Record<string, typeof Package> = {
+  general: Package,
+  operative: Sparkles,
+  endodontic: Activity,
+  prosthodontic: Stethoscope,
+  surgery: Scissors,
+  orthopedic: AlignCenter,
+  pedodontic: Baby,
+  periodontic: HeartPulse,
+};
+
+const branchOptions = [
+  { value: "general", ar: "مواد عامة", en: "General" },
+  { value: "operative", ar: "معالجة الأسنان", en: "Operative" },
+  { value: "endodontic", ar: "علاج الجذور", en: "Endodontics" },
+  { value: "prosthodontic", ar: "التركيبات", en: "Prosthodontics" },
+  { value: "surgery", ar: "جراحة الفم", en: "Surgery" },
+  { value: "orthopedic", ar: "تقويم الأسنان", en: "Orthodontics" },
+  { value: "pedodontic", ar: "أسنان الأطفال", en: "Pedodontics" },
+  { value: "periodontic", ar: "علاج اللثة", en: "Periodontics" },
+];
 
 export const Route = createFileRoute("/profile/$accountId")({
   component: ProfilePage,
@@ -54,6 +111,33 @@ function ProfilePage() {
     () => allProducts.filter((p) => p.companyId === accountId),
     [allProducts, accountId],
   );
+
+  const isSupply = account?.accountType === "supply";
+
+  const [branchFilter, setBranchFilter] = useState<string>("all");
+
+  const activeBranchName = branchFilter !== "all"
+    ? branchOptions.find((b) => b.value === branchFilter)
+    : null;
+
+  const filteredProducts = useMemo(() => {
+    if (!isSupply) return products;
+    if (branchFilter === "all") return [];
+    return products.filter((p) => p.branch === branchFilter);
+  }, [products, branchFilter, isSupply]);
+
+  const filterImagePaths = useMemo(
+    () => filteredProducts.flatMap((p) => p.images),
+    [filteredProducts],
+  );
+  const { data: filterUrls = {} } = useSignedImageUrls(filterImagePaths);
+
+  const fmtPrice = (p: typeof allProducts[0]) => {
+    const isIQD = p.currency === "IQD";
+    return isIQD
+      ? `${p.price.toLocaleString()} د.ع`
+      : `$${p.price.toFixed(2)}`;
+  };
 
   if (isLoading) {
     return (
@@ -112,6 +196,7 @@ function ProfilePage() {
     <MobileShell>
       <TopBar title={ar ? "الملف الشخصي" : "Profile"} showBack />
       <div className="px-4 pt-4 space-y-4 pb-6">
+        {/* ── Profile Header ─────────────────────── */}
         <div className="bg-card border border-border rounded-2xl p-4 shadow-soft flex items-start gap-4">
           <span
             className={`size-14 rounded-2xl flex items-center justify-center shrink-0 font-display font-extrabold text-xl ${categoryColor}`}
@@ -144,6 +229,7 @@ function ProfilePage() {
           </div>
         </div>
 
+        {/* ── Contact buttons ────────────────────── */}
         {(account.phone || getMapsUrl()) && (
           <div className="flex gap-2">
             {account.phone && (
@@ -171,6 +257,7 @@ function ProfilePage() {
           </div>
         )}
 
+        {/* ── Offers ────────────────────────────── */}
         {offers.length > 0 && (
           <div>
             <h2 className="font-display font-bold text-base flex items-center gap-1.5 mb-3">
@@ -213,7 +300,139 @@ function ProfilePage() {
           </div>
         )}
 
-        {products.length > 0 && (
+        {/* ── Supply: Branch Categories + Products ─ */}
+        {isSupply && (
+          <>
+            {activeBranchName ? (
+              <>
+                {/* Active filter header */}
+                <button
+                  onClick={() => setBranchFilter("all")}
+                  className="flex items-center gap-2 text-sm font-bold text-primary hover:text-primary/80 transition"
+                >
+                  <Package className="size-4" />
+                  {ar ? "كل الفئات" : "All Categories"}
+                </button>
+                <div className="flex items-center gap-3 bg-primary/5 border border-primary/15 rounded-2xl p-3">
+                  <span className="size-10 rounded-xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
+                    {(() => {
+                      const Badge = BRANCH_BADGE[activeBranchName.value] ?? Package;
+                      return <Badge className="size-5" />;
+                    })()}
+                  </span>
+                  <div>
+                    <p className="font-display font-bold text-sm">
+                      {ar ? activeBranchName.ar : activeBranchName.en}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {filteredProducts.length} {ar ? "منتج" : "products"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* 5-col filtered products */}
+                {filteredProducts.length > 0 ? (
+                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
+                    {filteredProducts.map((p) => (
+                      <div
+                        key={p.id}
+                        className="bg-card border border-border rounded-xl p-1.5 shadow-soft"
+                      >
+                        {p.images.length > 0 && filterUrls[p.images[0]] ? (
+                          <div className="w-full aspect-square rounded-lg bg-slate-100 overflow-hidden mb-1">
+                            <img
+                              src={filterUrls[p.images[0]]}
+                              alt=""
+                              className="size-full object-cover"
+                              loading="lazy"
+                            />
+                          </div>
+                        ) : (
+                          <div className="w-full aspect-square rounded-lg bg-slate-100 flex items-center justify-center mb-1">
+                            <Package className="size-4 text-slate-400" />
+                          </div>
+                        )}
+                        <p className="font-display font-bold text-[11px] leading-tight line-clamp-2">
+                          {ar ? p.ar || p.en : p.en || p.ar}
+                        </p>
+                        <p className="text-[9px] text-muted-foreground truncate mt-0.5">
+                          {p.brand}
+                        </p>
+                        <p className="mt-1 font-display font-extrabold text-xs text-primary">
+                          {fmtPrice(p)}
+                        </p>
+                        <div className="flex items-center gap-1 mt-0.5 text-[9px] text-muted-foreground">
+                          <Layers className="size-2.5" />
+                          {p.stock ?? 0}
+                        </div>
+                        <button className="w-full h-6 mt-1 rounded-md bg-primary/10 text-primary text-[9px] font-bold flex items-center justify-center gap-1 hover:bg-primary/20 transition">
+                          <ShoppingCart className="size-2.5" />
+                          {ar ? "طلب المنتج" : "Order"}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="py-10 text-center text-sm text-muted-foreground">
+                    <Package className="size-8 mx-auto mb-2 text-muted-foreground/50" />
+                    <p>
+                      {ar
+                        ? `لا توجد منتجات في ${activeBranchName.ar}`
+                        : `No products in ${activeBranchName.en}`}
+                    </p>
+                  </div>
+                )}
+              </>
+            ) : (
+              /* Branch categories grid */
+              <div>
+                <h2 className="font-display font-bold text-base flex items-center gap-1.5 mb-3">
+                  <Package className="size-4 text-primary" />
+                  {ar ? "فروع طب الأسنان" : "Dental Specialties"}
+                </h2>
+                <div className="grid grid-cols-2 gap-2.5">
+                  {branchOptions.map((b) => {
+                    const Badge = BRANCH_BADGE[b.value] ?? Package;
+                    const image = BRANCH_IMAGES[b.value];
+                    const count = products.filter((p) => p.branch === b.value).length;
+                    return (
+                      <button
+                        key={b.value}
+                        onClick={() => setBranchFilter(b.value)}
+                        className="text-start bg-card border border-border rounded-2xl p-3 shadow-soft hover:shadow-card transition active:scale-[0.98] relative overflow-hidden"
+                      >
+                        <span className="absolute top-2.5 end-2.5 size-7 rounded-full bg-primary-soft text-primary flex items-center justify-center">
+                          <Badge className="size-3.5" />
+                        </span>
+                        <div className="h-20 flex items-center justify-center mb-1">
+                          {image ? (
+                            <img
+                              src={image}
+                              alt=""
+                              loading="lazy"
+                              className="h-20 w-auto object-contain"
+                            />
+                          ) : (
+                            <Badge className="size-8 text-primary" />
+                          )}
+                        </div>
+                        <p className="font-display font-bold text-xs leading-tight">
+                          {ar ? b.ar : b.en}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {count} {ar ? "صنف" : "items"}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── Non-supply: Simple products ────────── */}
+        {!isSupply && products.length > 0 && (
           <div>
             <h2 className="font-display font-bold text-base flex items-center gap-1.5 mb-3">
               <Package className="size-4 text-primary" />
@@ -224,9 +443,7 @@ function ProfilePage() {
                 <div key={p.id} className="bg-card border border-border rounded-xl p-3 shadow-soft">
                   <p className="font-display font-bold text-sm truncate">{ar ? p.ar : p.en}</p>
                   <p className="text-[11px] text-muted-foreground truncate">{p.brand}</p>
-                  <p className="text-xs font-semibold mt-1">
-                    {p.currency === "IQD" ? `${p.price.toLocaleString()} IQD` : `$${p.price}`}
-                  </p>
+                  <p className="text-xs font-semibold mt-1">{fmtPrice(p)}</p>
                 </div>
               ))}
             </div>
@@ -240,6 +457,7 @@ function ProfilePage() {
           </div>
         )}
 
+        {/* ── Empty state ───────────────────────── */}
         {offers.length === 0 && products.length === 0 && (
           <div className="py-10 text-center text-sm text-muted-foreground">
             <Eye className="size-8 mx-auto mb-2 text-muted-foreground/50" />

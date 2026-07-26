@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, useRouterState } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
@@ -18,7 +18,14 @@ import {
   Baby,
   HeartPulse,
   EyeOff,
+  ArrowRight,
+  ArrowLeft,
 } from "lucide-react";
+
+const BRANCH_BACK_ICON: Record<string, typeof ArrowRight> = {
+  rtl: ArrowRight,
+  ltr: ArrowLeft,
+};
 import imgGeneral from "@/assets/branch-general.png";
 import imgOperative from "@/assets/branch-operative.png";
 import imgEndodontic from "@/assets/branch-endodontic.png";
@@ -72,7 +79,8 @@ function OfficePage() {
   const { offices: OFFICES, branches: BRANCHES } = useAdminStore();
   const { data: PRODUCTS = [] } = useProducts();
   const office = OFFICES.find((o) => o.id === officeId);
-  const { t, lang } = useI18n();
+  const { t, lang, dir } = useI18n();
+  const BackIcon = BRANCH_BACK_ICON[dir] ?? ArrowRight;
   const isVisitor = useRouterState({
     select: (s) =>
       s.location.state != null &&
@@ -91,30 +99,26 @@ function OfficePage() {
   }, [office]);
 
   const needle = q.trim().toLowerCase();
-  const branches = useMemo(
-    () =>
-      BRANCHES.filter(
-        (b) =>
-          !needle || b.ar.toLowerCase().includes(needle) || b.en.toLowerCase().includes(needle),
-      ),
-    [needle],
-  );
 
-  const productMatches = useMemo(() => {
-    const hasFilter = needle.length > 0 || branchFilter !== "all";
-    if (!hasFilter) return [];
-    return PRODUCTS.filter((p) => {
-      if (branchFilter !== "all" && p.branch !== branchFilter) return false;
-      if (!needle) return true;
-      return (
-        p.ar.toLowerCase().includes(needle) ||
-        p.en.toLowerCase().includes(needle) ||
-        p.brand.toLowerCase().includes(needle)
+  const activeBranch = branchFilter !== "all"
+    ? BRANCHES.find((b) => b.slug === branchFilter)
+    : null;
+
+  const filteredProducts = useMemo(() => {
+    let list = PRODUCTS;
+    if (branchFilter !== "all") list = list.filter((p) => p.branch === branchFilter);
+    if (needle) {
+      list = list.filter(
+        (p) =>
+          p.ar.toLowerCase().includes(needle) ||
+          p.en.toLowerCase().includes(needle) ||
+          p.brand.toLowerCase().includes(needle),
       );
-    });
+    }
+    return list;
   }, [needle, branchFilter, PRODUCTS]);
 
-  const matchPaths = useMemo(() => productMatches.flatMap((p) => p.images), [productMatches]);
+  const matchPaths = useMemo(() => filteredProducts.flatMap((p) => p.images), [filteredProducts]);
   const { data: matchUrls = {} } = useSignedImageUrls(matchPaths);
 
   if (!office) {
@@ -147,85 +151,89 @@ function OfficePage() {
         </div>
       )}
       <div className="px-4 pt-4">
-        <p className="text-xs text-muted-foreground mb-3">
+        <p className="text-xs text-muted-foreground mb-4">
           {lang === "ar" ? office.area.ar : office.area.en}
         </p>
 
-        <div className="flex gap-2 overflow-x-auto -mx-4 px-4 pb-2 mb-3">
-          {[{ slug: "all", ar: "كل الفروع", en: "All branches" }, ...BRANCHES].map((b) => {
-            const active = branchFilter === b.slug;
-            return (
-              <button
-                key={b.slug}
-                onClick={() => setBranchFilter(b.slug)}
-                className={`shrink-0 h-8 px-3 rounded-full text-xs font-semibold border transition ${
-                  active
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-card text-foreground border-border hover:bg-accent"
-                }`}
-              >
-                {lang === "ar" ? b.ar : b.en}
-              </button>
-            );
-          })}
-        </div>
-
-        {(needle || branchFilter !== "all") && (
-          <div className="mb-5">
-            <h2 className="font-display font-bold text-sm mb-2">
-              {lang === "ar" ? "نتائج المنتجات" : "Product matches"}{" "}
-              <span className="text-[11px] text-muted-foreground font-normal">
-                ({productMatches.length})
+        {/* ── Active branch filter indicator ──────── */}
+        {activeBranch && (
+          <div className="mb-4">
+            <button
+              onClick={() => setBranchFilter("all")}
+              className="flex items-center gap-2 text-sm font-bold text-primary hover:text-primary/80 transition mb-3"
+            >
+              <BackIcon className="size-4" />
+              {lang === "ar" ? "كل الفروع" : "All Branches"}
+            </button>
+            <div className="flex items-center gap-3 bg-primary/5 border border-primary/15 rounded-2xl p-3">
+              <span className="size-10 rounded-xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
+                {(() => {
+                  const Badge = BRANCH_BADGE[activeBranch.slug] ?? Package;
+                  return <Badge className="size-5" />;
+                })()}
               </span>
-            </h2>
-            {productMatches.length === 0 ? (
-              <div className="py-10 flex flex-col items-center text-center text-muted-foreground">
-                <SearchX className="size-8 mb-2" />
-                <p className="text-sm">
-                  {lang === "ar" ? "لا توجد منتجات مطابقة" : "No matching products"}
+              <div>
+                <p className="font-display font-bold text-sm">
+                  {lang === "ar" ? activeBranch.ar : activeBranch.en}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  {filteredProducts.length} {lang === "ar" ? "منتج" : "products"}
                 </p>
               </div>
-            ) : (
-              <ul className="space-y-2">
-                {productMatches.map((p) => {
-                  const pImg = matchUrls[p.images[0]] ?? resolveProductImage(undefined);
-                  return (
-                    <li key={p.id}>
-                      <Link
-                        to="/supplies/$officeId/$branchSlug"
-                        params={{ officeId: office.id, branchSlug: p.branch }}
-                        className="flex items-center gap-3 bg-card border border-border rounded-xl p-2.5 shadow-soft"
-                      >
-                        <div className="size-9 rounded-lg bg-surface flex items-center justify-center text-lg shrink-0 overflow-hidden">
-                          {pImg ? (
-                            <img
-                              src={pImg}
-                              alt=""
-                              className="size-full object-cover"
-                              loading="lazy"
-                            />
-                          ) : (
-                            "📦"
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-display font-bold text-xs truncate">
-                            {lang === "ar" ? p.ar : p.en}
-                          </p>
-                          <p className="text-[10px] text-muted-foreground">
-                            {p.brand} · ${p.price}
-                          </p>
-                        </div>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
+            </div>
           </div>
         )}
 
-        {promos.length > 0 && !needle && branchFilter === "all" && (
+        {/* ── Branch Categories Grid ──────────────── */}
+        {!activeBranch && !needle && (
+          <>
+            <h2 className="font-display font-bold text-base mb-3">
+              {lang === "ar" ? "فروع طب الأسنان" : "Dental Specialties"}
+            </h2>
+            <ul className="grid grid-cols-2 gap-3 mb-6">
+              {BRANCHES.map((b) => {
+                const Badge = BRANCH_BADGE[b.slug] ?? Package;
+                const image = BRANCH_IMAGES[b.slug];
+                const count = PRODUCTS.filter((p) => p.branch === b.slug).length;
+                return (
+                  <li key={b.slug}>
+                    <button
+                      onClick={() => setBranchFilter(b.slug)}
+                      className="w-full block bg-card border border-border rounded-2xl p-3 h-full shadow-soft hover:shadow-card transition relative overflow-hidden text-start active:scale-[0.98]"
+                    >
+                      <span className="absolute top-2.5 end-2.5 size-8 rounded-full bg-primary-soft text-primary flex items-center justify-center">
+                        <Badge className="size-4" />
+                      </span>
+                      <div className="h-24 flex items-center justify-center -mt-1 mb-1">
+                        {image ? (
+                          <img
+                            src={image}
+                            alt=""
+                            loading="lazy"
+                            width={1024}
+                            height={1024}
+                            className="h-24 w-auto object-contain"
+                          />
+                        ) : (
+                          <Badge className="size-10 text-primary" />
+                        )}
+                      </div>
+                      <p className="font-display font-bold text-sm leading-tight">
+                        {lang === "ar" ? b.ar : b.en}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        {count} {lang === "ar" ? "صنف" : "items"}
+                      </p>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        )}
+
+        {/* ── Promos ──────────────────────────────── */}
+        {promos.length > 0 && !needle && !activeBranch && (
           <div className="mb-5">
             <div className="flex items-center justify-between mb-2">
               <h2 className="font-display font-bold text-base flex items-center gap-1.5">
@@ -256,59 +264,56 @@ function OfficePage() {
           </div>
         )}
 
-        {branchFilter === "all" && !needle && (
-          <>
-            <h2 className="font-display font-bold text-base mb-3">{t("branches_title")}</h2>
-            {branches.length === 0 ? (
+        {/* ── Product Results ──────────────────────── */}
+        {(activeBranch || needle) && (
+          <div className="mb-5">
+            <h2 className="font-display font-bold text-sm mb-3">
+              {lang === "ar" ? "المنتجات" : "Products"}{" "}
+              <span className="text-[11px] text-muted-foreground font-normal">
+                ({filteredProducts.length})
+              </span>
+            </h2>
+            {filteredProducts.length === 0 ? (
               <div className="py-10 flex flex-col items-center text-center text-muted-foreground">
                 <SearchX className="size-8 mb-2" />
                 <p className="text-sm">
-                  {lang === "ar" ? "لا يوجد فرع مطابق" : "No matching branch"}
+                  {lang === "ar" ? "لا توجد منتجات مطابقة" : "No matching products"}
                 </p>
               </div>
             ) : (
-              <ul className="grid grid-cols-2 gap-3">
-                {branches.map((b) => {
-                  const Badge = BRANCH_BADGE[b.slug] ?? Package;
-                  const image = BRANCH_IMAGES[b.slug];
-                  const count = PRODUCTS.filter((p) => p.branch === b.slug).length;
+              <ul className="space-y-2">
+                {filteredProducts.map((p) => {
+                  const pImg = matchUrls[p.images[0]] ?? resolveProductImage(undefined);
                   return (
-                    <li key={b.slug}>
-                      <Link
-                        to="/supplies/$officeId/$branchSlug"
-                        params={{ officeId: office.id, branchSlug: b.slug }}
-                        className="block bg-card border border-border rounded-2xl p-3 h-full shadow-soft hover:shadow-card transition relative overflow-hidden"
-                      >
-                        <span className="absolute top-2.5 end-2.5 size-8 rounded-full bg-primary-soft text-primary flex items-center justify-center">
-                          <Badge className="size-4" />
-                        </span>
-                        <div className="h-24 flex items-center justify-center -mt-1 mb-1">
-                          {image ? (
+                    <li key={p.id}>
+                      <div className="flex items-center gap-3 bg-card border border-border rounded-xl p-2.5 shadow-soft">
+                        <div className="size-9 rounded-lg bg-surface flex items-center justify-center text-lg shrink-0 overflow-hidden">
+                          {pImg ? (
                             <img
-                              src={image}
+                              src={pImg}
                               alt=""
+                              className="size-full object-cover"
                               loading="lazy"
-                              width={1024}
-                              height={1024}
-                              className="h-24 w-auto object-contain"
                             />
                           ) : (
-                            <Badge className="size-10 text-primary" />
+                            "📦"
                           )}
                         </div>
-                        <p className="font-display font-bold text-sm leading-tight">
-                          {lang === "ar" ? b.ar : b.en}
-                        </p>
-                        <p className="text-[11px] text-muted-foreground mt-0.5">
-                          {count} {lang === "ar" ? "صنف" : "items"}
-                        </p>
-                      </Link>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-display font-bold text-xs truncate">
+                            {lang === "ar" ? p.ar : p.en}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {p.brand} · ${p.price}
+                          </p>
+                        </div>
+                      </div>
                     </li>
                   );
                 })}
               </ul>
             )}
-          </>
+          </div>
         )}
       </div>
     </MobileShell>

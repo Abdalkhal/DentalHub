@@ -111,43 +111,38 @@ function saveCounter(n: number) {
 
 let _counter = loadCounter();
 
+(function normalizeCaseIds() {
+  if (typeof window === "undefined") return;
+  if (orders.length === 0) return;
+  const needsFix = orders.some((o) => o.caseId >= 1000 || !o.caseId);
+  if (!needsFix) {
+    const maxId = orders.reduce((m, o) => Math.max(m, o.caseId), 0);
+    _counter = maxId;
+    saveCounter(maxId);
+    return;
+  }
+  const sorted = [...orders].sort(
+    (a, b) => new Date(a.receivedDate || a.dueDate).getTime() - new Date(b.receivedDate || b.dueDate).getTime(),
+  );
+  sorted.forEach((o, i) => {
+    o.caseId = i + 1;
+    o.orderNumber = `ORD-${String(i + 1).padStart(3, "0")}`;
+  });
+  orders = sorted;
+  _counter = sorted.length;
+  saveCounter(_counter);
+  saveOrders(orders);
+  try { localStorage.removeItem("dental_case_counter"); } catch {}
+})();
+
 export function getNextOrderNumber(): string {
   _counter += 1;
   saveCounter(_counter);
   return `ORD-${String(_counter).padStart(3, "0")}`;
 }
 
-const CASE_COUNTER_KEY = "dental_case_counter";
-
-function loadCaseCounter(): number {
-  try {
-    const v = localStorage.getItem(CASE_COUNTER_KEY);
-    return v ? parseInt(v, 10) : 0;
-  } catch {
-    return 0;
-  }
-}
-
-function saveCaseCounter(n: number) {
-  try {
-    localStorage.setItem(CASE_COUNTER_KEY, String(n));
-  } catch {}
-}
-
-let _caseCounter = loadCaseCounter();
-
-function initCaseCounter() {
-  if (_caseCounter > 0) return;
-  const maxCaseId = orders.reduce((max, o) => Math.max(max, o.caseId ?? 0), 0);
-  _caseCounter = Math.max(maxCaseId, 7000);
-  saveCaseCounter(_caseCounter);
-}
-
 export function getNextCaseId(): number {
-  if (_caseCounter === 0) initCaseCounter();
-  _caseCounter += 1;
-  saveCaseCounter(_caseCounter);
-  return _caseCounter;
+  return _counter + 1;
 }
 
 export function addOrder(order: Order) {

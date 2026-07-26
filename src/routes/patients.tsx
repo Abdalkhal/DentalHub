@@ -142,6 +142,11 @@ function PatientsPage() {
       });
     }
 
+    // Sort patients by lastVisit descending (newest first)
+    extracted.sort(
+      (a, b) => new Date(b.lastVisit).getTime() - new Date(a.lastVisit).getTime(),
+    );
+
     // --- Merge with manual patients ---
     const manualPatients = loadManualPatients();
     const merged = [...extracted];

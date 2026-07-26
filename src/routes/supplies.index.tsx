@@ -266,7 +266,27 @@ function ProductsPanel() {
   const upsert = useUpsertProduct();
   const remove = useDeleteProduct();
 
-  const myProducts = allProducts;
+  const [branchFilter, setBranchFilter] = useState<string>("all");
+
+  const myProducts = useMemo(() => {
+    if (branchFilter === "all") return allProducts;
+    return allProducts.filter((p) => p.branch === branchFilter);
+  }, [allProducts, branchFilter]);
+
+  const branchOptions = [
+    { value: "general", ar: "مواد عامة", en: "General" },
+    { value: "operative", ar: "معالجة الأسنان", en: "Operative" },
+    { value: "endodontic", ar: "علاج الجذور", en: "Endodontics" },
+    { value: "prosthodontic", ar: "التركيبات", en: "Prosthodontics" },
+    { value: "surgery", ar: "جراحة الفم", en: "Surgery" },
+    { value: "orthopedic", ar: "تقويم الأسنان", en: "Orthodontics" },
+    { value: "pedodontic", ar: "أسنان الأطفال", en: "Pedodontics" },
+    { value: "periodontic", ar: "علاج اللثة", en: "Periodontics" },
+  ];
+
+  const activeBranchName = branchFilter !== "all"
+    ? branchOptions.find((b) => b.value === branchFilter)
+    : null;
 
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
@@ -282,17 +302,6 @@ function ProductsPanel() {
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
 
-  const branchOptions = [
-    { value: "general", ar: "مواد عامة", en: "General" },
-    { value: "operative", ar: "معالجة الأسنان", en: "Operative" },
-    { value: "endodontic", ar: "علاج الجذور", en: "Endodontics" },
-    { value: "prosthodontic", ar: "التركيبات", en: "Prosthodontics" },
-    { value: "surgery", ar: "جراحة الفم", en: "Surgery" },
-    { value: "orthopedic", ar: "تقويم الأسنان", en: "Orthodontics" },
-    { value: "pedodontic", ar: "أسنان الأطفال", en: "Pedodontics" },
-    { value: "periodontic", ar: "علاج اللثة", en: "Periodontics" },
-  ];
-
   const openAdd = () => {
     setEditing(null);
     setNameAr("");
@@ -301,7 +310,7 @@ function ProductsPanel() {
     setPrice("");
     setCurrency("USD");
     setStock("0");
-    setBranch("general");
+    setBranch(branchFilter !== "all" ? branchFilter : "general");
     setImageFiles([]);
     setImagePreviews([]);
     setFormError("");
@@ -398,6 +407,7 @@ function ProductsPanel() {
         stock: Number(stock) || 0,
         inStock: Number(stock) > 0,
         images: allImages,
+        companyId: editing?.companyId || auth.currentUser?.uid || "",
       });
 
       setShowForm(false);
@@ -686,8 +696,81 @@ function ProductsPanel() {
         </div>
       )}
 
-      {/* Product list */}
-      {isLoading ? (
+      {/* ── Branch Categories Grid (Owner View) ── */}
+      {!showForm && (
+        <>
+          {activeBranchName && (
+            <div>
+              <button
+                onClick={() => setBranchFilter("all")}
+                className="flex items-center gap-2 text-sm font-bold text-primary hover:text-primary/80 transition mb-3"
+              >
+                <ChevronRight className="size-4" />
+                {ar ? "كل الفئات" : "All Categories"}
+              </button>
+              <div className="flex items-center gap-3 bg-primary/5 border border-primary/15 rounded-2xl p-3">
+                <span className="size-10 rounded-xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
+                  {(() => {
+                    const Badge = BRANCH_BADGE[activeBranchName.value] ?? Package;
+                    return <Badge className="size-5" />;
+                  })()}
+                </span>
+                <div>
+                  <p className="font-display font-bold text-sm">
+                    {ar ? activeBranchName.ar : activeBranchName.en}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {myProducts.length} {ar ? "منتج" : "products"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!activeBranchName && (
+            <>
+              <h2 className="font-display font-bold text-sm text-muted-foreground">
+                {ar ? "فروع طب الأسنان" : "Dental Specialties"}
+              </h2>
+              <div className="grid grid-cols-2 gap-2.5">
+                {branchOptions.map((b) => {
+                  const Badge = BRANCH_BADGE[b.value] ?? Package;
+                  const image = BRANCH_IMAGES[b.value];
+                  const count = allProducts.filter((p) => p.branch === b.value).length;
+                  return (
+                    <button
+                      key={b.value}
+                      onClick={() => setBranchFilter(b.value)}
+                      className="text-start bg-card border border-border rounded-2xl p-3 shadow-soft hover:shadow-card transition active:scale-[0.98] relative overflow-hidden"
+                    >
+                      <span className="absolute top-2.5 end-2.5 size-7 rounded-full bg-primary-soft text-primary flex items-center justify-center">
+                        <Badge className="size-3.5" />
+                      </span>
+                      <div className="h-20 flex items-center justify-center mb-1">
+                        {image ? (
+                          <img src={image} alt="" loading="lazy" className="h-20 w-auto object-contain" />
+                        ) : (
+                          <Badge className="size-8 text-primary" />
+                        )}
+                      </div>
+                      <p className="font-display font-bold text-xs leading-tight">
+                        {ar ? b.ar : b.en}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {count} {ar ? "صنف" : "items"}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </>
+      )}
+
+      {/* Product list — only when a branch is selected */}
+      {activeBranchName && (
+        isLoading ? (
         <div className="flex items-center justify-center py-20">
           <div className="size-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
@@ -695,91 +778,90 @@ function ProductsPanel() {
         <div className="py-20 flex flex-col items-center text-center text-muted-foreground">
           <Package className="size-14 mb-4 opacity-20" />
           <p className="font-display font-bold text-lg text-slate-400">
-            {ar ? "لا توجد منتجات بعد" : "No products yet"}
+            {ar
+              ? `لا توجد منتجات في ${activeBranchName!.ar}`
+              : `No products in ${activeBranchName!.en}`}
           </p>
           <p className="text-sm mt-1 max-w-xs text-slate-400">
             {ar
-              ? "اضغط على زر 'إضافة منتج جديد' لإضافة أول منتج لك"
-              : "Tap 'Add new product' to add your first product"}
+              ? "اضغط على زر 'إضافة منتج جديد' لإضافة منتج في هذا الفرع"
+              : "Tap 'Add new product' to add a product in this category"}
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
           {myProducts.map((p) => {
             const isOut = (p.stock ?? 0) === 0;
             return (
               <div
                 key={p.id}
-                className="bg-card border border-border rounded-2xl p-3.5 shadow-soft hover:shadow-card transition relative overflow-hidden group"
+                className="bg-card border border-border rounded-xl p-1.5 shadow-soft hover:shadow-card transition relative overflow-hidden group"
               >
-                {/* Badge */}
+                {/* Out badge */}
                 {isOut && (
-                  <span className="absolute top-2.5 end-2.5 text-[10px] font-bold bg-rose-100 text-rose-600 px-2 py-0.5 rounded-full">
+                  <span className="absolute top-1 end-1 text-[9px] font-bold bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded-full z-10">
                     {ar ? "نفد" : "Out"}
                   </span>
                 )}
 
                 {/* Image or icon */}
                 {p.images.length > 0 && imageUrlMap[p.images[0]] ? (
-                  <div className="w-full aspect-[4/3] rounded-xl bg-slate-100 overflow-hidden mb-2.5">
+                  <div className="w-full aspect-square rounded-lg bg-slate-100 overflow-hidden mb-1">
                     <img src={imageUrlMap[p.images[0]]} alt="" className="size-full object-cover" />
                   </div>
                 ) : (
-                  <div className="size-10 rounded-xl bg-slate-100 flex items-center justify-center mb-2.5">
-                    <Package className="size-5 text-slate-400" />
+                  <div className="w-full aspect-square rounded-lg bg-slate-100 flex items-center justify-center mb-1">
+                    <Package className="size-4 text-slate-400" />
                   </div>
                 )}
 
                 {/* Product name */}
-                <p className="font-display font-bold text-sm leading-snug line-clamp-2">
+                <p className="font-display font-bold text-[11px] leading-tight line-clamp-2">
                   {ar ? p.ar || p.en : p.en || p.ar}
                 </p>
 
                 {/* Brand */}
                 {p.brand && (
-                  <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{p.brand}</p>
+                  <p className="text-[9px] text-muted-foreground mt-0.5 truncate">{p.brand}</p>
                 )}
 
                 {/* Price */}
-                <p className="mt-1.5 font-display font-extrabold text-lg text-primary">
+                <p className="mt-1 font-display font-extrabold text-xs text-primary">
                   {fmtPrice(p)}
                 </p>
 
                 {/* Stock */}
-                <div className="flex items-center gap-1.5 mt-1.5">
-                  <Layers className="size-3 text-slate-400" />
+                <div className="flex items-center gap-1 mt-0.5">
+                  <Layers className="size-2.5 text-slate-400" />
                   <span
-                    className={cn(
-                      "text-[11px] font-semibold",
-                      isOut ? "text-rose-500" : "text-emerald-600",
-                    )}
+                    className={cn("text-[9px] font-semibold", isOut ? "text-rose-500" : "text-emerald-600")}
                   >
-                    {ar ? "المخزون:" : "Stock:"} {p.stock ?? 0}
+                    {p.stock ?? 0}
                   </span>
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-1 mt-2.5 pt-2.5 border-t border-border">
+                <div className="flex gap-0.5 mt-1 pt-1 border-t border-border">
                   <button
                     onClick={() => openEdit(p)}
-                    className="flex-1 h-8 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-sky-100 hover:text-sky-600 flex items-center justify-center gap-1 transition"
+                    className="flex-1 h-6 rounded-md text-[9px] font-semibold bg-slate-100 hover:bg-sky-100 hover:text-sky-600 flex items-center justify-center gap-0.5 transition"
                   >
-                    <Pencil className="size-3" />
+                    <Pencil className="size-2.5" />
                     {ar ? "تعديل" : "Edit"}
                   </button>
                   <button
                     onClick={() => handleDelete(p)}
-                    className="w-8 h-8 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-rose-100 hover:text-rose-600 flex items-center justify-center transition"
+                    className="w-6 h-6 rounded-md text-[9px] font-semibold bg-slate-100 hover:bg-rose-100 hover:text-rose-600 flex items-center justify-center transition"
                   >
-                    <Trash2 className="size-3.5" />
+                    <Trash2 className="size-2.5" />
                   </button>
                 </div>
               </div>
             );
           })}
         </div>
-      )}
-    </div>
+      ))}
+      </div>
   );
 }
 
@@ -2216,50 +2298,6 @@ function BrowseSupplies() {
             </button>
           ))}
         </div>
-
-        <h2 className="font-display font-bold text-base mb-3">
-          {lang === "ar" ? "فروع طب الأسنان" : "Dental specialties"}
-        </h2>
-        <ul className="grid grid-cols-2 gap-3 mb-6">
-          {BRANCHES.map((b) => {
-            const Badge = BRANCH_BADGE[b.slug] ?? Package;
-            const image = BRANCH_IMAGES[b.slug];
-            const count = PRODUCTS.filter((p) => p.branch === b.slug).length;
-            return (
-              <li key={b.slug}>
-                <Link
-                  to="/supplies/branch/$branchSlug"
-                  params={{ branchSlug: b.slug }}
-                  className="block bg-card border border-border rounded-2xl p-3 h-full shadow-soft hover:shadow-card transition relative overflow-hidden"
-                >
-                  <span className="absolute top-2.5 end-2.5 size-8 rounded-full bg-primary-soft text-primary flex items-center justify-center">
-                    <Badge className="size-4" />
-                  </span>
-                  <div className="h-24 flex items-center justify-center -mt-1 mb-1">
-                    {image ? (
-                      <img
-                        src={image}
-                        alt=""
-                        loading="lazy"
-                        width={1024}
-                        height={1024}
-                        className="h-24 w-auto object-contain"
-                      />
-                    ) : (
-                      <Badge className="size-10 text-primary" />
-                    )}
-                  </div>
-                  <p className="font-display font-bold text-sm leading-tight">
-                    {lang === "ar" ? b.ar : b.en}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">
-                    {count} {lang === "ar" ? "صنف" : "items"}
-                  </p>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
 
         <h2 className="font-display font-bold text-base mb-3">{t("offices_title")}</h2>
         {filtered.length === 0 ? (
