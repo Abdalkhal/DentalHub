@@ -66,6 +66,11 @@ import {
   BookOpen,
   Shield,
   Wrench,
+  Cog,
+  Smile,
+  Shirt,
+  Settings,
+  FlaskConical,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Currency } from "@/lib/products";
@@ -87,6 +92,14 @@ const BRANCH_IMAGES: Record<string, string> = {
   orthopedic: imgOrthopedic,
   pedodontic: imgPedodontic,
   periodontic: imgPeriodontic,
+  equipment: "/photo/equipment.png",
+  burs: "/photo/burs.png",
+  sterilization: "/photo/sterilization.png",
+  "oral-care": "/photo/oral-care.png",
+  apparel: "/photo/appearel.png",
+  training: "/photo/training.png",
+  maintenance: "/photo/maintenance.png",
+  "lab-materials": "/photo/lab-materials.png",
 };
 
 const BRANCH_BADGE: Record<string, typeof Package> = {
@@ -98,6 +111,14 @@ const BRANCH_BADGE: Record<string, typeof Package> = {
   orthopedic: AlignCenter,
   pedodontic: Baby,
   periodontic: HeartPulse,
+  equipment: Wrench,
+  burs: Cog,
+  sterilization: Shield,
+  "oral-care": Smile,
+  apparel: Shirt,
+  training: BookOpen,
+  maintenance: Settings,
+  "lab-materials": FlaskConical,
 };
 
 export const Route = createFileRoute("/supplies/")({
@@ -282,6 +303,14 @@ function ProductsPanel() {
     { value: "orthopedic", ar: "تقويم الأسنان", en: "Orthodontics" },
     { value: "pedodontic", ar: "أسنان الأطفال", en: "Pedodontics" },
     { value: "periodontic", ar: "علاج اللثة", en: "Periodontics" },
+    { value: "equipment", ar: "معدات", en: "Equipment" },
+    { value: "burs", ar: "مبردات الأسنان", en: "Dental Burs" },
+    { value: "sterilization", ar: "مواد التعقيم", en: "Sterilization" },
+    { value: "oral-care", ar: "العناية بالفم", en: "Oral Care" },
+    { value: "apparel", ar: "ملابس وأزياء", en: "Apparel" },
+    { value: "training", ar: "التعلم والتدريب", en: "Training" },
+    { value: "maintenance", ar: "مواد الصيانة", en: "Maintenance" },
+    { value: "lab-materials", ar: "مواد المختبر", en: "Lab Materials" },
   ];
 
   const activeBranchName = branchFilter !== "all"
@@ -295,7 +324,7 @@ function ProductsPanel() {
   const [brand, setBrand] = useState("");
   const [price, setPrice] = useState("");
   const [currency, setCurrency] = useState<Currency>("USD");
-  const [stock, setStock] = useState("0");
+  const [stock, setStock] = useState("");
   const [branch, setBranch] = useState("general");
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState("");
@@ -309,7 +338,7 @@ function ProductsPanel() {
     setBrand("");
     setPrice("");
     setCurrency("USD");
-    setStock("0");
+    setStock("");
     setBranch(branchFilter !== "all" ? branchFilter : "general");
     setImageFiles([]);
     setImagePreviews([]);
@@ -533,11 +562,12 @@ function ProductsPanel() {
                   type="number"
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
+                  onFocus={(e) => e.target.select()}
                   placeholder="0"
                   dir="ltr"
-                  className="w-full h-12 rounded-xl bg-slate-50 border border-border pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+                  className="w-full h-12 rounded-xl bg-slate-50 border border-border ps-12 pe-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />
-                <DollarSign className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
+                <DollarSign className="absolute start-4 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
               </div>
               <div className="flex rounded-xl bg-slate-50 border border-border overflow-hidden shrink-0">
                 <button
@@ -578,11 +608,12 @@ function ProductsPanel() {
                 type="number"
                 value={stock}
                 onChange={(e) => setStock(e.target.value)}
+                onFocus={(e) => e.target.select()}
                 placeholder="0"
                 dir="ltr"
-                className="w-full h-12 rounded-xl bg-slate-50 border border-border pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+                className="w-full h-12 rounded-xl bg-slate-50 border border-border ps-12 pe-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               />
-              <Layers className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
+              <Layers className="absolute start-4 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
             </div>
           </div>
 
@@ -732,7 +763,7 @@ function ProductsPanel() {
               <h2 className="font-display font-bold text-sm text-muted-foreground">
                 {ar ? "فروع طب الأسنان" : "Dental Specialties"}
               </h2>
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                 {branchOptions.map((b) => {
                   const Badge = BRANCH_BADGE[b.value] ?? Package;
                   const image = BRANCH_IMAGES[b.value];

@@ -24,6 +24,14 @@ import {
   HeartPulse,
   ShoppingCart,
   Layers,
+  Wrench,
+  Cog,
+  Shield,
+  Smile,
+  Shirt,
+  BookOpen,
+  Settings,
+  FlaskConical,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import imgGeneral from "@/assets/branch-general.png";
@@ -44,6 +52,14 @@ const BRANCH_IMAGES: Record<string, string> = {
   orthopedic: imgOrthopedic,
   pedodontic: imgPedodontic,
   periodontic: imgPeriodontic,
+  equipment: "/photo/equipment.png",
+  burs: "/photo/burs.png",
+  sterilization: "/photo/sterilization.png",
+  "oral-care": "/photo/oral-care.png",
+  apparel: "/photo/appearel.png",
+  training: "/photo/training.png",
+  maintenance: "/photo/maintenance.png",
+  "lab-materials": "/photo/lab-materials.png",
 };
 
 const BRANCH_BADGE: Record<string, typeof Package> = {
@@ -55,6 +71,14 @@ const BRANCH_BADGE: Record<string, typeof Package> = {
   orthopedic: AlignCenter,
   pedodontic: Baby,
   periodontic: HeartPulse,
+  equipment: Wrench,
+  burs: Cog,
+  sterilization: Shield,
+  "oral-care": Smile,
+  apparel: Shirt,
+  training: BookOpen,
+  maintenance: Settings,
+  "lab-materials": FlaskConical,
 };
 
 const branchOptions = [
@@ -66,6 +90,14 @@ const branchOptions = [
   { value: "orthopedic", ar: "تقويم الأسنان", en: "Orthodontics" },
   { value: "pedodontic", ar: "أسنان الأطفال", en: "Pedodontics" },
   { value: "periodontic", ar: "علاج اللثة", en: "Periodontics" },
+  { value: "equipment", ar: "معدات", en: "Equipment" },
+  { value: "burs", ar: "مبردات الأسنان", en: "Dental Burs" },
+  { value: "sterilization", ar: "مواد التعقيم", en: "Sterilization" },
+  { value: "oral-care", ar: "العناية بالفم", en: "Oral Care" },
+  { value: "apparel", ar: "ملابس وأزياء", en: "Apparel" },
+  { value: "training", ar: "التعلم والتدريب", en: "Training" },
+  { value: "maintenance", ar: "مواد الصيانة", en: "Maintenance" },
+  { value: "lab-materials", ar: "مواد المختبر", en: "Lab Materials" },
 ];
 
 export const Route = createFileRoute("/profile/$accountId")({
@@ -390,7 +422,7 @@ function ProfilePage() {
                   <Package className="size-4 text-primary" />
                   {ar ? "فروع طب الأسنان" : "Dental Specialties"}
                 </h2>
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                   {branchOptions.map((b) => {
                     const Badge = BRANCH_BADGE[b.value] ?? Package;
                     const image = BRANCH_IMAGES[b.value];

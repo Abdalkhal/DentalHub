@@ -13,6 +13,14 @@ export const BRANCHES: Branch[] = [
   { slug: "orthopedic", ar: "تقويم الأسنان", en: "Orthopedic" },
   { slug: "pedodontic", ar: "أسنان الأطفال", en: "Pedodontic" },
   { slug: "periodontic", ar: "علاج اللثة", en: "Periodontic" },
+  { slug: "equipment", ar: "معدات", en: "Equipment" },
+  { slug: "burs", ar: "مبردات الأسنان", en: "Dental Burs" },
+  { slug: "sterilization", ar: "مواد التعقيم", en: "Sterilization" },
+  { slug: "oral-care", ar: "العناية بالفم", en: "Oral Care" },
+  { slug: "apparel", ar: "ملابس وأزياء", en: "Apparel" },
+  { slug: "training", ar: "التعلم والتدريب", en: "Training" },
+  { slug: "maintenance", ar: "مواد الصيانة", en: "Maintenance" },
+  { slug: "lab-materials", ar: "مواد المختبر", en: "Lab Materials" },
 ];
 
 export type Office = {

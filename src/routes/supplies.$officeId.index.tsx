@@ -20,6 +20,14 @@ import {
   EyeOff,
   ArrowRight,
   ArrowLeft,
+  Wrench,
+  Cog,
+  Shield,
+  Smile,
+  Shirt,
+  BookOpen,
+  Settings,
+  FlaskConical,
 } from "lucide-react";
 
 const BRANCH_BACK_ICON: Record<string, typeof ArrowRight> = {
@@ -57,6 +65,14 @@ const BRANCH_IMAGES: Record<string, string> = {
   orthopedic: imgOrthopedic,
   pedodontic: imgPedodontic,
   periodontic: imgPeriodontic,
+  equipment: "/photo/equipment.png",
+  burs: "/photo/burs.png",
+  sterilization: "/photo/sterilization.png",
+  "oral-care": "/photo/oral-care.png",
+  apparel: "/photo/appearel.png",
+  training: "/photo/training.png",
+  maintenance: "/photo/maintenance.png",
+  "lab-materials": "/photo/lab-materials.png",
 };
 
 const BRANCH_BADGE: Record<string, typeof Package> = {
@@ -68,6 +84,14 @@ const BRANCH_BADGE: Record<string, typeof Package> = {
   orthopedic: AlignCenter,
   pedodontic: Baby,
   periodontic: HeartPulse,
+  equipment: Wrench,
+  burs: Cog,
+  sterilization: Shield,
+  "oral-care": Smile,
+  apparel: Shirt,
+  training: BookOpen,
+  maintenance: Settings,
+  "lab-materials": FlaskConical,
 };
 
 export const Route = createFileRoute("/supplies/$officeId/")({
@@ -190,7 +214,7 @@ function OfficePage() {
             <h2 className="font-display font-bold text-base mb-3">
               {lang === "ar" ? "فروع طب الأسنان" : "Dental Specialties"}
             </h2>
-            <ul className="grid grid-cols-2 gap-3 mb-6">
+            <ul className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
               {BRANCHES.map((b) => {
                 const Badge = BRANCH_BADGE[b.slug] ?? Package;
                 const image = BRANCH_IMAGES[b.slug];
