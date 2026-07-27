@@ -53,7 +53,7 @@ function BottomTabBar() {
   ] as const;
 
   return (
-    <nav className="absolute bottom-0 inset-x-0 z-30 bg-card/95 backdrop-blur border-t border-border">
+    <nav className="fixed bottom-0 inset-x-0 z-50 bg-card/95 backdrop-blur border-t border-border shadow-lg">
       <ul className="grid grid-cols-5 px-2 py-2">
         {tabs.map(({ to, icon: Icon, label, match }) => {
           const active = match(pathname);

@@ -1,11 +1,14 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/integrations/firebase/client";
+import type { UserRoleDoc } from "@/integrations/firebase/types";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
+import { useSession } from "@/lib/useAuth";
 import { cn } from "@/lib/utils";
-import { useAdminStore } from "@/lib/adminStore";
-import { IMPLANTS } from "@/data/implants";
 import { Search, FlaskConical, Package, Stethoscope, MapPin } from "lucide-react";
 
 type Category = "all" | "supplies" | "implants" | "labs";
@@ -41,67 +44,72 @@ function Explore() {
   const { lang } = useI18n();
   const ar = lang === "ar";
   const navigate = useNavigate();
-  const { offices, labs } = useAdminStore();
+  const { user } = useSession();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [category, setCategory] = useState<Category>("all");
 
-  const items = useMemo<ResultItem[]>(() => {
-    const results: ResultItem[] = [];
+  const { data: items = [], isLoading } = useQuery({
+    queryKey: ["explore-accounts"],
+    queryFn: async (): Promise<ResultItem[]> => {
+      const snap = await getDocs(collection(db, "user_roles"));
+      const results: ResultItem[] = [];
 
-    for (const o of offices) {
-      results.push({
-        id: o.id,
-        name: { ar: o.ar, en: o.en },
-        category: "supplies",
-        location: o.city,
-        route: "/supplies/$officeId",
-        params: { officeId: o.id },
-      });
-    }
+      for (const d of snap.docs) {
+        const u = d.data() as UserRoleDoc;
+        const name = u.name || u.surname || "";
+        if (!name) continue;
 
-    const seenImplantCompany = new Set<string>();
-    for (const brand of IMPLANTS) {
-      const agentKey = brand.agent.ar + brand.agent.en;
-      if (seenImplantCompany.has(agentKey)) continue;
-      seenImplantCompany.add(agentKey);
-      results.push({
-        id: brand.id,
-        name: { ar: brand.agent.ar, en: brand.agent.en },
-        category: "implants",
-        location: { ar: brand.ar, en: brand.name },
-        route: "/implants/$country",
-        params: { country: brand.country },
-      });
-    }
+        let cat: Category;
+        let route: string;
+        let params: Record<string, string>;
 
-    for (const lab of labs) {
-      results.push({
-        id: lab.id,
-        name: { ar: lab.ar, en: lab.en },
-        category: "labs",
-        location: lab.area,
-        route: "/labs/$labId",
-        params: { labId: lab.id },
-      });
-    }
+        if (u.accountType === "supply" || (u.accountType as string) === "medical_supplies") {
+          cat = "supplies";
+          route = "/profile/$accountId";
+          params = { accountId: u.userId };
+        } else if (u.accountType === "implant" || (u.accountType as string) === "dental_implants") {
+          cat = "implants";
+          route = "/profile/$accountId";
+          params = { accountId: u.userId };
+        } else if (u.accountType === "lab") {
+          cat = "labs";
+          route = "/labs/$labId";
+          params = { labId: u.userId };
+        } else {
+          continue;
+        }
 
-    return results;
-  }, [offices, labs]);
+        const city = u.city || u.address || "";
+        results.push({
+          id: u.userId,
+          name: { ar: name, en: name },
+          category: cat,
+          location: { ar: city, en: city },
+          route,
+          params,
+        });
+      }
+
+      return results;
+    },
+    staleTime: 30_000,
+  });
 
   const filtered = useMemo(() => {
     return items.filter((item) => {
+      if (user && item.id === user.uid) return false;
       if (category !== "all" && item.category !== category) return false;
       if (!searchQuery.trim()) return true;
       const q = searchQuery.toLowerCase();
       return (
-        item.name.ar.includes(q) ||
+        item.name.ar.toLowerCase().includes(q) ||
         item.name.en.toLowerCase().includes(q) ||
-        item.location.ar.includes(q) ||
+        item.location.ar.toLowerCase().includes(q) ||
         item.location.en.toLowerCase().includes(q)
       );
     });
-  }, [items, category, searchQuery]);
+  }, [items, category, searchQuery, user]);
 
   const handleSelect = (item: ResultItem) => {
     (
@@ -156,7 +164,11 @@ function Explore() {
         </p>
 
         <div className="space-y-2 pb-4">
-          {filtered.length === 0 ? (
+          {isLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="size-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : filtered.length === 0 ? (
             <div className="text-center py-16 text-sm text-muted-foreground">
               <Search className="size-10 mx-auto mb-3 text-muted-foreground/40" />
               {ar ? "لا توجد نتائج مطابقة" : "No matching results"}

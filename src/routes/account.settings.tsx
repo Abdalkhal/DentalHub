@@ -365,23 +365,37 @@ function SettingsPage() {
                   className={inputClass}
                 />
               </Field>
-              <Field
-                icon={FileText}
-                iconTone="bg-violet-100 text-violet-600"
-                label={ar ? "وصف المختبر والتقنيات المستخدمة" : "Lab Description & Technologies"}
-              >
-                <textarea
-                  value={labDescription}
-                  onChange={(e) => setLabDescription(e.target.value)}
-                  rows={3}
-                  placeholder={
-                    ar
-                      ? "اكتب وصفاً لمختبرك والتقنيات التي تستخدمها..."
-                      : "Describe your lab and the technologies you use..."
+              {role?.accountType !== "dentist" && (
+                <Field
+                  icon={FileText}
+                  iconTone="bg-violet-100 text-violet-600"
+                  label={
+                    role?.accountType === "lab"
+                      ? ar
+                        ? "وصف المختبر والتقنيات المستخدمة"
+                        : "Lab Description & Technologies"
+                      : ar
+                        ? "عن المكتب / الشركة"
+                        : "About Store / Company"
                   }
-                  className="w-full bg-card border border-border rounded-xl px-3 py-2.5 outline-none text-sm focus:ring-2 focus:ring-ring/40 resize-none placeholder:text-muted-foreground/60"
-                />
-              </Field>
+                >
+                  <textarea
+                    value={labDescription}
+                    onChange={(e) => setLabDescription(e.target.value)}
+                    rows={3}
+                    placeholder={
+                      role?.accountType === "lab"
+                        ? ar
+                          ? "اكتب وصفاً لمختبرك والتقنيات التي تستخدمها..."
+                          : "Describe your lab and the technologies you use..."
+                        : ar
+                          ? "اكتب نبذة عن مكتبك أو شركتك..."
+                          : "Write about your store or company..."
+                    }
+                    className="w-full bg-card border border-border rounded-xl px-3 py-2.5 outline-none text-sm focus:ring-2 focus:ring-ring/40 resize-none placeholder:text-muted-foreground/60"
+                  />
+                </Field>
+              )}
             </div>
           </div>
         </section>
@@ -578,17 +592,19 @@ function SettingsPage() {
           </div>
         </section>
 
-        {/* Section 5: Service Pricing */}
-        <section>
-          <p className="text-xs font-bold text-muted-foreground mb-2 px-1">
-            {ar ? "إدارة أسعار الخدمات" : "Service Pricing Management"}
-          </p>
-          <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-soft">
-            {PRICING_ITEMS.map((item, i) => (
-              <PricingRow key={item.key} item={item} index={i} ar={ar} />
-            ))}
-          </div>
-        </section>
+        {/* Section 5: Service Pricing — labs only */}
+        {role?.accountType === "lab" && (
+          <section>
+            <p className="text-xs font-bold text-muted-foreground mb-2 px-1">
+              {ar ? "إدارة أسعار الخدمات" : "Service Pricing Management"}
+            </p>
+            <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-soft">
+              {PRICING_ITEMS.map((item, i) => (
+                <PricingRow key={item.key} item={item} index={i} ar={ar} />
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Save Button */}
         <button

@@ -18,7 +18,7 @@ export const dict = {
   account_sub: { ar: "الإعدادات والملف", en: "Settings & profile" },
   // Tabs
   tab_home: { ar: "الرئيسية", en: "Home" },
-  tab_orders: { ar: "طلباتي", en: "Orders" },
+  tab_orders: { ar: "طلباتي", en: "My Orders" },
   tab_account: { ar: "حسابي", en: "Account" },
   tab_more: { ar: "المزيد", en: "More" },
   // Banner
