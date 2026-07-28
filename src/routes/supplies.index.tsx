@@ -1,5 +1,5 @@
 ﻿import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState, useRef } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { collection, getDocs, updateDoc } from "firebase/firestore";
 import { db } from "@/integrations/firebase/client";
@@ -35,6 +35,7 @@ import {
   Star,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   SearchX,
   Package,
   Sparkles,
@@ -74,6 +75,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Currency } from "@/lib/products";
+import Cropper, { type Area } from "react-easy-crop";
 import imgGeneral from "@/assets/branch-general.png";
 import imgOperative from "@/assets/branch-operative.png";
 import imgEndodontic from "@/assets/branch-endodontic.png";
@@ -330,6 +332,23 @@ function ProductsPanel() {
   const [formError, setFormError] = useState("");
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [catDropdownOpen, setCatDropdownOpen] = useState(false);
+  const catRef = useRef<HTMLDivElement>(null);
+  const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [cropFile, setCropFile] = useState<string | null>(null);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (catRef.current && !catRef.current.contains(e.target as Node)) {
+        setCatDropdownOpen(false);
+      }
+    };
+    if (catDropdownOpen) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [catDropdownOpen]);
 
   const openAdd = () => {
     setEditing(null);
@@ -342,6 +361,7 @@ function ProductsPanel() {
     setBranch(branchFilter !== "all" ? branchFilter : "general");
     setImageFiles([]);
     setImagePreviews([]);
+    setCatDropdownOpen(false);
     setFormError("");
     setShowForm(true);
   };
@@ -363,11 +383,50 @@ function ProductsPanel() {
 
   const handleFiles = (files: FileList | null) => {
     if (!files) return;
-    const incoming = Array.from(files).slice(0, MAX_PRODUCT_IMAGES - imageFiles.length);
+    const incoming = Array.from(files).slice(0, MAX_PRODUCT_IMAGES - imageFiles.length - (editing?.images.length ?? 0));
     if (incoming.length === 0) return;
-    const newPreviews = incoming.map((f) => URL.createObjectURL(f));
-    setImageFiles((prev) => [...prev, ...incoming]);
-    setImagePreviews((prev) => [...prev, ...newPreviews]);
+    const file = incoming[0];
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCropFile(reader.result as string);
+      setCrop({ x: 0, y: 0 });
+      setZoom(1);
+      setCroppedAreaPixels(null);
+      setCropModalOpen(true);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleCropComplete = async () => {
+    if (!cropFile || !croppedAreaPixels) return;
+    try {
+      const img = new Image();
+      img.src = cropFile;
+      await new Promise<void>((resolve) => { img.onload = () => resolve(); });
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d")!;
+      canvas.width = croppedAreaPixels.width;
+      canvas.height = croppedAreaPixels.height;
+      ctx.drawImage(
+        img,
+        croppedAreaPixels.x,
+        croppedAreaPixels.y,
+        croppedAreaPixels.width,
+        croppedAreaPixels.height,
+        0,
+        0,
+        croppedAreaPixels.width,
+        croppedAreaPixels.height,
+      );
+      const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", 0.9));
+      if (!blob) return;
+      const croppedFile = new File([blob], "cropped.jpg", { type: "image/jpeg" });
+      const preview = URL.createObjectURL(croppedFile);
+      setImageFiles((prev) => [...prev, croppedFile]);
+      setImagePreviews((prev) => [...prev, preview]);
+      setCropModalOpen(false);
+      setCropFile(null);
+    } catch {}
   };
 
   const removePreview = (idx: number) => {
@@ -499,17 +558,47 @@ function ProductsPanel() {
             <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
               {ar ? "الفئة" : "Category"}
             </label>
-            <select
-              value={branch}
-              onChange={(e) => setBranch(e.target.value)}
-              className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
-            >
-              {branchOptions.map((b) => (
-                <option key={b.value} value={b.value}>
-                  {ar ? b.ar : b.en}
-                </option>
-              ))}
-            </select>
+            <div ref={catRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setCatDropdownOpen(!catDropdownOpen)}
+                className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition flex items-center justify-between"
+              >
+                <span className={branch ? "" : "text-muted-foreground/60"}>
+                  {branch
+                    ? (ar
+                        ? branchOptions.find((b) => b.value === branch)?.ar
+                        : branchOptions.find((b) => b.value === branch)?.en)
+                    : ar
+                      ? "اختر الفئة"
+                      : "Select category"}
+                </span>
+                <ChevronDown
+                  className={`size-4 text-slate-400 transition-transform ${catDropdownOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+              {catDropdownOpen && (
+                <div className="absolute start-0 end-0 top-full mt-1 bg-white rounded-xl shadow-xl border border-gray-100 max-h-60 overflow-y-auto py-2 z-50">
+                  {branchOptions.map((b) => (
+                    <button
+                      key={b.value}
+                      type="button"
+                      onClick={() => {
+                        setBranch(b.value);
+                        setCatDropdownOpen(false);
+                      }}
+                      className={`w-full px-4 py-2.5 text-sm transition-colors flex items-center justify-between hover:bg-blue-50 hover:text-blue-600 ${
+                        branch === b.value
+                          ? "bg-blue-100 text-blue-700 font-medium"
+                          : "text-gray-700"
+                      }`}
+                    >
+                      {ar ? b.ar : b.en}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Name ar */}
@@ -772,24 +861,28 @@ function ProductsPanel() {
                     <button
                       key={b.value}
                       onClick={() => setBranchFilter(b.value)}
-                      className="text-start bg-card border border-border rounded-2xl p-3 shadow-soft hover:shadow-card transition active:scale-[0.98] relative overflow-hidden"
+                      className="group text-start bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-200 active:scale-[0.98]"
                     >
-                      <span className="absolute top-2.5 end-2.5 size-7 rounded-full bg-primary-soft text-primary flex items-center justify-center">
-                        <Badge className="size-3.5" />
-                      </span>
-                      <div className="h-20 flex items-center justify-center mb-1">
+                      <div className="relative h-24 bg-gradient-to-b from-slate-50 to-white flex items-center justify-center overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent" />
                         {image ? (
-                          <img src={image} alt="" loading="lazy" className="h-20 w-auto object-contain" />
+                          <img src={image} alt="" loading="lazy" className="h-20 w-auto object-contain relative z-10 group-hover:scale-110 transition-transform duration-300" />
                         ) : (
-                          <Badge className="size-8 text-primary" />
+                          <span className="size-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center relative z-10 group-hover:scale-110 transition-transform duration-300">
+                            <Badge className="size-7" />
+                          </span>
                         )}
                       </div>
-                      <p className="font-display font-bold text-xs leading-tight">
-                        {ar ? b.ar : b.en}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground">
-                        {count} {ar ? "صنف" : "items"}
-                      </p>
+                      <div className="p-2.5 border-t border-slate-100">
+                        <p className="font-display font-bold text-xs leading-tight text-slate-800">
+                          {ar ? b.ar : b.en}
+                        </p>
+                        <div className="flex items-center gap-1 mt-1">
+                          <span className="text-[10px] font-semibold text-primary bg-primary/10 rounded-full px-1.5 py-0.5">
+                            {count} {ar ? "صنف" : "items"}
+                          </span>
+                        </div>
+                      </div>
                     </button>
                   );
                 })}
@@ -892,6 +985,53 @@ function ProductsPanel() {
           })}
         </div>
       ))}
+
+      {/* Crop modal */}
+      {cropModalOpen && cropFile && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex flex-col">
+          <div className="flex items-center justify-between px-4 py-3 bg-white">
+            <button
+              type="button"
+              onClick={() => { setCropModalOpen(false); setCropFile(null); }}
+              className="text-sm font-bold text-slate-600"
+            >
+              {ar ? "إلغاء" : "Cancel"}
+            </button>
+            <span className="font-display font-bold text-sm">
+              {ar ? "اقتصاص الصورة" : "Crop Image"}
+            </span>
+            <button
+              type="button"
+              onClick={handleCropComplete}
+              className="text-sm font-bold text-primary"
+            >
+              {ar ? "تأكيد" : "Done"}
+            </button>
+          </div>
+          <div className="flex-1 relative">
+            <Cropper
+              image={cropFile}
+              crop={crop}
+              zoom={zoom}
+              aspect={4 / 3}
+              onCropChange={setCrop}
+              onZoomChange={setZoom}
+              onCropComplete={(_, area) => setCroppedAreaPixels(area)}
+            />
+          </div>
+          <div className="bg-white px-4 py-3">
+            <input
+              type="range"
+              min={1}
+              max={3}
+              step={0.05}
+              value={zoom}
+              onChange={(e) => setZoom(parseFloat(e.target.value))}
+              className="w-full accent-primary"
+            />
+          </div>
+        </div>
+      )}
       </div>
   );
 }

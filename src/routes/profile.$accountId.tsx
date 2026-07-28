@@ -229,47 +229,49 @@ function ProfilePage() {
       <TopBar title={ar ? "الملف الشخصي" : "Profile"} showBack />
       <div className="px-4 pt-4 space-y-4 pb-6">
         {/* ── Profile Header ─────────────────────── */}
-        <div className="bg-card border border-border rounded-2xl p-4 shadow-soft flex items-start gap-4">
-          <span
-            className={`size-14 rounded-2xl flex items-center justify-center shrink-0 font-display font-extrabold text-xl ${categoryColor}`}
-          >
-            {account.photoURL ? (
-              <img src={account.photoURL} alt="" className="size-full object-cover rounded-2xl" />
-            ) : (
-              typeLetter
-            )}
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="font-display font-bold text-lg">{displayName}</p>
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50/30 border border-blue-100 rounded-3xl p-5 shadow-soft">
+          <div className="flex items-start gap-4">
             <span
-              className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full mt-1 ${categoryColor}`}
+              className={`size-16 rounded-2xl flex items-center justify-center shrink-0 font-display font-extrabold text-2xl shadow-sm ${categoryColor}`}
             >
-              {displayRole}
+              {account.photoURL ? (
+                <img src={account.photoURL} alt="" className="size-full object-cover rounded-2xl" />
+              ) : (
+                typeLetter
+              )}
             </span>
-            {account.phone && (
-              <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-2">
-                <Phone className="size-3 shrink-0" />
-                {formatPhone(account.phone)}
-              </p>
-            )}
-            {account.address && (
-              <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-1">
-                <MapPin className="size-3 shrink-0" />
-                {account.address}
-              </p>
-            )}
+            <div className="min-w-0 flex-1">
+              <p className="font-display font-bold text-xl text-slate-800">{displayName}</p>
+              <span
+                className={`inline-block text-[11px] font-semibold px-2.5 py-1 rounded-full mt-1.5 ${categoryColor}`}
+              >
+                {displayRole}
+              </span>
+              {account.phone && (
+                <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-2.5">
+                  <Phone className="size-3.5 shrink-0" />
+                  {formatPhone(account.phone)}
+                </p>
+              )}
+              {account.address && (
+                <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-1">
+                  <MapPin className="size-3.5 shrink-0" />
+                  {account.address}
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
         {/* ── Contact buttons ────────────────────── */}
         {(account.phone || getMapsUrl()) && (
-          <div className="flex gap-2">
+          <div className="flex gap-2.5">
             {account.phone && (
               <a
                 href={getWhatsAppLink(account.phone)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 h-11 rounded-xl bg-green-50 text-green-700 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-green-100 transition"
+                className="flex-1 h-12 rounded-2xl bg-emerald-50 text-emerald-700 text-sm font-bold flex items-center justify-center gap-2 hover:bg-emerald-100 transition shadow-sm"
               >
                 <Phone className="size-4" />
                 {ar ? "واتساب" : "WhatsApp"}
@@ -280,7 +282,7 @@ function ProfilePage() {
                 href={getMapsUrl()}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 h-11 rounded-xl bg-amber-50 text-amber-700 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-amber-100 transition"
+                className="flex-1 h-12 rounded-2xl bg-amber-50 text-amber-700 text-sm font-bold flex items-center justify-center gap-2 hover:bg-amber-100 transition shadow-sm"
               >
                 <MapPin className="size-4" />
                 {ar ? "الموقع" : "Location"}
@@ -362,47 +364,15 @@ function ProfilePage() {
                   </div>
                 </div>
 
-                {/* 5-col filtered products */}
+                {/* Products grid */}
                 {filteredProducts.length > 0 ? (
-                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
-                    {filteredProducts.map((p) => (
-                      <div
-                        key={p.id}
-                        className="bg-card border border-border rounded-xl p-1.5 shadow-soft"
-                      >
-                        {p.images.length > 0 && filterUrls[p.images[0]] ? (
-                          <div className="w-full aspect-square rounded-lg bg-slate-100 overflow-hidden mb-1">
-                            <img
-                              src={filterUrls[p.images[0]]}
-                              alt=""
-                              className="size-full object-cover"
-                              loading="lazy"
-                            />
-                          </div>
-                        ) : (
-                          <div className="w-full aspect-square rounded-lg bg-slate-100 flex items-center justify-center mb-1">
-                            <Package className="size-4 text-slate-400" />
-                          </div>
-                        )}
-                        <p className="font-display font-bold text-[11px] leading-tight line-clamp-2">
-                          {ar ? p.ar || p.en : p.en || p.ar}
-                        </p>
-                        <p className="text-[9px] text-muted-foreground truncate mt-0.5">
-                          {p.brand}
-                        </p>
-                        <p className="mt-1 font-display font-extrabold text-xs text-primary">
-                          {fmtPrice(p)}
-                        </p>
-                        <div className="flex items-center gap-1 mt-0.5 text-[9px] text-muted-foreground">
-                          <Layers className="size-2.5" />
-                          {p.stock ?? 0}
-                        </div>
-                        <button className="w-full h-6 mt-1 rounded-md bg-primary/10 text-primary text-[9px] font-bold flex items-center justify-center gap-1 hover:bg-primary/20 transition">
-                          <ShoppingCart className="size-2.5" />
-                          {ar ? "طلب المنتج" : "Order"}
-                        </button>
-                      </div>
-                    ))}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                    {filteredProducts.map((p) => {
+                      const imgSrc = p.images.length > 0 ? filterUrls[p.images[0]] : null;
+                      return (
+                      <ProductCard key={p.id} product={p} imgSrc={imgSrc} ar={ar} />
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="py-10 text-center text-sm text-muted-foreground">
@@ -470,12 +440,26 @@ function ProfilePage() {
               <Package className="size-4 text-primary" />
               {ar ? "المنتجات" : "Products"}
             </h2>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {products.slice(0, 6).map((p) => (
-                <div key={p.id} className="bg-card border border-border rounded-xl p-3 shadow-soft">
-                  <p className="font-display font-bold text-sm truncate">{ar ? p.ar : p.en}</p>
-                  <p className="text-[11px] text-muted-foreground truncate">{p.brand}</p>
-                  <p className="text-xs font-semibold mt-1">{fmtPrice(p)}</p>
+                <div key={p.id} className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all">
+                  <div className="h-36 w-full bg-gray-50 flex items-center justify-center p-3">
+                    {p.images.length > 0 ? (
+                      <img
+                        src={p.images[0]}
+                        alt=""
+                        className="size-full object-contain"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <Package className="size-10 text-slate-300" />
+                    )}
+                  </div>
+                  <div className="p-3">
+                    <p className="font-display font-bold text-sm truncate text-slate-800">{ar ? p.ar : p.en}</p>
+                    <p className="text-[11px] text-slate-400 truncate mt-0.5">{p.brand}</p>
+                    <p className="text-blue-600 font-bold mt-2">{fmtPrice(p)}</p>
+                  </div>
                 </div>
               ))}
             </div>
@@ -498,5 +482,53 @@ function ProfilePage() {
         )}
       </div>
     </MobileShell>
+  );
+}
+
+function ProductCard({
+  product,
+  imgSrc,
+  ar,
+}: {
+  product: { ar: string; en: string; brand: string; price: number; currency: string };
+  imgSrc: string | null;
+  ar: boolean;
+}) {
+  const [imgError, setImgError] = useState(false);
+  return (
+    <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all">
+      <div className="h-28 w-full bg-gray-50 flex items-center justify-center p-2 relative">
+        {imgSrc && !imgError ? (
+          <img
+            src={imgSrc}
+            alt=""
+            className="size-full object-contain"
+            loading="lazy"
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          <Package className="size-7 text-slate-300" />
+        )}
+      </div>
+      <div className="p-2">
+        <p className="font-display font-bold text-[11px] leading-tight line-clamp-2 text-slate-800">
+          {ar ? product.ar || product.en : product.en || product.ar}
+        </p>
+        {product.brand ? (
+          <p className="text-[10px] text-slate-400 mt-0.5 truncate">{product.brand}</p>
+        ) : null}
+        <div className="flex items-center justify-between mt-1.5">
+          <p className="font-display font-extrabold text-xs text-blue-600">
+            {product.currency === "IQD"
+              ? `${product.price.toLocaleString()} د.ع`
+              : `$${product.price.toFixed(2)}`}
+          </p>
+          <button className="h-6 px-2 rounded-md bg-primary/10 text-primary text-[10px] font-bold flex items-center gap-0.5 hover:bg-primary/20 transition">
+            <ShoppingCart className="size-2.5" />
+            {ar ? "طلب" : "Order"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

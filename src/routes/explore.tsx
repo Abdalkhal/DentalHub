@@ -181,7 +181,7 @@ function Explore() {
                 <button
                   key={`${item.category}-${item.id}`}
                   onClick={() => handleSelect(item)}
-                  className="w-full text-start bg-card border border-border rounded-2xl p-4 shadow-soft hover:shadow-card transition flex items-start gap-3"
+                  className="w-full text-start bg-card border border-border rounded-2xl p-4 shadow-soft hover:shadow-md hover:bg-slate-50 hover:border-primary/30 transition-all cursor-pointer flex items-start gap-3"
                 >
                   <span
                     className={cn(
