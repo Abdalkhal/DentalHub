@@ -108,6 +108,7 @@ const NAV_ITEMS = [
   { key: "finance", ar: "المالية", en: "Finance", icon: CreditCard, path: "/finance" },
   { key: "supplies", ar: "المكاتب والمستلزمات", en: "Supplies", icon: Package, path: "/supplies" },
   { key: "labs", ar: "المختبرات", en: "Labs", icon: Building2, path: "/labs" },
+  { key: "services", ar: "خدمات المختبر", en: "Lab Services", icon: Sparkles, path: "/lab/my-services" },
   { key: "messages", ar: "الرسائل", en: "Messages", icon: MessageSquare, path: "/messages" },
   { key: "settings", ar: "الإعدادات", en: "Settings", icon: Edit3, path: "/account/settings" },
 ];

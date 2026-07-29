@@ -35,6 +35,7 @@ import { Route as LabsExploreRouteImport } from './routes/labs.explore'
 import { Route as LabsDashboardRouteImport } from './routes/labs.dashboard'
 import { Route as LabsCasesRouteImport } from './routes/labs.cases'
 import { Route as LabsLabIdRouteImport } from './routes/labs.$labId'
+import { Route as LabMyServicesRouteImport } from './routes/lab.my-services'
 import { Route as ImplantsCountryRouteImport } from './routes/implants.$country'
 import { Route as AccountSettingsRouteImport } from './routes/account.settings'
 import { Route as AccountHelpRouteImport } from './routes/account.help'
@@ -176,6 +177,11 @@ const LabsLabIdRoute = LabsLabIdRouteImport.update({
   path: '/labs/$labId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LabMyServicesRoute = LabMyServicesRouteImport.update({
+  id: '/lab/my-services',
+  path: '/lab/my-services',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ImplantsCountryRoute = ImplantsCountryRouteImport.update({
   id: '/implants/$country',
   path: '/implants/$country',
@@ -253,6 +259,7 @@ export interface FileRoutesByFullPath {
   '/account/help': typeof AccountHelpRouteWithChildren
   '/account/settings': typeof AccountSettingsRoute
   '/implants/$country': typeof ImplantsCountryRoute
+  '/lab/my-services': typeof LabMyServicesRoute
   '/labs/$labId': typeof LabsLabIdRouteWithChildren
   '/labs/cases': typeof LabsCasesRoute
   '/labs/dashboard': typeof LabsDashboardRoute
@@ -291,6 +298,7 @@ export interface FileRoutesByTo {
   '/account/help': typeof AccountHelpRouteWithChildren
   '/account/settings': typeof AccountSettingsRoute
   '/implants/$country': typeof ImplantsCountryRoute
+  '/lab/my-services': typeof LabMyServicesRoute
   '/labs/$labId': typeof LabsLabIdRouteWithChildren
   '/labs/cases': typeof LabsCasesRoute
   '/labs/dashboard': typeof LabsDashboardRoute
@@ -330,6 +338,7 @@ export interface FileRoutesById {
   '/account/help': typeof AccountHelpRouteWithChildren
   '/account/settings': typeof AccountSettingsRoute
   '/implants/$country': typeof ImplantsCountryRoute
+  '/lab/my-services': typeof LabMyServicesRoute
   '/labs/$labId': typeof LabsLabIdRouteWithChildren
   '/labs/cases': typeof LabsCasesRoute
   '/labs/dashboard': typeof LabsDashboardRoute
@@ -370,6 +379,7 @@ export interface FileRouteTypes {
     | '/account/help'
     | '/account/settings'
     | '/implants/$country'
+    | '/lab/my-services'
     | '/labs/$labId'
     | '/labs/cases'
     | '/labs/dashboard'
@@ -408,6 +418,7 @@ export interface FileRouteTypes {
     | '/account/help'
     | '/account/settings'
     | '/implants/$country'
+    | '/lab/my-services'
     | '/labs/$labId'
     | '/labs/cases'
     | '/labs/dashboard'
@@ -446,6 +457,7 @@ export interface FileRouteTypes {
     | '/account/help'
     | '/account/settings'
     | '/implants/$country'
+    | '/lab/my-services'
     | '/labs/$labId'
     | '/labs/cases'
     | '/labs/dashboard'
@@ -481,6 +493,7 @@ export interface RootRouteChildren {
   ReportsRoute: typeof ReportsRoute
   SignupRoute: typeof SignupRoute
   ImplantsCountryRoute: typeof ImplantsCountryRoute
+  LabMyServicesRoute: typeof LabMyServicesRoute
   LabsLabIdRoute: typeof LabsLabIdRouteWithChildren
   LabsCasesRoute: typeof LabsCasesRoute
   LabsDashboardRoute: typeof LabsDashboardRoute
@@ -678,6 +691,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LabsLabIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/lab/my-services': {
+      id: '/lab/my-services'
+      path: '/lab/my-services'
+      fullPath: '/lab/my-services'
+      preLoaderRoute: typeof LabMyServicesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/implants/$country': {
       id: '/implants/$country'
       path: '/implants/$country'
@@ -812,6 +832,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReportsRoute: ReportsRoute,
   SignupRoute: SignupRoute,
   ImplantsCountryRoute: ImplantsCountryRoute,
+  LabMyServicesRoute: LabMyServicesRoute,
   LabsLabIdRoute: LabsLabIdRouteWithChildren,
   LabsCasesRoute: LabsCasesRoute,
   LabsDashboardRoute: LabsDashboardRoute,

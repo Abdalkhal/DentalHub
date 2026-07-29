@@ -1,133 +1,140 @@
-import { createFileRoute, Link, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useState, useMemo, useEffect } from "react";
+import { doc, onSnapshot } from "firebase/firestore";
+import { db } from "@/integrations/firebase/client";
+import type { UserRoleDoc } from "@/integrations/firebase/types";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
-import { CASES } from "@/data/labs";
-import { useAdminStore } from "@/lib/adminStore";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { CaseTimeline } from "@/components/CaseTimeline";
-import { Send, Star, Clock, FileText } from "lucide-react";
+import { toast } from "sonner";
+import {
+  Clock, Sparkles, Crown, Stethoscope, MapPin, Phone, Loader2,
+  ShoppingCart, ChevronLeft, ChevronRight,
+} from "lucide-react";
 
 export const Route = createFileRoute("/labs/$labId")({
   component: LabPage,
 });
 
+type Service = {
+  id: string; titleAr: string; titleEn: string; category: string;
+  turnaroundAr: string; turnaroundEn: string;
+  price: number; currency: "USD" | "IQD"; imageUrl?: string;
+};
+
+const PILL_COLORS = ["bg-sky-500","bg-violet-500","bg-indigo-500","bg-emerald-500","bg-amber-500","bg-rose-500","bg-cyan-500","bg-fuchsia-500"];
+
 function LabPage() {
   const { labId } = Route.useParams();
-  const { labs: LABS } = useAdminStore();
-  const lab = LABS.find((l) => l.id === labId);
-  const { t, lang } = useI18n();
-  const isVisitor = useRouterState({
-    select: (s) =>
-      s.location.state != null &&
-      (s.location.state as unknown as Record<string, unknown>)?.isVisitor === true,
-  });
-  const labCases = lab ? CASES.filter((c) => c.labId === lab.id).slice(0, 2) : [];
+  const { lang, dir } = useI18n();
+  const ar = lang === "ar";
+  const navigate = useNavigate();
+  const BackIcon = dir === "rtl" ? ChevronLeft : ChevronRight;
 
-  if (!lab) {
-    return (
-      <MobileShell>
-        <TopBar title={lang === "ar" ? "غير موجود" : "Not found"} showBack />
-        <div className="p-6 text-center text-sm text-muted-foreground">
-          {lang === "ar" ? "المختبر غير موجود" : "Lab not found"}
-        </div>
-      </MobileShell>
-    );
-  }
+  const [profile, setProfile] = useState<UserRoleDoc | null>(null);
+  const [services, setServices] = useState<Service[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState("all");
+
+  useEffect(() => {
+    const unsubProfile = onSnapshot(doc(db, "user_roles", labId), (snap) => {
+      if (snap.exists()) setProfile(snap.data() as UserRoleDoc);
+      setLoading(false);
+    });
+    const unsubServices = onSnapshot(doc(db, "lab_services", labId), (snap) => {
+      if (snap.exists()) setServices((snap.data() as any).services ?? []);
+      else setServices([]);
+    });
+    return () => { unsubProfile(); unsubServices(); };
+  }, [labId]);
+
+  const labName = profile?.name || (ar ? "مختبر" : "Lab");
+  const phone = profile?.phone || "";
+  const address = profile?.address || "";
+
+  const dynamicCategories = useMemo(() => {
+    const seen = new Set<string>();
+    return services.reduce((acc, s) => {
+      const c = s.category.trim();
+      if (c && !seen.has(c)) { seen.add(c); acc.push({ id: c, color: PILL_COLORS[acc.length % PILL_COLORS.length] }); }
+      return acc;
+    }, [] as { id: string; color: string }[]);
+  }, [services]);
+
+  const filtered = useMemo(() =>
+    filter === "all" ? services : services.filter((s) => s.category === filter),
+  [services, filter]);
+
+  if (loading) return <MobileShell><TopBar title={ar ? "تحميل..." : "Loading..."} showBack /><div className="flex justify-center py-20"><Loader2 className="size-8 animate-spin text-primary" /></div></MobileShell>;
+
+  if (!profile) return <MobileShell><TopBar title={ar ? "غير موجود" : "Not found"} showBack /><div className="p-6 text-center text-slate-400"><p className="font-semibold">{ar ? "المختبر غير موجود" : "Lab not found"}</p></div></MobileShell>;
 
   return (
     <MobileShell>
-      <TopBar title={lang === "ar" ? lab.ar : lab.en} showBack />
-      <div className="px-4 pt-4 space-y-5">
-        {/* Header card */}
-        <div className="bg-card border border-border rounded-2xl p-4 shadow-soft">
-          <p className="text-xs text-muted-foreground">
-            {lang === "ar" ? lab.area.ar : lab.area.en}
-          </p>
-          <h2 className="font-display font-bold text-lg mt-0.5">
-            {lang === "ar" ? lab.ar : lab.en}
-          </h2>
-          <div className="flex items-center gap-4 mt-2 text-sm">
-            <span className="inline-flex items-center gap-1 text-amber-500 font-semibold">
-              <Star className="size-4 fill-current" />
-              {lab.rating}
+      <TopBar title={labName} showBack />
+
+      <div className="px-4 pt-4 pb-6 space-y-4">
+        {/* Profile header */}
+        <div className="bg-gradient-to-r from-sky-50 to-indigo-50/30 border border-sky-100 rounded-3xl p-5 shadow-sm">
+          <div className="flex items-start gap-4">
+            <span className="size-14 rounded-2xl bg-sky-100 text-sky-600 flex items-center justify-center font-bold text-xl shrink-0">
+              {labName.charAt(0)}
             </span>
-            <span className="inline-flex items-center gap-1 text-muted-foreground">
-              <Clock className="size-4" />
-              {lab.deliveryDays} {t("delivery_days")}
-            </span>
+            <div className="min-w-0 flex-1">
+              <p className="font-bold text-lg text-slate-800">{labName}</p>
+              <span className="inline-block text-[11px] font-semibold px-2.5 py-1 rounded-full mt-1.5 bg-sky-50 text-sky-600">{ar ? "مختبر أسنان" : "Dental Lab"}</span>
+              {phone && <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-2.5"><Phone className="size-3.5" />{phone.replace(/\D/g, "").replace(/^964/, "+964 ")}</p>}
+            </div>
           </div>
-          <div className={cn("grid gap-2", isVisitor ? "grid-cols-1" : "grid-cols-2")}>
-            {!isVisitor && (
-              <button className="h-11 rounded-xl bg-primary text-primary-foreground font-display font-bold inline-flex items-center justify-center gap-2">
-                <Send className="size-4" />
-                {t("send_case")}
-              </button>
-            )}
-            <Link
-              to="/labs/$labId/statement"
-              params={{ labId: lab.id }}
-              className="h-11 rounded-xl bg-card border border-border text-foreground font-display font-bold inline-flex items-center justify-center gap-2 hover:bg-accent"
-            >
-              <FileText className="size-4" />
-              {lang === "ar" ? "كشف الحساب" : "Statement"}
-            </Link>
-          </div>
+          {address && <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-3 border-t border-sky-100 pt-3"><MapPin className="size-3.5" />{address}</p>}
         </div>
 
-        {/* Work types */}
-        <section>
-          <h3 className="font-display font-bold text-base mb-2">{t("work_types")}</h3>
-          <ul className="flex flex-wrap gap-2">
-            {lab.workTypes.map((w: { ar: string; en: string }, i: number) => (
-              <li
-                key={i}
-                className="px-3 py-1.5 rounded-full bg-primary-soft text-primary text-xs font-semibold"
-              >
-                {lang === "ar" ? w.ar : w.en}
-              </li>
-            ))}
-          </ul>
-        </section>
+        {/* Filter pills */}
+        {services.length > 0 && (
+          <div className="flex gap-1.5 overflow-x-auto pb-1">
+            <Pill active={filter === "all"} color="bg-sky-500" onClick={() => setFilter("all")}>{ar ? "الكل" : "All"}</Pill>
+            {dynamicCategories.map((c) => <Pill key={c.id} active={filter === c.id} color={c.color} onClick={() => setFilter(c.id)}>{c.id}</Pill>)}
+          </div>
+        )}
 
-        {/* Prices */}
-        <section>
-          <h3 className="font-display font-bold text-base mb-2">{t("price_list")}</h3>
-          <ul className="bg-card border border-border rounded-2xl divide-y divide-border overflow-hidden shadow-soft">
-            {lab.priceList.map((item: { ar: string; en: string; price: number }, i: number) => (
-              <li key={i} className="flex items-center justify-between px-4 py-3">
-                <span className="text-sm">{lang === "ar" ? item.ar : item.en}</span>
-                <span className="font-display font-extrabold text-primary">${item.price}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        {/* Recent cases at this lab */}
-        {labCases.length > 0 && (
-          <section>
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-display font-bold text-base">{t("cases")}</h3>
-              <Link to="/labs/cases" className="text-xs font-semibold text-primary">
-                {t("view_all")}
-              </Link>
-            </div>
-            <ul className="space-y-3">
-              {labCases.map((c) => (
-                <li key={c.id} className="bg-card border border-border rounded-2xl p-4 shadow-soft">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="font-display font-bold text-sm">
-                      {lang === "ar" ? c.work.ar : c.work.en}
-                    </p>
-                    <span className="text-[10px] font-mono text-muted-foreground">{c.id}</span>
+        {/* Services grid */}
+        {filtered.length === 0 ? (
+          <div className="py-16 text-center text-slate-400">
+            <Stethoscope className="size-10 mx-auto mb-3 opacity-30" />
+            <p className="font-semibold">{ar ? "لا توجد خدمات بعد" : "No services yet"}</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filtered.map((s) => {
+              const cat = dynamicCategories.find((c) => c.id === s.category);
+              const fmt = s.currency === "IQD" ? `${s.price.toLocaleString()} د.ع` : `$${s.price.toFixed(2)}`;
+              return (
+                <div key={s.id} className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm hover:shadow-md transition-all">
+                  <div className={cn("h-1", cat?.color ?? "bg-slate-300")} />
+                  {s.imageUrl ? <div className="h-36 bg-slate-50 flex items-center justify-center p-2"><img src={s.imageUrl} alt="" className="size-full object-contain" loading="lazy" /></div>
+                  : <div className="h-24 bg-slate-50 flex items-center justify-center"><Crown className="size-8 text-slate-300" /></div>}
+                  <div className="p-3">
+                    <p className="font-bold text-sm leading-snug line-clamp-2 text-slate-800">{ar ? s.titleAr : s.titleEn}</p>
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-slate-50 rounded-lg text-[10px] font-semibold text-slate-600"><Clock className="size-3" />{ar ? s.turnaroundAr : s.turnaroundEn}</span>
+                      <span className="font-bold text-sm text-blue-600">{fmt}</span>
+                    </div>
+                    {s.category && <p className="text-[10px] text-slate-400 mt-1.5">{ar ? `الفئة: ${s.category}` : `Category: ${s.category}`}</p>}
+                    <button className="w-full h-7 mt-2 rounded-lg bg-primary/10 text-primary text-[11px] font-bold flex items-center justify-center gap-1 hover:bg-primary/20 transition">
+                      <ShoppingCart className="size-3" />{ar ? "طلب" : "Order"}
+                    </button>
                   </div>
-                  <CaseTimeline status={c.status} />
-                </li>
-              ))}
-            </ul>
-          </section>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
     </MobileShell>
   );
+}
+
+function Pill({ active, color, onClick, children }: { active: boolean; color: string; onClick: () => void; children: React.ReactNode }) {
+  return <button onClick={onClick} className={cn("shrink-0 px-4 h-9 rounded-full text-xs font-bold border-2 transition-all", active ? `${color} text-white border-transparent shadow-lg` : "bg-white text-slate-600 border-slate-200 hover:border-slate-300")}>{children}</button>;
 }
