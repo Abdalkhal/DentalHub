@@ -19,10 +19,11 @@ import {
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { NewOrderModal, type NewOrder } from "./NewOrderModal";
-import { OrderDetailsModal } from "./OrderDetailsModal";
+import { EditOrderModal } from "./EditOrderModal";
 import {
   useOrders,
   addOrder,
+  updateOrder,
   updateOrderStatus,
   getNextOrderNumber,
   getNextCaseId,
@@ -79,6 +80,7 @@ export function DashboardHome() {
   const handleStatusChange = (id: string, newStatus: OrderStatus) => {
     updateOrderStatus(id, newStatus);
   };
+
 
   const hour = new Date().getHours();
   const isMorning = hour >= 5 && hour < 12;
@@ -487,12 +489,12 @@ export function DashboardHome() {
         }}
       />
 
-      {/* Order Status Modal */}
+      {/* Order Edit Modal */}
       {selectedOrder && (
-        <OrderDetailsModal
+        <EditOrderModal
           order={selectedOrder}
           onClose={() => setSelectedOrderId(null)}
-          onStatusChange={handleStatusChange}
+          onSave={updateOrder}
         />
       )}
     </div>

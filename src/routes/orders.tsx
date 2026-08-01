@@ -7,7 +7,7 @@ import { db } from "@/integrations/firebase/client";
 import type { OrderDoc } from "@/integrations/firebase/types";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
-import { OrderDetailsModal } from "@/components/OrderDetailsModal";
+import { EditOrderModal } from "@/components/EditOrderModal";
 import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
 import { useI18n } from "@/lib/i18n";
 import { useUserRole } from "@/lib/useAuth";
@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   updateOrderStatus,
+  updateOrder,
   deleteOrder,
   useOrders,
   type Order,
@@ -271,10 +272,10 @@ function LabOrders() {
       </div>
 
       {selectedOrder && (
-        <OrderDetailsModal
+        <EditOrderModal
           order={selectedOrder}
           onClose={() => setSelectedOrderId(null)}
-          onStatusChange={handleStatusChange}
+          onSave={updateOrder}
         />
       )}
       {deleteTarget && (

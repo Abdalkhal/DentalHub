@@ -24,6 +24,7 @@ import {
   ScrollText,
   CheckCircle2,
   Clock,
+  ChevronDown,
   X,
   Plus,
   Save,
@@ -40,6 +41,7 @@ type PaymentRecord = {
   id: string;
   clinic: string;
   amount: number;
+  currency: "USD" | "IQD";
   date: string;
 };
 
@@ -158,6 +160,7 @@ function FinancePage() {
   const [editingExpenseCat, setEditingExpenseCat] = useState<string | null>(null);
   const [paymentClinic, setPaymentClinic] = useState("");
   const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentCurrency, setPaymentCurrency] = useState<"USD" | "IQD">("IQD");
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split("T")[0]);
 
   /* ── Load lab finances from Firestore ────────────── */
@@ -256,6 +259,7 @@ function FinancePage() {
       id: crypto.randomUUID(),
       clinic: paymentClinic.trim(),
       amount: amt,
+      currency: paymentCurrency,
       date: paymentDate,
     };
     const updated: LabFinanceDoc = {
@@ -265,6 +269,7 @@ function FinancePage() {
     saveMutation.mutate(updated);
     setPaymentClinic("");
     setPaymentAmount("");
+    setPaymentCurrency("IQD");
     setPaymentDate(new Date().toISOString().split("T")[0]);
     setShowPaymentModal(false);
   };
@@ -549,34 +554,67 @@ function FinancePage() {
               <label className="text-xs font-bold text-muted-foreground mb-1.5 block">
                 {ar ? "العيادة / الطبيب" : "Clinic / Doctor"}
               </label>
-              <select
-                value={paymentClinic}
-                onChange={(e) => setPaymentClinic(e.target.value)}
-                className="w-full h-11 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
-              >
-                <option value="">{ar ? "اختر العيادة" : "Select clinic"}</option>
-                {clinicSummaries.map((c) => (
-                  <option key={c.name} value={c.name}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  value={paymentClinic}
+                  onChange={(e) => setPaymentClinic(e.target.value)}
+                  className="w-full h-11 rounded-xl bg-slate-50 border border-border ps-4 pe-10 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition appearance-none"
+                >
+                  <option value="">{ar ? "اختر العيادة" : "Select clinic"}</option>
+                  {clinicSummaries.map((c) => (
+                    <option key={c.name} value={c.name}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute top-1/2 -translate-y-1/2 end-3 size-4 text-slate-400 pointer-events-none" />
+              </div>
             </div>
 
             <div>
               <label className="text-xs font-bold text-muted-foreground mb-1.5 block">
                 {ar ? "المبلغ" : "Amount"}
               </label>
-              <input
-                type="number"
-                min="0"
-                step="1000"
-                value={paymentAmount}
-                onChange={(e) => setPaymentAmount(e.target.value)}
-                placeholder="0"
-                dir="ltr"
-                className="w-full h-11 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
-              />
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type="number"
+                    min="0"
+                    step="1000"
+                    value={paymentAmount}
+                    onChange={(e) => setPaymentAmount(e.target.value)}
+                    placeholder="0"
+                    dir="ltr"
+                    className="w-full h-11 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  />
+                </div>
+                <div className="flex rounded-xl bg-slate-50 border border-border overflow-hidden shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentCurrency("USD")}
+                    className={cn(
+                      "px-3.5 text-sm font-semibold transition",
+                      paymentCurrency === "USD"
+                        ? "bg-primary text-primary-foreground"
+                        : "text-slate-500 hover:text-slate-700",
+                    )}
+                  >
+                    $
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentCurrency("IQD")}
+                    className={cn(
+                      "px-3.5 text-sm font-semibold transition",
+                      paymentCurrency === "IQD"
+                        ? "bg-primary text-primary-foreground"
+                        : "text-slate-500 hover:text-slate-700",
+                    )}
+                  >
+                    {ar ? "د.ع" : "IQD"}
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div>

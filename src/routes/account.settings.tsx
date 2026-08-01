@@ -592,20 +592,6 @@ function SettingsPage() {
           </div>
         </section>
 
-        {/* Section 5: Service Pricing — labs only */}
-        {role?.accountType === "lab" && (
-          <section>
-            <p className="text-xs font-bold text-muted-foreground mb-2 px-1">
-              {ar ? "إدارة أسعار الخدمات" : "Service Pricing Management"}
-            </p>
-            <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-soft">
-              {PRICING_ITEMS.map((item, i) => (
-                <PricingRow key={item.key} item={item} index={i} ar={ar} />
-              ))}
-            </div>
-          </section>
-        )}
-
         {/* Save Button */}
         <button
           onClick={handleSave}
@@ -854,71 +840,6 @@ function SettingsPage() {
         </div>
       )}
     </MobileShell>
-  );
-}
-
-const PRICING_ITEMS = [
-  { key: "zirconia", ar: "زيركون", en: "Zirconia", price: 80000 },
-  { key: "emax", ar: "إيماكس", en: "E-max", price: 65000 },
-  { key: "pfm", ar: "PFM", en: "PFM", price: 45000 },
-  { key: "all_ceramic", ar: "سيراميك بالكامل", en: "All Ceramic", price: 55000 },
-  { key: "implant_pricing", ar: "زرعات", en: "Implants", price: 120000 },
-];
-
-function PricingRow({
-  item,
-  index,
-  ar,
-}: {
-  item: (typeof PRICING_ITEMS)[number];
-  index: number;
-  ar: boolean;
-}) {
-  const [value, setValue] = useState(String(item.price));
-  const [editing, setEditing] = useState(false);
-
-  return (
-    <div
-      className={cn(
-        "flex items-center gap-3 px-4 py-3.5",
-        index !== PRICING_ITEMS.length - 1 && "border-b border-border",
-      )}
-    >
-      <span className="size-8 rounded-lg bg-muted flex items-center justify-center shrink-0 text-muted-foreground">
-        <DollarSign className="size-4" />
-      </span>
-      <span className="flex-1 text-sm font-semibold text-foreground">{ar ? item.ar : item.en}</span>
-      {editing ? (
-        <div className="flex items-center gap-1.5">
-          <input
-            type="number"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            className="w-24 h-9 rounded-lg border border-border bg-card px-2 text-sm font-bold text-end focus:outline-none focus:ring-2 focus:ring-ring/40"
-            autoFocus
-            onBlur={() => setEditing(false)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") setEditing(false);
-            }}
-          />
-          <span className="text-[11px] text-muted-foreground font-medium">
-            {ar ? "د.ع" : "IQD"}
-          </span>
-        </div>
-      ) : (
-        <button
-          onClick={() => setEditing(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-accent transition"
-        >
-          <span className="font-display font-extrabold text-sm text-foreground">
-            {Number(value).toLocaleString()}
-          </span>
-          <span className="text-[11px] text-muted-foreground font-medium">
-            {ar ? "د.ع" : "IQD"}
-          </span>
-        </button>
-      )}
-    </div>
   );
 }
 

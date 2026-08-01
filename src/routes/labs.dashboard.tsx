@@ -7,11 +7,13 @@ import { useI18n } from "@/lib/i18n";
 import { useSession } from "@/lib/useAuth";
 import { cn } from "@/lib/utils";
 import { NewOrderModal, type NewOrder } from "@/components/NewOrderModal";
-import { OrderDetailsModal } from "@/components/OrderDetailsModal";
+import { EditOrderModal } from "@/components/EditOrderModal";
 import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
 import { toast } from "sonner";
+import { NotificationBell } from "@/components/NotificationBell";
 import {
   addOrder,
+  updateOrder,
   updateOrderStatus,
   deleteOrder,
   useOrders,
@@ -504,10 +506,7 @@ function LabDashboard() {
                 >
                   <Globe className="size-5" />
                 </button>
-                <button className="relative size-10 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-500">
-                  <Bell className="size-5" />
-                  <span className="absolute top-2 end-2 size-2 rounded-full bg-rose-500 ring-2 ring-white" />
-                </button>
+                <NotificationBell userId={user?.uid || ""} />
                 <button className="size-10 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-500">
                   <MessageSquare className="size-5" />
                 </button>
@@ -789,12 +788,12 @@ function LabDashboard() {
         </main>
       </div>
 
-      {/* Order detail modal */}
+      {/* Order edit modal */}
       {selectedOrder && (
-        <OrderDetailsModal
+        <EditOrderModal
           order={selectedOrder}
           onClose={() => setSelectedOrder(null)}
-          onStatusChange={handleStatusChange}
+          onSave={updateOrder}
         />
       )}
 

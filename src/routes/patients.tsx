@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
@@ -15,6 +15,8 @@ import {
   CheckCircle,
   Clock,
   Syringe,
+  ChevronRight,
+  ChevronLeft,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -102,6 +104,7 @@ export const Route = createFileRoute("/patients")({
 
 function PatientsPage() {
   const { t, lang, dir } = useI18n();
+  const navigate = useNavigate();
   const orders = useOrders();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
@@ -183,7 +186,14 @@ function PatientsPage() {
       />
 
       <div className="px-4 pt-2 pb-4 space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-row-reverse items-center justify-between">
+          <button
+            onClick={() => navigate({ to: "/labs/dashboard" })}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-sky-200 text-sky-600 text-xs font-bold shadow-sm hover:bg-sky-50 hover:border-sky-300 transition"
+          >
+            {dir === "rtl" ? <ChevronRight className="size-3.5" /> : <ChevronLeft className="size-3.5" />}
+            {lang === "ar" ? "العودة" : "Back"}
+          </button>
           <h2 className="text-xs font-semibold text-sky-700 uppercase tracking-wide">
             {lang === "ar" ? `المرضى (${filtered.length})` : `Patients (${filtered.length})`}
           </h2>

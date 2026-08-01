@@ -155,6 +155,11 @@ export function updateOrderStatus(id: string, status: OrderStatus) {
   emit();
 }
 
+export function updateOrder(id: string, updates: Partial<Order>) {
+  orders = orders.map((o) => (o.id === id ? { ...o, ...updates } : o));
+  emit();
+}
+
 export function setOrders(newOrders: Order[]) {
   orders = [...newOrders];
   emit();
