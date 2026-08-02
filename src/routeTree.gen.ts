@@ -14,7 +14,6 @@ import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as ProductionRouteImport } from './routes/production'
 import { Route as PricingRouteImport } from './routes/pricing'
-import { Route as PatientsRouteImport } from './routes/patients'
 import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as MoreRouteImport } from './routes/more'
 import { Route as MessagesRouteImport } from './routes/messages'
@@ -28,15 +27,23 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SuppliesIndexRouteImport } from './routes/supplies.index'
+import { Route as PatientsIndexRouteImport } from './routes/patients.index'
 import { Route as LabsIndexRouteImport } from './routes/labs.index'
 import { Route as ImplantsIndexRouteImport } from './routes/implants.index'
+import { Route as ClinicIndexRouteImport } from './routes/clinic.index'
 import { Route as ProfileAccountIdRouteImport } from './routes/profile.$accountId'
+import { Route as PatientsPatientIdRouteImport } from './routes/patients.$patientId'
 import { Route as LabsExploreRouteImport } from './routes/labs.explore'
 import { Route as LabsDashboardRouteImport } from './routes/labs.dashboard'
 import { Route as LabsCasesRouteImport } from './routes/labs.cases'
 import { Route as LabsLabIdRouteImport } from './routes/labs.$labId'
 import { Route as LabMyServicesRouteImport } from './routes/lab.my-services'
 import { Route as ImplantsCountryRouteImport } from './routes/implants.$country'
+import { Route as ClinicReportsRouteImport } from './routes/clinic.reports'
+import { Route as ClinicOrdersRouteImport } from './routes/clinic.orders'
+import { Route as ClinicMaterialsRouteImport } from './routes/clinic.materials'
+import { Route as ClinicFinanceRouteImport } from './routes/clinic.finance'
+import { Route as ClinicDoctorsRouteImport } from './routes/clinic.doctors'
 import { Route as AccountSettingsRouteImport } from './routes/account.settings'
 import { Route as AccountHelpRouteImport } from './routes/account.help'
 import { Route as AccountBalancesRouteImport } from './routes/account.balances'
@@ -70,11 +77,6 @@ const ProductionRoute = ProductionRouteImport.update({
 const PricingRoute = PricingRouteImport.update({
   id: '/pricing',
   path: '/pricing',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PatientsRoute = PatientsRouteImport.update({
-  id: '/patients',
-  path: '/patients',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OrdersRoute = OrdersRouteImport.update({
@@ -142,6 +144,11 @@ const SuppliesIndexRoute = SuppliesIndexRouteImport.update({
   path: '/supplies/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PatientsIndexRoute = PatientsIndexRouteImport.update({
+  id: '/patients/',
+  path: '/patients/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LabsIndexRoute = LabsIndexRouteImport.update({
   id: '/labs/',
   path: '/labs/',
@@ -152,9 +159,19 @@ const ImplantsIndexRoute = ImplantsIndexRouteImport.update({
   path: '/implants/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ClinicIndexRoute = ClinicIndexRouteImport.update({
+  id: '/clinic/',
+  path: '/clinic/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProfileAccountIdRoute = ProfileAccountIdRouteImport.update({
   id: '/profile/$accountId',
   path: '/profile/$accountId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PatientsPatientIdRoute = PatientsPatientIdRouteImport.update({
+  id: '/patients/$patientId',
+  path: '/patients/$patientId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LabsExploreRoute = LabsExploreRouteImport.update({
@@ -185,6 +202,31 @@ const LabMyServicesRoute = LabMyServicesRouteImport.update({
 const ImplantsCountryRoute = ImplantsCountryRouteImport.update({
   id: '/implants/$country',
   path: '/implants/$country',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClinicReportsRoute = ClinicReportsRouteImport.update({
+  id: '/clinic/reports',
+  path: '/clinic/reports',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClinicOrdersRoute = ClinicOrdersRouteImport.update({
+  id: '/clinic/orders',
+  path: '/clinic/orders',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClinicMaterialsRoute = ClinicMaterialsRouteImport.update({
+  id: '/clinic/materials',
+  path: '/clinic/materials',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClinicFinanceRoute = ClinicFinanceRouteImport.update({
+  id: '/clinic/finance',
+  path: '/clinic/finance',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClinicDoctorsRoute = ClinicDoctorsRouteImport.update({
+  id: '/clinic/doctors',
+  path: '/clinic/doctors',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AccountSettingsRoute = AccountSettingsRouteImport.update({
@@ -248,7 +290,6 @@ export interface FileRoutesByFullPath {
   '/messages': typeof MessagesRoute
   '/more': typeof MoreRoute
   '/orders': typeof OrdersRoute
-  '/patients': typeof PatientsRoute
   '/pricing': typeof PricingRoute
   '/production': typeof ProductionRoute
   '/register': typeof RegisterRoute
@@ -258,15 +299,23 @@ export interface FileRoutesByFullPath {
   '/account/balances': typeof AccountBalancesRoute
   '/account/help': typeof AccountHelpRouteWithChildren
   '/account/settings': typeof AccountSettingsRoute
+  '/clinic/doctors': typeof ClinicDoctorsRoute
+  '/clinic/finance': typeof ClinicFinanceRoute
+  '/clinic/materials': typeof ClinicMaterialsRoute
+  '/clinic/orders': typeof ClinicOrdersRoute
+  '/clinic/reports': typeof ClinicReportsRoute
   '/implants/$country': typeof ImplantsCountryRoute
   '/lab/my-services': typeof LabMyServicesRoute
   '/labs/$labId': typeof LabsLabIdRouteWithChildren
   '/labs/cases': typeof LabsCasesRoute
   '/labs/dashboard': typeof LabsDashboardRoute
   '/labs/explore': typeof LabsExploreRoute
+  '/patients/$patientId': typeof PatientsPatientIdRoute
   '/profile/$accountId': typeof ProfileAccountIdRoute
+  '/clinic/': typeof ClinicIndexRoute
   '/implants/': typeof ImplantsIndexRoute
   '/labs/': typeof LabsIndexRoute
+  '/patients/': typeof PatientsIndexRoute
   '/supplies/': typeof SuppliesIndexRoute
   '/labs/$labId/statement': typeof LabsLabIdStatementRoute
   '/supplies/$officeId/$branchSlug': typeof SuppliesOfficeIdBranchSlugRoute
@@ -287,7 +336,6 @@ export interface FileRoutesByTo {
   '/messages': typeof MessagesRoute
   '/more': typeof MoreRoute
   '/orders': typeof OrdersRoute
-  '/patients': typeof PatientsRoute
   '/pricing': typeof PricingRoute
   '/production': typeof ProductionRoute
   '/register': typeof RegisterRoute
@@ -297,15 +345,23 @@ export interface FileRoutesByTo {
   '/account/balances': typeof AccountBalancesRoute
   '/account/help': typeof AccountHelpRouteWithChildren
   '/account/settings': typeof AccountSettingsRoute
+  '/clinic/doctors': typeof ClinicDoctorsRoute
+  '/clinic/finance': typeof ClinicFinanceRoute
+  '/clinic/materials': typeof ClinicMaterialsRoute
+  '/clinic/orders': typeof ClinicOrdersRoute
+  '/clinic/reports': typeof ClinicReportsRoute
   '/implants/$country': typeof ImplantsCountryRoute
   '/lab/my-services': typeof LabMyServicesRoute
   '/labs/$labId': typeof LabsLabIdRouteWithChildren
   '/labs/cases': typeof LabsCasesRoute
   '/labs/dashboard': typeof LabsDashboardRoute
   '/labs/explore': typeof LabsExploreRoute
+  '/patients/$patientId': typeof PatientsPatientIdRoute
   '/profile/$accountId': typeof ProfileAccountIdRoute
+  '/clinic': typeof ClinicIndexRoute
   '/implants': typeof ImplantsIndexRoute
   '/labs': typeof LabsIndexRoute
+  '/patients': typeof PatientsIndexRoute
   '/supplies': typeof SuppliesIndexRoute
   '/labs/$labId/statement': typeof LabsLabIdStatementRoute
   '/supplies/$officeId/$branchSlug': typeof SuppliesOfficeIdBranchSlugRoute
@@ -327,7 +383,6 @@ export interface FileRoutesById {
   '/messages': typeof MessagesRoute
   '/more': typeof MoreRoute
   '/orders': typeof OrdersRoute
-  '/patients': typeof PatientsRoute
   '/pricing': typeof PricingRoute
   '/production': typeof ProductionRoute
   '/register': typeof RegisterRoute
@@ -337,15 +392,23 @@ export interface FileRoutesById {
   '/account/balances': typeof AccountBalancesRoute
   '/account/help': typeof AccountHelpRouteWithChildren
   '/account/settings': typeof AccountSettingsRoute
+  '/clinic/doctors': typeof ClinicDoctorsRoute
+  '/clinic/finance': typeof ClinicFinanceRoute
+  '/clinic/materials': typeof ClinicMaterialsRoute
+  '/clinic/orders': typeof ClinicOrdersRoute
+  '/clinic/reports': typeof ClinicReportsRoute
   '/implants/$country': typeof ImplantsCountryRoute
   '/lab/my-services': typeof LabMyServicesRoute
   '/labs/$labId': typeof LabsLabIdRouteWithChildren
   '/labs/cases': typeof LabsCasesRoute
   '/labs/dashboard': typeof LabsDashboardRoute
   '/labs/explore': typeof LabsExploreRoute
+  '/patients/$patientId': typeof PatientsPatientIdRoute
   '/profile/$accountId': typeof ProfileAccountIdRoute
+  '/clinic/': typeof ClinicIndexRoute
   '/implants/': typeof ImplantsIndexRoute
   '/labs/': typeof LabsIndexRoute
+  '/patients/': typeof PatientsIndexRoute
   '/supplies/': typeof SuppliesIndexRoute
   '/labs/$labId/statement': typeof LabsLabIdStatementRoute
   '/supplies/$officeId/$branchSlug': typeof SuppliesOfficeIdBranchSlugRoute
@@ -368,7 +431,6 @@ export interface FileRouteTypes {
     | '/messages'
     | '/more'
     | '/orders'
-    | '/patients'
     | '/pricing'
     | '/production'
     | '/register'
@@ -378,15 +440,23 @@ export interface FileRouteTypes {
     | '/account/balances'
     | '/account/help'
     | '/account/settings'
+    | '/clinic/doctors'
+    | '/clinic/finance'
+    | '/clinic/materials'
+    | '/clinic/orders'
+    | '/clinic/reports'
     | '/implants/$country'
     | '/lab/my-services'
     | '/labs/$labId'
     | '/labs/cases'
     | '/labs/dashboard'
     | '/labs/explore'
+    | '/patients/$patientId'
     | '/profile/$accountId'
+    | '/clinic/'
     | '/implants/'
     | '/labs/'
+    | '/patients/'
     | '/supplies/'
     | '/labs/$labId/statement'
     | '/supplies/$officeId/$branchSlug'
@@ -407,7 +477,6 @@ export interface FileRouteTypes {
     | '/messages'
     | '/more'
     | '/orders'
-    | '/patients'
     | '/pricing'
     | '/production'
     | '/register'
@@ -417,15 +486,23 @@ export interface FileRouteTypes {
     | '/account/balances'
     | '/account/help'
     | '/account/settings'
+    | '/clinic/doctors'
+    | '/clinic/finance'
+    | '/clinic/materials'
+    | '/clinic/orders'
+    | '/clinic/reports'
     | '/implants/$country'
     | '/lab/my-services'
     | '/labs/$labId'
     | '/labs/cases'
     | '/labs/dashboard'
     | '/labs/explore'
+    | '/patients/$patientId'
     | '/profile/$accountId'
+    | '/clinic'
     | '/implants'
     | '/labs'
+    | '/patients'
     | '/supplies'
     | '/labs/$labId/statement'
     | '/supplies/$officeId/$branchSlug'
@@ -446,7 +523,6 @@ export interface FileRouteTypes {
     | '/messages'
     | '/more'
     | '/orders'
-    | '/patients'
     | '/pricing'
     | '/production'
     | '/register'
@@ -456,15 +532,23 @@ export interface FileRouteTypes {
     | '/account/balances'
     | '/account/help'
     | '/account/settings'
+    | '/clinic/doctors'
+    | '/clinic/finance'
+    | '/clinic/materials'
+    | '/clinic/orders'
+    | '/clinic/reports'
     | '/implants/$country'
     | '/lab/my-services'
     | '/labs/$labId'
     | '/labs/cases'
     | '/labs/dashboard'
     | '/labs/explore'
+    | '/patients/$patientId'
     | '/profile/$accountId'
+    | '/clinic/'
     | '/implants/'
     | '/labs/'
+    | '/patients/'
     | '/supplies/'
     | '/labs/$labId/statement'
     | '/supplies/$officeId/$branchSlug'
@@ -486,21 +570,28 @@ export interface RootRouteChildren {
   MessagesRoute: typeof MessagesRoute
   MoreRoute: typeof MoreRoute
   OrdersRoute: typeof OrdersRoute
-  PatientsRoute: typeof PatientsRoute
   PricingRoute: typeof PricingRoute
   ProductionRoute: typeof ProductionRoute
   RegisterRoute: typeof RegisterRoute
   ReportsRoute: typeof ReportsRoute
   SignupRoute: typeof SignupRoute
+  ClinicDoctorsRoute: typeof ClinicDoctorsRoute
+  ClinicFinanceRoute: typeof ClinicFinanceRoute
+  ClinicMaterialsRoute: typeof ClinicMaterialsRoute
+  ClinicOrdersRoute: typeof ClinicOrdersRoute
+  ClinicReportsRoute: typeof ClinicReportsRoute
   ImplantsCountryRoute: typeof ImplantsCountryRoute
   LabMyServicesRoute: typeof LabMyServicesRoute
   LabsLabIdRoute: typeof LabsLabIdRouteWithChildren
   LabsCasesRoute: typeof LabsCasesRoute
   LabsDashboardRoute: typeof LabsDashboardRoute
   LabsExploreRoute: typeof LabsExploreRoute
+  PatientsPatientIdRoute: typeof PatientsPatientIdRoute
   ProfileAccountIdRoute: typeof ProfileAccountIdRoute
+  ClinicIndexRoute: typeof ClinicIndexRoute
   ImplantsIndexRoute: typeof ImplantsIndexRoute
   LabsIndexRoute: typeof LabsIndexRoute
+  PatientsIndexRoute: typeof PatientsIndexRoute
   SuppliesIndexRoute: typeof SuppliesIndexRoute
   SuppliesOfficeIdBranchSlugRoute: typeof SuppliesOfficeIdBranchSlugRoute
   SuppliesBranchBranchSlugRoute: typeof SuppliesBranchBranchSlugRoute
@@ -542,13 +633,6 @@ declare module '@tanstack/react-router' {
       path: '/pricing'
       fullPath: '/pricing'
       preLoaderRoute: typeof PricingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/patients': {
-      id: '/patients'
-      path: '/patients'
-      fullPath: '/patients'
-      preLoaderRoute: typeof PatientsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/orders': {
@@ -642,6 +726,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SuppliesIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/patients/': {
+      id: '/patients/'
+      path: '/patients'
+      fullPath: '/patients/'
+      preLoaderRoute: typeof PatientsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/labs/': {
       id: '/labs/'
       path: '/labs'
@@ -656,11 +747,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ImplantsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/clinic/': {
+      id: '/clinic/'
+      path: '/clinic'
+      fullPath: '/clinic/'
+      preLoaderRoute: typeof ClinicIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/profile/$accountId': {
       id: '/profile/$accountId'
       path: '/profile/$accountId'
       fullPath: '/profile/$accountId'
       preLoaderRoute: typeof ProfileAccountIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/patients/$patientId': {
+      id: '/patients/$patientId'
+      path: '/patients/$patientId'
+      fullPath: '/patients/$patientId'
+      preLoaderRoute: typeof PatientsPatientIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/labs/explore': {
@@ -703,6 +808,41 @@ declare module '@tanstack/react-router' {
       path: '/implants/$country'
       fullPath: '/implants/$country'
       preLoaderRoute: typeof ImplantsCountryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/clinic/reports': {
+      id: '/clinic/reports'
+      path: '/clinic/reports'
+      fullPath: '/clinic/reports'
+      preLoaderRoute: typeof ClinicReportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/clinic/orders': {
+      id: '/clinic/orders'
+      path: '/clinic/orders'
+      fullPath: '/clinic/orders'
+      preLoaderRoute: typeof ClinicOrdersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/clinic/materials': {
+      id: '/clinic/materials'
+      path: '/clinic/materials'
+      fullPath: '/clinic/materials'
+      preLoaderRoute: typeof ClinicMaterialsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/clinic/finance': {
+      id: '/clinic/finance'
+      path: '/clinic/finance'
+      fullPath: '/clinic/finance'
+      preLoaderRoute: typeof ClinicFinanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/clinic/doctors': {
+      id: '/clinic/doctors'
+      path: '/clinic/doctors'
+      fullPath: '/clinic/doctors'
+      preLoaderRoute: typeof ClinicDoctorsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/account/settings': {
@@ -825,21 +965,28 @@ const rootRouteChildren: RootRouteChildren = {
   MessagesRoute: MessagesRoute,
   MoreRoute: MoreRoute,
   OrdersRoute: OrdersRoute,
-  PatientsRoute: PatientsRoute,
   PricingRoute: PricingRoute,
   ProductionRoute: ProductionRoute,
   RegisterRoute: RegisterRoute,
   ReportsRoute: ReportsRoute,
   SignupRoute: SignupRoute,
+  ClinicDoctorsRoute: ClinicDoctorsRoute,
+  ClinicFinanceRoute: ClinicFinanceRoute,
+  ClinicMaterialsRoute: ClinicMaterialsRoute,
+  ClinicOrdersRoute: ClinicOrdersRoute,
+  ClinicReportsRoute: ClinicReportsRoute,
   ImplantsCountryRoute: ImplantsCountryRoute,
   LabMyServicesRoute: LabMyServicesRoute,
   LabsLabIdRoute: LabsLabIdRouteWithChildren,
   LabsCasesRoute: LabsCasesRoute,
   LabsDashboardRoute: LabsDashboardRoute,
   LabsExploreRoute: LabsExploreRoute,
+  PatientsPatientIdRoute: PatientsPatientIdRoute,
   ProfileAccountIdRoute: ProfileAccountIdRoute,
+  ClinicIndexRoute: ClinicIndexRoute,
   ImplantsIndexRoute: ImplantsIndexRoute,
   LabsIndexRoute: LabsIndexRoute,
+  PatientsIndexRoute: PatientsIndexRoute,
   SuppliesIndexRoute: SuppliesIndexRoute,
   SuppliesOfficeIdBranchSlugRoute: SuppliesOfficeIdBranchSlugRoute,
   SuppliesBranchBranchSlugRoute: SuppliesBranchBranchSlugRoute,

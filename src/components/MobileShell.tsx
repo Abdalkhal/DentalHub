@@ -14,10 +14,8 @@ export function MobileShell({
   className?: string;
 }) {
   return (
-    <div className="min-h-screen w-full bg-slate-50 overflow-x-hidden">
-      <div
-        className={cn("relative w-full min-h-screen bg-white flex flex-col", className)}
-      >
+    <div className="min-h-screen w-full bg-slate-50 overflow-x-hidden flex justify-center">
+      <div className={cn("relative w-full max-w-md min-h-screen bg-white flex flex-col", className)}>
         <div className={cn("flex-1", hideBottomNav ? "pb-0" : "pb-24")}>{children}</div>
         {!hideBottomNav && <BottomTabBar />}
       </div>
@@ -53,7 +51,7 @@ function BottomTabBar() {
   ] as const;
 
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-50 bg-card/95 backdrop-blur border-t border-border shadow-lg">
+    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50 bg-card/95 backdrop-blur border-t border-border shadow-lg">
       <ul className="grid grid-cols-5 px-2 py-2">
         {tabs.map(({ to, icon: Icon, label, match }) => {
           const active = match(pathname);

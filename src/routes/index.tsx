@@ -1,260 +1,238 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { MobileShell } from "@/components/MobileShell";
-import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
-import { useSession, useUserRole, getAccountDashboard } from "@/lib/useAuth";
-import { FlaskConical, UserCircle2, ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { getSnapshot } from "@/lib/ordersStore";
 import dentalImplant from "@/assets/dental-implant.png";
 import dentalSupplies from "@/assets/dental-supplies-icon.png";
 import dentalBridge from "@/assets/dental-bridge.png";
+import {
+  Bell, Globe, Search, ChevronLeft, ChevronRight,
+  ClipboardList, Plus, Sparkles, Stethoscope,
+} from "lucide-react";
 
 export const Route = createFileRoute("/")({
   component: Home,
 });
 
-const BANNERS = [
-  {
-    ar: { kicker: "عروض زرعات", title: "Alfa Gate", price: "$399", sub: "تجهيز فوري — الموصل" },
-    en: { kicker: "Implant Offers", title: "Alfa Gate", price: "$399", sub: "In stock — Mosul" },
-    image: dentalImplant,
-  },
-  {
-    ar: {
-      kicker: "عروض المختبر",
-      title: "Zirconia −15%",
-      price: "−15%",
-      sub: "مختبر النور — يونيو",
-    },
-    en: { kicker: "Lab Offers", title: "Zirconia −15%", price: "−15%", sub: "Al-Noor Lab — June" },
-    image: dentalBridge,
-  },
-  {
-    ar: {
-      kicker: "عروض المستلزمات",
-      title: "ProTaper Gold",
-      price: "$65",
-      sub: "مكتب بوابة الموصل",
-    },
-    en: {
-      kicker: "Supplies Offers",
-      title: "ProTaper Gold",
-      price: "$65",
-      sub: "Mosul Gate Office",
-    },
-    image: dentalSupplies,
-  },
-];
+type Role = "supply" | "lab" | "implant";
+type Banner = { id: string; title: string; subtitle: string; price: string; image?: string; role: Role };
+
+const ROLE_META: Record<Role, { ar: string; en: string }> = {
+  supply: { ar: "عروض المستلزمات", en: "Supplies Offers" },
+  lab: { ar: "عروض المختبر", en: "Lab Offers" },
+  implant: { ar: "عروض الزرعات", en: "Implant Offers" },
+};
+
+const DEFAULT_BANNER: Banner = { id: "default", role: "lab", title: "", subtitle: "", price: "" };
+
+function loadBanners(): Banner[] {
+  if (typeof window === "undefined") return [];
+  const out: Banner[] = [];
+  (Object.keys(ROLE_META) as Role[]).forEach((role) => {
+    try {
+      const raw = localStorage.getItem(`dh_store_${role}`);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { promos?: Array<Omit<Banner, "role">> };
+      (parsed.promos ?? []).forEach((p) => out.push({ ...p, role }));
+    } catch {}
+  });
+  return out;
+}
 
 function Home() {
-  const { t, lang, dir } = useI18n();
-  const { user, loading } = useSession();
-  const { role, loading: roleLoading } = useUserRole();
-  const navigate = useNavigate();
+  const { t, lang, dir, toggle } = useI18n();
+  const [userBanners, setUserBanners] = useState<Banner[]>([]);
   const [idx, setIdx] = useState(0);
-  const banner = BANNERS[idx];
-  const next = () => setIdx((i) => (i + 1) % BANNERS.length);
-  const prev = () => setIdx((i) => (i - 1 + BANNERS.length) % BANNERS.length);
 
   useEffect(() => {
-    if (!loading && !user) navigate({ to: "/auth" });
-  }, [loading, user, navigate]);
+    setUserBanners(loadBanners());
+    const on = () => setUserBanners(loadBanners());
+    window.addEventListener("storage", on);
+    return () => window.removeEventListener("storage", on);
+  }, []);
 
+  const banners = userBanners.length ? userBanners : [DEFAULT_BANNER];
+  const banner = banners[idx] ?? banners[0];
+  const next = () => setIdx((i) => (i + 1) % banners.length);
+  const prev = () => setIdx((i) => (i - 1 + banners.length) % banners.length);
+
+  const [caseCount, setCaseCount] = useState(0);
   useEffect(() => {
-    if (role && !roleLoading) {
-      const target = getAccountDashboard(role.role);
-      if (target !== "/") navigate({ to: target });
-    }
-  }, [role, roleLoading, navigate]);
-
-  if (loading || !user || roleLoading) {
-    return (
-      <MobileShell>
-        <TopBar title="DentalHub" />
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="size-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-        </div>
-      </MobileShell>
-    );
-  }
-
-  const sections = [
-    {
-      to: "/supplies",
-      icon: null,
-      image: dentalSupplies,
-      title: t("supplies"),
-      sub: t("supplies_sub"),
-      tint: "bg-[oklch(0.93_0.06_250)]",
-      ring: "ring-[oklch(0.82_0.1_250)]",
-      iconColor: "text-[oklch(0.45_0.18_256)]",
-    },
-    {
-      to: "/labs",
-      icon: null,
-      image: dentalBridge,
-      title: t("labs"),
-      sub: t("labs_sub"),
-      tint: "bg-[oklch(0.93_0.06_175)]",
-      ring: "ring-[oklch(0.8_0.09_175)]",
-      iconColor: "text-[oklch(0.45_0.15_175)]",
-    },
-    {
-      to: "/implants",
-      icon: null,
-      image: dentalImplant,
-      title: t("implants"),
-      sub: t("implants_sub"),
-      tint: "bg-[oklch(0.93_0.06_30)]",
-      ring: "ring-[oklch(0.85_0.1_30)]",
-      iconColor: "text-[oklch(0.5_0.18_30)]",
-    },
-    {
-      to: "/account",
-      icon: UserCircle2,
-      image: null,
-      title: t("account"),
-      sub: t("account_sub"),
-      tint: "bg-[oklch(0.93_0.06_300)]",
-      ring: "ring-[oklch(0.82_0.1_300)]",
-      iconColor: "text-[oklch(0.45_0.18_300)]",
-    },
-  ] as const;
+    const upd = () => setCaseCount(getSnapshot().filter((o) => o.status !== "completed").length);
+    upd();
+    window.addEventListener("storage", upd);
+    return () => window.removeEventListener("storage", upd);
+  }, []);
 
   const NextIcon = dir === "rtl" ? ChevronLeft : ChevronRight;
   const PrevIcon = dir === "rtl" ? ChevronRight : ChevronLeft;
 
+  const categories = [
+    { to: "/implants", title: lang === "ar" ? "زراعة الأسنان" : "Dental Implants", img: dentalImplant, ring: "ring-amber-200" },
+    { to: "/supplies", title: lang === "ar" ? "مستلزمات طبية" : "Dental Supplies", img: dentalSupplies, ring: "ring-emerald-200" },
+    { to: "/labs", title: lang === "ar" ? "المختبرات" : "Laboratories", img: dentalBridge, ring: "ring-sky-200" },
+    { to: "/clinic", title: lang === "ar" ? "عيادتي" : "My Clinic", img: null, ring: "ring-violet-200", icon: Stethoscope },
+  ];
+
   return (
     <MobileShell>
-      <TopBar variant="home" showSearch />
-
-      {/* Banner carousel — bold blue offer card */}
-      <section className="px-4 mt-2">
-        <div
-          className="relative rounded-3xl overflow-hidden min-h-[180px] shadow-card"
-          style={{
-            background: "linear-gradient(135deg, #4aa3e8 0%, #2f7fd1 55%, #1e5fb3 100%)",
-          }}
-        >
-          {/* decorative blobs */}
-          <div className="absolute -top-14 -end-14 size-44 rounded-full bg-white/15 blur-2xl pointer-events-none" />
-          <div className="absolute -bottom-16 -start-10 size-40 rounded-full bg-white/10 blur-2xl pointer-events-none" />
-
-          <div className="relative flex items-center gap-4 p-4">
-            {/* image tile */}
-            <div className="shrink-0 size-[112px] rounded-2xl bg-white flex items-center justify-center shadow-[0_10px_25px_-8px_rgba(0,0,0,0.35)] ring-4 ring-white/30">
-              <img
-                src={banner.image}
-                alt=""
-                loading="lazy"
-                className="size-[92px] object-contain drop-shadow"
-              />
-            </div>
-
-            {/* text side */}
-            <div className="flex-1 min-w-0 text-white">
-              <h2 className="font-display font-extrabold text-[26px] leading-[1.05] tracking-tight drop-shadow-sm">
-                {lang === "ar" ? banner.ar.kicker : banner.en.kicker}
-              </h2>
-              <p className="font-display font-extrabold text-white/95 text-[20px] leading-tight mt-1">
-                {lang === "ar" ? banner.ar.title : banner.en.title}
-              </p>
-              <div className="mt-2 inline-flex items-center font-display font-extrabold text-[26px] leading-none text-[#ffd54a] drop-shadow">
-                {lang === "ar" ? banner.ar.price : banner.en.price}
-              </div>
-              <div className="mt-2.5">
-                <span className="inline-block px-3 py-1 rounded-full bg-[#0b3b6f] text-white text-[11px] font-bold shadow-sm">
-                  {lang === "ar" ? banner.ar.sub : banner.en.sub}
-                </span>
-              </div>
-            </div>
+      {/* Top Nav */}
+      <header className="px-3 pt-4 pb-2 bg-gradient-to-b from-sky-50 to-transparent">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <button onClick={toggle} className="h-9 px-2.5 rounded-full bg-white border border-slate-200 flex items-center gap-1 text-xs font-bold text-slate-700 shadow-sm">
+              <span>{lang === "ar" ? "EN" : "AR"}</span>
+              <Globe className="size-3.5 text-slate-400" />
+            </button>
+            <button className="relative size-9 rounded-full bg-white border border-slate-200 flex items-center justify-center shadow-sm">
+              <Bell className="size-[18px] text-slate-600" />
+              <span className="absolute -top-0.5 -end-0.5 size-4 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">3</span>
+            </button>
           </div>
 
-          {/* side nav arrows */}
-          <button
-            onClick={prev}
-            aria-label="prev"
-            className="absolute top-1/2 -translate-y-1/2 start-1.5 size-8 rounded-full bg-white/25 hover:bg-white/40 backdrop-blur-sm flex items-center justify-center text-white transition"
-          >
-            <PrevIcon className="size-4" />
-          </button>
-          <button
-            onClick={next}
-            aria-label="next"
-            className="absolute top-1/2 -translate-y-1/2 end-1.5 size-8 rounded-full bg-white/25 hover:bg-white/40 backdrop-blur-sm flex items-center justify-center text-white transition"
-          >
-            <NextIcon className="size-4" />
-          </button>
+          <Link className="flex items-center gap-1.5 font-display font-extrabold text-lg" to="/">
+            <span className="text-primary">Dental</span>
+            <span className="text-slate-800">Hub</span>
+          </Link>
+
+          <Link to="/clinic" className="flex flex-col items-center gap-0.5 shrink-0">
+            <span className="size-11 rounded-full overflow-hidden ring-2 ring-primary shadow-sm bg-primary/10 flex items-center justify-center">
+              <Stethoscope className="size-5 text-primary" />
+            </span>
+            <span className="text-[10px] font-bold text-slate-700">{lang === "ar" ? "عيادتي" : "Clinic"}</span>
+          </Link>
         </div>
 
-        {/* dots */}
-        <div className="flex justify-center gap-1.5 mt-3">
-          {BANNERS.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => setIdx(i)}
-              className={cn(
-                "h-1.5 rounded-full transition-all",
-                i === idx ? "w-6 bg-[#2f7fd1]" : "w-1.5 bg-border",
-              )}
-              aria-label={`slide ${i + 1}`}
-            />
-          ))}
+        {/* Search */}
+        <div className="mt-3 relative">
+          <input type="search" placeholder={lang === "ar" ? "ابحث عن زراعة، مادة، مختبر..." : "Search implants, materials, labs..."} className="w-full h-12 rounded-2xl bg-white border border-slate-200 ps-4 pe-11 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-sm" />
+          <Search className="size-4 absolute top-1/2 -translate-y-1/2 end-4 text-slate-400 pointer-events-none" />
+        </div>
+      </header>
+
+      {/* Hero banner */}
+      <section className="px-3 mt-3">
+        <div className="relative rounded-3xl overflow-hidden min-h-[190px] shadow-card" style={{ background: "linear-gradient(135deg, #6bb2ee 0%, #3d86dd 50%, #1f5fb8 100%)" }}>
+          <div className="absolute -top-16 -end-14 size-52 rounded-full bg-white/15 blur-2xl pointer-events-none" />
+          <div className="absolute -bottom-20 -start-14 size-48 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+          <div className="absolute top-3 end-3 z-10">
+            <span className="inline-flex items-center justify-center size-14 rounded-full bg-white/20 text-white text-[11px] font-extrabold text-center leading-tight shadow-lg ring-2 ring-white/40">
+              {lang === "ar" ? "خصم\nخاص" : "Special\nOffer"}
+            </span>
+          </div>
+          <div className="relative flex items-center gap-3 p-4 pt-5">
+            <div className="flex-1 min-w-0 text-white">
+              <h2 className="font-display font-extrabold text-[22px] leading-tight drop-shadow-sm">
+                {banner.title || (lang === "ar" ? ROLE_META[banner.role].ar : ROLE_META[banner.role].en)}
+              </h2>
+              <p className="mt-2 text-white/95 text-sm leading-snug">
+                {banner.subtitle || (lang === "ar" ? "خصم حتى 15% على أدوات المختبرات" : "Up to 15% off lab tools")}
+              </p>
+              {banner.price && <div className="mt-1 font-display font-extrabold text-2xl text-yellow-300 drop-shadow">{banner.price}</div>}
+              <Link to="/supplies" className="mt-3 inline-flex h-10 px-5 rounded-full bg-white/20 text-white text-sm font-bold shadow-md hover:bg-white/30 transition items-center">
+                {lang === "ar" ? "تسوق الآن" : "Shop now"}
+              </Link>
+            </div>
+            <div className="shrink-0 w-[130px] h-[140px] flex items-center justify-center">
+              <img src={banner.image || dentalBridge} alt="" loading="lazy" className="max-w-full max-h-full object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.35)]" />
+            </div>
+          </div>
+          {banners.length > 1 && (
+            <>
+              <button onClick={prev} aria-label="prev" className="absolute top-1/2 -translate-y-1/2 start-2 size-8 rounded-full bg-white/25 hover:bg-white/40 flex items-center justify-center text-white"><PrevIcon className="size-4" /></button>
+              <button onClick={next} aria-label="next" className="absolute top-1/2 -translate-y-1/2 end-2 size-8 rounded-full bg-white/25 hover:bg-white/40 flex items-center justify-center text-white"><NextIcon className="size-4" /></button>
+            </>
+          )}
+          <div className="absolute bottom-2 inset-x-0 flex justify-center gap-1.5">
+            {banners.map((_, i) => (
+              <button key={i} onClick={() => setIdx(i)} className={cn("h-1.5 rounded-full transition-all", i === idx ? "w-5 bg-white" : "w-1.5 bg-white/50")} aria-label={`slide ${i + 1}`} />
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* Sections grid */}
-      <section className="px-4 mt-5">
-        <ul className="grid grid-cols-2 gap-3">
-          {sections.map(({ to, icon: Icon, image, title, sub, tint, ring, iconColor }) => (
-            <li key={to}>
-              <Link
-                to={to}
-                className="group block bg-card border border-border rounded-3xl p-4 h-full shadow-soft hover:shadow-card hover:-translate-y-0.5 transition"
-              >
-                <span
-                  className={cn(
-                    "size-16 rounded-2xl flex items-center justify-center mb-3 overflow-hidden ring-1 shadow-sm transition-transform group-hover:scale-105",
-                    tint,
-                    ring,
-                  )}
-                >
-                  {image ? (
-                    <img
-                      src={image}
-                      alt=""
-                      loading="lazy"
-                      decoding="async"
-                      className="size-12 object-contain drop-shadow-sm"
-                    />
-                  ) : Icon ? (
-                    <Icon className={cn("size-8", iconColor)} strokeWidth={2} />
-                  ) : null}
-                </span>
-                <p className="font-display font-bold text-foreground leading-tight">{title}</p>
-                <p className="text-xs text-muted-foreground mt-1">{sub}</p>
-              </Link>
-            </li>
-          ))}
+      {/* Categories */}
+      <section className="px-3 mt-4">
+        <ul className="grid grid-cols-4 gap-2">
+          {categories.map((c) => (
+              <li key={c.to}>
+                <Link to={c.to} className="flex flex-col items-center justify-between h-full min-h-[120px] p-2.5 rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition">
+                  <span className={cn("size-14 rounded-full flex items-center justify-center ring-2 bg-slate-50 overflow-hidden", c.ring)}>
+                    {c.img ? (
+                      <img src={c.img} alt="" loading="lazy" className="size-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                    ) : c.icon ? (
+                      <c.icon className="size-6 text-slate-600" />
+                    ) : null}
+                  </span>
+                  <p className="mt-2 text-center font-display font-bold text-[11px] leading-snug text-slate-700">{c.title}</p>
+                </Link>
+              </li>
+            ))}
         </ul>
       </section>
 
-      {/* Lab quick action */}
-      <section className="px-4 mt-5">
-        <Link
-          to="/labs/cases"
-          className="flex items-center gap-3 bg-primary-soft/60 border border-primary/15 rounded-2xl p-4"
-        >
-          <span className="size-12 rounded-2xl bg-[oklch(0.93_0.06_250)] ring-1 ring-[oklch(0.82_0.1_250)] shadow-sm text-[oklch(0.45_0.18_256)] flex items-center justify-center">
-            <FlaskConical className="size-6 drop-shadow-sm" strokeWidth={2} />
+      {/* Track Cases */}
+      <section className="px-3 mt-4">
+        <Link className="flex items-center gap-3 bg-sky-50 border border-sky-100 rounded-2xl p-3.5" to="/orders">
+          <span className="size-11 rounded-2xl bg-sky-100 ring-1 ring-sky-200 shadow-sm text-sky-600 flex items-center justify-center">
+            <ClipboardList className="size-5" strokeWidth={2.2} />
           </span>
-          <div className="flex-1">
-            <p className="font-display font-bold text-sm">{t("track_cases")}</p>
-            <p className="text-xs text-muted-foreground">{t("cases")}</p>
+          <div className="flex-1 min-w-0">
+            <p className="font-display font-extrabold text-sm">{lang === "ar" ? "تتبع حالاتك" : "Track your cases"}</p>
+            <p className="text-[11px] text-slate-500">{lang === "ar" ? "تابع حالة الطلبات من المختبر" : "Follow your lab order status"}</p>
+            <p className="text-[11px] font-bold text-primary mt-0.5">{lang === "ar" ? "عرض جميع الحالات ›" : "View all cases ›"}</p>
           </div>
-          <span className="text-primary font-bold text-sm">›</span>
+          <div className="shrink-0 rounded-2xl bg-white border border-slate-200 px-3 py-2 text-center shadow-sm">
+            <p className="font-display font-extrabold text-xl text-slate-800">{caseCount}</p>
+            <p className="text-[10px] text-slate-500">{lang === "ar" ? "حالات" : "cases"}</p>
+          </div>
         </Link>
+      </section>
+
+      {/* Dual quick-section cards */}
+      <section className="px-3 mt-4 pb-6">
+        <div className="grid grid-cols-2 gap-2.5">
+          <div className="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm">
+            <div className="flex items-center justify-between mb-2">
+              <p className="font-display font-extrabold text-[13px]">{lang === "ar" ? "الطلبات السريعة" : "Quick Orders"}</p>
+              <Link className="text-[10px] font-bold text-primary" to="/orders">{lang === "ar" ? "عرض الكل" : "View all"}</Link>
+            </div>
+            <ul className="grid grid-cols-2 gap-1.5">
+              {[
+                { name: lang === "ar" ? "زراعة" : "Implant", img: dentalImplant },
+                { name: lang === "ar" ? "قفازات" : "Gloves", img: dentalSupplies },
+                { name: lang === "ar" ? "جسر" : "Bridge", img: dentalBridge },
+                { name: lang === "ar" ? "مادة" : "Supply", img: dentalSupplies },
+              ].map((it) => (
+                <li key={it.name} className="relative rounded-xl bg-slate-50 border border-slate-200 p-1.5 flex flex-col items-center">
+                  <img src={it.img} alt="" loading="lazy" className="w-10 h-10 object-contain" />
+                  <p className="text-[9px] font-semibold text-slate-600 truncate max-w-full text-center mt-0.5">{it.name}</p>
+                  <button className="absolute -top-1 -end-1 size-5 rounded-full bg-primary text-white flex items-center justify-center shadow-sm"><Plus className="size-3" strokeWidth={3} /></button>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="relative bg-white border border-slate-200 rounded-2xl p-3 shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between mb-1">
+              <p className="font-display font-extrabold text-[13px]">{lang === "ar" ? "عروض خاصة" : "Special Offers"}</p>
+              <Link className="text-[10px] font-bold text-primary" to="/implants">{lang === "ar" ? "عرض الكل" : "View all"}</Link>
+            </div>
+            <div className="relative flex items-center justify-center h-16 my-1">
+              <img src={dentalImplant} alt="" loading="lazy" className="max-h-full object-contain" />
+              <span className="absolute top-0 start-0 size-11 rounded-full bg-primary text-white text-[9px] font-extrabold text-center leading-tight flex items-center justify-center shadow-md">
+                {lang === "ar" ? "خصم\n15%" : "15%\nOFF"}
+              </span>
+            </div>
+            <p className="text-[10px] font-semibold text-slate-700 text-center truncate">{lang === "ar" ? "مجموعة زراعات" : "Implant Set"}</p>
+            <div className="flex items-baseline justify-center gap-1.5 mt-1">
+              <span className="font-display font-extrabold text-primary text-sm">$1250</span>
+              <span className="text-[10px] text-slate-400 line-through">$1470</span>
+            </div>
+            <Sparkles className="absolute -top-2 -end-2 size-8 text-primary/10" />
+          </div>
+        </div>
       </section>
     </MobileShell>
   );
