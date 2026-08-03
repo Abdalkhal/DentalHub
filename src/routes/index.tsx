@@ -9,7 +9,7 @@ import dentalSupplies from "@/assets/dental-supplies-icon.png";
 import dentalBridge from "@/assets/dental-bridge.png";
 import {
   Bell, Globe, Search, ChevronLeft, ChevronRight,
-  ClipboardList, Plus, Sparkles, Stethoscope,
+  ClipboardList, Plus, Sparkles, Stethoscope, User,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -97,11 +97,11 @@ function Home() {
             <span className="text-slate-800">Hub</span>
           </Link>
 
-          <Link to="/clinic" className="flex flex-col items-center gap-0.5 shrink-0">
+          <Link to="/account" className="flex flex-col items-center gap-0.5 shrink-0">
             <span className="size-11 rounded-full overflow-hidden ring-2 ring-primary shadow-sm bg-primary/10 flex items-center justify-center">
-              <Stethoscope className="size-5 text-primary" />
+              <User className="size-5 text-primary" />
             </span>
-            <span className="text-[10px] font-bold text-slate-700">{lang === "ar" ? "عيادتي" : "Clinic"}</span>
+            <span className="text-[10px] font-bold text-slate-700">{lang === "ar" ? "حسابي" : "Account"}</span>
           </Link>
         </div>
 
