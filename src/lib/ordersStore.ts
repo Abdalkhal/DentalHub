@@ -92,6 +92,8 @@ export function useOrders(): Order[] {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }
 
+export const listOrders = getSnapshot;
+
 const COUNTER_KEY = "dental_orders_counter";
 
 function loadCounter(): number {

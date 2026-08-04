@@ -1,6 +1,8 @@
+// Local patients store (localStorage) for the Dentist dashboard.
 import { useSyncExternalStore } from "react";
 
-export type PatientStatus = "new" | "in_treatment" | "completed";
+export type Gender = "male" | "female";
+export type PatientStatus = "in_treatment" | "completed" | "new";
 
 export type MedicalHistory = {
   diabetes: boolean;
@@ -8,6 +10,88 @@ export type MedicalHistory = {
   heart: boolean;
   allergy: boolean;
   bleeding: boolean;
+};
+
+export type ToothStatus =
+  | "healthy"
+  | "caries"
+  | "filled"
+  | "crown"
+  | "missing"
+  | "implant"
+  | "rct"
+  | "bridge"
+  | "unerupted";
+
+export type PlanStatus = "done" | "active" | "planned";
+
+export type PlanStep = {
+  id: string;
+  title: string;
+  status: PlanStatus;
+  dept?: string;
+  tooth?: string;
+  cost?: number;
+  note?: string;
+};
+
+export type HistoryEntry = {
+  id: string;
+  date: string;
+  text: string;
+};
+
+export type Visit = {
+  id: string;
+  date: string;
+  procedure: string;
+  note?: string;
+  upcoming?: boolean;
+};
+
+export type PatientFile = {
+  id: string;
+  name: string;
+  dataUrl: string;
+  type: string;
+  addedAt: string;
+};
+
+export type Payment = {
+  id: string;
+  date: string;
+  amount: number;
+  note?: string;
+};
+
+export type Patient = {
+  id: string;
+  fileNo: string;
+  name: string;
+  age: number | "";
+  gender: Gender;
+  phone: string;
+  history: MedicalHistory;
+  complaint: string;
+  status: PatientStatus;
+  lastVisit: string;
+  createdAt: string;
+  teeth: Record<number, ToothStatus>;
+  visits: Visit[];
+  files: PatientFile[];
+  totalFees: number;
+  payments: Payment[];
+  dob?: string;
+  avatar?: string;
+  branch?: string;
+  doctorName?: string;
+  doctorNote?: string;
+  doctorNoteDate?: string;
+  allergies?: string;
+  meds?: string;
+  notes?: string;
+  plan?: PlanStep[];
+  log?: HistoryEntry[];
 };
 
 export const EMPTY_HISTORY: MedicalHistory = {
@@ -18,141 +102,193 @@ export const EMPTY_HISTORY: MedicalHistory = {
   bleeding: false,
 };
 
-export type Patient = {
-  id: string;
-  fileNo: string;
-  name: string;
-  phone: string;
-  age: number;
-  gender: string;
-  status: PatientStatus;
-  history: MedicalHistory;
-  complaint: string;
-  lastVisit: string;
-  notes: string;
-};
+const KEY = "dh:patients:v1";
 
-export type Visit = {
-  id: string;
-  patientId: string;
-  date: string;
-  diagnosis: string;
-  treatment: string;
-  cost: number;
-  currency: "USD" | "IQD";
-};
-
-export type ToothStatus = {
-  tooth: number;
-  status: string;
-  condition: string;
-};
-
-export type PlanStep = {
-  id: string;
-  patientId: string;
-  step: string;
-  planned: string;
-  completed: string;
-  notes: string;
-};
-
-export type Payment = {
-  id: string;
-  patientId: string;
-  amount: number;
-  currency: "USD" | "IQD";
-  date: string;
-  method: string;
-};
-
-const STORAGE_KEY = "dental_hub_patients_v2";
+let state: Patient[] = [];
+let loaded = false;
+const listeners = new Set<() => void>();
 
 function load(): Patient[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
+    return JSON.parse(localStorage.getItem(KEY) || "[]") as Patient[];
+  } catch {
+    return [];
+  }
 }
 
-function save(data: Patient[]) {
+function ensure() {
+  if (!loaded && typeof window !== "undefined") {
+    state = load();
+    loaded = true;
+  }
+}
+
+function persist() {
   if (typeof window === "undefined") return;
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch {}
+  localStorage.setItem(KEY, JSON.stringify(state));
+  listeners.forEach((l) => l());
 }
 
-let patients = load();
-const listeners = new Set<() => void>();
-
-function emit() { save(patients); listeners.forEach((l) => l()); }
-
-if (typeof window !== "undefined") {
-  window.addEventListener("storage", (e) => {
-    if (e.key === STORAGE_KEY && e.newValue) {
-      try { patients = JSON.parse(e.newValue); listeners.forEach((l) => l()); } catch {}
-    }
-  });
+export function subscribe(cb: () => void) {
+  listeners.add(cb);
+  return () => listeners.delete(cb);
 }
 
-function subscribe(fn: () => void) { listeners.add(fn); return () => listeners.delete(fn); }
-function getSnapshot(): Patient[] { return patients; }
-function getServerSnapshot(): Patient[] { return []; }
+export function getPatients(): Patient[] {
+  ensure();
+  return state;
+}
 
 export function usePatients(): Patient[] {
-  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  return useSyncExternalStore(subscribe, getPatients, () => [] as Patient[]);
 }
 
-export function addPatient(form: {
-  name: string;
-  age: number | "";
-  gender: "male" | "female";
-  phone: string;
-  complaint: string;
-  status: PatientStatus;
-  history: MedicalHistory;
-}): Patient {
-  const nextNo = patients.length + 1;
+export function getPatient(id: string): Patient | undefined {
+  return getPatients().find((p) => p.id === id);
+}
+
+function nextFileNo(): string {
+  const nums = getPatients()
+    .map((p) => Number(p.fileNo.replace(/\D/g, "")))
+    .filter((n) => !Number.isNaN(n));
+  const max = nums.length ? Math.max(...nums) : 100;
+  return `PAT-${max + 1}`;
+}
+
+export type PatientInput = Pick<Patient, "name" | "age" | "gender" | "phone" | "history" | "complaint" | "status">;
+
+export function addPatient(input: PatientInput): Patient {
+  ensure();
+  const now = new Date().toISOString();
   const p: Patient = {
-    id: crypto.randomUUID(),
-    fileNo: String(nextNo).padStart(4, "0"),
-    name: form.name.trim(),
-    phone: form.phone.trim(),
-    age: typeof form.age === "number" ? form.age : 0,
-    gender: form.gender,
-    status: form.status,
-    history: { ...form.history },
-    complaint: form.complaint.trim(),
-    lastVisit: new Date().toISOString().split("T")[0],
-    notes: form.complaint.trim(),
+    id: `p_${Date.now().toString(36)}`,
+    fileNo: nextFileNo(),
+    createdAt: now,
+    lastVisit: now.slice(0, 10),
+    teeth: {},
+    visits: [],
+    files: [],
+    totalFees: 0,
+    payments: [],
+    ...input,
   };
-  patients = [p, ...patients];
-  emit();
+  state = [p, ...state];
+  persist();
   return p;
 }
 
-export function updatePatient(id: string, updates: Partial<Patient>) {
-  patients = patients.map((p) => (p.id === id ? { ...p, ...updates, notes: updates.complaint !== undefined ? updates.complaint?.trim() || "" : p.notes } : p));
-  emit();
+export function updatePatient(id: string, patch: Partial<Patient>) {
+  ensure();
+  state = state.map((p) => (p.id === id ? { ...p, ...patch } : p));
+  persist();
 }
 
-export function deletePatient(id: string) { patients = patients.filter((p) => p.id !== id); emit(); }
-
-export function addPayment(p: Payment) {
-  const key = "dental_patient_payments";
-  try {
-    const raw = localStorage.getItem(key);
-    const payments: Payment[] = raw ? JSON.parse(raw) : [];
-    payments.push(p);
-    localStorage.setItem(key, JSON.stringify(payments));
-  } catch {}
+export function removePatient(id: string) {
+  ensure();
+  state = state.filter((p) => p.id !== id);
+  persist();
 }
 
-export function addVisit(v: Visit) {
-  const key = "dental_patient_visits";
-  try {
-    const raw = localStorage.getItem(key);
-    const visits: Visit[] = raw ? JSON.parse(raw) : [];
-    visits.push(v);
-    localStorage.setItem(key, JSON.stringify(visits));
-  } catch {}
+export function setTooth(id: string, tooth: number, status: ToothStatus) {
+  const p = getPatient(id);
+  if (!p) return;
+  const teeth = { ...p.teeth };
+  if (status === "healthy") delete teeth[tooth];
+  else teeth[tooth] = status;
+  updatePatient(id, { teeth });
+}
+
+export function addVisit(id: string, v: Omit<Visit, "id">) {
+  const p = getPatient(id);
+  if (!p) return;
+  const visit: Visit = { id: `v_${Date.now().toString(36)}`, ...v };
+  updatePatient(id, {
+    visits: [visit, ...p.visits],
+    lastVisit: v.upcoming ? p.lastVisit : v.date,
+  });
+}
+
+export function removeVisit(id: string, visitId: string) {
+  const p = getPatient(id);
+  if (!p) return;
+  updatePatient(id, { visits: p.visits.filter((v) => v.id !== visitId) });
+}
+
+export function addFile(id: string, f: Omit<PatientFile, "id" | "addedAt">) {
+  const p = getPatient(id);
+  if (!p) return;
+  updatePatient(id, {
+    files: [{ id: `f_${Date.now().toString(36)}`, addedAt: new Date().toISOString(), ...f }, ...p.files],
+  });
+}
+
+export function removeFile(id: string, fileId: string) {
+  const p = getPatient(id);
+  if (!p) return;
+  updatePatient(id, { files: p.files.filter((f) => f.id !== fileId) });
+}
+
+export function addPayment(id: string, pay: Omit<Payment, "id">) {
+  const p = getPatient(id);
+  if (!p) return;
+  updatePatient(id, { payments: [{ id: `pay_${Date.now().toString(36)}`, ...pay }, ...p.payments] });
+}
+
+export function removePayment(id: string, payId: string) {
+  const p = getPatient(id);
+  if (!p) return;
+  updatePatient(id, { payments: p.payments.filter((x) => x.id !== payId) });
+}
+
+export function paidTotal(p: Patient) {
+  return p.payments.reduce((s, x) => s + (Number(x.amount) || 0), 0);
+}
+
+// ---- Treatment plan ----
+export function getPlan(p: Patient): PlanStep[] {
+  return p.plan ?? [];
+}
+
+export function addPlanStep(id: string, title: string, extra?: Partial<Omit<PlanStep, "id" | "title" | "status">>) {
+  const p = getPatient(id);
+  if (!p || !title.trim()) return;
+  const step: PlanStep = { id: `pl_${Date.now().toString(36)}`, title: title.trim(), status: "planned", ...extra };
+  updatePatient(id, { plan: [...getPlan(p), step] });
+}
+
+export function updatePlanStep(id: string, stepId: string, patch: Partial<PlanStep>) {
+  const p = getPatient(id);
+  if (!p) return;
+  updatePatient(id, { plan: getPlan(p).map((s) => (s.id === stepId ? { ...s, ...patch } : s)) });
+}
+
+export function cyclePlanStep(id: string, stepId: string) {
+  const p = getPatient(id);
+  if (!p) return;
+  const next: Record<PlanStatus, PlanStatus> = { planned: "active", active: "done", done: "planned" };
+  updatePatient(id, { plan: getPlan(p).map((s) => (s.id === stepId ? { ...s, status: next[s.status] } : s)) });
+}
+
+export function removePlanStep(id: string, stepId: string) {
+  const p = getPatient(id);
+  if (!p) return;
+  updatePatient(id, { plan: getPlan(p).filter((s) => s.id !== stepId) });
+}
+
+// ---- Medical history log ----
+export function getLog(p: Patient): HistoryEntry[] {
+  return p.log ?? [];
+}
+
+export function addLogEntry(id: string, entry: Omit<HistoryEntry, "id">) {
+  const p = getPatient(id);
+  if (!p || !entry.text.trim()) return;
+  updatePatient(id, { log: [{ id: `lg_${Date.now().toString(36)}`, ...entry }, ...getLog(p)] });
+}
+
+export function removeLogEntry(id: string, entryId: string) {
+  const p = getPatient(id);
+  if (!p) return;
+  updatePatient(id, { log: getLog(p).filter((e) => e.id !== entryId) });
 }
