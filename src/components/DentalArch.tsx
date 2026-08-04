@@ -3,6 +3,9 @@ import type { ToothStatus } from "@/lib/patientsStore";
 import archUpper from "@/assets/arch-upper.png";
 import archLower from "@/assets/arch-lower.png";
 
+export const FDI_UPPER = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
+export const FDI_LOWER = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
+
 export const LEGEND_ORDER: ToothStatus[] = ["healthy", "caries", "filled", "crown", "missing", "implant", "rct", "bridge", "unerupted"];
 
 export const TOOTH_META: Record<string, { ar: string; en: string; dot: string }> = {
@@ -17,6 +20,20 @@ export const TOOTH_META: Record<string, { ar: string; en: string; dot: string }>
   unerupted: { ar: "غير بازغ", en: "Unerupted", dot: "bg-gray-300" },
 };
 
+const UPPER_POS: Record<number, [number, number]> = {
+  18: [12.5, 82], 17: [13.5, 67], 16: [15.5, 54], 15: [18.5, 42.5], 14: [21, 34],
+  13: [25, 25], 12: [32.5, 15.5], 11: [42.5, 11],
+  21: [55.5, 11], 22: [65.5, 15.5], 23: [73, 25], 24: [77.5, 34],
+  25: [80.5, 42.5], 26: [83.5, 54], 27: [85.5, 67], 28: [86.5, 82],
+};
+
+const LOWER_POS: Record<number, [number, number]> = {
+  48: [14, 14], 47: [15.5, 27], 46: [17, 41], 45: [20, 54], 44: [24, 63.5],
+  43: [28.5, 72], 42: [36, 79], 41: [44, 83],
+  31: [54, 83], 32: [62, 79], 33: [69.5, 72], 34: [74, 63.5],
+  35: [78, 54], 36: [81, 41], 37: [82.5, 27], 38: [84, 14],
+};
+
 export function DentalArch({
   jaw,
   teeth,
@@ -26,9 +43,9 @@ export function DentalArch({
   teeth: Record<number, ToothStatus>;
   onTooth?: (n: number) => void;
 }) {
-  const isUpper = jaw === "upper";
-  const range = isUpper ? [1, 16] : [17, 32];
-  const archSrc = isUpper ? archUpper : archLower;
+  const fdiList = jaw === "upper" ? FDI_UPPER : FDI_LOWER;
+  const posMap = jaw === "upper" ? UPPER_POS : LOWER_POS;
+  const archSrc = jaw === "upper" ? archUpper : archLower;
 
   const statusColors: Record<ToothStatus, string> = {
     healthy: "bg-emerald-100/90 border-emerald-300 text-emerald-700",
@@ -43,22 +60,27 @@ export function DentalArch({
   };
 
   return (
-    <div className="relative w-full max-w-md mx-auto">
-      <img src={archSrc} alt={isUpper ? "Upper arch" : "Lower arch"} className="w-full h-auto" loading="lazy" />
-      <div className="absolute inset-0 flex items-center justify-center px-[8%]">
-        <div className="flex justify-center gap-0.5 w-full">
-          {Array.from({ length: 16 }, (_, i) => {
-            const n = range[0] + i;
-            const status = teeth[n] || "healthy";
-            return (
-              <button key={n} type="button" onClick={() => onTooth?.(n)}
-                className={cn("flex-1 max-w-[22px] aspect-[3/4] rounded-sm border text-[7px] font-bold flex items-center justify-center transition hover:scale-110 hover:z-10", statusColors[status])}>
-                {n}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+    <div className="relative w-full aspect-[4/3] max-w-md mx-auto">
+      <img src={archSrc} alt={jaw === "upper" ? "Upper arch" : "Lower arch"} className="absolute inset-0 w-full h-full object-contain" loading="lazy" />
+      {fdiList.map((n) => {
+        const pos = posMap[n];
+        if (!pos) return null;
+        const status = teeth[n] || "healthy";
+        return (
+          <button
+            key={n}
+            type="button"
+            onClick={() => onTooth?.(n)}
+            className={cn(
+              "absolute -translate-x-1/2 -translate-y-1/2 w-[8%] max-w-[28px] aspect-square rounded-full border-2 text-[9px] font-bold flex items-center justify-center transition hover:scale-125 hover:z-10 hover:shadow-md",
+              statusColors[status],
+            )}
+            style={{ top: `${pos[0]}%`, left: `${pos[1]}%` }}
+          >
+            {n}
+          </button>
+        );
+      })}
     </div>
   );
 }
