@@ -7,6 +7,8 @@ import { getSnapshot } from "@/lib/ordersStore";
 import dentalImplant from "@/assets/dental-implant.png";
 import dentalSupplies from "@/assets/dental-supplies-icon.png";
 import dentalBridge from "@/assets/dental-bridge.png";
+import { BRANDS } from "@/data/brands";
+import { BrandLogo } from "@/components/BrandLogo";
 import {
   Bell, Globe, Search, ChevronLeft, ChevronRight,
   ClipboardList, Plus, Sparkles, Stethoscope, User,
@@ -173,6 +175,11 @@ function Home() {
         </ul>
       </section>
 
+      {/* Brands */}
+      <section className="px-3 mt-4">
+        <BrandsStrip lang={lang} />
+      </section>
+
       {/* Track Cases */}
       <section className="px-3 mt-4">
         <Link className="flex items-center gap-3 bg-sky-50 border border-sky-100 rounded-2xl p-3.5" to="/orders">
@@ -235,5 +242,28 @@ function Home() {
         </div>
       </section>
     </MobileShell>
+  );
+}
+
+function BrandsStrip({ lang }: { lang: "ar" | "en" }) {
+  const ar = lang === "ar";
+  const featured = BRANDS.slice(0, 6);
+  return (
+    <>
+      <div className="flex items-center justify-between mb-2.5">
+        <h3 className="font-display font-extrabold text-sm text-slate-800">{ar ? "البراندات" : "Brands"}</h3>
+        <Link to="/brands" className="text-xs font-bold text-primary hover:underline">{ar ? "المزيد >" : "More >"}</Link>
+      </div>
+      <div className="flex gap-2.5 overflow-x-auto pb-1">
+        {featured.map((b) => (
+          <Link key={b.id} to="/brands/$brandId" params={{ brandId: b.id }} className="shrink-0 w-28 bg-white border border-slate-200 rounded-2xl p-3 flex flex-col items-center shadow-sm hover:shadow-md transition">
+            <span className="size-16 rounded-xl bg-slate-50 flex items-center justify-center mb-1.5 overflow-hidden">
+              <BrandLogo brand={b} className="w-full h-full" />
+            </span>
+            <p className="text-[11px] font-bold text-slate-700 text-center leading-tight line-clamp-2">{ar ? b.ar : b.name}</p>
+          </Link>
+        ))}
+      </div>
+    </>
   );
 }
