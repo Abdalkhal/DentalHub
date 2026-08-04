@@ -185,83 +185,29 @@ function PatientModal({ ar, onClose }: { ar: boolean; onClose: () => void }) {
       <form
         onSubmit={submit}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-[440px] max-h-[88vh] overflow-y-auto rounded-t-3xl bg-background p-4 pb-8 space-y-3"
+        className="w-full max-w-[440px] max-h-[85vh] flex flex-col rounded-t-3xl bg-background"
       >
-        <div className="flex items-center justify-between">
-          <h2 className="font-display font-extrabold text-base">{ar ? "إضافة مريض جديد" : "Add new patient"}</h2>
-          <button type="button" onClick={onClose} className="size-8 rounded-full bg-card border border-border flex items-center justify-center">
-            <X className="size-4" />
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-display font-extrabold text-base">{ar ? "إضافة مريض جديد" : "Add new patient"}</h2>
+            <button type="button" onClick={onClose} className="size-8 rounded-full bg-card border border-border flex items-center justify-center"><X className="size-4" /></button>
+          </div>
+          <Field label={ar ? "الاسم الكامل" : "Full name"}><input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} /></Field>
+          <div className="grid grid-cols-2 gap-2.5">
+            <Field label={ar ? "العمر" : "Age"}><input type="number" min={0} value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value === "" ? "" : Number(e.target.value) })} className={inputCls} /></Field>
+            <Field label={ar ? "الجنس" : "Gender"}><select value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value as "male" | "female" })} className={inputCls}><option value="male">{ar ? "ذكر" : "Male"}</option><option value="female">{ar ? "أنثى" : "Female"}</option></select></Field>
+          </div>
+          <Field label={ar ? "رقم الهاتف" : "Phone number"}><input inputMode="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={inputCls} /></Field>
+          <Field label={ar ? "الحالة" : "Status"}><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as PatientStatus })} className={inputCls}>{(Object.keys(STATUS_META) as PatientStatus[]).map((s) => (<option key={s} value={s}>{ar ? STATUS_META[s].ar : STATUS_META[s].en}</option>))}</select></Field>
+          <div><p className="text-[11px] font-bold text-muted-foreground mb-1.5">{ar ? "التاريخ المرضي" : "Medical history"}</p><div className="grid grid-cols-2 gap-1.5">{HISTORY_LABELS.map((h) => (<button type="button" key={h.key} onClick={() => setForm({ ...form, history: { ...form.history, [h.key]: !form.history[h.key] } })} className={cn("h-10 px-3 rounded-xl border text-[12px] font-semibold text-start transition", form.history[h.key] ? "bg-primary/10 border-primary text-primary" : "bg-card border-border text-foreground")}>{ar ? h.ar : h.en}</button>))}</div></div>
+          <Field label={ar ? "الشكوى الرئيسية / ملاحظات" : "Chief complaint / notes"}><textarea rows={3} value={form.complaint} onChange={(e) => setForm({ ...form, complaint: e.target.value })} className={cn(inputCls, "h-auto py-2 resize-none")} /></Field>
+        </div>
+
+        <div className="p-4 border-t border-border bg-background shrink-0 mb-16">
+          <button type="submit" className="w-full h-12 rounded-2xl bg-primary text-primary-foreground font-display font-extrabold text-sm shadow-card">
+            {ar ? "حفظ المريض" : "Save patient"}
           </button>
         </div>
-
-        <Field label={ar ? "الاسم الكامل" : "Full name"}>
-          <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} />
-        </Field>
-
-        <div className="grid grid-cols-2 gap-2.5">
-          <Field label={ar ? "العمر" : "Age"}>
-            <input
-              type="number"
-              min={0}
-              value={form.age}
-              onChange={(e) => setForm({ ...form, age: e.target.value === "" ? "" : Number(e.target.value) })}
-              className={inputCls}
-            />
-          </Field>
-          <Field label={ar ? "الجنس" : "Gender"}>
-            <select value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value as "male" | "female" })} className={inputCls}>
-              <option value="male">{ar ? "ذكر" : "Male"}</option>
-              <option value="female">{ar ? "أنثى" : "Female"}</option>
-            </select>
-          </Field>
-        </div>
-
-        <Field label={ar ? "رقم الهاتف" : "Phone number"}>
-          <input inputMode="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={inputCls} />
-        </Field>
-
-        <Field label={ar ? "الحالة" : "Status"}>
-          <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as PatientStatus })} className={inputCls}>
-            {(Object.keys(STATUS_META) as PatientStatus[]).map((s) => (
-              <option key={s} value={s}>{ar ? STATUS_META[s].ar : STATUS_META[s].en}</option>
-            ))}
-          </select>
-        </Field>
-
-        <div>
-          <p className="text-[11px] font-bold text-muted-foreground mb-1.5">{ar ? "التاريخ المرضي" : "Medical history"}</p>
-          <div className="grid grid-cols-2 gap-1.5">
-            {HISTORY_LABELS.map((h) => {
-              const on = form.history[h.key];
-              return (
-                <button
-                  type="button"
-                  key={h.key}
-                  onClick={() => setForm({ ...form, history: { ...form.history, [h.key]: !on } })}
-                  className={cn(
-                    "h-10 px-3 rounded-xl border text-[12px] font-semibold text-start transition",
-                    on ? "bg-primary/10 border-primary text-primary" : "bg-card border-border text-foreground"
-                  )}
-                >
-                  {ar ? h.ar : h.en}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <Field label={ar ? "الشكوى الرئيسية / ملاحظات" : "Chief complaint / notes"}>
-          <textarea
-            rows={3}
-            value={form.complaint}
-            onChange={(e) => setForm({ ...form, complaint: e.target.value })}
-            className={cn(inputCls, "h-auto py-2 resize-none")}
-          />
-        </Field>
-
-        <button type="submit" className="w-full h-12 rounded-2xl bg-primary text-primary-foreground font-display font-extrabold text-sm shadow-card">
-          {ar ? "حفظ المريض" : "Save patient"}
-        </button>
       </form>
     </div>
   );
