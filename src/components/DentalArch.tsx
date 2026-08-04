@@ -75,7 +75,7 @@ export function DentalArch({
               "absolute -translate-x-1/2 -translate-y-1/2 w-[8%] max-w-[28px] aspect-square rounded-full border-2 text-[9px] font-bold flex items-center justify-center transition hover:scale-125 hover:z-10 hover:shadow-md",
               statusColors[status],
             )}
-            style={{ top: `${pos[0]}%`, left: `${pos[1]}%` }}
+            style={{ top: `${pos[1]}%`, left: `${pos[0]}%` }}
           >
             {n}
           </button>
