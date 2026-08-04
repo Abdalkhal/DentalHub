@@ -65,6 +65,10 @@ export function DentalArch({
       {fdiList.map((n) => {
         const pos = posMap[n];
         if (!pos) return null;
+        const px = pos[0];
+        const py = pos[1];
+        const lx = 50 + (px - 50) * 1.22;
+        const ly = 50 + (py - 50) * 1.18;
         const status = teeth[n] || "healthy";
         return (
           <button
@@ -75,7 +79,7 @@ export function DentalArch({
               "absolute -translate-x-1/2 -translate-y-1/2 w-[8%] max-w-[28px] aspect-square rounded-full border-2 text-[9px] font-bold flex items-center justify-center transition hover:scale-125 hover:z-10 hover:shadow-md",
               statusColors[status],
             )}
-            style={{ top: `${pos[1]}%`, left: `${pos[0]}%` }}
+            style={{ top: `${ly}%`, left: `${lx}%` }}
           >
             {n}
           </button>
