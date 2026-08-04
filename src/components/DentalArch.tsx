@@ -1,5 +1,7 @@
 import { cn } from "@/lib/utils";
 import type { ToothStatus } from "@/lib/patientsStore";
+import archUpper from "@/assets/arch-upper.png";
+import archLower from "@/assets/arch-lower.png";
 
 export const LEGEND_ORDER: ToothStatus[] = ["healthy", "caries", "filled", "crown", "missing", "implant", "rct", "bridge", "unerupted"];
 
@@ -26,31 +28,37 @@ export function DentalArch({
 }) {
   const isUpper = jaw === "upper";
   const range = isUpper ? [1, 16] : [17, 32];
+  const archSrc = isUpper ? archUpper : archLower;
 
   const statusColors: Record<ToothStatus, string> = {
-    healthy: "bg-emerald-100 border-emerald-300 text-emerald-700",
-    caries: "bg-red-100 border-red-300 text-red-700",
-    filled: "bg-amber-100 border-amber-300 text-amber-700",
-    crown: "bg-yellow-100 border-yellow-300 text-yellow-700",
-    missing: "bg-slate-200 border-slate-300 text-slate-500 line-through",
-    implant: "bg-blue-100 border-blue-300 text-blue-700",
-    rct: "bg-orange-100 border-orange-300 text-orange-700",
-    bridge: "bg-purple-100 border-purple-300 text-purple-700",
-    unerupted: "bg-gray-50 border-gray-200 text-gray-400",
+    healthy: "bg-emerald-100/90 border-emerald-300 text-emerald-700",
+    caries: "bg-red-100/90 border-red-300 text-red-700",
+    filled: "bg-amber-100/90 border-amber-300 text-amber-700",
+    crown: "bg-yellow-100/90 border-yellow-300 text-yellow-700",
+    missing: "bg-slate-200/90 border-slate-300 text-slate-500 line-through",
+    implant: "bg-blue-100/90 border-blue-300 text-blue-700",
+    rct: "bg-orange-100/90 border-orange-300 text-orange-700",
+    bridge: "bg-purple-100/90 border-purple-300 text-purple-700",
+    unerupted: "bg-gray-50/90 border-gray-200 text-gray-400",
   };
 
   return (
-    <div className="flex justify-center gap-1 py-1">
-      {Array.from({ length: 16 }, (_, i) => {
-        const n = range[0] + i;
-        const status = teeth[n] || "healthy";
-        return (
-          <button key={n} type="button" onClick={() => onTooth?.(n)}
-            className={cn("w-7 h-8 rounded-md border text-[9px] font-bold flex items-center justify-center transition hover:scale-110", statusColors[status])}>
-            {n}
-          </button>
-        );
-      })}
+    <div className="relative w-full max-w-md mx-auto">
+      <img src={archSrc} alt={isUpper ? "Upper arch" : "Lower arch"} className="w-full h-auto" loading="lazy" />
+      <div className="absolute inset-0 flex items-center justify-center px-[8%]">
+        <div className="flex justify-center gap-0.5 w-full">
+          {Array.from({ length: 16 }, (_, i) => {
+            const n = range[0] + i;
+            const status = teeth[n] || "healthy";
+            return (
+              <button key={n} type="button" onClick={() => onTooth?.(n)}
+                className={cn("flex-1 max-w-[22px] aspect-[3/4] rounded-sm border text-[7px] font-bold flex items-center justify-center transition hover:scale-110 hover:z-10", statusColors[status])}>
+                {n}
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
