@@ -1,10 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useState, useMemo } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import { clinicTotals, useClinic } from "@/lib/clinicStore";
 import { usePatients } from "@/lib/patientsStore";
-import { Download } from "lucide-react";
+import { Download, User, TrendingUp } from "lucide-react";
 import { Stat } from "./clinic.materials";
 
 export const Route = createFileRoute("/clinic/reports")({
@@ -21,12 +23,30 @@ export const Route = createFileRoute("/clinic/reports")({
   component: ReportsPage,
 });
 
+const DOCTOR_OPTIONS = [
+  { id: "all", ar: "جميع الأطباء", en: "All doctors" },
+  { id: "d1", ar: "د. أحمد علي (عام)", en: "Dr. Ahmed Ali (General)" },
+  { id: "d2", ar: "د. عمر خالد (تقويم)", en: "Dr. Omar Khaled (Ortho)" },
+  { id: "d3", ar: "د. سارة حسن (أسنان أطفال)", en: "Dr. Sara Hassan (Pedo)" },
+];
+
+const PERIOD_OPTIONS = [
+  { id: "today", ar: "اليوم", en: "Today" },
+  { id: "week", ar: "هذا الأسبوع", en: "This week" },
+  { id: "month", ar: "هذا الشهر", en: "This month" },
+  { id: "year", ar: "هذه السنة", en: "This year" },
+];
+
+function fmtIQD(n: number) { return `${n.toLocaleString()} د.ع`; }
+
 function ReportsPage() {
   const { lang } = useI18n();
   const ar = lang === "ar";
   const data = useClinic();
   const patients = usePatients();
   const { income, expense, net } = clinicTotals(data);
+  const [doctorFilter, setDoctorFilter] = useState("all");
+  const [periodFilter, setPeriodFilter] = useState("month");
 
   const month = new Date().toISOString().slice(0, 7);
   const monthTx = data.transactions.filter((t) => t.date.startsWith(month));
@@ -37,6 +57,15 @@ function ReportsPage() {
   const newPatients = patients.filter((p) => p.status === "new").length;
   const delivered = data.orders.filter((o) => o.status === "delivered").length;
 
+  const doctorPerformance = useMemo(() => {
+    const docsWithSplits = [
+      { id: "d1", name: ar ? "د. أحمد علي" : "Dr. Ahmed Ali", specialty: ar ? "طب أسنان عام" : "General Dentistry", split: 50, cases: 24, revenue: 12000000 },
+      { id: "d2", name: ar ? "د. عمر خالد" : "Dr. Omar Khaled", specialty: ar ? "تقويم أسنان" : "Orthodontics", split: 60, cases: 18, revenue: 18000000 },
+      { id: "d3", name: ar ? "د. سارة حسن" : "Dr. Sara Hassan", specialty: ar ? "أسنان أطفال" : "Pediatric Dentistry", split: 55, cases: 15, revenue: 9000000 },
+    ];
+    return doctorFilter === "all" ? docsWithSplits : docsWithSplits.filter((d) => d.id === doctorFilter);
+  }, [doctorFilter, ar]);
+
   const exportCsv = () => {
     const rows = [
       ["type", "label", "amount", "date", "source"],
@@ -44,11 +73,7 @@ function ReportsPage() {
     ];
     const csv = rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
     const url = URL.createObjectURL(new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" }));
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `clinic-report-${month}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const a = document.createElement("a"); a.href = url; a.download = `clinic-report-${month}.csv`; a.click(); URL.revokeObjectURL(url);
   };
 
   const bars = [
@@ -60,22 +85,42 @@ function ReportsPage() {
   return (
     <MobileShell>
       <TopBar title={ar ? "التقارير والإحصائيات" : "Reports & Analytics"} showBack />
-      <div className="px-3 pt-3 pb-6">
+      <div className="px-3 pt-3 pb-6 space-y-3">
+        {/* Filter bar */}
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <select value={doctorFilter} onChange={(e) => setDoctorFilter(e.target.value)}
+              className="w-full h-10 rounded-xl bg-card border border-border px-3 pe-8 text-xs font-semibold appearance-none focus:outline-none focus:ring-2 focus:ring-primary/20">
+              {DOCTOR_OPTIONS.map((d) => (<option key={d.id} value={d.id}>{ar ? d.ar : d.en}</option>))}
+            </select>
+            <span className="absolute end-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-[10px]">▼</span>
+          </div>
+          <div className="relative flex-1">
+            <select value={periodFilter} onChange={(e) => setPeriodFilter(e.target.value)}
+              className="w-full h-10 rounded-xl bg-card border border-border px-3 pe-8 text-xs font-semibold appearance-none focus:outline-none focus:ring-2 focus:ring-primary/20">
+              {PERIOD_OPTIONS.map((p) => (<option key={p.id} value={p.id}>{ar ? p.ar : p.en}</option>))}
+            </select>
+            <span className="absolute end-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-[10px]">▼</span>
+          </div>
+        </div>
+
+        {/* Stats */}
         <div className="grid grid-cols-2 gap-2.5">
-          <Stat label={ar ? "إجمالي الإيرادات" : "Total revenue"} value={`${income} $`} tone="good" />
-          <Stat label={ar ? "إجمالي المصاريف" : "Total expenses"} value={`${expense} $`} tone="bad" />
-          <Stat label={ar ? "صافي الربح" : "Net profit"} value={`${net} $`} tone={net >= 0 ? "good" : "bad"} />
+          <Stat label={ar ? "إجمالي الإيرادات" : "Total revenue"} value={fmtIQD(income)} tone="good" />
+          <Stat label={ar ? "إجمالي المصاريف" : "Total expenses"} value={fmtIQD(expense)} tone="bad" />
+          <Stat label={ar ? "صافي الربح" : "Net profit"} value={fmtIQD(net)} tone={net >= 0 ? "good" : "bad"} />
           <Stat label={ar ? "طلبيات مسلّمة" : "Delivered orders"} value={String(delivered)} />
         </div>
 
-        <div className="mt-3 rounded-2xl bg-card border border-border p-3.5 shadow-soft">
+        {/* Month performance */}
+        <div className="rounded-2xl bg-card border border-border p-3.5 shadow-soft">
           <p className="font-display font-extrabold text-sm">{ar ? "أداء الشهر الحالي" : "This month"}</p>
           <div className="mt-3 space-y-2.5">
             {bars.map((b) => (
               <div key={b.label}>
                 <div className="flex items-center justify-between text-[11px] mb-1">
                   <span className="text-muted-foreground">{b.label}</span>
-                  <span className="font-bold">{b.value} $</span>
+                  <span className="font-bold">{fmtIQD(b.value)}</span>
                 </div>
                 <div className="h-2 rounded-full bg-muted overflow-hidden">
                   <div className={`h-full rounded-full ${b.cls}`} style={{ width: `${(b.value / max) * 100}%` }} />
@@ -85,7 +130,34 @@ function ReportsPage() {
           </div>
         </div>
 
-        <div className="mt-3 rounded-2xl bg-card border border-border p-3.5 shadow-soft">
+        {/* Doctor performance */}
+        <div className="rounded-2xl bg-card border border-border p-3.5 shadow-soft">
+          <p className="font-display font-extrabold text-sm mb-3">{ar ? "ملخص أداء الأطباء والمستحقات" : "Doctor Performance & Dues"}</p>
+          <div className="space-y-2.5">
+            {doctorPerformance.map((d) => (
+              <div key={d.id} className="flex items-start gap-3 rounded-xl bg-muted/50 p-3">
+                <span className="size-10 shrink-0 rounded-2xl bg-sky-100 text-sky-600 flex items-center justify-center font-bold text-sm">
+                  {d.name.charAt(0)}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="font-bold text-sm truncate">{d.name}</p>
+                    <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">{d.split}%</span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">{d.specialty}</p>
+                  <div className="grid grid-cols-3 gap-2 mt-1.5 text-center">
+                    <div className="bg-white rounded-lg p-1.5"><p className="text-[10px] text-slate-400">{ar ? "الحالات" : "Cases"}</p><p className="text-xs font-bold">{d.cases}</p></div>
+                    <div className="bg-white rounded-lg p-1.5"><p className="text-[10px] text-slate-400">{ar ? "الإيراد" : "Revenue"}</p><p className="text-xs font-bold">{fmtIQD(d.revenue)}</p></div>
+                    <div className="bg-white rounded-lg p-1.5"><p className="text-[10px] text-slate-400">{ar ? "المستحق" : "Due"}</p><p className="text-xs font-bold text-emerald-600">{fmtIQD(Math.round(d.revenue * d.split / 100))}</p></div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Patients */}
+        <div className="rounded-2xl bg-card border border-border p-3.5 shadow-soft">
           <p className="font-display font-extrabold text-sm">{ar ? "المرضى والعلاجات" : "Patients & treatments"}</p>
           <ul className="mt-2.5 space-y-2 text-sm">
             <Row label={ar ? "إجمالي المرضى" : "Total patients"} value={patients.length} />
@@ -95,12 +167,11 @@ function ReportsPage() {
           </ul>
         </div>
 
-        <button
-          onClick={exportCsv}
-          className="mt-3 w-full h-12 rounded-2xl bg-primary text-primary-foreground font-display font-extrabold text-sm shadow-card flex items-center justify-center gap-2"
-        >
+        {/* Export */}
+        <button onClick={exportCsv}
+          className="w-full h-12 rounded-2xl bg-primary text-primary-foreground font-display font-extrabold text-sm shadow-card flex items-center justify-center gap-2">
           <Download className="size-4" />
-          {ar ? "تصدير التقرير المالي (CSV)" : "Export financial report (CSV)"}
+          {ar ? "تصدير التقرير المالي والإداري (CSV)" : "Export Financial & Admin Report (CSV)"}
         </button>
       </div>
     </MobileShell>
