@@ -3,6 +3,7 @@ import { useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import { addDoctor, removeDoctor, useClinic } from "@/lib/clinicStore";
 import { Stethoscope, Plus, Trash2, Phone, Clock } from "lucide-react";
 import { EmptyState, Field, Sheet, inputCls } from "./clinic.materials";
