@@ -34,6 +34,10 @@ export type Material = {
   minQty: number;
   unit: string;
   price: number;
+  expiryDate: string;
+  batchNumber: string;
+  supplierName: string;
+  storageLocation: string;
 };
 
 export type Doctor = {

@@ -204,45 +204,68 @@ function MaterialsPage() {
 }
 
 function MaterialModal({ ar, onClose }: { ar: boolean; onClose: () => void }) {
-  const [f, setF] = useState({ name: "", category: "consumables", qty: 0, minQty: 5, unit: ar ? "قطعة" : "pcs", price: 0 });
+  const [f, setF] = useState({ name: "", category: "consumables", qty: 0, minQty: 5, unit: ar ? "قطعة" : "pcs", price: 0, expiryDate: "", batchNumber: "", supplierName: "", storageLocation: "" });
+  const [priceDisplay, setPriceDisplay] = useState("");
+
+  const formatNum = (raw: string) => { const d = raw.replace(/\D/g, ""); return d ? Number(d).toLocaleString("en-US") : ""; };
+
   return (
     <Sheet onClose={onClose} title={ar ? "إضافة مادة" : "Add material"}>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!f.name.trim()) return;
-          addMaterial(f);
-          onClose();
-        }}
-        className="space-y-3"
-      >
+      <form onSubmit={(e) => { e.preventDefault(); if (!f.name.trim()) return; addMaterial(f); onClose(); }} className="space-y-3">
         <Field label={ar ? "اسم المادة" : "Material name"}>
-          <input required value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} className={inputCls} />
-        </Field>
-        <Field label={ar ? "التصنيف" : "Category"}>
-          <select value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })} className={inputCls}>
-            {CATS.map((c) => (
-              <option key={c.id} value={c.id}>{ar ? c.ar : c.en}</option>
-            ))}
-          </select>
+          <input required autoFocus value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} className={inputCls} />
         </Field>
         <div className="grid grid-cols-2 gap-2.5">
-          <Field label={ar ? "الكمية" : "Quantity"}>
+          <Field label={ar ? "التصنيف" : "Category"}>
+            <div className="relative">
+              <select value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })} className={cn(inputCls, "appearance-none pe-10")}>
+                {CATS.map((c) => (<option key={c.id} value={c.id}>{ar ? c.ar : c.en}</option>))}
+              </select>
+              <span className="absolute end-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</span>
+            </div>
+          </Field>
+          <Field label={ar ? "الوحدة" : "Unit"}>
+            <div className="relative">
+              <select value={f.unit} onChange={(e) => setF({ ...f, unit: e.target.value })} className={cn(inputCls, "appearance-none pe-10")}>
+                {["قطعة", "علبة", "باكيت", "سرنجة", "تيوب", "أمبول"].map((u) => (<option key={u} value={u}>{u}</option>))}
+              </select>
+              <span className="absolute end-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</span>
+            </div>
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-2.5">
+          <Field label={ar ? "الكمية الحالية" : "Current qty"}>
             <input type="number" min={0} value={f.qty} onChange={(e) => setF({ ...f, qty: Number(e.target.value) })} className={inputCls} />
           </Field>
           <Field label={ar ? "الحد الأدنى" : "Min qty"}>
             <input type="number" min={0} value={f.minQty} onChange={(e) => setF({ ...f, minQty: Number(e.target.value) })} className={inputCls} />
           </Field>
-          <Field label={ar ? "الوحدة" : "Unit"}>
-            <input value={f.unit} onChange={(e) => setF({ ...f, unit: e.target.value })} className={inputCls} />
+        </div>
+        <div className="grid grid-cols-2 gap-2.5">
+          <Field label={ar ? "سعر الشراء (د.ع)" : "Purchase price (IQD)"}>
+            <div className="relative">
+              <input type="text" inputMode="numeric" value={priceDisplay}
+                onChange={(e) => { const fm = formatNum(e.target.value); setPriceDisplay(fm); setF({ ...f, price: Number(fm.replace(/,/g, "")) || 0 }); }}
+                placeholder="0" className={cn(inputCls, "text-right pe-12")} />
+              <span className="absolute end-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">د.ع</span>
+            </div>
           </Field>
-          <Field label={ar ? "السعر ($)" : "Price ($)"}>
-            <input type="number" min={0} value={f.price} onChange={(e) => setF({ ...f, price: Number(e.target.value) })} className={inputCls} />
+          <Field label={ar ? "تاريخ الانتهاء" : "Expiry date"}>
+            <input type="date" value={f.expiryDate} onChange={(e) => setF({ ...f, expiryDate: e.target.value })} className={inputCls} />
           </Field>
         </div>
-        <button type="submit" className="w-full h-12 rounded-2xl bg-primary text-primary-foreground font-display font-extrabold text-sm shadow-card">
-          {ar ? "حفظ" : "Save"}
-        </button>
+        <div className="grid grid-cols-2 gap-2.5">
+          <Field label={ar ? "رقم التشغيلة (LOT)" : "Batch number"}>
+            <input value={f.batchNumber} onChange={(e) => setF({ ...f, batchNumber: e.target.value })} className={inputCls} />
+          </Field>
+          <Field label={ar ? "اسم المورد" : "Supplier"}>
+            <input value={f.supplierName} onChange={(e) => setF({ ...f, supplierName: e.target.value })} className={inputCls} />
+          </Field>
+        </div>
+        <Field label={ar ? "مكان التخزين" : "Storage location"}>
+          <input value={f.storageLocation} onChange={(e) => setF({ ...f, storageLocation: e.target.value })} placeholder={ar ? "مثال: رف A، ثلاجة" : "e.g. Shelf A, Fridge"} className={inputCls} />
+        </Field>
+        <button type="submit" className="w-full h-12 rounded-2xl bg-primary text-primary-foreground font-display font-extrabold text-sm shadow-card">{ar ? "حفظ" : "Save"}</button>
       </form>
     </Sheet>
   );
