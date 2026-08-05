@@ -278,8 +278,8 @@ export function EmptyState({ icon: Icon, title, sub }: { icon: React.ElementType
 
 export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/40 backdrop-blur-sm" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-[440px] max-h-[88vh] overflow-y-auto rounded-t-3xl bg-background p-4 pb-8">
+    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-foreground/40 backdrop-blur-sm" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-[440px] max-h-[88vh] overflow-y-auto rounded-t-3xl bg-background p-4 pb-24">
         <h2 className="font-display font-extrabold text-base mb-3">{title}</h2>
         {children}
       </div>
