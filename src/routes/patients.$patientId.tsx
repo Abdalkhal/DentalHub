@@ -31,6 +31,7 @@ import {
   type ToothStatus,
 } from "@/lib/patientsStore";
 import { listOrders } from "@/lib/ordersStore";
+import { useClinic } from "@/lib/clinicStore";
 import {
   ArrowLeft,
   ArrowRight,
@@ -958,6 +959,7 @@ function MedsTab({ p, ar }: { p: P; ar: boolean }) {
 }
 
 function NotesCard({ p, ar }: { p: P; ar: boolean }) {
+  const { doctors } = useClinic();
   return (
     <Card title={ar ? "ملاحظات الطبيب" : "Doctor notes"} action={<Pencil className="size-3.5 text-primary" />}>
       <textarea
@@ -969,11 +971,18 @@ function NotesCard({ p, ar }: { p: P; ar: boolean }) {
       />
       <div className="mt-2 grid grid-cols-2 gap-2">
         <Field label={ar ? "الطبيب المعالج" : "Doctor"}>
-          <input
-            value={p.doctorName ?? ""}
-            onChange={(e) => updatePatient(p.id, { doctorName: e.target.value })}
-            className={cn(inputCls, "h-9 text-[12px]")}
-          />
+          <div className="relative">
+            <select
+              value={p.doctorName ?? ""}
+              onChange={(e) => updatePatient(p.id, { doctorName: e.target.value })}
+              className={cn(inputCls, "h-9 text-[12px] appearance-none pe-8")}>
+              <option value="">{ar ? "اختر الطبيب" : "Select doctor"}</option>
+              {doctors.map((d) => (
+                <option key={d.id} value={d.name}>{d.name}</option>
+              ))}
+            </select>
+            <span className="absolute end-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-[10px]">▼</span>
+          </div>
         </Field>
         <Field label={ar ? "تاريخ الملاحظة" : "Note date"}>
           <input
