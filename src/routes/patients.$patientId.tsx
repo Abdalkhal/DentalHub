@@ -71,6 +71,10 @@ import {
   Wallet,
   ZoomIn,
   ZoomOut,
+  Minus,
+  Download,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 export const Route = createFileRoute("/patients/$patientId")({
@@ -784,6 +788,7 @@ function RadiologyGallery({
   inputRef: React.RefObject<HTMLInputElement | null>;
 }) {
   const xrays = p.files.filter((f) => f.name.startsWith(XRAY_TAG));
+  const [viewer, setViewer] = useState<{ idx: number; zoom: number; rotate: number } | null>(null);
 
   const onPick = async (files: FileList | null) => {
     if (!files) return;
@@ -799,46 +804,61 @@ function RadiologyGallery({
 
   return (
     <div>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*,application/pdf"
-        multiple
-        className="hidden"
-        onChange={(e) => onPick(e.target.files)}
-      />
+      <input ref={inputRef} type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={(e) => onPick(e.target.files)} />
       {xrays.length === 0 ? (
         <div className="rounded-xl border border-border bg-[oklch(0.98_0.01_240)] py-7 flex flex-col items-center gap-2">
           <FileImage className="size-9 text-muted-foreground" />
-          <p className="text-[12px] text-muted-foreground text-center px-4">
-            {ar ? "لا توجد صور أشعة مرفوعة للمريض بعد" : "No radiographs uploaded yet"}
-          </p>
+          <p className="text-[12px] text-muted-foreground text-center px-4">{ar ? "لا توجد صور أشعة مرفوعة للمريض بعد" : "No radiographs uploaded yet"}</p>
         </div>
       ) : (
         <div className="grid grid-cols-3 gap-2">
-          {xrays.map((f) => (
-            <div key={f.id} className="relative">
-              <a href={f.dataUrl} target="_blank" rel="noreferrer" className="block rounded-xl overflow-hidden border border-border bg-card">
+          {xrays.map((f, i) => (
+            <div key={f.id} className="relative group">
+              <button onClick={() => setViewer({ idx: i, zoom: 1, rotate: 0 })} className="block w-full rounded-xl overflow-hidden border border-border bg-card hover:ring-2 hover:ring-primary/50 transition">
                 {f.type.startsWith("image/") ? (
-                  <img src={f.dataUrl} alt={f.name.replace(XRAY_TAG, "")} className="w-full aspect-square object-cover" />
-                ) : (
-                  <span className="w-full aspect-square flex items-center justify-center">
-                    <FileImage className="size-6 text-muted-foreground" />
-                  </span>
-                )}
-              </a>
-              <p className="text-[9px] text-muted-foreground text-center mt-1" dir="ltr">
-                {f.addedAt.slice(0, 10)}
-              </p>
-              <button
-                onClick={() => removeFile(p.id, f.id)}
-                className="absolute top-1 end-1 size-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center"
-                aria-label={ar ? "حذف" : "Delete"}
-              >
-                <Trash2 className="size-3" />
+                  <div className="relative">
+                    <img src={f.dataUrl} alt="" className="w-full aspect-square object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                    <span className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition"><ZoomIn className="size-5 text-white opacity-0 group-hover:opacity-100 transition" /></span>
+                  </div>
+                ) : <span className="w-full aspect-square flex items-center justify-center"><FileImage className="size-6 text-muted-foreground" /></span>}
               </button>
+              <p className="text-[9px] text-muted-foreground text-center mt-1" dir="ltr">{f.addedAt.slice(0, 10)}</p>
+              <button onClick={() => removeFile(p.id, f.id)} className="absolute top-1 end-1 size-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center"><Trash2 className="size-3" /></button>
             </div>
           ))}
+        </div>
+      )}
+
+      {viewer && xrays[viewer.idx] && (
+        <div className="fixed inset-0 z-[70] bg-black flex flex-col" onClick={() => setViewer(null)}>
+          <div className="flex items-center justify-between px-4 py-3 bg-black/80 text-white shrink-0">
+            <button onClick={() => setViewer(null)} className="size-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20"><X className="size-4" /></button>
+            <span className="text-xs font-bold">{viewer.idx + 1}/{xrays.length}</span>
+            <div className="flex items-center gap-1">
+              <button onClick={(e) => { e.stopPropagation(); setViewer((v) => v && { ...v, zoom: Math.min(3, v.zoom + 0.5) }); }} className="size-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20"><Plus className="size-4" /></button>
+              <button onClick={(e) => { e.stopPropagation(); setViewer((v) => v && { ...v, zoom: Math.max(0.5, v.zoom - 0.5) }); }} className="size-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20"><Minus className="size-4" /></button>
+              <button onClick={(e) => { e.stopPropagation(); setViewer((v) => v && { ...v, zoom: 1 }); }} className="size-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20 text-[10px] font-bold">1:1</button>
+              <button onClick={(e) => { e.stopPropagation(); setViewer((v) => v && { ...v, rotate: v.rotate + 90 }); }} className="size-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20"><RotateCcw className="size-4" /></button>
+              <a href={xrays[viewer.idx].dataUrl} download className="size-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20" onClick={(e) => e.stopPropagation()}><Download className="size-4" /></a>
+            </div>
+          </div>
+          <div className="flex-1 flex items-center justify-center overflow-auto p-8" onClick={() => setViewer(null)}>
+            <img
+              src={xrays[viewer.idx].dataUrl}
+              alt=""
+              onClick={(e) => e.stopPropagation()}
+              className="max-w-none"
+              style={{ transform: `scale(${viewer.zoom}) rotate(${viewer.rotate}deg)`, transition: "transform 0.2s" }}
+              onError={(e) => { (e.target as HTMLImageElement).src = ""; }}
+            />
+          </div>
+          {xrays.length > 1 && (
+            <div className="flex items-center justify-center gap-2 py-3 bg-black/80 shrink-0">
+              <button onClick={(e) => { e.stopPropagation(); setViewer((v) => v && { idx: Math.max(0, v.idx - 1), zoom: 1, rotate: 0 }); }} disabled={viewer.idx === 0} className="size-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20 disabled:opacity-30"><ChevronLeft className="size-4 text-white" /></button>
+              <span className="text-xs text-white">{viewer.idx + 1} / {xrays.length}</span>
+              <button onClick={(e) => { e.stopPropagation(); setViewer((v) => v && { idx: Math.min(xrays.length - 1, v.idx + 1), zoom: 1, rotate: 0 }); }} disabled={viewer.idx === xrays.length - 1} className="size-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20 disabled:opacity-30"><ChevronRight className="size-4 text-white" /></button>
+            </div>
+          )}
         </div>
       )}
     </div>
