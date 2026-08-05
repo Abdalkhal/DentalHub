@@ -74,38 +74,73 @@ function DoctorsPage() {
 }
 
 function DoctorModal({ ar, onClose }: { ar: boolean; onClose: () => void }) {
-  const [f, setF] = useState({ name: "", specialty: "", phone: "", shift: "", cases: 0 });
+  const DAYS = ["السبت", "الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة"];
+  const [f, setF] = useState({ name: "", specialty: "", phone: "", shift: "", licenseNumber: "", agreementType: "percentage" as "percentage" | "fixed", agreementPercent: 50, workingDays: [] as string[], permissions: ar ? "رؤية مرضاه الخاصين فقط" : "Own patients only" });
+
+  const toggleDay = (day: string) => {
+    setF((prev) => ({ ...prev, workingDays: prev.workingDays.includes(day) ? prev.workingDays.filter((d) => d !== day) : [...prev.workingDays, day] }));
+  };
+
   return (
     <Sheet onClose={onClose} title={ar ? "إضافة طبيب" : "Add doctor"}>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!f.name.trim()) return;
-          addDoctor(f);
-          onClose();
-        }}
-        className="space-y-3"
-      >
+      <form onSubmit={(e) => { e.preventDefault(); if (!f.name.trim()) return; addDoctor({ ...f, cases: 0 } as any); onClose(); }} className="space-y-3">
         <Field label={ar ? "اسم الطبيب" : "Doctor name"}>
-          <input required value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} className={inputCls} />
+          <input required autoFocus value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} className={inputCls} />
         </Field>
-        <Field label={ar ? "الاختصاص" : "Specialty"}>
-          <input value={f.specialty} onChange={(e) => setF({ ...f, specialty: e.target.value })} className={inputCls} />
-        </Field>
+        <div className="grid grid-cols-2 gap-2.5">
+          <Field label={ar ? "الاختصاص" : "Specialty"}>
+            <input value={f.specialty} onChange={(e) => setF({ ...f, specialty: e.target.value })} className={inputCls} />
+          </Field>
+          <Field label={ar ? "رقم الهوية / النقابة" : "License ID"}>
+            <input value={f.licenseNumber} onChange={(e) => setF({ ...f, licenseNumber: e.target.value })} className={inputCls} />
+          </Field>
+        </div>
         <div className="grid grid-cols-2 gap-2.5">
           <Field label={ar ? "الهاتف" : "Phone"}>
             <input inputMode="tel" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} className={inputCls} />
           </Field>
           <Field label={ar ? "الدوام" : "Shift"}>
-            <input value={f.shift} onChange={(e) => setF({ ...f, shift: e.target.value })} className={inputCls} placeholder={ar ? "صباحي 9-2" : "Morning 9-2"} />
+            <input value={f.shift} onChange={(e) => setF({ ...f, shift: e.target.value })} placeholder={ar ? "صباحي 9-2" : "Morning 9-2"} className={inputCls} />
           </Field>
         </div>
-        <Field label={ar ? "عدد الحالات المسندة" : "Assigned cases"}>
-          <input type="number" min={0} value={f.cases} onChange={(e) => setF({ ...f, cases: Number(e.target.value) })} className={inputCls} />
+        <div>
+          <p className="text-[11px] font-bold text-muted-foreground mb-1.5">{ar ? "الاتفاقية المالية" : "Financial Agreement"}</p>
+          <div className="flex gap-2 mb-2">
+            <button type="button" onClick={() => setF({ ...f, agreementType: "percentage" })}
+              className={cn("flex-1 h-9 rounded-xl text-xs font-bold border transition", f.agreementType === "percentage" ? "bg-primary text-primary-foreground border-primary" : "bg-card text-muted-foreground border-border")}>
+              {ar ? "نسبة مئوية (%)" : "Percentage (%)"}
+            </button>
+            <button type="button" onClick={() => setF({ ...f, agreementType: "fixed" })}
+              className={cn("flex-1 h-9 rounded-xl text-xs font-bold border transition", f.agreementType === "fixed" ? "bg-primary text-primary-foreground border-primary" : "bg-card text-muted-foreground border-border")}>
+              {ar ? "راتب ثابت" : "Fixed Salary"}
+            </button>
+          </div>
+          {f.agreementType === "percentage" && (
+            <Field label={ar ? "النسبة (%)" : "Percent (%)"}>
+              <input type="number" min={0} max={100} value={f.agreementPercent} onChange={(e) => setF({ ...f, agreementPercent: Number(e.target.value) })} className={inputCls} />
+            </Field>
+          )}
+        </div>
+        <div>
+          <p className="text-[11px] font-bold text-muted-foreground mb-1.5">{ar ? "أيام العمل" : "Working Days"}</p>
+          <div className="flex flex-wrap gap-1.5">
+            {DAYS.map((d) => (
+              <button key={d} type="button" onClick={() => toggleDay(d)}
+                className={cn("h-8 px-3 rounded-full text-[11px] font-semibold border transition", f.workingDays.includes(d) ? "bg-primary text-primary-foreground border-primary" : "bg-card text-muted-foreground border-border hover:border-slate-300")}>{d}</button>
+            ))}
+          </div>
+        </div>
+        <Field label={ar ? "صلاحيات السجلات" : "App Permissions"}>
+          <div className="relative">
+            <select value={f.permissions} onChange={(e) => setF({ ...f, permissions: e.target.value })}
+              className={cn(inputCls, "appearance-none pe-10")}>
+              <option value={ar ? "رؤية مرضاه الخاصين فقط" : "Own patients only"}>{ar ? "رؤية مرضاه الخاصين فقط" : "Own patients only"}</option>
+              <option value={ar ? "رؤية جميع مرضى العيادة" : "All clinic patients"}>{ar ? "رؤية جميع مرضى العيادة" : "All clinic patients"}</option>
+            </select>
+            <span className="absolute end-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</span>
+          </div>
         </Field>
-        <button type="submit" className="w-full h-12 rounded-2xl bg-primary text-primary-foreground font-display font-extrabold text-sm shadow-card">
-          {ar ? "حفظ" : "Save"}
-        </button>
+        <button type="submit" className="w-full h-12 rounded-2xl bg-primary text-primary-foreground font-display font-extrabold text-sm shadow-card">{ar ? "حفظ" : "Save"}</button>
       </form>
     </Sheet>
   );

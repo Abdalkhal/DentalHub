@@ -47,6 +47,11 @@ export type Doctor = {
   phone: string;
   shift: string;
   cases: number;
+  licenseNumber: string;
+  agreementType: "percentage" | "fixed";
+  agreementPercent: number;
+  workingDays: string[];
+  permissions: string;
 };
 
 export type ClinicState = {
