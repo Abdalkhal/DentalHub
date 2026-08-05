@@ -41,10 +41,10 @@ function FinancePage() {
       <TopBar title={ar ? "المالية والحسابات" : "Finance & Accounts"} showBack />
       <div className="px-3 pt-3 pb-6">
         <div className="grid grid-cols-2 gap-2.5">
-          <Stat label={ar ? "الإيرادات" : "Revenue"} value={`${income} $`} tone="good" />
-          <Stat label={ar ? "المصاريف" : "Expenses"} value={`${expense} $`} tone="bad" />
-          <Stat label={ar ? "الصافي" : "Net"} value={`${net} $`} tone={net >= 0 ? "good" : "bad"} />
-          <Stat label={ar ? "متبقي للموردين" : "Outstanding"} value={`${dueOrders} $`} tone="warn" />
+          <Stat label={ar ? "الإيرادات" : "Revenue"} value={`${income} د.ع`} tone="good" />
+          <Stat label={ar ? "المصاريف" : "Expenses"} value={`${expense} د.ع`} tone="bad" />
+          <Stat label={ar ? "الصافي" : "Net"} value={`${net} د.ع`} tone={net >= 0 ? "good" : "bad"} />
+          <Stat label={ar ? "متبقي للموردين" : "Outstanding"} value={`${dueOrders} د.ع`} tone="warn" />
         </div>
 
         <button
@@ -76,7 +76,7 @@ function FinancePage() {
                   </p>
                 </div>
                 <span className={cn("font-display font-extrabold text-sm", t.kind === "income" ? "text-emerald-600" : "text-rose-600")}>
-                  {t.amount} $
+                  {t.amount.toLocaleString()} د.ع
                 </span>
                 <button onClick={() => removeTransaction(t.id)} className="size-8 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
                   <Trash2 className="size-3.5" />
@@ -143,17 +143,19 @@ function TxModal({ ar, onClose }: { ar: boolean; onClose: () => void }) {
                 setF({ ...f, amount: Number(formatted.replace(/,/g, "")) || 0 });
               }}
               placeholder="0"
-              dir="ltr"
-              className={cn(inputCls, "pe-12")}
+              className={cn(inputCls, "text-right")}
             />
             <span className="absolute end-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">{ar ? "د.ع" : "IQD"}</span>
           </div>
         </Field>
 
         <Field label={ar ? "المصدر" : "Source"}>
-          <select value={f.source} onChange={(e) => setF({ ...f, source: e.target.value as (typeof SOURCES)[number]["id"] })} className={inputCls}>
-            {SOURCES.map((s) => (<option key={s.id} value={s.id}>{ar ? s.ar : s.en}</option>))}
-          </select>
+          <div className="relative">
+            <select value={f.source} onChange={(e) => setF({ ...f, source: e.target.value as (typeof SOURCES)[number]["id"] })} className={cn(inputCls, "appearance-none pe-10")}>
+              {SOURCES.map((s) => (<option key={s.id} value={s.id}>{ar ? s.ar : s.en}</option>))}
+            </select>
+            <span className="absolute end-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</span>
+          </div>
         </Field>
 
         <button type="submit"
