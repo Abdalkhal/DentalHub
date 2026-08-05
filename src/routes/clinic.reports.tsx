@@ -6,7 +6,7 @@ import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { clinicTotals, useClinic } from "@/lib/clinicStore";
 import { usePatients } from "@/lib/patientsStore";
-import { Download, User, TrendingUp } from "lucide-react";
+import { Download } from "lucide-react";
 import { Stat } from "./clinic.materials";
 
 export const Route = createFileRoute("/clinic/reports")({
@@ -22,13 +22,6 @@ export const Route = createFileRoute("/clinic/reports")({
   }),
   component: ReportsPage,
 });
-
-const DOCTOR_OPTIONS = [
-  { id: "all", ar: "جميع الأطباء", en: "All doctors" },
-  { id: "d1", ar: "د. أحمد علي (عام)", en: "Dr. Ahmed Ali (General)" },
-  { id: "d2", ar: "د. عمر خالد (تقويم)", en: "Dr. Omar Khaled (Ortho)" },
-  { id: "d3", ar: "د. سارة حسن (أسنان أطفال)", en: "Dr. Sara Hassan (Pedo)" },
-];
 
 const PERIOD_OPTIONS = [
   { id: "today", ar: "اليوم", en: "Today" },
@@ -57,14 +50,24 @@ function ReportsPage() {
   const newPatients = patients.filter((p) => p.status === "new").length;
   const delivered = data.orders.filter((o) => o.status === "delivered").length;
 
+  const { doctors } = useClinic();
+
+  const doctorOptions = useMemo(() => [
+    { id: "all", name: ar ? "جميع الأطباء" : "All doctors" },
+    ...doctors.map((d) => ({ id: d.id, name: d.name })),
+  ], [doctors, ar]);
+
   const doctorPerformance = useMemo(() => {
-    const docsWithSplits = [
-      { id: "d1", name: ar ? "د. أحمد علي" : "Dr. Ahmed Ali", specialty: ar ? "طب أسنان عام" : "General Dentistry", split: 50, cases: 24, revenue: 12000000 },
-      { id: "d2", name: ar ? "د. عمر خالد" : "Dr. Omar Khaled", specialty: ar ? "تقويم أسنان" : "Orthodontics", split: 60, cases: 18, revenue: 18000000 },
-      { id: "d3", name: ar ? "د. سارة حسن" : "Dr. Sara Hassan", specialty: ar ? "أسنان أطفال" : "Pediatric Dentistry", split: 55, cases: 15, revenue: 9000000 },
-    ];
-    return doctorFilter === "all" ? docsWithSplits : docsWithSplits.filter((d) => d.id === doctorFilter);
-  }, [doctorFilter, ar]);
+    const list = doctorFilter === "all" ? doctors : doctors.filter((d) => d.id === doctorFilter);
+    return list.map((d) => ({
+      id: d.id,
+      name: d.name,
+      specialty: d.specialty || (ar ? "بدون اختصاص" : "No specialty"),
+      split: 50,
+      cases: d.cases || 0,
+      revenue: 0,
+    }));
+  }, [doctors, doctorFilter, ar]);
 
   const exportCsv = () => {
     const rows = [
@@ -91,7 +94,7 @@ function ReportsPage() {
           <div className="relative flex-1">
             <select value={doctorFilter} onChange={(e) => setDoctorFilter(e.target.value)}
               className="w-full h-10 rounded-xl bg-card border border-border px-3 pe-8 text-xs font-semibold appearance-none focus:outline-none focus:ring-2 focus:ring-primary/20">
-              {DOCTOR_OPTIONS.map((d) => (<option key={d.id} value={d.id}>{ar ? d.ar : d.en}</option>))}
+              {doctorOptions.map((d) => (<option key={d.id} value={d.id}>{d.name}</option>))}
             </select>
             <span className="absolute end-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-[10px]">▼</span>
           </div>
