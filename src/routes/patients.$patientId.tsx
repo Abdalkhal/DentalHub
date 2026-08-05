@@ -268,37 +268,7 @@ function PatientProfile() {
       {/* Patient info card */}
       <section className="px-4 mt-3">
         <div className="rounded-2xl bg-card border border-border p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <span className="size-12 shrink-0 rounded-full overflow-hidden bg-[oklch(0.95_0.04_250)] text-[oklch(0.45_0.18_256)] font-display font-extrabold text-lg flex items-center justify-center">
-              {p.avatar ? <img src={p.avatar} alt={p.name} className="size-full object-cover" /> : p.name.trim().charAt(0) || "?"}
-            </span>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <p className="font-display font-extrabold text-[15px] truncate">{p.name}</p>
-                <button
-                  onClick={() => {
-                    const v = window.prompt(ar ? "اسم المريض" : "Patient name", p.name);
-                    if (v) updatePatient(p.id, { name: v });
-                  }}
-                  className="text-primary shrink-0"
-                  aria-label={ar ? "تعديل الاسم" : "Edit name"}
-                >
-                  <Pencil className="size-3.5" />
-                </button>
-              </div>
-              <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1.5">
-                <CalendarDays className="size-3 shrink-0" />
-                <span dir="ltr">{p.dob || p.lastVisit || "—"}</span>
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <Meta label={ar ? "العمر" : "Age"} value={`${p.age || "—"}${p.age ? (ar ? " سنة" : "y") : ""}`} />
-            <Meta label={ar ? "الجنس" : "Gender"} value={p.gender === "male" ? (ar ? "ذكر" : "Male") : ar ? "أنثى" : "Female"} />
-            <Meta label={ar ? "رقم الملف" : "File #"} value={`#${p.fileNo.replace(/\D/g, "") || p.fileNo}`} />
-            <Meta label={ar ? "الهاتف" : "Phone"} value={p.phone || "—"} ltr icon={Phone} />
-          </div>
+          <PatientInfoCard p={p} ar={ar} />
         </div>
       </section>
 
@@ -1257,6 +1227,87 @@ function Stat({ label, value, cls }: { label: string; value: number; cls: string
     <div className={cn("rounded-2xl p-3 text-center border border-border", cls)}>
       <p className="font-display font-extrabold text-base leading-none">${value || 0}</p>
       <p className="text-[10px] mt-1 opacity-80">{label}</p>
+    </div>
+  );
+}
+
+function PatientInfoCard({ p, ar }: { p: P; ar: boolean }) {
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({ name: p.name, age: String(p.age || ""), gender: p.gender, phone: p.phone || "" });
+  const inp = "w-full h-8 rounded-lg bg-slate-50 border px-2 text-xs outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary";
+
+  const save = () => {
+    updatePatient(p.id, { name: form.name, age: Number(form.age) || 0, gender: form.gender as "male" | "female", phone: form.phone });
+    setEditing(false);
+  };
+
+  const cancel = () => {
+    setForm({ name: p.name, age: String(p.age || ""), gender: p.gender, phone: p.phone || "" });
+    setEditing(false);
+  };
+
+  return (
+    <div>
+      <div className="flex items-center gap-3">
+        <span className="size-12 shrink-0 rounded-full overflow-hidden bg-[oklch(0.95_0.04_250)] text-[oklch(0.45_0.18_256)] font-display font-extrabold text-lg flex items-center justify-center">
+          {p.avatar ? <img src={p.avatar} alt={p.name} className="size-full object-cover" /> : p.name.trim().charAt(0) || "?"}
+        </span>
+        <div className="flex-1 min-w-0">
+          {editing ? (
+            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={cn(inp, "font-bold text-[15px]")} />
+          ) : (
+            <p className="font-display font-extrabold text-[15px] truncate">{p.name}</p>
+          )}
+          <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1.5">
+            <CalendarDays className="size-3 shrink-0" />
+            <span dir="ltr">{p.dob || p.lastVisit || "—"}</span>
+          </p>
+        </div>
+        <button onClick={() => setEditing(!editing)} className="text-primary shrink-0" aria-label={ar ? "تعديل" : "Edit"}>
+          <Pencil className="size-3.5" />
+        </button>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        {editing ? (
+          <>
+            <MetaField label={ar ? "العمر" : "Age"} value={form.age} onChange={(v) => setForm({ ...form, age: v })} />
+            <div>
+              <label className="text-[10px] font-semibold text-muted-foreground">{ar ? "الجنس" : "Gender"}</label>
+              <div className="flex gap-1 mt-0.5">
+                <button type="button" onClick={() => setForm({ ...form, gender: "male" })} className={cn("flex-1 h-8 rounded-lg text-[10px] font-bold border transition", form.gender === "male" ? "bg-primary text-primary-foreground border-primary" : "bg-slate-50 text-slate-600 border-slate-200")}>{ar ? "ذكر" : "Male"}</button>
+                <button type="button" onClick={() => setForm({ ...form, gender: "female" })} className={cn("flex-1 h-8 rounded-lg text-[10px] font-bold border transition", form.gender === "female" ? "bg-primary text-primary-foreground border-primary" : "bg-slate-50 text-slate-600 border-slate-200")}>{ar ? "أنثى" : "Female"}</button>
+              </div>
+            </div>
+            <MetaField label={ar ? "رقم الملف" : "File #"} value={`#${p.fileNo.replace(/\D/g, "")}`} disabled />
+            <MetaField label={ar ? "الهاتف" : "Phone"} value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} />
+          </>
+        ) : (
+          <>
+            <Meta label={ar ? "العمر" : "Age"} value={`${p.age || "—"}${p.age ? (ar ? " سنة" : "y") : ""}`} />
+            <Meta label={ar ? "الجنس" : "Gender"} value={p.gender === "male" ? (ar ? "ذكر" : "Male") : ar ? "أنثى" : "Female"} />
+            <Meta label={ar ? "رقم الملف" : "File #"} value={`#${p.fileNo.replace(/\D/g, "") || p.fileNo}`} />
+            <Meta label={ar ? "الهاتف" : "Phone"} value={p.phone || "—"} ltr icon={Phone} />
+          </>
+        )}
+      </div>
+
+      {editing && (
+        <div className="flex gap-2 mt-3 pt-3 border-t border-border">
+          <button onClick={cancel} className="flex-1 h-9 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold hover:bg-slate-200 transition">{ar ? "تجاهل" : "Cancel"}</button>
+          <button onClick={save} className="flex-1 h-9 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:opacity-90 transition">{ar ? "حفظ" : "Save"}</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MetaField({ label, value, onChange, disabled }: { label: string; value: string; onChange?: (v: string) => void; disabled?: boolean }) {
+  return (
+    <div>
+      <label className="text-[10px] font-semibold text-muted-foreground">{label}</label>
+      <input value={value} onChange={onChange ? (e) => onChange(e.target.value) : undefined} disabled={disabled}
+        className={cn("w-full h-8 rounded-lg bg-slate-50 border px-2 text-xs outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary mt-0.5", disabled && "opacity-50")} dir={label.includes("ملف") ? "ltr" : undefined} />
     </div>
   );
 }
