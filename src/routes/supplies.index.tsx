@@ -2273,7 +2273,6 @@ function BrowseSupplies() {
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<"default" | "rating" | "items">("default");
   const [city, setCity] = useState<string>("all");
-  const [category, setCategory] = useState<"all" | CompanyCategory>("all");
 
   const { data: implantCompanies = [] } = useQuery({
     queryKey: ["supplies-implant-companies"],
@@ -2363,14 +2362,13 @@ function BrowseSupplies() {
   }, [OFFICES, firestoreSupplies]);
 
   const allCompanies = useMemo<CompanyItem[]>(() => {
-    return [...suppliesCompanies, ...implantCompanies];
-  }, [suppliesCompanies, implantCompanies]);
+    return suppliesCompanies;
+  }, [suppliesCompanies]);
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     let list = allCompanies.filter((item) => {
       if (city !== "all" && item.cityId !== city) return false;
-      if (category !== "all" && item.category !== category) return false;
       if (!needle) return true;
       return (
         item.name.ar.toLowerCase().includes(needle) ||
@@ -2384,18 +2382,12 @@ function BrowseSupplies() {
     if (sort === "rating") list = [...list].sort((a, b) => b.rating - a.rating);
     if (sort === "items") list = [...list].sort((a, b) => b.itemsCount - a.itemsCount);
     return list;
-  }, [q, sort, city, category, allCompanies]);
+  }, [q, sort, city, allCompanies]);
 
   const chips: { key: typeof sort; ar: string; en: string }[] = [
     { key: "default", ar: "الكل", en: "All" },
     { key: "rating", ar: "الأعلى تقييماً", en: "Top rated" },
     { key: "items", ar: "الأكثر تنوعاً", en: "Most items" },
-  ];
-
-  const categoryTabs: { id: "all" | CompanyCategory; ar: string; en: string }[] = [
-    { id: "all", ar: "الكل", en: "All" },
-    { id: "implants", ar: "شركات الزرعات", en: "Implant Companies" },
-    { id: "supplies", ar: "شركات المستلزمات", en: "Medical Supplies" },
   ];
 
   return (
@@ -2436,22 +2428,6 @@ function BrowseSupplies() {
               </button>
             );
           })}
-        </div>
-
-        <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 mb-2">
-          {categoryTabs.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setCategory(t.id)}
-              className={`shrink-0 h-8 px-3 rounded-full text-xs font-semibold border transition ${
-                category === t.id
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-card text-foreground border-border hover:bg-accent"
-              }`}
-            >
-              {lang === "ar" ? t.ar : t.en}
-            </button>
-          ))}
         </div>
 
         <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 mb-1">
