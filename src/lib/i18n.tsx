@@ -21,6 +21,8 @@ export const dict = {
   tab_orders: { ar: "طلباتي", en: "My Orders" },
   tab_account: { ar: "حسابي", en: "Account" },
   tab_more: { ar: "المزيد", en: "More" },
+  tab_favorites: { ar: "المفضلة", en: "Favorites" },
+  tab_offers: { ar: "العروض", en: "Offers" },
   // Banner
   banner_title: { ar: "عروض زرعات", en: "Implant Deals" },
   banner_brand: { ar: "Alfa Gate", en: "Alfa Gate" },

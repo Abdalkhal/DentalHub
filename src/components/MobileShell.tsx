@@ -1,8 +1,9 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Home, ShoppingBag, User, Menu, Search } from "lucide-react";
+import { Home, ShoppingBag, User, Menu, Search, Heart, Tag } from "lucide-react";
 import { type ReactNode } from "react";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { useUserRole } from "@/lib/useAuth";
 
 export function MobileShell({
   children,
@@ -25,30 +26,25 @@ export function MobileShell({
 
 function BottomTabBar() {
   const { t, lang } = useI18n();
+  const { role } = useUserRole();
+  const isDentist = role?.accountType === "dentist";
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
-  const tabs = [
-    { to: "/", icon: Home, label: t("tab_home"), match: (p: string) => p === "/" },
-    {
-      to: "/explore",
-      icon: Search,
-      label: lang === "ar" ? "بحث" : "Search",
-      match: (p: string) => p.startsWith("/explore"),
-    },
-    {
-      to: "/orders",
-      icon: ShoppingBag,
-      label: t("tab_orders"),
-      match: (p: string) => p.startsWith("/orders"),
-    },
-    {
-      to: "/account",
-      icon: User,
-      label: t("tab_account"),
-      match: (p: string) => p.startsWith("/account"),
-    },
-    { to: "/more", icon: Menu, label: t("tab_more"), match: (p: string) => p.startsWith("/more") },
-  ] as const;
+  const tabs = isDentist
+    ? [
+        { to: "/", icon: Home, label: t("tab_home"), match: (p: string) => p === "/" },
+        { to: "/favorites", icon: Heart, label: t("tab_favorites"), match: (p: string) => p.startsWith("/favorites") },
+        { to: "/orders", icon: ShoppingBag, label: t("tab_orders"), match: (p: string) => p.startsWith("/orders") },
+        { to: "/explore", icon: Tag, label: t("tab_offers"), match: (p: string) => p.startsWith("/explore") },
+        { to: "/more", icon: Menu, label: t("tab_more"), match: (p: string) => p.startsWith("/more") },
+      ]
+    : ([
+        { to: "/", icon: Home, label: t("tab_home"), match: (p: string) => p === "/" },
+        { to: "/explore", icon: Search, label: lang === "ar" ? "بحث" : "Search", match: (p: string) => p.startsWith("/explore") },
+        { to: "/orders", icon: ShoppingBag, label: t("tab_orders"), match: (p: string) => p.startsWith("/orders") },
+        { to: "/account", icon: User, label: t("tab_account"), match: (p: string) => p.startsWith("/account") },
+        { to: "/more", icon: Menu, label: t("tab_more"), match: (p: string) => p.startsWith("/more") },
+      ] as const);
 
   return (
     <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50 bg-card/95 backdrop-blur border-t border-border shadow-lg">
