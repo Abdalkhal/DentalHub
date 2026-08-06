@@ -94,7 +94,7 @@ function emit() { save(state); listeners.forEach((l) => l()); }
 
 if (typeof window !== "undefined") {
   window.addEventListener("storage", (e) => {
-    if (e.key === KEY && e.newValue) { try { state = { ...def(), ...JSON.parse(e.newValue) }; listeners.forEach((l) => l()); } catch {} }
+    if (e.key === getKey() && e.newValue) { try { state = { ...def(), ...JSON.parse(e.newValue) }; listeners.forEach((l) => l()); } catch {} }
   });
 }
 
