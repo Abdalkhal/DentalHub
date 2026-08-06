@@ -3,6 +3,8 @@ import { MobileShell } from "@/components/MobileShell";
 import { useI18n } from "@/lib/i18n";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { useSession } from "@/lib/useAuth";
+import { NotificationBell } from "@/components/NotificationBell";
 import { getSnapshot } from "@/lib/ordersStore";
 import dentalImplant from "@/assets/dental-implant.png";
 import dentalSupplies from "@/assets/dental-supplies-icon.png";
@@ -45,6 +47,7 @@ function loadBanners(): Banner[] {
 
 function Home() {
   const { t, lang, dir, toggle } = useI18n();
+  const { user } = useSession();
   const [userBanners, setUserBanners] = useState<Banner[]>([]);
   const [idx, setIdx] = useState(0);
 
@@ -88,10 +91,7 @@ function Home() {
               <span>{lang === "ar" ? "EN" : "AR"}</span>
               <Globe className="size-3.5 text-slate-400" />
             </button>
-            <button className="relative size-9 rounded-full bg-white border border-slate-200 flex items-center justify-center shadow-sm">
-              <Bell className="size-[18px] text-slate-600" />
-              <span className="absolute -top-0.5 -end-0.5 size-4 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">3</span>
-            </button>
+            <NotificationBell userId={user?.uid || ""} />
           </div>
 
           <Link className="flex items-center gap-1.5 font-display font-extrabold text-lg" to="/">
