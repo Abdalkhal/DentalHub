@@ -63,7 +63,16 @@ export type ClinicState = {
 
 /* ── Store ──────────────────────────────────── */
 
-const KEY = "dh_clinic_v3";
+const KEY_PREFIX = "dh_clinic_v3:";
+let currentUserId = "";
+
+export function setClinicStoreUser(uid: string) {
+  currentUserId = uid;
+  state = def();
+  emit();
+}
+
+function getKey() { return KEY_PREFIX + (currentUserId || "guest"); }
 
 function def(): ClinicState {
   return { transactions: [], orders: [], materials: [], doctors: [] };
@@ -71,12 +80,12 @@ function def(): ClinicState {
 
 function load(): ClinicState {
   if (typeof window === "undefined") return def();
-  try { const r = localStorage.getItem(KEY); return r ? { ...def(), ...JSON.parse(r) } : def(); } catch { return def(); }
+  try { const r = localStorage.getItem(getKey()); return r ? { ...def(), ...JSON.parse(r) } : def(); } catch { return def(); }
 }
 
 function save(s: ClinicState) {
   if (typeof window === "undefined") return;
-  try { localStorage.setItem(KEY, JSON.stringify(s)); } catch {}
+  try { localStorage.setItem(getKey(), JSON.stringify(s)); } catch {}
 }
 
 let state = load();

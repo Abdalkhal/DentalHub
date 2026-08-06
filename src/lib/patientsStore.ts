@@ -102,16 +102,32 @@ export const EMPTY_HISTORY: MedicalHistory = {
   bleeding: false,
 };
 
-const KEY = "dh:patients:v1";
+const KEY_PREFIX = "dh:patients:v1:";
 
+let currentUserId = "";
 let state: Patient[] = [];
 let loaded = false;
 const listeners = new Set<() => void>();
 
+export function setPatientStoreUser(uid: string) {
+  currentUserId = uid;
+  loaded = false;
+  state = [];
+  listeners.forEach((l) => l());
+}
+
+function getKey() {
+  return KEY_PREFIX + (currentUserId || "guest");
+}
+
 function load(): Patient[] {
   if (typeof window === "undefined") return [];
   try {
-    return JSON.parse(localStorage.getItem(KEY) || "[]") as Patient[];
+    return JSON.parse(localStorage.getItem(getKey()) || "[]") as Patient[];
+  } catch {
+    return [];
+  }
+}
   } catch {
     return [];
   }
@@ -126,7 +142,7 @@ function ensure() {
 
 function persist() {
   if (typeof window === "undefined") return;
-  localStorage.setItem(KEY, JSON.stringify(state));
+  localStorage.setItem(getKey(), JSON.stringify(state));
   listeners.forEach((l) => l());
 }
 

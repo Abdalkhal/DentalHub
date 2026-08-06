@@ -4,6 +4,8 @@ import { useI18n } from "@/lib/i18n";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/lib/useAuth";
+import { setPatientStoreUser } from "@/lib/patientsStore";
+import { setClinicStoreUser } from "@/lib/clinicStore";
 import { NotificationBell } from "@/components/NotificationBell";
 import { getSnapshot } from "@/lib/ordersStore";
 import dentalImplant from "@/assets/dental-implant.png";
@@ -50,6 +52,12 @@ function Home() {
   const { user } = useSession();
   const [userBanners, setUserBanners] = useState<Banner[]>([]);
   const [idx, setIdx] = useState(0);
+
+  useEffect(() => {
+    const uid = user?.uid || "";
+    setPatientStoreUser(uid);
+    setClinicStoreUser(uid);
+  }, [user?.uid]);
 
   useEffect(() => {
     setUserBanners(loadBanners());
