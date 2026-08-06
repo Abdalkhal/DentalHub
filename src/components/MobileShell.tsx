@@ -35,7 +35,7 @@ function BottomTabBar() {
         { to: "/", icon: Home, label: t("tab_home"), match: (p: string) => p === "/" },
         { to: "/favorites", icon: Heart, label: t("tab_favorites"), match: (p: string) => p.startsWith("/favorites") },
         { to: "/orders", icon: ShoppingBag, label: t("tab_orders"), match: (p: string) => p.startsWith("/orders") },
-        { to: "/explore", icon: Tag, label: t("tab_offers"), match: (p: string) => p.startsWith("/explore") },
+        { to: "/offers", icon: Tag, label: t("tab_offers"), match: (p: string) => p.startsWith("/offers") },
         { to: "/more", icon: Menu, label: t("tab_more"), match: (p: string) => p.startsWith("/more") },
       ]
     : ([

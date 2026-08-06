@@ -15,6 +15,7 @@ import { Route as RegisterRouteImport } from './routes/register'
 import { Route as ProductionRouteImport } from './routes/production'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as OrdersRouteImport } from './routes/orders'
+import { Route as OffersRouteImport } from './routes/offers'
 import { Route as MoreRouteImport } from './routes/more'
 import { Route as MessagesRouteImport } from './routes/messages'
 import { Route as LoginRouteImport } from './routes/login'
@@ -84,6 +85,11 @@ const PricingRoute = PricingRouteImport.update({
 const OrdersRoute = OrdersRouteImport.update({
   id: '/orders',
   path: '/orders',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OffersRoute = OffersRouteImport.update({
+  id: '/offers',
+  path: '/offers',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MoreRoute = MoreRouteImport.update({
@@ -301,6 +307,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
   '/more': typeof MoreRoute
+  '/offers': typeof OffersRoute
   '/orders': typeof OrdersRoute
   '/pricing': typeof PricingRoute
   '/production': typeof ProductionRoute
@@ -349,6 +356,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
   '/more': typeof MoreRoute
+  '/offers': typeof OffersRoute
   '/orders': typeof OrdersRoute
   '/pricing': typeof PricingRoute
   '/production': typeof ProductionRoute
@@ -398,6 +406,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
   '/more': typeof MoreRoute
+  '/offers': typeof OffersRoute
   '/orders': typeof OrdersRoute
   '/pricing': typeof PricingRoute
   '/production': typeof ProductionRoute
@@ -448,6 +457,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/messages'
     | '/more'
+    | '/offers'
     | '/orders'
     | '/pricing'
     | '/production'
@@ -496,6 +506,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/messages'
     | '/more'
+    | '/offers'
     | '/orders'
     | '/pricing'
     | '/production'
@@ -544,6 +555,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/messages'
     | '/more'
+    | '/offers'
     | '/orders'
     | '/pricing'
     | '/production'
@@ -593,6 +605,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   MessagesRoute: typeof MessagesRoute
   MoreRoute: typeof MoreRoute
+  OffersRoute: typeof OffersRoute
   OrdersRoute: typeof OrdersRoute
   PricingRoute: typeof PricingRoute
   ProductionRoute: typeof ProductionRoute
@@ -666,6 +679,13 @@ declare module '@tanstack/react-router' {
       path: '/orders'
       fullPath: '/orders'
       preLoaderRoute: typeof OrdersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/offers': {
+      id: '/offers'
+      path: '/offers'
+      fullPath: '/offers'
+      preLoaderRoute: typeof OffersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/more': {
@@ -1004,6 +1024,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   MessagesRoute: MessagesRoute,
   MoreRoute: MoreRoute,
+  OffersRoute: OffersRoute,
   OrdersRoute: OrdersRoute,
   PricingRoute: PricingRoute,
   ProductionRoute: ProductionRoute,
