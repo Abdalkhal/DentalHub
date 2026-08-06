@@ -128,10 +128,6 @@ function load(): Patient[] {
     return [];
   }
 }
-  } catch {
-    return [];
-  }
-}
 
 function ensure() {
   if (!loaded && typeof window !== "undefined") {
