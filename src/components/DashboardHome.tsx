@@ -476,7 +476,7 @@ export function DashboardHome() {
             workType: order.workType,
             receivedDate: new Date().toISOString().split("T")[0],
             dueDate: order.date,
-            status: "in_progress",
+            status: "delayed",
             agent: order.agent,
             unitsCount: units,
             unitPrice: price,
