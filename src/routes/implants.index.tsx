@@ -50,6 +50,10 @@ import {
   GripVertical,
   MoreHorizontal,
   Settings,
+  SlidersHorizontal,
+  ChevronRight,
+  Bone,
+  Stethoscope,
 } from "lucide-react";
 
 export const Route = createFileRoute("/implants/")({
@@ -2405,12 +2409,14 @@ function ImplantOrdersPanel({ companyId }: { companyId: string }) {
 }
 
 function BrowseImplants() {
-  const { t, lang, toggle } = useI18n();
+  const { lang } = useI18n();
   const ar = lang === "ar";
-  const [guideQuery, setGuideQuery] = useState("");
+  const [searchQ, setSearchQ] = useState("");
+  const [showFilter, setShowFilter] = useState(false);
+  const [lenRange, setLenRange] = useState([5, 18]);
+  const [diaRange, setDiaRange] = useState([3, 7]);
   const { role } = useUserRole();
   const { data: products = [] } = useProducts();
-  const { user, loading: sessionLoading } = { user: auth.currentUser, loading: false };
 
   const countryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -2424,162 +2430,76 @@ function BrowseImplants() {
     return counts;
   }, [products]);
 
-  const filteredGuides = useMemo(() => {
-    const q = guideQuery.trim().toLowerCase();
-    if (!q) return SURGICAL_GUIDE_COMPANIES;
-    return SURGICAL_GUIDE_COMPANIES.filter((g) => {
-      const name = lang === "ar" ? g.ar : g.name;
-      const desc = lang === "ar" ? g.description.ar : g.description.en;
-      const systems = g.systems.map((s) => (lang === "ar" ? s.ar : s.en)).join(" ");
-      return (
-        name.toLowerCase().includes(q) ||
-        desc.toLowerCase().includes(q) ||
-        systems.toLowerCase().includes(q)
-      );
-    });
-  }, [guideQuery, lang]);
+  const categories = [
+    { to: "", icon: Bone, title: ar ? "البون كرافت" : "Bone Graft" },
+    { to: "", icon: Crosshair, title: ar ? "الدليل الجراحي" : "Surgical Guide" },
+    { to: "", icon: Stethoscope, title: ar ? "زرعات Subperiosteal" : "Subperiosteal Implants" },
+  ];
 
   return (
     <MobileShell>
-      <TopBar title={t("implants")} showBack />
-      <div className="px-4 pt-4 space-y-6">
-        {user && !sessionLoading && (
-          <div className="flex items-center justify-between bg-card border border-border rounded-2xl p-3.5 shadow-soft">
-            <Link
-              to="/account"
-              className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition"
-            >
-              <div className="size-11 rounded-full bg-primary/10 ring-2 ring-primary/20 flex items-center justify-center overflow-hidden shrink-0">
-                <UserCircle2 className="size-6 text-primary" />
-              </div>
-              <div className="min-w-0">
-                <p className="font-display font-bold text-sm text-foreground truncate">
-                  {role?.name || (ar ? "المستخدم" : "User")}
-                </p>
-                <p className="text-[11px] text-muted-foreground">{ar ? "طبيب أسنان" : "Dentist"}</p>
-                {role?.phone && (
-                  <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
-                    <Phone className="size-3 shrink-0" />
-                    {role.phone}
-                  </p>
-                )}
-                {role?.address && (
-                  <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
-                    <MapPin className="size-3 shrink-0" />
-                    {role.address}
-                  </p>
-                )}
-              </div>
-            </Link>
+      <TopBar title={ar ? "الزراعة" : "Implants"} showBack />
+      <div className="px-4 pt-4 pb-6 space-y-5">
+        {/* Search + Filter */}
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="size-4 absolute top-1/2 -translate-y-1/2 start-3 text-slate-400" />
+            <input type="search" value={searchQ} onChange={(e) => setSearchQ(e.target.value)} placeholder={ar ? "ابحث حسب الشركة أو الطول أو القطر..." : "Search by company, length, diameter..."} className="w-full h-11 rounded-2xl bg-white border border-slate-200 ps-10 pe-4 text-sm outline-none focus:ring-2 focus:ring-primary/20" />
+          </div>
+          <button onClick={() => setShowFilter(!showFilter)} className={cn("size-11 rounded-2xl border flex items-center justify-center transition", showFilter ? "bg-primary text-white border-primary" : "bg-white text-slate-500 border-slate-200")}><SlidersHorizontal className="size-5" /></button>
+        </div>
 
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={toggle}
-                className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-sky-100 hover:text-sky-600 text-xs font-bold transition"
-              >
-                {lang === "ar" ? "EN" : "AR"}
-              </button>
-              <button
-                type="button"
-                onClick={() => auth.signOut()}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-rose-100 hover:text-rose-600 text-xs font-semibold transition"
-              >
-                <LogOut className="size-4" />
-                {ar ? "خروج" : "Logout"}
-              </button>
+        {showFilter && (
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+            <div>
+              <div className="flex items-center justify-between mb-1"><span className="text-xs font-bold text-slate-500">{ar ? "الطول (مم)" : "Length (mm)"}</span><span className="text-xs font-bold text-primary">{lenRange[0]} - {lenRange[1]}</span></div>
+              <input type="range" min={5} max={18} value={lenRange[0]} onChange={(e) => setLenRange([+e.target.value, lenRange[1]])} className="w-full accent-primary" />
+              <input type="range" min={5} max={18} value={lenRange[1]} onChange={(e) => setLenRange([lenRange[0], +e.target.value])} className="w-full accent-primary" />
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-1"><span className="text-xs font-bold text-slate-500">{ar ? "القطر (مم)" : "Diameter (mm)"}</span><span className="text-xs font-bold text-primary">{diaRange[0]} - {diaRange[1]}</span></div>
+              <input type="range" min={3} max={7} step={0.5} value={diaRange[0]} onChange={(e) => setDiaRange([+e.target.value, diaRange[1]])} className="w-full accent-primary" />
+              <input type="range" min={3} max={7} step={0.5} value={diaRange[1]} onChange={(e) => setDiaRange([diaRange[0], +e.target.value])} className="w-full accent-primary" />
             </div>
           </div>
         )}
 
-        <section>
-          <div className="mb-3">
-            <h2 className="font-display font-bold text-base">{t("surgical_guides")}</h2>
-            <p className="text-xs text-muted-foreground">{t("surgical_guides_sub")}</p>
+        {/* Promo Banner */}
+        <div className="relative rounded-2xl overflow-hidden bg-gradient-to-r from-blue-500 to-blue-700 p-4 shadow-lg">
+          <div className="absolute -top-8 -end-8 size-32 rounded-full bg-white/10" />
+          <p className="font-extrabold text-white text-lg relative z-10">{ar ? "دقة أعلى.. نتائج أفضل" : "Higher precision.. Better results"}</p>
+          <p className="text-white/70 text-xs mt-1 relative z-10">{ar ? "أحدث أنظمة الزراعة السنية" : "Latest dental implant systems"}</p>
+        </div>
+
+        {/* Category Cards */}
+        <div>
+          <h3 className="font-bold text-sm mb-3">{ar ? "اختر الفئة" : "Select category"}</h3>
+          <div className="grid grid-cols-3 gap-2.5">
+            {categories.map((c) => <div key={c.title} className="bg-white border border-slate-200 rounded-2xl p-4 text-center shadow-sm hover:shadow-md transition cursor-pointer"><c.icon className="size-8 mx-auto mb-2 text-primary" /><p className="text-[11px] font-bold">{c.title}</p></div>)}
           </div>
+        </div>
 
-          <div className="relative mb-3">
-            <Search className="size-4 absolute top-1/2 -translate-y-1/2 start-3.5 text-muted-foreground pointer-events-none" />
-            <input
-              type="search"
-              value={guideQuery}
-              onChange={(e) => setGuideQuery(e.target.value)}
-              placeholder={t("search_guides_placeholder")}
-              className="w-full h-10 rounded-2xl bg-card border border-border ps-10 pe-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-primary"
-            />
-          </div>
-
-          {filteredGuides.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4 text-center">{t("no_results")}</p>
-          ) : (
-            <ul className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x snap-mandatory scrollbar-hide">
-              {filteredGuides.map((g) => (
-                <li
-                  key={g.id}
-                  className="min-w-[260px] w-[260px] snap-start bg-card border border-border rounded-2xl p-4 shadow-soft"
-                >
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-xl bg-primary-soft text-primary flex items-center justify-center shrink-0">
-                      <Crosshair className="w-5 h-5" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-display font-bold text-sm truncate">
-                        {lang === "ar" ? g.ar : g.name}
-                      </p>
-                    </div>
-                  </div>
-
-                  <p className="text-xs text-muted-foreground leading-relaxed mb-3">
-                    {lang === "ar" ? g.description.ar : g.description.en}
-                  </p>
-
-                  <div className="pt-2 border-t border-border">
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1.5">
-                      {t("guide_systems")}
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {g.systems.map((s, idx) => (
-                        <span
-                          key={idx}
-                          className="px-2 py-0.5 rounded-md bg-surface border border-border text-[10px] font-medium"
-                        >
-                          {lang === "ar" ? s.ar : s.en}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <section>
-          <h2 className="font-display font-bold text-base mb-3">{t("countries")}</h2>
-          <ul className="grid grid-cols-2 gap-3">
+        {/* Country Grid */}
+        <div>
+          <h3 className="font-bold text-sm mb-3">{ar ? "زرعات حسب الدول" : "Implants by country"}</h3>
+          <div className="grid grid-cols-2 gap-3">
             {COUNTRIES.map((c) => {
               const count = countryCounts[c.slug] || 0;
               return (
-                <li key={c.slug}>
-                  <Link
-                    to="/implants/$country"
-                    params={{ country: c.slug }}
-                    className="block bg-card border border-border rounded-3xl p-4 shadow-soft hover:shadow-card transition"
-                  >
-                    <div className="text-4xl mb-2">{c.flag}</div>
-                    <p className="font-display font-bold">
-                      {t("implants")}{" "}
-                      <span className="text-primary">{lang === "ar" ? c.ar : c.en}</span>
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {count} {t("brands")}
-                    </p>
-                  </Link>
-                </li>
+                <Link key={c.slug} to="/implants/$country" params={{ country: c.slug }} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="size-12 rounded-xl bg-slate-50 flex items-center justify-center text-2xl">{c.flag}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-sm truncate">{ar ? c.ar : c.en}</p>
+                      <p className="text-[11px] text-slate-500">{count} {ar ? "منتج" : "products"}</p>
+                    </div>
+                    <ChevronRight className="size-4 text-slate-300 shrink-0" />
+                  </div>
+                </Link>
               );
             })}
-          </ul>
-        </section>
+          </div>
+        </div>
       </div>
     </MobileShell>
   );
