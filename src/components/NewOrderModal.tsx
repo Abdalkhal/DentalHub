@@ -19,6 +19,7 @@ import {
 export type NewOrder = {
   patient: string;
   dentist: string;
+  clinic: string;
   date: string;
   workType: string;
   unitsCount: number;
@@ -53,6 +54,7 @@ export function NewOrderModal({ open, onClose, onSubmit }: Props) {
 
   const [patient, setPatient] = useState("");
   const [dentist, setDentist] = useState("");
+  const [clinic, setClinic] = useState("");
   const [date, setDate] = useState("");
   const [workType, setWorkType] = useState("");
   const [unitsCount, setUnitsCount] = useState("");
@@ -77,6 +79,7 @@ export function NewOrderModal({ open, onClose, onSubmit }: Props) {
     const errs: Record<string, boolean> = {};
     if (!patient.trim()) errs.patient = true;
     if (!dentist.trim()) errs.dentist = true;
+    if (!clinic.trim()) errs.clinic = true;
     if (!date) errs.date = true;
     if (!workType) errs.workType = true;
     if (!unitsCount.trim() || parseFloat(unitsCount) <= 0) errs.unitsCount = true;
@@ -92,6 +95,7 @@ export function NewOrderModal({ open, onClose, onSubmit }: Props) {
     onSubmit({
       patient: patient.trim(),
       dentist: dentist.trim(),
+      clinic: clinic.trim(),
       date,
       workType,
       unitsCount: parseFloat(unitsCount) || 0,
@@ -105,6 +109,7 @@ export function NewOrderModal({ open, onClose, onSubmit }: Props) {
       setSubmitted(false);
       setPatient("");
       setDentist("");
+      setClinic("");
       setDate("");
       setWorkType("");
       setUnitsCount("");
@@ -207,6 +212,16 @@ export function NewOrderModal({ open, onClose, onSubmit }: Props) {
                     {t("field_required")}
                   </p>
                 )}
+              </div>
+
+              {/* Clinic Name */}
+              <div>
+                <label className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground mb-1.5">
+                  <Building2 className="size-3.5" />
+                  {ar ? "اسم العيادة" : "Clinic Name"} <span className="text-destructive">*</span>
+                </label>
+                <input value={clinic} onChange={(e) => { setClinic(e.target.value); clearError("clinic"); }} placeholder={ar ? "أدخل اسم العيادة" : "Enter clinic name"} className={cn(inputClass, errors.clinic && inputErrorClass)} />
+                {errors.clinic && <p className="text-[11px] text-destructive mt-1 flex items-center gap-1"><AlertCircle className="size-3" />{t("field_required")}</p>}
               </div>
 
               {/* Date / Due Date */}

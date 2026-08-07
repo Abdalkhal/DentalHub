@@ -308,6 +308,7 @@ function LabDashboard() {
       discount: disc,
       price: total,
       notes: newOrder.notes,
+      clinic: newOrder.clinic,
     });
   };
 

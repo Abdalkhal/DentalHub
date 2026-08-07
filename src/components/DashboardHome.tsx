@@ -484,6 +484,7 @@ export function DashboardHome() {
             discount: disc,
             price: total,
             notes: order.notes,
+            clinic: order.clinic,
           };
           addOrder(newOrder);
         }}

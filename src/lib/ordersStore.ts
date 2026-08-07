@@ -23,6 +23,7 @@ export type Order = {
   price: number;
   rating?: number;
   notes: string;
+  clinic: string;
 };
 
 const STORAGE_KEY = "dental_hub_orders";
