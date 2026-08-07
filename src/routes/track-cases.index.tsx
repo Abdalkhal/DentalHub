@@ -55,21 +55,12 @@ const STATUS: Record<"all", StatusStyle> & Record<OrderStatus, StatusStyle> = {
     dot: "bg-emerald-500",
     light: "bg-emerald-50/30",
   },
-  pending: {
-    bg: "bg-sky-50",
-    border: "border-sky-200",
-    text: "text-sky-700",
-    accent: "border-l-sky-400",
-    dot: "bg-sky-500",
-    light: "bg-sky-50/30",
-  },
 };
 
 const STATUS_LABELS: Record<OrderStatus, { ar: string; en: string }> = {
   delayed: { ar: "متأخرة", en: "Delayed" },
   in_progress: { ar: "قيد التنفيذ", en: "In Progress" },
   completed: { ar: "مكتملة", en: "Completed" },
-  pending: { ar: "قيد الانتظار", en: "Pending" },
 };
 
 function TrackCases() {
