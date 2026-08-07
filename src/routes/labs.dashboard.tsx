@@ -661,6 +661,15 @@ function LabDashboard() {
                                 <Eye className="size-3" />
                                 {ar ? "عرض" : "View"}
                               </button>
+                              <select
+                                value={c.status}
+                                onChange={(e) => handleStatusChange(c.id, e.target.value as OrderStatus)}
+                                className="h-7 px-1.5 rounded-lg text-[10px] font-bold bg-slate-50 border border-slate-200 text-slate-600 outline-none cursor-pointer appearance-none text-center"
+                              >
+                                <option value="delayed">{ar ? "متأخرة" : "Delayed"}</option>
+                                <option value="in_progress">{ar ? "قيد التنفيذ" : "In Progress"}</option>
+                                <option value="completed">{ar ? "مكتملة" : "Completed"}</option>
+                              </select>
                               <button
                                 onClick={() => setDeleteTarget(c)}
                                 className="h-7 w-7 rounded-lg text-[11px] font-bold text-rose-500 hover:bg-rose-50 flex items-center justify-center"
