@@ -4,7 +4,7 @@ import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { useOrders, type Order, type OrderStatus } from "@/lib/ordersStore";
+import { useOrders, type OrderStatus } from "@/lib/ordersStore";
 import { Clock, User, Wrench } from "lucide-react";
 
 export const Route = createFileRoute("/track-cases/")({
@@ -15,7 +15,6 @@ const STATUS_META: Record<OrderStatus, { ar: string; en: string; color: string }
   delayed: { ar: "متأخرة", en: "Delayed", color: "bg-rose-100 text-rose-700" },
   in_progress: { ar: "قيد التنفيذ", en: "In Progress", color: "bg-amber-100 text-amber-700" },
   completed: { ar: "مكتملة", en: "Completed", color: "bg-emerald-100 text-emerald-700" },
-  pending: { ar: "قيد الانتظار", en: "Pending", color: "bg-sky-100 text-sky-700" },
 };
 
 function TrackCases() {
@@ -58,7 +57,7 @@ function TrackCases() {
         ) : (
           <div className="space-y-2">
             {filtered.map((o) => {
-              const sm = STATUS_META[o.status] ?? STATUS_META.pending;
+              const sm = STATUS_META[o.status] ?? STATUS_META.delayed;
               return (
                 <div key={o.id} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
                   <div className="flex items-start justify-between">
