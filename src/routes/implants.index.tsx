@@ -2430,10 +2430,12 @@ function BrowseImplants() {
     return counts;
   }, [products]);
 
+  const countryCodeMap: Record<string, string> = { korean: "kr", swiss: "ch", italian: "it", german: "de", brazilian: "br" };
+
   const categories = [
-    { to: "", icon: Bone, title: ar ? "البون كرافت" : "Bone Graft" },
-    { to: "", icon: Crosshair, title: ar ? "الدليل الجراحي" : "Surgical Guide" },
-    { to: "", icon: Stethoscope, title: ar ? "زرعات Subperiosteal" : "Subperiosteal Implants" },
+    { to: "", img: "/photo/bonecraft.jpg", title: ar ? "البون كرافت" : "Bone Graft" },
+    { to: "", img: "/photo/surgecalguid.jpg", title: ar ? "الدليل الجراحي" : "Surgical Guide" },
+    { to: "", img: "/photo/subperustul.jpg", title: ar ? "زرعات Subperiosteal" : "Subperiosteal Implants" },
   ];
 
   return (
@@ -2475,7 +2477,14 @@ function BrowseImplants() {
         <div>
           <h3 className="font-bold text-sm mb-3">{ar ? "اختر الفئة" : "Select category"}</h3>
           <div className="grid grid-cols-3 gap-2.5">
-            {categories.map((c) => <div key={c.title} className="bg-white border border-slate-200 rounded-2xl p-4 text-center shadow-sm hover:shadow-md transition cursor-pointer"><c.icon className="size-8 mx-auto mb-2 text-primary" /><p className="text-[11px] font-bold">{c.title}</p></div>)}
+            {categories.map((c) => (
+              <div key={c.title} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition cursor-pointer">
+                <div className="h-24 bg-slate-50 flex items-center justify-center p-2">
+                  <img src={c.img} alt={c.title} className="size-full object-cover rounded-lg" loading="lazy" />
+                </div>
+                <p className="p-2 text-[11px] font-bold text-center">{c.title}</p>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -2488,7 +2497,10 @@ function BrowseImplants() {
               return (
                 <Link key={c.slug} to="/implants/$country" params={{ country: c.slug }} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition">
                   <div className="flex items-center gap-3 mb-2">
-                    <span className="size-12 rounded-xl bg-slate-50 flex items-center justify-center text-2xl">{c.flag}</span>
+                    <span className="size-12 rounded-xl bg-slate-50 flex items-center justify-center text-2xl overflow-hidden">
+                      <img src={`https://flagcdn.com/w80/${countryCodeMap[c.slug] || c.slug}.png`} alt={c.en} className="w-full h-full object-cover" loading="lazy" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; (e.target as HTMLImageElement).parentElement!.querySelector("span")!.style.display = "block"; }} />
+                      <span style={{ display: "none" }} className="text-2xl">{c.flag}</span>
+                    </span>
                     <div className="flex-1 min-w-0">
                       <p className="font-bold text-sm truncate">{ar ? c.ar : c.en}</p>
                       <p className="text-[11px] text-slate-500">{count} {ar ? "منتج" : "products"}</p>
