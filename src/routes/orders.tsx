@@ -1,4 +1,4 @@
-import { createFileRoute, useSearch } from "@tanstack/react-router";
+import { createFileRoute, Link, useSearch } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
@@ -95,6 +95,7 @@ function Orders() {
   }
 
   if (role?.accountType === "supply") return <SupplierOrders />;
+  if (role?.accountType === "dentist") return <DentistOrders />;
   return <LabOrders />;
 }
 
@@ -349,6 +350,30 @@ function DentistOrders() {
             ))}
           </div>
         )}
+      </div>
+    </MobileShell>
+  );
+}
+
+/* ── Dentist Orders View ─────────────────────────── */
+
+function DentistOrders() {
+  const { lang } = useI18n();
+  const ar = lang === "ar";
+
+  return (
+    <MobileShell>
+      <TopBar title={ar ? "طلباتي" : "My Orders"} showBack />
+      <div className="px-4 pt-4 pb-6 flex flex-col items-center justify-center min-h-[60vh] text-center">
+        <div className="size-20 rounded-full bg-slate-100 flex items-center justify-center mb-4">
+          <Package className="size-9 text-slate-400" />
+        </div>
+        <p className="font-display font-bold text-lg text-slate-500">{ar ? "لا توجد طلبات حالياً" : "No orders yet"}</p>
+        <p className="text-sm text-slate-400 mt-1">{ar ? "لم تقم بإجراء أي طلبات شراء بعد" : "You haven't made any purchase orders yet"}</p>
+        <Link to="/supplies" className="mt-4 inline-flex h-11 px-5 rounded-xl bg-primary text-primary-foreground font-bold text-sm items-center gap-2 hover:opacity-90 transition">
+          <Package className="size-4" />
+          {ar ? "تصفح المنتجات" : "Browse Products"}
+        </Link>
       </div>
     </MobileShell>
   );
