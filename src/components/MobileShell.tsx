@@ -14,9 +14,11 @@ export function MobileShell({
   hideBottomNav?: boolean;
   className?: string;
 }) {
+  const { role } = useUserRole();
+  const isLab = role?.accountType === "lab";
   return (
     <div className="min-h-screen w-full bg-slate-50 overflow-x-hidden flex justify-center">
-      <div className={cn("relative w-full max-w-md min-h-screen bg-white flex flex-col", className)}>
+      <div className={cn("relative w-full min-h-screen bg-white flex flex-col", isLab ? "max-w-none" : "max-w-md", className)}>
         <div className={cn("flex-1", hideBottomNav ? "pb-0" : "pb-24")}>{children}</div>
         {!hideBottomNav && <BottomTabBar />}
       </div>

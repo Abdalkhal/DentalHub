@@ -31,6 +31,7 @@ import { Route as SuppliesIndexRouteImport } from './routes/supplies.index'
 import { Route as PatientsIndexRouteImport } from './routes/patients.index'
 import { Route as LabsIndexRouteImport } from './routes/labs.index'
 import { Route as ImplantsIndexRouteImport } from './routes/implants.index'
+import { Route as FavoritesIndexRouteImport } from './routes/favorites.index'
 import { Route as ClinicIndexRouteImport } from './routes/clinic.index'
 import { Route as BrandsIndexRouteImport } from './routes/brands.index'
 import { Route as ProfileAccountIdRouteImport } from './routes/profile.$accountId'
@@ -165,6 +166,11 @@ const LabsIndexRoute = LabsIndexRouteImport.update({
 const ImplantsIndexRoute = ImplantsIndexRouteImport.update({
   id: '/implants/',
   path: '/implants/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FavoritesIndexRoute = FavoritesIndexRouteImport.update({
+  id: '/favorites/',
+  path: '/favorites/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ClinicIndexRoute = ClinicIndexRouteImport.update({
@@ -334,6 +340,7 @@ export interface FileRoutesByFullPath {
   '/profile/$accountId': typeof ProfileAccountIdRoute
   '/brands/': typeof BrandsIndexRoute
   '/clinic/': typeof ClinicIndexRoute
+  '/favorites/': typeof FavoritesIndexRoute
   '/implants/': typeof ImplantsIndexRoute
   '/labs/': typeof LabsIndexRoute
   '/patients/': typeof PatientsIndexRoute
@@ -383,6 +390,7 @@ export interface FileRoutesByTo {
   '/profile/$accountId': typeof ProfileAccountIdRoute
   '/brands': typeof BrandsIndexRoute
   '/clinic': typeof ClinicIndexRoute
+  '/favorites': typeof FavoritesIndexRoute
   '/implants': typeof ImplantsIndexRoute
   '/labs': typeof LabsIndexRoute
   '/patients': typeof PatientsIndexRoute
@@ -433,6 +441,7 @@ export interface FileRoutesById {
   '/profile/$accountId': typeof ProfileAccountIdRoute
   '/brands/': typeof BrandsIndexRoute
   '/clinic/': typeof ClinicIndexRoute
+  '/favorites/': typeof FavoritesIndexRoute
   '/implants/': typeof ImplantsIndexRoute
   '/labs/': typeof LabsIndexRoute
   '/patients/': typeof PatientsIndexRoute
@@ -484,6 +493,7 @@ export interface FileRouteTypes {
     | '/profile/$accountId'
     | '/brands/'
     | '/clinic/'
+    | '/favorites/'
     | '/implants/'
     | '/labs/'
     | '/patients/'
@@ -533,6 +543,7 @@ export interface FileRouteTypes {
     | '/profile/$accountId'
     | '/brands'
     | '/clinic'
+    | '/favorites'
     | '/implants'
     | '/labs'
     | '/patients'
@@ -582,6 +593,7 @@ export interface FileRouteTypes {
     | '/profile/$accountId'
     | '/brands/'
     | '/clinic/'
+    | '/favorites/'
     | '/implants/'
     | '/labs/'
     | '/patients/'
@@ -628,6 +640,7 @@ export interface RootRouteChildren {
   ProfileAccountIdRoute: typeof ProfileAccountIdRoute
   BrandsIndexRoute: typeof BrandsIndexRoute
   ClinicIndexRoute: typeof ClinicIndexRoute
+  FavoritesIndexRoute: typeof FavoritesIndexRoute
   ImplantsIndexRoute: typeof ImplantsIndexRoute
   LabsIndexRoute: typeof LabsIndexRoute
   PatientsIndexRoute: typeof PatientsIndexRoute
@@ -791,6 +804,13 @@ declare module '@tanstack/react-router' {
       path: '/implants'
       fullPath: '/implants/'
       preLoaderRoute: typeof ImplantsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/favorites/': {
+      id: '/favorites/'
+      path: '/favorites'
+      fullPath: '/favorites/'
+      preLoaderRoute: typeof FavoritesIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/clinic/': {
@@ -1047,6 +1067,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProfileAccountIdRoute: ProfileAccountIdRoute,
   BrandsIndexRoute: BrandsIndexRoute,
   ClinicIndexRoute: ClinicIndexRoute,
+  FavoritesIndexRoute: FavoritesIndexRoute,
   ImplantsIndexRoute: ImplantsIndexRoute,
   LabsIndexRoute: LabsIndexRoute,
   PatientsIndexRoute: PatientsIndexRoute,

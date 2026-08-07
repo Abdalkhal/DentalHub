@@ -52,6 +52,18 @@ export function useOffers(supplierId: string) {
   });
 }
 
+export function useAllOffers() {
+  return useQuery({
+    queryKey: ["offers", "all"],
+    queryFn: async (): Promise<Offer[]> => {
+      const q = query(collection(db, "offers"), orderBy("createdAt", "desc"));
+      const snap = await getDocs(q);
+      return snap.docs.map((d) => fromDoc(d.id, d.data()));
+    },
+    staleTime: 30_000,
+  });
+}
+
 export function useUpsertOffer() {
   const qc = useQueryClient();
   return useMutation({

@@ -1,12 +1,12 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useAllOffers } from "@/lib/offers";
 import {
-  Plus, X, Phone, MapPin, User, Tag, Briefcase,
-  GraduationCap, Wrench, Search, TrendingDown, Upload, ImageOff,
+  Plus, X, Phone, MapPin, User, Briefcase, Upload, Megaphone,
 } from "lucide-react";
 
 export const Route = createFileRoute("/offers")({
@@ -40,13 +40,6 @@ function saveClassifieds(d: Classified[]) {
   localStorage.setItem("dh_classifieds", JSON.stringify(d));
 }
 
-const PROMO_ITEMS = [
-  { id: "p1", title: "كومبوزيت 3M Filtek", vendor: "مكتب بغداد الطبي", oldPrice: 45, newPrice: 38, discount: 15, currency: "USD" as const },
-  { id: "p2", title: "طقم زرعات Dentium", vendor: "شركة الموصل", oldPrice: 1200, newPrice: 1020, discount: 15, currency: "USD" as const },
-  { id: "p3", title: "تيجان زيركون", vendor: "مختبر دنتال هب", oldPrice: 80, newPrice: 68, discount: 15, currency: "USD" as const },
-  { id: "p4", title: "قفازات نتريل (100)", vendor: "مكتب بغداد الطبي", oldPrice: 9, newPrice: 7, discount: 22, currency: "USD" as const },
-];
-
 function fmtPrice(n: number, c: string) {
   return c === "IQD" ? `${n.toLocaleString()} د.ع` : `$${n.toFixed(2)}`;
 }
@@ -58,6 +51,7 @@ function OffersPage() {
   const [cat, setCat] = useState("all");
   const [classifieds, setClassifieds] = useState<Classified[]>(loadClassifieds);
   const [showForm, setShowForm] = useState(false);
+  const { data: realOffers = [], isLoading } = useAllOffers();
 
   const filtered = useMemo(() => {
     return cat === "all" ? classifieds : classifieds.filter((c) => c.category === cat);
@@ -73,21 +67,26 @@ function OffersPage() {
         </div>
 
         {tab === "products" ? (
-          <div className="grid grid-cols-1 gap-3">
-            {PROMO_ITEMS.map((p) => (
-              <div key={p.id} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-start gap-3">
-                <span className="size-12 shrink-0 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center font-extrabold text-xs">-{p.discount}%</span>
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-sm truncate">{p.title}</p>
-                  <p className="text-[11px] text-slate-500 mt-0.5">{p.vendor}</p>
-                  <div className="flex items-center gap-2 mt-1.5">
-                    <span className="font-extrabold text-sm text-primary">{fmtPrice(p.newPrice, p.currency)}</span>
-                    <span className="text-[11px] text-slate-400 line-through">{fmtPrice(p.oldPrice, p.currency)}</span>
-                  </div>
+          isLoading ? (
+            <div className="flex justify-center py-12"><div className="size-6 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>
+          ) : realOffers.length === 0 ? (
+            <div className="py-16 text-center text-slate-400">
+              <Megaphone className="size-12 mx-auto mb-3 opacity-30" />
+              <p className="font-semibold">{ar ? "لا توجد عروض أو خصومات متاحة حالياً" : "No offers available yet"}</p>
+              <p className="text-[11px] text-slate-400 mt-1">{ar ? "ستظهر هنا عروض المكاتب والمختبرات" : "Offers from suppliers will appear here"}</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3">
+              {realOffers.map((o) => (
+                <div key={o.id} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                  <p className="font-bold text-sm">{o.title}</p>
+                  {o.description && <p className="text-[11px] text-slate-500 mt-1 line-clamp-2">{o.description}</p>}
+                  {o.price != null && <p className="font-extrabold text-sm text-primary mt-1.5">{fmtPrice(o.price, o.currency || "USD")}</p>}
+                  {o.expiryDate && <p className="text-[10px] text-slate-400 mt-1">{ar ? "ينتهي" : "Expires"}: {o.expiryDate}</p>}
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )
         ) : (
           <>
             {/* Category filter chips */}
