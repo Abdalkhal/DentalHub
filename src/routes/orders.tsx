@@ -95,7 +95,6 @@ function Orders() {
   }
 
   if (role?.accountType === "supply") return <SupplierOrders />;
-  if (role?.accountType === "dentist") return <DentistOrders />;
   return <LabOrders />;
 }
 
