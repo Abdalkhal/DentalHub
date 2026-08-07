@@ -1,18 +1,116 @@
-rules_version='2'
+rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // -----------------------------------------------------------------------
+    // Helpers
+    // -----------------------------------------------------------------------
+    function isAuth()      { return request.auth != null; }
+    function userId()      { return request.auth.uid; }
+    function isAdmin()     { return exists(/databases/$(database)/documents/user_roles/$(userId()))
+                              && get(/databases/$(database)/documents/user_roles/$(userId())).data.role == 'admin'; }
+
+    // -----------------------------------------------------------------------
+    // user_roles — a user owns their own profile; admins can read anyone.
+    // -----------------------------------------------------------------------
+    match /user_roles/{uid} {
+      // Prevent a user from self-promoting to admin at write time.
+      function isValidRole() {
+        let data = request.resource.data;
+        return data.role in ['dentist','supply','implant','lab'];
+      }
+      allow read:  if isAuth() && (uid == userId() || isAdmin());
+      allow create: if isAuth() && uid == userId() && isValidRole();
+      allow update: if isAuth() && uid == userId() && isValidRole();
+      allow delete: if isAdmin();
+    }
+
+    // -----------------------------------------------------------------------
+    // products — public catalog for authenticated users; managed by admins.
+    // -----------------------------------------------------------------------
+    match /products/{docId} {
+      allow read:  if isAuth();
+      allow write: if isAdmin();
+    }
+
+    // -----------------------------------------------------------------------
+    // offers — similar to products.
+    // -----------------------------------------------------------------------
+    match /offers/{docId} {
+      allow read:  if isAuth();
+      allow write: if isAdmin();
+    }
+
+    // -----------------------------------------------------------------------
+    // orders — dentists place orders; suppliers read orders sent to them.
+    // -----------------------------------------------------------------------
+    match /orders/{docId} {
+      function isOwner() {
+        let data = request.resource.data;
+        return request.auth.uid == data.dentistId || request.auth.uid == data.supplierId;
+      }
+      // Anyone authenticated can read orders they are involved in.
+      allow read: if isAuth() && (
+        resource == null
+        || resource.data.dentistId == userId()
+        || resource.data.supplierId == userId()
+        || isAdmin()
+      );
+      allow create: if isAuth() && request.resource.data.dentistId == userId();
+      allow update: if isAuth() && (
+        (resource.data.supplierId == userId())  // supplier confirms / delivers
+        || isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    // -----------------------------------------------------------------------
+    // cases — dentist creates; assigned lab can read & advance.
+    // -----------------------------------------------------------------------
+    match /cases/{docId} {
+      allow read: if isAuth() && (
+        resource == null
+        || resource.data.dentistId == userId()
+        || resource.data.labId == userId()
+        || isAdmin()
+      );
+      allow create: if isAuth() && request.resource.data.dentistId == userId();
+      allow update: if isAuth() && (
+        (resource.data.labId == userId())   // lab advances the stage
+        || (resource.data.dentistId == userId() && request.resource.data.dentistId == userId())
+        || isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    // -----------------------------------------------------------------------
+    // conversations — participants only, plus admin.
+    // -----------------------------------------------------------------------
+    match /conversations/{convId} {
+      function isParticipant() {
+        return userId() in resource.data.participants;
+      }
+      allow read:  if isAuth() && (resource == null || isParticipant() || isAdmin());
+      allow create: if isAuth() && userId() in request.resource.data.participants;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+
+      // Messages inside conversations follow the same participant rule.
+      match /messages/{msgId} {
+        allow read:  if isAuth() && (isParticipant() || isAdmin());
+        allow create: if isAuth()
+                       && request.resource.data.senderId == userId()
+                       && isParticipant();
+        allow update, delete: if isAdmin();
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Default — deny everything else.
+    // -----------------------------------------------------------------------
     match /{document=**} {
-      // This rule allows anyone with your database reference to view, edit,
-      // and delete all data in your database. It is useful for getting
-      // started, but it is configured to expire after 30 days because it
-      // leaves your app open to attackers. At that time, all client
-      // requests to your database will be denied.
-      //
-      // Make sure to write security rules for your app before that time, or
-      // else all client requests to your database will be denied until you
-      // update your rules.
-      allow read, write: if request.time < timestamp.date(2026, 8, 7);
+      allow read, write: if false;
     }
   }
 }

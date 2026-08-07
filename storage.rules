@@ -2,8 +2,22 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
+
+    function isAuth()  { return request.auth != null; }
+    function userId()  { return request.auth.uid; }
+    function isAdmin() { return firestore.exists(/databases/(default)/documents/user_roles/$(userId()))
+                          && firestore.get(/databases/(default)/documents/user_roles/$(userId())).data.role == 'admin'; }
+
+    // Authenticated users can read any product image.
+    // Admin users can upload / delete product images.
+    match /products/{allPaths=**} {
+      allow read:  if isAuth();
+      allow write: if isAdmin();
+    }
+
+    // Default — deny everything else.
     match /{allPaths=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }
