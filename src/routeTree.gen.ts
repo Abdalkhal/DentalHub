@@ -27,6 +27,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as TrackCasesIndexRouteImport } from './routes/track-cases.index'
 import { Route as SuppliesIndexRouteImport } from './routes/supplies.index'
 import { Route as PatientsIndexRouteImport } from './routes/patients.index'
 import { Route as LabsIndexRouteImport } from './routes/labs.index'
@@ -146,6 +147,11 @@ const AccountRoute = AccountRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TrackCasesIndexRoute = TrackCasesIndexRouteImport.update({
+  id: '/track-cases/',
+  path: '/track-cases/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SuppliesIndexRoute = SuppliesIndexRouteImport.update({
@@ -345,6 +351,7 @@ export interface FileRoutesByFullPath {
   '/labs/': typeof LabsIndexRoute
   '/patients/': typeof PatientsIndexRoute
   '/supplies/': typeof SuppliesIndexRoute
+  '/track-cases/': typeof TrackCasesIndexRoute
   '/labs/$labId/statement': typeof LabsLabIdStatementRoute
   '/supplies/$officeId/$branchSlug': typeof SuppliesOfficeIdBranchSlugRoute
   '/supplies/branch/$branchSlug': typeof SuppliesBranchBranchSlugRoute
@@ -395,6 +402,7 @@ export interface FileRoutesByTo {
   '/labs': typeof LabsIndexRoute
   '/patients': typeof PatientsIndexRoute
   '/supplies': typeof SuppliesIndexRoute
+  '/track-cases': typeof TrackCasesIndexRoute
   '/labs/$labId/statement': typeof LabsLabIdStatementRoute
   '/supplies/$officeId/$branchSlug': typeof SuppliesOfficeIdBranchSlugRoute
   '/supplies/branch/$branchSlug': typeof SuppliesBranchBranchSlugRoute
@@ -446,6 +454,7 @@ export interface FileRoutesById {
   '/labs/': typeof LabsIndexRoute
   '/patients/': typeof PatientsIndexRoute
   '/supplies/': typeof SuppliesIndexRoute
+  '/track-cases/': typeof TrackCasesIndexRoute
   '/labs/$labId/statement': typeof LabsLabIdStatementRoute
   '/supplies/$officeId/$branchSlug': typeof SuppliesOfficeIdBranchSlugRoute
   '/supplies/branch/$branchSlug': typeof SuppliesBranchBranchSlugRoute
@@ -498,6 +507,7 @@ export interface FileRouteTypes {
     | '/labs/'
     | '/patients/'
     | '/supplies/'
+    | '/track-cases/'
     | '/labs/$labId/statement'
     | '/supplies/$officeId/$branchSlug'
     | '/supplies/branch/$branchSlug'
@@ -548,6 +558,7 @@ export interface FileRouteTypes {
     | '/labs'
     | '/patients'
     | '/supplies'
+    | '/track-cases'
     | '/labs/$labId/statement'
     | '/supplies/$officeId/$branchSlug'
     | '/supplies/branch/$branchSlug'
@@ -598,6 +609,7 @@ export interface FileRouteTypes {
     | '/labs/'
     | '/patients/'
     | '/supplies/'
+    | '/track-cases/'
     | '/labs/$labId/statement'
     | '/supplies/$officeId/$branchSlug'
     | '/supplies/branch/$branchSlug'
@@ -645,6 +657,7 @@ export interface RootRouteChildren {
   LabsIndexRoute: typeof LabsIndexRoute
   PatientsIndexRoute: typeof PatientsIndexRoute
   SuppliesIndexRoute: typeof SuppliesIndexRoute
+  TrackCasesIndexRoute: typeof TrackCasesIndexRoute
   SuppliesOfficeIdBranchSlugRoute: typeof SuppliesOfficeIdBranchSlugRoute
   SuppliesBranchBranchSlugRoute: typeof SuppliesBranchBranchSlugRoute
   SuppliesOfficeIdIndexRoute: typeof SuppliesOfficeIdIndexRoute
@@ -776,6 +789,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/track-cases/': {
+      id: '/track-cases/'
+      path: '/track-cases'
+      fullPath: '/track-cases/'
+      preLoaderRoute: typeof TrackCasesIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/supplies/': {
@@ -1072,6 +1092,7 @@ const rootRouteChildren: RootRouteChildren = {
   LabsIndexRoute: LabsIndexRoute,
   PatientsIndexRoute: PatientsIndexRoute,
   SuppliesIndexRoute: SuppliesIndexRoute,
+  TrackCasesIndexRoute: TrackCasesIndexRoute,
   SuppliesOfficeIdBranchSlugRoute: SuppliesOfficeIdBranchSlugRoute,
   SuppliesBranchBranchSlugRoute: SuppliesBranchBranchSlugRoute,
   SuppliesOfficeIdIndexRoute: SuppliesOfficeIdIndexRoute,

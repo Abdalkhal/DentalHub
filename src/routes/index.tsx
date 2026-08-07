@@ -190,7 +190,7 @@ function Home() {
 
       {/* Track Cases */}
       <section className="px-3 mt-4">
-        <Link className="flex items-center gap-3 bg-sky-50 border border-sky-100 rounded-2xl p-3.5" to="/orders">
+        <Link className="flex items-center gap-3 bg-sky-50 border border-sky-100 rounded-2xl p-3.5" to="/track-cases">
           <span className="size-11 rounded-2xl bg-sky-100 ring-1 ring-sky-200 shadow-sm text-sky-600 flex items-center justify-center">
             <ClipboardList className="size-5" strokeWidth={2.2} />
           </span>
