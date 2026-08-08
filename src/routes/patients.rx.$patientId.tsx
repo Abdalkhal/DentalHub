@@ -53,6 +53,12 @@ const COMPANIES: { key: Company | "ALL"; label: string; ar: string; color: strin
   { key: "KIN", label: "KIN", ar: "KIN", color: "text-indigo-900" },
 ];
 
+const COMPANY_LOGOS: Record<string, string> = {
+  KIN: "/photo/kin.jpg",
+  LACALUT: "/photo/lacalut.jpg",
+  WISDOM: "/photo/wisdom.jpg",
+};
+
 const FAV_KEY = "dh:rx:favs:v1";
 
 const PRESETS: RxItem[] = RX_CATALOG;
@@ -455,12 +461,14 @@ function AddMedicineSheet({
                 key={c.key}
                 onClick={() => setCompany(c.key)}
                 className={cn(
-                  "rounded-2xl bg-card border py-2.5 px-1 flex flex-col items-center justify-center gap-1 shadow-soft transition",
-                  active ? "border-primary border-2" : "border-border"
+                  "rounded-2xl bg-card border py-2.5 px-1 flex flex-col items-center justify-center gap-1 shadow-soft transition overflow-hidden",
+                  active ? "border-primary border-2 ring-1 ring-primary/20" : "border-border"
                 )}
               >
                 {c.key === "ALL" ? (
                   <Building2 className="size-6 text-primary" />
+                ) : COMPANY_LOGOS[c.key] ? (
+                  <img src={COMPANY_LOGOS[c.key]} alt={c.label} className="w-full h-8 object-contain" loading="lazy" />
                 ) : (
                   <span className={cn("text-[12px] font-black leading-none", c.color)}>{c.label}</span>
                 )}
