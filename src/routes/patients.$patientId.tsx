@@ -75,6 +75,7 @@ import {
   Download,
   ChevronLeft,
   ChevronRight,
+  Pill,
 } from "lucide-react";
 
 export const Route = createFileRoute("/patients/$patientId")({
@@ -259,6 +260,11 @@ function PatientProfile() {
         >
           <Share2 className="size-4" />
         </IconBtn>
+        <Link to="/patients/rx/$patientId" params={{ patientId: p.id }}>
+          <IconBtn>
+            <Pill className="size-4" />
+          </IconBtn>
+        </Link>
         <div className="flex-1" />
         <span className={cn("text-[11px] font-bold px-2.5 py-1 rounded-full", STATUS_META[p.status]?.cls)}>
           {ar ? STATUS_META[p.status]?.ar : STATUS_META[p.status]?.en}

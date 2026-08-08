@@ -56,6 +56,7 @@ import { Route as AccountAboutRouteImport } from './routes/account.about'
 import { Route as SuppliesOfficeIdIndexRouteImport } from './routes/supplies.$officeId.index'
 import { Route as SuppliesBranchBranchSlugRouteImport } from './routes/supplies.branch.$branchSlug'
 import { Route as SuppliesOfficeIdBranchSlugRouteImport } from './routes/supplies.$officeId.$branchSlug'
+import { Route as PatientsRxPatientIdRouteImport } from './routes/patients.rx.$patientId'
 import { Route as LabsLabIdStatementRouteImport } from './routes/labs.$labId.statement'
 import { Route as AccountHelpTopicSlugRouteImport } from './routes/account.help.topic.$slug'
 
@@ -296,6 +297,11 @@ const SuppliesOfficeIdBranchSlugRoute =
     path: '/supplies/$officeId/$branchSlug',
     getParentRoute: () => rootRouteImport,
   } as any)
+const PatientsRxPatientIdRoute = PatientsRxPatientIdRouteImport.update({
+  id: '/patients/rx/$patientId',
+  path: '/patients/rx/$patientId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LabsLabIdStatementRoute = LabsLabIdStatementRouteImport.update({
   id: '/statement',
   path: '/statement',
@@ -353,6 +359,7 @@ export interface FileRoutesByFullPath {
   '/supplies/': typeof SuppliesIndexRoute
   '/track-cases/': typeof TrackCasesIndexRoute
   '/labs/$labId/statement': typeof LabsLabIdStatementRoute
+  '/patients/rx/$patientId': typeof PatientsRxPatientIdRoute
   '/supplies/$officeId/$branchSlug': typeof SuppliesOfficeIdBranchSlugRoute
   '/supplies/branch/$branchSlug': typeof SuppliesBranchBranchSlugRoute
   '/supplies/$officeId/': typeof SuppliesOfficeIdIndexRoute
@@ -404,6 +411,7 @@ export interface FileRoutesByTo {
   '/supplies': typeof SuppliesIndexRoute
   '/track-cases': typeof TrackCasesIndexRoute
   '/labs/$labId/statement': typeof LabsLabIdStatementRoute
+  '/patients/rx/$patientId': typeof PatientsRxPatientIdRoute
   '/supplies/$officeId/$branchSlug': typeof SuppliesOfficeIdBranchSlugRoute
   '/supplies/branch/$branchSlug': typeof SuppliesBranchBranchSlugRoute
   '/supplies/$officeId': typeof SuppliesOfficeIdIndexRoute
@@ -456,6 +464,7 @@ export interface FileRoutesById {
   '/supplies/': typeof SuppliesIndexRoute
   '/track-cases/': typeof TrackCasesIndexRoute
   '/labs/$labId/statement': typeof LabsLabIdStatementRoute
+  '/patients/rx/$patientId': typeof PatientsRxPatientIdRoute
   '/supplies/$officeId/$branchSlug': typeof SuppliesOfficeIdBranchSlugRoute
   '/supplies/branch/$branchSlug': typeof SuppliesBranchBranchSlugRoute
   '/supplies/$officeId/': typeof SuppliesOfficeIdIndexRoute
@@ -509,6 +518,7 @@ export interface FileRouteTypes {
     | '/supplies/'
     | '/track-cases/'
     | '/labs/$labId/statement'
+    | '/patients/rx/$patientId'
     | '/supplies/$officeId/$branchSlug'
     | '/supplies/branch/$branchSlug'
     | '/supplies/$officeId/'
@@ -560,6 +570,7 @@ export interface FileRouteTypes {
     | '/supplies'
     | '/track-cases'
     | '/labs/$labId/statement'
+    | '/patients/rx/$patientId'
     | '/supplies/$officeId/$branchSlug'
     | '/supplies/branch/$branchSlug'
     | '/supplies/$officeId'
@@ -611,6 +622,7 @@ export interface FileRouteTypes {
     | '/supplies/'
     | '/track-cases/'
     | '/labs/$labId/statement'
+    | '/patients/rx/$patientId'
     | '/supplies/$officeId/$branchSlug'
     | '/supplies/branch/$branchSlug'
     | '/supplies/$officeId/'
@@ -658,6 +670,7 @@ export interface RootRouteChildren {
   PatientsIndexRoute: typeof PatientsIndexRoute
   SuppliesIndexRoute: typeof SuppliesIndexRoute
   TrackCasesIndexRoute: typeof TrackCasesIndexRoute
+  PatientsRxPatientIdRoute: typeof PatientsRxPatientIdRoute
   SuppliesOfficeIdBranchSlugRoute: typeof SuppliesOfficeIdBranchSlugRoute
   SuppliesBranchBranchSlugRoute: typeof SuppliesBranchBranchSlugRoute
   SuppliesOfficeIdIndexRoute: typeof SuppliesOfficeIdIndexRoute
@@ -994,6 +1007,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SuppliesOfficeIdBranchSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/patients/rx/$patientId': {
+      id: '/patients/rx/$patientId'
+      path: '/patients/rx/$patientId'
+      fullPath: '/patients/rx/$patientId'
+      preLoaderRoute: typeof PatientsRxPatientIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/labs/$labId/statement': {
       id: '/labs/$labId/statement'
       path: '/statement'
@@ -1093,6 +1113,7 @@ const rootRouteChildren: RootRouteChildren = {
   PatientsIndexRoute: PatientsIndexRoute,
   SuppliesIndexRoute: SuppliesIndexRoute,
   TrackCasesIndexRoute: TrackCasesIndexRoute,
+  PatientsRxPatientIdRoute: PatientsRxPatientIdRoute,
   SuppliesOfficeIdBranchSlugRoute: SuppliesOfficeIdBranchSlugRoute,
   SuppliesBranchBranchSlugRoute: SuppliesBranchBranchSlugRoute,
   SuppliesOfficeIdIndexRoute: SuppliesOfficeIdIndexRoute,
