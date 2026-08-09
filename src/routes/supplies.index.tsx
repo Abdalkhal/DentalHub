@@ -913,71 +913,69 @@ function ProductsPanel() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
+        <div className="grid grid-cols-2 gap-4">
           {myProducts.map((p) => {
             const isOut = (p.stock ?? 0) === 0;
             return (
               <div
                 key={p.id}
-                className="bg-card border border-border rounded-xl p-1.5 shadow-soft hover:shadow-card transition relative overflow-hidden group"
+                className="bg-card border border-border rounded-2xl p-3 shadow-soft hover:shadow-card transition relative overflow-hidden group"
               >
                 {/* Out badge */}
                 {isOut && (
-                  <span className="absolute top-1 end-1 text-[9px] font-bold bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded-full z-10">
+                  <span className="absolute top-2 end-2 text-[10px] font-bold bg-rose-100 text-rose-600 px-2 py-0.5 rounded-full z-10">
                     {ar ? "نفد" : "Out"}
                   </span>
                 )}
 
                 {/* Image or icon */}
                 {p.images.length > 0 && imageUrlMap[p.images[0]] ? (
-                  <div className="w-full aspect-square rounded-lg bg-slate-100 overflow-hidden mb-1">
-                    <img src={imageUrlMap[p.images[0]]} alt="" className="size-full object-cover" />
+                  <div className="w-full h-36 rounded-xl bg-slate-100 overflow-hidden mb-2.5">
+                    <img src={imageUrlMap[p.images[0]]} alt="" className="size-full object-contain" />
                   </div>
                 ) : (
-                  <div className="w-full aspect-square rounded-lg bg-slate-100 flex items-center justify-center mb-1">
-                    <Package className="size-4 text-slate-400" />
+                  <div className="w-full h-36 rounded-xl bg-slate-100 flex items-center justify-center mb-2.5">
+                    <Package className="size-10 text-slate-300" />
                   </div>
                 )}
 
                 {/* Product name */}
-                <p className="font-display font-bold text-[11px] leading-tight line-clamp-2">
+                <p className="font-display font-bold text-sm leading-snug line-clamp-2">
                   {ar ? p.ar || p.en : p.en || p.ar}
                 </p>
 
                 {/* Brand */}
                 {p.brand && (
-                  <p className="text-[9px] text-muted-foreground mt-0.5 truncate">{p.brand}</p>
+                  <p className="text-[11px] text-muted-foreground mt-1 truncate">{p.brand}</p>
                 )}
 
                 {/* Price */}
-                <p className="mt-1 font-display font-extrabold text-xs text-primary">
+                <p className="mt-1.5 font-display font-extrabold text-base text-primary">
                   {fmtPrice(p)}
                 </p>
 
                 {/* Stock */}
-                <div className="flex items-center gap-1 mt-0.5">
-                  <Layers className="size-2.5 text-slate-400" />
-                  <span
-                    className={cn("text-[9px] font-semibold", isOut ? "text-rose-500" : "text-emerald-600")}
-                  >
-                    {p.stock ?? 0}
+                <div className="flex items-center gap-1.5 mt-1.5">
+                  <Layers className="size-3 text-slate-400" />
+                  <span className={cn("text-[11px] font-semibold", isOut ? "text-rose-500" : "text-emerald-600")}>
+                    {ar ? "المخزون:" : "Stock:"} {p.stock ?? 0}
                   </span>
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-0.5 mt-1 pt-1 border-t border-border">
+                <div className="flex gap-1.5 mt-2.5 pt-2.5 border-t border-border">
                   <button
                     onClick={() => openEdit(p)}
-                    className="flex-1 h-6 rounded-md text-[9px] font-semibold bg-slate-100 hover:bg-sky-100 hover:text-sky-600 flex items-center justify-center gap-0.5 transition"
+                    className="flex-1 h-8 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-sky-100 hover:text-sky-600 flex items-center justify-center gap-1 transition"
                   >
-                    <Pencil className="size-2.5" />
+                    <Pencil className="size-3" />
                     {ar ? "تعديل" : "Edit"}
                   </button>
                   <button
                     onClick={() => handleDelete(p)}
-                    className="w-6 h-6 rounded-md text-[9px] font-semibold bg-slate-100 hover:bg-rose-100 hover:text-rose-600 flex items-center justify-center transition"
+                    className="w-8 h-8 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-rose-100 hover:text-rose-600 flex items-center justify-center transition"
                   >
-                    <Trash2 className="size-2.5" />
+                    <Trash2 className="size-3.5" />
                   </button>
                 </div>
               </div>
