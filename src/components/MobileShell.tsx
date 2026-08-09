@@ -1,9 +1,9 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Home, ShoppingBag, User, Menu, Search, Heart, Tag, ShoppingCart } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { Home, ShoppingBag, User, Menu, Search, Heart, Tag } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { useUserRole } from "@/lib/useAuth";
+import { useUserRole, getAccountDashboard } from "@/lib/useAuth";
 import { useCart } from "@/lib/cartStore";
 import { CartDrawer } from "@/components/CartDrawer";
 
@@ -38,6 +38,8 @@ function BottomTabBar({ onCartClick }: { onCartClick: () => void }) {
   const cart = useCart();
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
 
+  const homeTo = role?.role ? getAccountDashboard(role.role) : "/";
+
   const tabs = isDentist
     ? [
         { to: "/", icon: Home, label: t("tab_home"), match: (p: string) => p === "/" },
@@ -47,12 +49,12 @@ function BottomTabBar({ onCartClick }: { onCartClick: () => void }) {
         { to: "/more", icon: Menu, label: t("tab_more"), match: (p: string) => p.startsWith("/more") },
       ]
     : ([
-        { to: "/", icon: Home, label: t("tab_home"), match: (p: string) => p === "/" },
+        { to: homeTo, icon: Home, label: t("tab_home"), match: (p: string) => p === homeTo },
         { to: "/explore", icon: Search, label: lang === "ar" ? "بحث" : "Search", match: (p: string) => p.startsWith("/explore") },
         { to: "/orders", icon: ShoppingBag, label: t("tab_orders"), match: (p: string) => p.startsWith("/orders") },
         { to: "/account", icon: User, label: t("tab_account"), match: (p: string) => p.startsWith("/account") },
         { to: "/more", icon: Menu, label: t("tab_more"), match: (p: string) => p.startsWith("/more") },
-      ] as const);
+      ]);
 
   return (
     <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50 bg-card/95 backdrop-blur border-t border-border shadow-lg">
