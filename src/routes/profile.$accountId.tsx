@@ -368,7 +368,7 @@ function ProfilePage() {
 
                 {/* Products grid */}
                 {filteredProducts.length > 0 ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                  <div className="grid grid-cols-2 gap-4">
                     {filteredProducts.map((p) => {
                       const imgSrc = p.images.length > 0 ? filterUrls[p.images[0]] : null;
                       return (

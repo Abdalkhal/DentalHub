@@ -305,37 +305,25 @@ function OfficePage() {
                 </p>
               </div>
             ) : (
-              <ul className="space-y-2">
+              <div className="grid grid-cols-2 gap-4">
                 {filteredProducts.map((p) => {
                   const pImg = matchUrls[p.images[0]] ?? resolveProductImage(undefined);
                   return (
-                    <li key={p.id}>
-                      <div className="flex items-center gap-3 bg-card border border-border rounded-xl p-2.5 shadow-soft">
-                        <div className="size-9 rounded-lg bg-surface flex items-center justify-center text-lg shrink-0 overflow-hidden">
-                          {pImg ? (
-                            <img
-                              src={pImg}
-                              alt=""
-                              className="size-full object-cover"
-                              loading="lazy"
-                            />
-                          ) : (
-                            "📦"
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-display font-bold text-xs truncate">
-                            {lang === "ar" ? p.ar : p.en}
-                          </p>
-                          <p className="text-[10px] text-muted-foreground">
-                            {p.brand} · ${p.price}
-                          </p>
-                        </div>
+                    <div key={p.id} className="bg-card border border-border rounded-2xl p-3 shadow-soft flex flex-col">
+                      <div className="w-full h-36 rounded-xl bg-surface flex items-center justify-center overflow-hidden mb-2.5">
+                        {pImg ? (
+                          <img src={pImg} alt="" className="size-full object-contain" loading="lazy" />
+                        ) : (
+                          <span className="text-2xl">📦</span>
+                        )}
                       </div>
-                    </li>
+                      <p className="font-display font-bold text-sm leading-snug line-clamp-2">{lang === "ar" ? p.ar : p.en}</p>
+                      <p className="text-[11px] text-muted-foreground mt-1">{p.brand}</p>
+                      <p className="mt-1.5 font-display font-extrabold text-primary">${p.price}</p>
+                    </div>
                   );
                 })}
-              </ul>
+              </div>
             )}
           </div>
         )}
