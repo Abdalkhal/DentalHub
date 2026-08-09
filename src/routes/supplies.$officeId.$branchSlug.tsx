@@ -151,63 +151,36 @@ function BranchPage() {
             </p>
           </div>
         ) : (
-          <ul className="space-y-2.5">
+          <div className="grid grid-cols-2 gap-4">
             {items.map((p) => {
               const urls = p.images.map((path) => urlMap[path]).filter(Boolean);
               const first = urls[0];
               return (
-                <li key={p.id} className="bg-card border border-border rounded-2xl p-3 shadow-soft">
-                  <div className="flex items-center gap-3">
-                    <div className="size-14 rounded-xl bg-surface flex items-center justify-center shrink-0 overflow-hidden">
-                      {first ? (
-                        <img
-                          src={first}
-                          alt={lang === "ar" ? p.ar : p.en}
-                          loading="lazy"
-                          className="size-full object-cover"
-                        />
-                      ) : (
-                        <ImageOff className="size-5 text-muted-foreground" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-display font-bold text-sm truncate">
-                        {lang === "ar" ? p.ar : p.en}
-                      </p>
-                      <p className="text-[11px] text-muted-foreground">{p.brand}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="font-display font-extrabold text-primary text-sm">
-                          ${p.price}
-                        </span>
-                        <span
-                          className={`text-[10px] px-1.5 py-0.5 rounded-md font-semibold ${p.inStock ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive"}`}
-                        >
-                          {p.inStock ? t("in_stock") : t("out_of_stock")}
-                        </span>
-                      </div>
-                    </div>
-                    <AddToCartButton
-                      productId={p.id}
-                      productName={lang === "ar" ? p.ar : p.en}
-                      productImage={p.images?.[0] ? urlMap[p.images[0]] : undefined}
-                      officeId={officeId}
-                      officeName={lang === "ar" ? office?.ar ?? "" : office?.en ?? ""}
-                      brand={p.brand}
-                      category={p.branch}
-                      unitPrice={p.price}
-                      currency={p.currency ?? "USD"}
-                      inStock={p.inStock ?? false}
-                    />
+                <div key={p.id} className="bg-card border border-border rounded-xl p-3 shadow-soft flex flex-col">
+                  <div className="w-full h-36 rounded-lg bg-surface flex items-center justify-center overflow-hidden mb-2.5">
+                    {first ? (
+                      <img src={first} alt={lang === "ar" ? p.ar : p.en} loading="lazy" className="size-full object-contain" />
+                    ) : (
+                      <ImageOff className="size-8 text-muted-foreground" />
+                    )}
                   </div>
-                  {urls.length > 1 && (
-                    <div className="mt-2.5">
-                      <ProductGallery urls={urls} alt={lang === "ar" ? p.ar : p.en} size="sm" />
-                    </div>
-                  )}
-                </li>
+                  <p className="font-display font-bold text-sm leading-snug line-clamp-2">{lang === "ar" ? p.ar : p.en}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">{p.brand}</p>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="font-display font-extrabold text-primary text-sm">${p.price}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-semibold ${p.inStock ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive"}`}>{p.inStock ? t("in_stock") : t("out_of_stock")}</span>
+                  </div>
+                  <AddToCartButton
+                    productId={p.id} productName={lang === "ar" ? p.ar : p.en}
+                    productImage={p.images?.[0] ? urlMap[p.images[0]] : undefined}
+                    officeId={officeId} officeName={lang === "ar" ? office?.ar ?? "" : office?.en ?? ""}
+                    brand={p.brand} category={p.branch} unitPrice={p.price}
+                    currency={p.currency ?? "USD"} inStock={p.inStock ?? false} lang={lang}
+                  />
+                </div>
               );
             })}
-          </ul>
+          </div>
         )}
       </div>
     </MobileShell>
@@ -216,11 +189,12 @@ function BranchPage() {
 
 function AddToCartButton({
   productId, productName, productImage, officeId,
-  officeName, brand, category, unitPrice, currency, inStock,
+  officeName, brand, category, unitPrice, currency, inStock, lang,
 }: {
   productId: string; productName: string; productImage?: string;
   officeId: string; officeName: string; brand?: string; category?: string;
   unitPrice: number; currency: "USD" | "IQD"; inStock: boolean;
+  lang: "ar" | "en";
 }) {
   const [added, setAdded] = useState(false);
 
@@ -238,15 +212,16 @@ function AddToCartButton({
       disabled={!inStock}
       onClick={handleAdd}
       className={cn(
-        "size-9 rounded-xl flex items-center justify-center transition-all",
+        "w-full mt-2 h-9 rounded-lg flex items-center justify-center gap-1.5 transition-all text-xs font-bold",
         added
           ? "bg-emerald-500 text-white"
-          : "bg-primary text-primary-foreground",
+          : "bg-primary/10 text-primary hover:bg-primary/20",
         !inStock && "opacity-40",
       )}
       aria-label="Add to cart"
     >
-      {added ? <Check className="size-4" /> : <Plus className="size-4" />}
+      {added ? <Check className="size-3.5" /> : <Plus className="size-3.5" />}
+      {added ? (lang === "ar" ? "تمت الإضافة" : "Added") : (lang === "ar" ? "أضف للسلة" : "Add to cart")}
     </button>
   );
 }
