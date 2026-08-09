@@ -134,6 +134,8 @@ function ProfilePage() {
       if (!snap.exists()) return null;
       return snap.data() as UserRoleDoc;
     },
+    retry: false,
+    staleTime: 60_000,
   });
 
   const { data: offers = [] } = useOffers(accountId);

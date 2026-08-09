@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { collection, query, where, orderBy, onSnapshot, updateDoc, doc, writeBatch } from "firebase/firestore";
+import {
+  collection, query, where, orderBy, onSnapshot,
+  updateDoc, doc, writeBatch, setDoc,
+} from "firebase/firestore";
 import { db } from "@/integrations/firebase/client";
 import { Bell, CheckCheck, Package, Truck, CheckCircle2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -16,13 +19,10 @@ type Notification = {
 };
 
 export function createNotification(data: Omit<Notification, "id" | "isRead" | "createdAt">) {
-  const { db } = require("@/integrations/firebase/client");
   const id = `${data.userId}_${Date.now()}`;
-  return import("firebase/firestore").then(({ setDoc, doc, Timestamp }) =>
-    setDoc(doc(db, "notifications", id), {
-      ...data, id, isRead: false, createdAt: Date.now(),
-    })
-  );
+  return setDoc(doc(db, "notifications", id), {
+    ...data, id, isRead: false, createdAt: Date.now(),
+  });
 }
 
 const TYPE_ICONS: Record<string, typeof Package> = {

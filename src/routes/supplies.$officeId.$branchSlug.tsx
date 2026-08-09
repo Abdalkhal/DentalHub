@@ -6,7 +6,9 @@ import { useI18n } from "@/lib/i18n";
 import { useAdminStore } from "@/lib/adminStore";
 import { useProducts, useSignedImageUrls } from "@/lib/products";
 import { ProductGallery } from "@/components/ProductGallery";
-import { Plus, SearchX, ArrowUpDown, ImageOff } from "lucide-react";
+import { Plus, SearchX, ArrowUpDown, ImageOff, Check } from "lucide-react";
+import { addToCart } from "@/lib/cartStore";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/supplies/$officeId/$branchSlug")({
   component: BranchPage,
@@ -184,13 +186,18 @@ function BranchPage() {
                         </span>
                       </div>
                     </div>
-                    <button
-                      disabled={!p.inStock}
-                      className="size-9 rounded-xl bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40"
-                      aria-label={t("add_to_order")}
-                    >
-                      <Plus className="size-4" />
-                    </button>
+                    <AddToCartButton
+                      productId={p.id}
+                      productName={lang === "ar" ? p.ar : p.en}
+                      productImage={p.images?.[0] ? urlMap[p.images[0]] : undefined}
+                      officeId={officeId}
+                      officeName={lang === "ar" ? office?.ar ?? "" : office?.en ?? ""}
+                      brand={p.brand}
+                      category={p.branch}
+                      unitPrice={p.price}
+                      currency={p.currency ?? "USD"}
+                      inStock={p.inStock ?? false}
+                    />
                   </div>
                   {urls.length > 1 && (
                     <div className="mt-2.5">
@@ -204,5 +211,42 @@ function BranchPage() {
         )}
       </div>
     </MobileShell>
+  );
+}
+
+function AddToCartButton({
+  productId, productName, productImage, officeId,
+  officeName, brand, category, unitPrice, currency, inStock,
+}: {
+  productId: string; productName: string; productImage?: string;
+  officeId: string; officeName: string; brand?: string; category?: string;
+  unitPrice: number; currency: "USD" | "IQD"; inStock: boolean;
+}) {
+  const [added, setAdded] = useState(false);
+
+  const handleAdd = () => {
+    addToCart({
+      productId, productName, productImage, officeId,
+      officeName, brand, category, unitPrice, currency, quantity: 1,
+    });
+    setAdded(true);
+    setTimeout(() => setAdded(false), 1500);
+  };
+
+  return (
+    <button
+      disabled={!inStock}
+      onClick={handleAdd}
+      className={cn(
+        "size-9 rounded-xl flex items-center justify-center transition-all",
+        added
+          ? "bg-emerald-500 text-white"
+          : "bg-primary text-primary-foreground",
+        !inStock && "opacity-40",
+      )}
+      aria-label="Add to cart"
+    >
+      {added ? <Check className="size-4" /> : <Plus className="size-4" />}
+    </button>
   );
 }

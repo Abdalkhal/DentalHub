@@ -1,9 +1,11 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Home, ShoppingBag, User, Menu, Search, Heart, Tag } from "lucide-react";
-import { type ReactNode } from "react";
+import { Home, ShoppingBag, User, Menu, Search, Heart, Tag, ShoppingCart } from "lucide-react";
+import { type ReactNode, useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { useUserRole } from "@/lib/useAuth";
+import { useCart } from "@/lib/cartStore";
+import { CartDrawer } from "@/components/CartDrawer";
 
 export function MobileShell({
   children,
@@ -16,21 +18,25 @@ export function MobileShell({
 }) {
   const { role } = useUserRole();
   const isLab = role?.accountType === "lab";
+  const [cartOpen, setCartOpen] = useState(false);
   return (
     <div className="min-h-screen w-full bg-slate-50 overflow-x-hidden flex justify-center">
       <div className={cn("relative w-full min-h-screen bg-white flex flex-col", isLab ? "max-w-none" : "max-w-md", className)}>
         <div className={cn("flex-1", hideBottomNav ? "pb-0" : "pb-24")}>{children}</div>
-        {!hideBottomNav && <BottomTabBar />}
+        {!hideBottomNav && <BottomTabBar onCartClick={() => setCartOpen(true)} />}
+        <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} />
       </div>
     </div>
   );
 }
 
-function BottomTabBar() {
+function BottomTabBar({ onCartClick }: { onCartClick: () => void }) {
   const { t, lang } = useI18n();
   const { role } = useUserRole();
   const isDentist = role?.accountType === "dentist";
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const cart = useCart();
+  const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
 
   const tabs = isDentist
     ? [
@@ -78,6 +84,18 @@ function BottomTabBar() {
           );
         })}
       </ul>
+
+      {cartCount > 0 && (
+        <button
+          onClick={onCartClick}
+          className="absolute -top-5 right-4 size-12 rounded-2xl bg-rose-500 text-white shadow-lg flex items-center justify-center hover:bg-rose-600 transition active:scale-95"
+        >
+          <ShoppingCart className="size-5" />
+          <span className="absolute -top-1 -right-1 size-5 rounded-full bg-white text-rose-600 text-[10px] font-extrabold flex items-center justify-center ring-2 ring-rose-500">
+            {cartCount > 9 ? "9+" : cartCount}
+          </span>
+        </button>
+      )}
     </nav>
   );
 }

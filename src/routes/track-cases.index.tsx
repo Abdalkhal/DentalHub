@@ -1,12 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { useOrders, type OrderStatus } from "@/lib/ordersStore";
+import { useDentistCases, getCaseProgress, getStageLabel } from "@/lib/caseTracking";
+import { useSession } from "@/lib/useAuth";
 import {
-  Clock, User, Wrench, CalendarDays, Truck, Hash, Building2, ClipboardList,
+  User, Wrench, CalendarDays, Truck, Hash, Building2, ClipboardList,
+  RefreshCw,
 } from "lucide-react";
 
 export const Route = createFileRoute("/track-cases/")({
@@ -66,7 +69,17 @@ const STATUS_LABELS: Record<OrderStatus, { ar: string; en: string }> = {
 function TrackCases() {
   const { lang } = useI18n();
   const ar = lang === "ar";
-  const orders = useOrders();
+  const { user } = useSession();
+  const localOrders = useOrders();
+  const { cases: remoteCases, loading } = useDentistCases(user?.uid ?? "");
+
+  const allOrders = useMemo(() => {
+    const remote = remoteCases.map((c) => c.order);
+    const localIds = new Set(remote.map((r) => r.id));
+    const localOnly = localOrders.filter((o) => !localIds.has(o.id));
+    return [...remote, ...localOnly];
+  }, [remoteCases, localOrders]);
+
   const [filter, setFilter] = useState<string>("all");
 
   const statuses = [
@@ -78,16 +91,26 @@ function TrackCases() {
 
   const counts: Record<string, number> = {};
   statuses.forEach((s) => {
-    counts[s.id] = s.id === "all" ? orders.length : orders.filter((o) => o.status === s.id).length;
+    counts[s.id] = s.id === "all" ? allOrders.length : allOrders.filter((o) => o.status === s.id).length;
   });
 
-  const filtered = filter === "all" ? orders : orders.filter((o) => o.status === filter);
+  const filtered = filter === "all" ? allOrders : allOrders.filter((o) => o.status === filter);
 
   return (
     <MobileShell>
       <TopBar title={ar ? "تتبع حالاتك" : "Track your cases"} showBack />
       <div className="px-3 pt-4 pb-6">
         {/* Status count cards */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            {loading && (
+              <span className="text-[10px] font-semibold text-slate-400 inline-flex items-center gap-1">
+                <RefreshCw className="size-3 animate-spin" />
+                {ar ? "تحديث..." : "Syncing..."}
+              </span>
+            )}
+          </div>
+        </div>
         <div className="grid grid-cols-4 gap-2 mb-5">
           {statuses.map((s) => {
             const st = STATUS[s.id as keyof typeof STATUS];
@@ -165,6 +188,19 @@ function TrackCases() {
                       <span className="inline-flex items-center gap-1"><Truck className="size-3 text-slate-400" />{o.agent || "—"}</span>
                       <span className="inline-flex items-center gap-1"><Hash className="size-3 text-slate-400" />{o.unitsCount} {ar ? "وحدة" : "units"}</span>
                     </div>
+                    {o.currentStage && (
+                      <div className="pt-1">
+                        <div className="w-full h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-sky-400 to-emerald-400 transition-all duration-700"
+                            style={{ width: `${getCaseProgress(o.currentStage)}%` }}
+                          />
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-0.5 text-center">
+                          {getStageLabel(o.currentStage, lang)}
+                        </p>
+                      </div>
+                    )}
                     {o.clinic && (
                       <span className="inline-flex items-center gap-1 text-[11px] text-slate-500">
                         <Building2 className="size-3 text-slate-400" />{ar ? "عيادة" : "Clinic"}: {o.clinic}

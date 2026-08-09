@@ -13,6 +13,7 @@ import dentalSupplies from "@/assets/dental-supplies-icon.png";
 import dentalBridge from "@/assets/dental-bridge.png";
 import { BRANDS } from "@/data/brands";
 import { BrandLogo } from "@/components/BrandLogo";
+import { useProductSearch, type SearchResult } from "@/lib/search";
 import {
   Bell, Globe, Search, ChevronLeft, ChevronRight,
   ClipboardList, Plus, Sparkles, Stethoscope, User,
@@ -72,6 +73,9 @@ function Home() {
   const prev = () => setIdx((i) => (i - 1 + banners.length) % banners.length);
 
   const [caseCount, setCaseCount] = useState(0);
+  const [searchQ, setSearchQ] = useState("");
+  const { results: searchResults, loading: searchLoading } = useProductSearch(searchQ);
+
   useEffect(() => {
     const upd = () => setCaseCount(getSnapshot().filter((o) => o.status !== "completed").length);
     upd();
@@ -117,8 +121,48 @@ function Home() {
 
         {/* Search */}
         <div className="mt-3 relative">
-          <input type="search" placeholder={lang === "ar" ? "ابحث عن زراعة، مادة، مختبر..." : "Search implants, materials, labs..."} className="w-full h-12 rounded-2xl bg-white border border-slate-200 ps-4 pe-11 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-sm" />
+          <input
+            type="search"
+            value={searchQ}
+            onChange={(e) => setSearchQ(e.target.value)}
+            placeholder={lang === "ar" ? "ابحث عن زراعة، مادة، مختبر..." : "Search implants, materials, labs..."}
+            className="w-full h-12 rounded-2xl bg-white border border-slate-200 ps-4 pe-11 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-sm"
+          />
           <Search className="size-4 absolute top-1/2 -translate-y-1/2 end-4 text-slate-400 pointer-events-none" />
+
+          {searchQ.length >= 2 && (
+            <div className="absolute top-full start-0 end-0 mt-1 bg-white rounded-2xl border border-slate-200 shadow-xl z-40 max-h-72 overflow-y-auto">
+              {searchLoading ? (
+                <div className="p-4 text-center text-xs text-slate-400">{lang === "ar" ? "جارٍ البحث..." : "Searching..."}</div>
+              ) : searchResults.length === 0 ? (
+                <div className="p-4 text-center text-xs text-slate-400">
+                  {lang === "ar" ? "لا توجد نتائج" : "No results found"}
+                </div>
+              ) : (
+                searchResults.map((r) => (
+                  <Link
+                    key={`${r.type}-${r.id}`}
+                    to={r.route}
+                    onClick={() => setSearchQ("")}
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-sky-50/50 transition border-b border-slate-50 last:border-0"
+                  >
+                    <span className="size-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 text-xs font-bold text-slate-500">
+                      {r.type === "product" ? "P" : r.type === "lab" ? "L" : r.type === "office" ? "O" : "!"}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-slate-800 truncate">{lang === "ar" ? r.titleAr : r.titleEn}</p>
+                      {r.subtitle && <p className="text-[11px] text-slate-400">{r.subtitle}</p>}
+                    </div>
+                    <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 shrink-0">
+                      {r.type === "product" ? (lang === "ar" ? "منتج" : "Product") :
+                       r.type === "lab" ? (lang === "ar" ? "مختبر" : "Lab") :
+                       r.type === "office" ? (lang === "ar" ? "مكتب" : "Office") : r.type}
+                    </span>
+                  </Link>
+                ))
+              )}
+            </div>
+          )}
         </div>
       </header>
 

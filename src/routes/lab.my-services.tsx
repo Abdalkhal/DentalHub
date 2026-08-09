@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db, auth } from "@/integrations/firebase/client";
 import { MobileShell } from "@/components/MobileShell";
+import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -43,6 +44,20 @@ function LabMyServices() {
   const BackIcon = dir === "rtl" ? ChevronLeft : ChevronRight;
 
   const labId = auth.currentUser?.uid;
+
+  if (!labId) {
+    return (
+      <MobileShell>
+        <TopBar title={ar ? "خدمات المختبر" : "Lab Services"} showBack />
+        <div className="p-6 text-center space-y-3">
+          <Stethoscope className="size-10 text-slate-300 mx-auto" />
+          <p className="font-bold text-slate-600">
+            {ar ? "يجب تسجيل الدخول كمختبر" : "Please sign in as a lab"}
+          </p>
+        </div>
+      </MobileShell>
+    );
+  }
 
   const { data: services = [], isLoading } = useQuery({
     queryKey: ["lab-services", labId],

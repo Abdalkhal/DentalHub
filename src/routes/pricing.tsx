@@ -24,7 +24,7 @@ type Cycle = "monthly" | "yearly";
 function Pricing() {
   const { lang } = useI18n();
   const ar = lang === "ar";
-  const [cycle, setCycle] = (require("react") as typeof import("react")).useState<Cycle>("yearly");
+  const [cycle, setCycle] = useState<Cycle>("yearly");
 
   const t = {
     title: ar ? "خطط الاشتراك" : "Subscription Plans",

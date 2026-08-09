@@ -51,6 +51,31 @@ function SettingsPage() {
   const ar = lang === "ar";
   const { role, loading } = useUserRole();
 
+  if (loading) {
+    return (
+      <MobileShell>
+        <TopBar title={ar ? "الإعدادات" : "Settings"} showBack />
+        <div className="flex justify-center py-20">
+          <Loader2 className="size-8 animate-spin text-primary" />
+        </div>
+      </MobileShell>
+    );
+  }
+
+  if (!role) {
+    return (
+      <MobileShell>
+        <TopBar title={ar ? "الإعدادات" : "Settings"} showBack />
+        <div className="p-6 text-center space-y-3">
+          <ShieldAlert className="size-10 text-destructive mx-auto" />
+          <p className="font-bold text-slate-600">
+            {ar ? "يجب تسجيل الدخول أولاً" : "Please sign in first"}
+          </p>
+        </div>
+      </MobileShell>
+    );
+  }
+
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [phoneError, setPhoneError] = useState("");

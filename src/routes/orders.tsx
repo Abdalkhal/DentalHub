@@ -10,7 +10,7 @@ import { TopBar } from "@/components/TopBar";
 import { EditOrderModal } from "@/components/EditOrderModal";
 import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
 import { useI18n } from "@/lib/i18n";
-import { useUserRole } from "@/lib/useAuth";
+import { useUserRole, useSession } from "@/lib/useAuth";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -21,6 +21,7 @@ import {
   type Order,
   type OrderStatus,
 } from "@/lib/ordersStore";
+import { useCart, addToCart } from "@/lib/cartStore";
 import {
   Search,
   Eye,
@@ -33,10 +34,10 @@ import {
   Package,
   Building2,
   Clock,
-  CheckCircle2,
-  XCircle,
   Loader2,
+  Plus,
 } from "lucide-react";
+import { OrderStatusTracker, type SupplyOrderStatus } from "@/components/OrderStatusTracker";
 
 const ordersSearchSchema = z.object({
   status: z.enum(["all", "in_progress", "completed", "delayed"]).catch("all"),
@@ -49,20 +50,13 @@ export const Route = createFileRoute("/orders")({
 
 type FilterStatus = "all" | "in_progress" | "completed" | "delayed";
 type WorkType = "crown" | "veneer" | "implant" | "clear_aligner";
-type SupplierOrderStatus = "pending" | "confirmed" | "delivered" | "cancelled";
+type SupplierOrderStatus = "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled";
 
 const WORK_TYPES: Record<WorkType, { ar: string; en: string; icon: typeof Crown; color: string }> = {
   crown: { ar: "تاج", en: "Crown", icon: Crown, color: "text-amber-500 bg-amber-50" },
   veneer: { ar: "قشرة", en: "Veneer", icon: Sparkles, color: "text-sky-500 bg-sky-50" },
   implant: { ar: "زرعة", en: "Implant", icon: Syringe, color: "text-emerald-500 bg-emerald-50" },
   clear_aligner: { ar: "مصفف شفاف", en: "Clear Aligner", icon: Layers, color: "text-violet-500 bg-violet-50" },
-};
-
-const SUPPLIER_STATUS: Record<SupplierOrderStatus, { ar: string; en: string; color: string }> = {
-  pending: { ar: "قيد الانتظار", en: "Pending", color: "bg-amber-100 text-amber-700" },
-  confirmed: { ar: "قيد التجهيز", en: "Confirmed", color: "bg-sky-100 text-sky-700" },
-  delivered: { ar: "مكتمل", en: "Delivered", color: "bg-emerald-100 text-emerald-700" },
-  cancelled: { ar: "ملغي", en: "Cancelled", color: "bg-rose-100 text-rose-700" },
 };
 
 function formatShortDate(iso: string): string {
@@ -295,20 +289,143 @@ function LabOrders() {
 function DentistOrders() {
   const { lang } = useI18n();
   const ar = lang === "ar";
+  const { user } = useSession();
+  const cart = useCart();
+
+  const { data: myOrders = [], isLoading } = useQuery({
+    queryKey: ["dentist-orders", user?.uid],
+    queryFn: async (): Promise<OrderDoc[]> => {
+      if (!user?.uid) return [];
+      const q = query(
+        collection(db, "orders"),
+        where("dentistId", "==", user.uid),
+        orderBy("createdAt", "desc"),
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map((d) => ({ id: d.id, ...d.data() } as OrderDoc));
+    },
+    enabled: !!user?.uid,
+    staleTime: 30_000,
+  });
+
+  if (!user) {
+    return (
+      <MobileShell>
+        <TopBar title={ar ? "طلباتي" : "My Orders"} showBack />
+        <div className="p-6 text-center space-y-3">
+          <Package className="size-10 text-slate-300 mx-auto" />
+          <p className="font-bold text-slate-600">
+            {ar ? "يجب تسجيل الدخول أولاً" : "Please sign in first"}
+          </p>
+        </div>
+      </MobileShell>
+    );
+  }
 
   return (
     <MobileShell>
       <TopBar title={ar ? "طلباتي" : "My Orders"} showBack />
-      <div className="px-4 pt-4 pb-6 flex flex-col items-center justify-center min-h-[60vh] text-center">
-        <div className="size-20 rounded-full bg-slate-100 flex items-center justify-center mb-4">
-          <Package className="size-9 text-slate-400" />
-        </div>
-        <p className="font-display font-bold text-lg text-slate-500">{ar ? "لا توجد طلبات حالياً" : "No orders yet"}</p>
-        <p className="text-sm text-slate-400 mt-1">{ar ? "لم تقم بإجراء أي طلبات شراء بعد" : "You haven't made any purchase orders yet"}</p>
-        <Link to="/supplies" className="mt-4 inline-flex h-11 px-5 rounded-xl bg-primary text-primary-foreground font-bold text-sm items-center gap-2 hover:opacity-90 transition">
-          <Package className="size-4" />
-          {ar ? "تصفح المنتجات" : "Browse Products"}
-        </Link>
+      <div className="px-4 pt-4 pb-6 space-y-4">
+
+        {cart.length > 0 && (
+          <div className="bg-sky-50 border border-sky-200 rounded-2xl p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-bold text-sm text-sky-800">{ar ? "سلة التسوق" : "Shopping Cart"}</p>
+                <p className="text-xs text-sky-600 mt-0.5">
+                  {cart.length} {ar ? "منتجات" : "products"} · ${cart.reduce((s, i) => s + i.unitPrice * i.quantity, 0).toFixed(2)}
+                </p>
+              </div>
+              <Link
+                to="/supplies"
+                className="h-9 px-4 rounded-xl bg-sky-500 text-white font-bold text-xs flex items-center"
+              >
+                {ar ? "مراجعة الطلب" : "Review order"}
+              </Link>
+            </div>
+          </div>
+        )}
+
+        <h3 className="font-bold text-sm text-slate-600">
+          {ar ? "سجل الطلبات السابقة" : "Past orders"}
+        </h3>
+
+        {isLoading ? (
+          <div className="flex justify-center py-16">
+            <Loader2 className="size-6 text-primary animate-spin" />
+          </div>
+        ) : myOrders.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="size-20 rounded-full bg-slate-100 flex items-center justify-center mb-4">
+              <Package className="size-9 text-slate-400" />
+            </div>
+            <p className="font-bold text-lg text-slate-500">{ar ? "لا توجد طلبات سابقة" : "No past orders"}</p>
+            <p className="text-sm text-slate-400 mt-1">{ar ? "ستظهر هنا طلبات الشراء التي قمت بها" : "Your purchase orders will appear here"}</p>
+            <Link to="/supplies" className="mt-4 inline-flex h-11 px-5 rounded-xl bg-primary text-primary-foreground font-bold text-sm items-center gap-2 hover:opacity-90 transition">
+              <Package className="size-4" />
+              {ar ? "تصفح المنتجات" : "Browse Products"}
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {myOrders.map((o) => {
+              const s = (o.status as string) || "pending";
+              return (
+                <div key={o.id} className="bg-card border border-border rounded-2xl p-4 shadow-soft">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2.5">
+                      <span className="size-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                        <Package className="size-4" />
+                      </span>
+                      <div>
+                        <p className="font-bold text-sm">{o.productName || (ar ? "منتج" : "Product")}</p>
+                        <p className="text-[10px] text-slate-400">
+                          #{o.id.slice(0, 8).toUpperCase()} · {o.createdAt ? formatShortDate(o.createdAt as unknown as string) : ""}
+                        </p>
+                      </div>
+                    </div>
+                    <span className={cn(
+                      "text-[10px] font-bold px-2 py-0.5 rounded-full",
+                      s === "delivered" ? "bg-emerald-100 text-emerald-700" :
+                      s === "cancelled" ? "bg-rose-100 text-rose-700" :
+                      "bg-amber-100 text-amber-700",
+                    )}>
+                      {s === "pending" ? (ar ? "قيد الانتظار" : "Pending") :
+                       s === "confirmed" ? (ar ? "مؤكد" : "Confirmed") :
+                       s === "delivered" ? (ar ? "تم التسليم" : "Delivered") :
+                       s === "cancelled" ? (ar ? "ملغي" : "Cancelled") : s}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-slate-500">
+                    <span>×{o.quantity || 1} · {fmtPrice(o.total || 0)}</span>
+                    {s === "delivered" && (
+                      <button
+                        onClick={() => {
+                          addToCart({
+                            id: `reorder_${Date.now().toString(36)}`,
+                            productId: o.productId ?? o.id,
+                            productName: o.productName || (ar ? "منتج" : "Product"),
+                            productImage: o.productImage,
+                            officeId: o.supplierId,
+                            officeName: "",
+                            unitPrice: o.unitPrice || 0,
+                            currency: (o.currency as "USD" | "IQD") || "USD",
+                            quantity: o.quantity || 1,
+                          });
+                        }}
+                        className="h-8 px-3 rounded-lg bg-primary/10 text-primary text-[11px] font-bold hover:bg-primary/20 transition flex items-center gap-1"
+                      >
+                        <Plus className="size-3" />
+                        {ar ? "إعادة الطلب" : "Reorder"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </MobileShell>
   );
@@ -341,17 +458,25 @@ function SupplierOrders() {
     staleTime: 30_000,
   });
 
+  const handleSupplierStatusChange = async (orderId: string, status: string) => {
+    const { doc, updateDoc } = await import("firebase/firestore");
+    await updateDoc(doc(db, "orders", orderId), { status, updatedAt: new Date().toISOString() });
+    toast.success(ar ? "تم تحديث الحالة" : "Status updated");
+  };
+
   const statusOptions: { id: "all" | SupplierOrderStatus; ar: string; en: string }[] = [
     { id: "all", ar: "الكل", en: "All" },
     { id: "pending", ar: "قيد الانتظار", en: "Pending" },
-    { id: "confirmed", ar: "قيد التجهيز", en: "Confirmed" },
-    { id: "delivered", ar: "مكتمل", en: "Delivered" },
+    { id: "confirmed", ar: "مؤكد", en: "Confirmed" },
+    { id: "processing", ar: "قيد التجهيز", en: "Processing" },
+    { id: "shipped", ar: "تم الشحن", en: "Shipped" },
+    { id: "delivered", ar: "تم التسليم", en: "Delivered" },
     { id: "cancelled", ar: "ملغي", en: "Cancelled" },
   ];
 
   const filteredOrders = useMemo(() => {
     return supplierOrders.filter((o) => {
-      const s = o.status as SupplierOrderStatus;
+      const s = (o.status as string) || "pending";
       if (statusFilter !== "all" && s !== statusFilter) return false;
       if (search.trim()) {
         const q = search.toLowerCase();
@@ -399,7 +524,6 @@ function SupplierOrders() {
 
         <p className="text-xs text-muted-foreground">
           {filteredOrders.length} {ar ? "طلب" : "order"}
-          {filteredOrders.length !== 1 ? (ar ? "ات" : "s") : ""}
         </p>
 
         <div className="space-y-2">
@@ -416,8 +540,7 @@ function SupplierOrders() {
             </div>
           ) : (
             filteredOrders.map((o) => {
-              const s = (o.status as SupplierOrderStatus) || "pending";
-              const sm = SUPPLIER_STATUS[s] ?? SUPPLIER_STATUS.pending;
+              const s = (o.status as string) || "pending";
               return (
                 <div key={o.id} className="bg-card border border-border rounded-2xl p-4 shadow-soft">
                   <div className="flex items-center justify-between mb-3">
@@ -434,9 +557,6 @@ function SupplierOrders() {
                         </p>
                       </div>
                     </div>
-                    <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full", sm.color)}>
-                      {ar ? sm.ar : sm.en}
-                    </span>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
@@ -459,27 +579,18 @@ function SupplierOrders() {
                       <p className="font-semibold text-foreground">×{o.quantity || 1}</p>
                     </div>
                     <div>
-                      <p className="text-muted-foreground">{ar ? "سعر الوحدة" : "Unit Price"}</p>
-                      <p className="font-semibold text-foreground">{fmtPrice(o.unitPrice || 0)}</p>
+                      <p className="text-muted-foreground">{ar ? "المبلغ" : "Total"}</p>
+                      <p className="font-display font-extrabold text-sm text-emerald-600">
+                        {fmtPrice(o.total || 0)}
+                      </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between pt-2 border-t border-border">
-                    <p className="font-display font-extrabold text-sm text-emerald-600">
-                      {ar ? "الإجمالي" : "Total"}: {fmtPrice(o.total || 0)}
-                    </p>
-                    <div className="flex gap-1.5">
-                      <button className="h-8 px-3 rounded-lg bg-primary/10 text-primary text-[11px] font-bold hover:bg-primary/20 transition flex items-center gap-1">
-                        <Eye className="size-3" />
-                        {ar ? "تفاصيل" : "Details"}
-                      </button>
-                      {s === "pending" && (
-                        <button className="h-8 px-3 rounded-lg bg-emerald-50 text-emerald-700 text-[11px] font-bold hover:bg-emerald-100 transition flex items-center gap-1">
-                          <CheckCircle2 className="size-3" />
-                          {ar ? "قبول" : "Accept"}
-                        </button>
-                      )}
-                    </div>
+                  <div className="pt-2 border-t border-border">
+                    <OrderStatusTracker
+                      currentStatus={s as SupplyOrderStatus}
+                      onStatusChange={(newStatus) => handleSupplierStatusChange(o.id, newStatus)}
+                    />
                   </div>
                 </div>
               );

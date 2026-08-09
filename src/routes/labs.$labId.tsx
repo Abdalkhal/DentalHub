@@ -5,12 +5,13 @@ import { db } from "@/integrations/firebase/client";
 import type { UserRoleDoc } from "@/integrations/firebase/types";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
+import { SendCaseModal } from "@/components/SendCaseModal";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   Clock, Sparkles, Crown, Stethoscope, MapPin, Phone, Loader2,
-  ShoppingCart, ChevronLeft, ChevronRight,
+  ShoppingCart, ChevronLeft, ChevronRight, Send,
 } from "lucide-react";
 
 export const Route = createFileRoute("/labs/$labId")({
@@ -36,17 +37,29 @@ function LabPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
+  const [showSendCase, setShowSendCase] = useState(false);
 
   useEffect(() => {
+    let done = false;
+    const timeout = setTimeout(() => {
+      if (!done) { done = true; setLoading(false); }
+    }, 8000);
+
     const unsubProfile = onSnapshot(doc(db, "user_roles", labId), (snap) => {
       if (snap.exists()) setProfile(snap.data() as UserRoleDoc);
+      if (!done) { done = true; clearTimeout(timeout); }
+      setLoading(false);
+    }, () => {
+      if (!done) { done = true; clearTimeout(timeout); }
       setLoading(false);
     });
+
     const unsubServices = onSnapshot(doc(db, "lab_services", labId), (snap) => {
       if (snap.exists()) setServices((snap.data() as any).services ?? []);
       else setServices([]);
     });
-    return () => { unsubProfile(); unsubServices(); };
+
+    return () => { clearTimeout(timeout); unsubProfile(); unsubServices(); };
   }, [labId]);
 
   const labName = profile?.name || (ar ? "مختبر" : "Lab");
@@ -88,6 +101,14 @@ function LabPage() {
             </div>
           </div>
           {address && <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-3 border-t border-sky-100 pt-3"><MapPin className="size-3.5" />{address}</p>}
+
+          <button
+            onClick={() => setShowSendCase(true)}
+            className="w-full mt-4 h-10 rounded-xl bg-emerald-500 text-white font-bold text-sm flex items-center justify-center gap-2 hover:bg-emerald-600 transition"
+          >
+            <Send className="size-4" />
+            {ar ? "إرسال حالة للمختبر" : "Send case to lab"}
+          </button>
         </div>
 
         {/* Filter pills */}
@@ -131,6 +152,13 @@ function LabPage() {
           </div>
         )}
       </div>
+
+      <SendCaseModal
+        labId={labId}
+        labName={labName}
+        open={showSendCase}
+        onClose={() => setShowSendCase(false)}
+      />
     </MobileShell>
   );
 }

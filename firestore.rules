@@ -1,18 +1,82 @@
-rules_version='2'
+rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/user_roles/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    match /user_roles/{userId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    match /products/{productId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin() || 
+        (isAuthenticated() && resource != null && resource.data.companyId == request.auth.uid);
+    }
+
+    match /offers/{offerId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() &&
+        (resource == null || resource.data.supplierId == request.auth.uid);
+    }
+
+    match /orders/{orderId} {
+      allow read: if isAuthenticated() &&
+        (resource.data.supplierId == request.auth.uid || resource.data.dentistId == request.auth.uid);
+      allow create: if isAuthenticated() &&
+        request.resource.data.dentistId == request.auth.uid;
+      allow update: if isAuthenticated() &&
+        (resource.data.supplierId == request.auth.uid || resource.data.dentistId == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+    }
+
+    match /lab_services/{labId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() && request.auth.uid == labId;
+    }
+
+    match /lab_finances/{labId} {
+      allow read, create, update: if isAuthenticated() && request.auth.uid == labId;
+      allow delete: if isAuthenticated() && request.auth.uid == labId;
+    }
+
+    match /lab_orders/{labId} {
+      match /cases/{caseId} {
+        allow read: if isAuthenticated() &&
+          (request.auth.uid == labId || resource.data.dentistId == request.auth.uid);
+        allow create: if isAuthenticated();
+        allow update: if isAuthenticated() &&
+          (request.auth.uid == labId || resource.data.dentistId == request.auth.uid);
+        allow delete: if isAuthenticated() && request.auth.uid == labId;
+      }
+    }
+
+    match /admin_config/{config} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     match /{document=**} {
-      // This rule allows anyone with your database reference to view, edit,
-      // and delete all data in your database. It is useful for getting
-      // started, but it is configured to expire after 30 days because it
-      // leaves your app open to attackers. At that time, all client
-      // requests to your database will be denied.
-      //
-      // Make sure to write security rules for your app before that time, or
-      // else all client requests to your database will be denied until you
-      // update your rules.
-      allow read, write: if request.time < timestamp.date(2026, 8, 7);
+      allow read, write: if false;
     }
   }
 }
