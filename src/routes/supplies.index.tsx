@@ -1485,6 +1485,7 @@ function ImplantProductsPanel() {
   const [kitType, setKitType] = useState<"implant" | "surgical_kit">("implant");
   const [country, setCountry] = useState("KR");
   const [implantType, setImplantType] = useState<"immediate" | "non-immediate">("immediate");
+  const [subType, setSubType] = useState<"basal" | "compressive" | "">("");
   const [price, setPrice] = useState("");
   const [catalogUrl, setCatalogUrl] = useState("");
   const [certificationsStr, setCertificationsStr] = useState("");
@@ -1519,6 +1520,7 @@ function ImplantProductsPanel() {
     setKitType("implant");
     setCountry("KR");
     setImplantType("immediate");
+    setSubType("");
     setCatalogUrl("");
     setCertificationsStr("");
     setImageFiles([]);
@@ -1546,6 +1548,7 @@ function ImplantProductsPanel() {
     setKitType(p.implantSpec?.kitType ?? "implant");
     setCountry(p.country || p.implantSpec?.country || "KR");
     setImplantType(p.implantSpec?.implantType ?? "immediate");
+    setSubType(p.implantSpec?.subType ?? "");
     setCatalogUrl(p.implantSpec?.catalogUrl ?? "");
     setCertificationsStr((p.implantSpec?.certifications ?? []).join(", "));
     setImageFiles([]);
@@ -1628,6 +1631,7 @@ function ImplantProductsPanel() {
           recommendedTorque: recommendedTorque.trim() || undefined,
           kitType,
           implantType,
+          subType: (subType || undefined) as "basal" | "compressive" | undefined,
           country,
           catalogUrl: catalogUrl.trim() || undefined,
           certifications: certificationsStr
@@ -1866,6 +1870,36 @@ function ImplantProductsPanel() {
               ))}
             </div>
           </div>
+
+          {implantType === "immediate" && (
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+                {ar ? "النوع الفرعي" : "Sub-type"}
+              </label>
+              <div className="flex gap-2">
+                {(
+                  [
+                    { value: "basal" as const, ar: "Basal", en: "Basal" },
+                    { value: "compressive" as const, ar: "Compressive", en: "Compressive" },
+                  ] as const
+                ).map((t) => (
+                  <button
+                    key={t.value}
+                    type="button"
+                    onClick={() => setSubType(t.value)}
+                    className={cn(
+                      "flex-1 h-11 rounded-xl text-sm font-semibold border-2 transition-all duration-300",
+                      subType === t.value
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-transparent bg-slate-50 text-slate-500 hover:bg-slate-100",
+                    )}
+                  >
+                    {ar ? t.ar : t.en}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>

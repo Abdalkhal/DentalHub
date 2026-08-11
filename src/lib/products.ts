@@ -31,6 +31,7 @@ export type ImplantSpec = {
   certifications?: string[];
   country?: string;
   implantType?: "immediate" | "non-immediate";
+  subType?: "basal" | "compressive";
 };
 
 export type ProductAccessory = {
@@ -92,6 +93,7 @@ const fromDoc = (id: string, data: Record<string, unknown>): Product => {
           certifications: (rawSpec.certifications as string[]) ?? undefined,
           country: (rawSpec.country as string) ?? undefined,
           implantType: (rawSpec.implantType as ImplantSpec["implantType"]) ?? undefined,
+          subType: (rawSpec.subType as ImplantSpec["subType"]) ?? undefined,
         }
       : undefined,
     companyId: (data.companyId as string) ?? undefined,

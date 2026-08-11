@@ -40,6 +40,7 @@ export const productSchema = z.object({
     certifications: z.array(z.string()).optional(),
     country: z.string().optional(),
     implantType: z.string().optional(),
+    subType: z.string().optional(),
   }).optional(),
   accessories: z.array(
     z.object({

@@ -37,6 +37,7 @@ function CountryPage() {
   const { t, lang } = useI18n();
   const ar = lang === "ar";
   const [filter, setFilter] = useState<ImplantFilter>("all");
+  const [subFilter, setSubFilter] = useState<string>("all");
   const isVisitor = useRouterState({
     select: (s) =>
       s.location.state != null &&
@@ -46,9 +47,13 @@ function CountryPage() {
   const { data: products = [], isLoading } = useProductsByCountry(country.slug);
 
   const filtered = useMemo(() => {
-    if (filter === "all") return products;
-    return products.filter((p) => p.implantSpec?.implantType === filter);
-  }, [products, filter]);
+    let list = products;
+    if (filter !== "all") list = list.filter((p) => p.implantSpec?.implantType === filter);
+    if (filter === "immediate" && subFilter !== "all") {
+      list = list.filter((p) => p.implantSpec?.subType === subFilter);
+    }
+    return list;
+  }, [products, filter, subFilter]);
 
   const allPaths = useMemo(() => {
     const productPaths = products.flatMap((p) => p.images);
@@ -85,7 +90,7 @@ function CountryPage() {
           </div>
         </div>
 
-        <div className="flex gap-2 mb-4 overflow-x-auto -mx-4 px-4 pb-1 scrollbar-hide">
+        <div className="flex gap-2 overflow-x-auto -mx-4 px-4 pb-1 scrollbar-hide">
           {filters.map((f) => {
             const active = filter === f.key;
             return (
@@ -104,6 +109,29 @@ function CountryPage() {
             );
           })}
         </div>
+
+        {filter === "immediate" && (
+          <div className="flex gap-2 overflow-x-auto -mx-4 px-4 pb-1 scrollbar-hide">
+            {[
+              { key: "all", ar: "الكل (فورية)", en: "All Immediate" },
+              { key: "basal", ar: "Basal", en: "Basal" },
+              { key: "compressive", ar: "Compressive", en: "Compressive" },
+            ].map((s) => (
+              <button
+                key={s.key}
+                onClick={() => setSubFilter(s.key)}
+                className={cn(
+                  "h-8 px-3 rounded-full text-[11px] font-bold whitespace-nowrap transition border",
+                  subFilter === s.key
+                    ? "bg-[oklch(0.93_0.06_30)] text-[oklch(0.5_0.18_30)] border-[oklch(0.85_0.1_30)]"
+                    : "bg-card text-muted-foreground border-border hover:bg-accent",
+                )}
+              >
+                {ar ? s.ar : s.en}
+              </button>
+            ))}
+          </div>
+        )}
 
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
