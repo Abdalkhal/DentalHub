@@ -3,7 +3,7 @@ import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
 import { useQuickOrders } from "@/lib/quickOrders";
-import { Package, FlaskConical, ShoppingBag, ArrowRight } from "lucide-react";
+import { Package, ShoppingBag } from "lucide-react";
 
 export const Route = createFileRoute("/quick-orders")({
   component: QuickOrdersPage,
@@ -32,9 +32,6 @@ function QuickOrdersPage() {
             <div className="flex gap-2 mt-4 justify-center">
               <Link to="/supplies" className="h-10 px-4 rounded-xl bg-primary text-primary-foreground text-xs font-bold flex items-center gap-1.5">
                 <Package className="size-4" />{ar ? "المستلزمات الطبية" : "Medical Supplies"}
-              </Link>
-              <Link to="/labs" className="h-10 px-4 rounded-xl bg-sky-50 text-sky-700 text-xs font-bold flex items-center gap-1.5">
-                <FlaskConical className="size-4" />{ar ? "المختبرات" : "Labs"}
               </Link>
             </div>
           </div>
