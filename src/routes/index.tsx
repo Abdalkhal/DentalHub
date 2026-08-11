@@ -176,43 +176,68 @@ function Home() {
 
       {/* Hero banner */}
       <section className="px-3 mt-3">
-        <div className="relative rounded-3xl overflow-hidden min-h-[190px] shadow-card" style={{ background: "linear-gradient(135deg, #6bb2ee 0%, #3d86dd 50%, #1f5fb8 100%)" }}>
-          <div className="absolute -top-16 -end-14 size-52 rounded-full bg-white/15 blur-2xl pointer-events-none" />
-          <div className="absolute -bottom-20 -start-14 size-48 rounded-full bg-white/10 blur-2xl pointer-events-none" />
-          <div className="absolute top-3 end-3 z-10">
-            <span className="inline-flex items-center justify-center size-14 rounded-full bg-white/20 text-white text-[11px] font-extrabold text-center leading-tight shadow-lg ring-2 ring-white/40">
-              {lang === "ar" ? "خصم\nخاص" : "Special\nOffer"}
-            </span>
-          </div>
-          <div className="relative flex items-center gap-3 p-4 pt-5">
-            <div className="flex-1 min-w-0 text-white">
-              <h2 className="font-display font-extrabold text-[22px] leading-tight drop-shadow-sm">
-                {banner.title || (lang === "ar" ? ROLE_META[banner.role].ar : ROLE_META[banner.role].en)}
-              </h2>
-              <p className="mt-2 text-white/95 text-sm leading-snug">
-                {banner.subtitle || (lang === "ar" ? "خصم حتى 15% على أدوات المختبرات" : "Up to 15% off lab tools")}
-              </p>
-              {banner.price && <div className="mt-1 font-display font-extrabold text-2xl text-yellow-300 drop-shadow">{banner.price}</div>}
-              <Link to="/supplies" className="mt-3 inline-flex h-10 px-5 rounded-full bg-white/20 text-white text-sm font-bold shadow-md hover:bg-white/30 transition items-center">
-                {lang === "ar" ? "تسوق الآن" : "Shop now"}
-              </Link>
+        {banners.length > 1 || userBanners.length > 0 ? (
+          <div className="relative rounded-3xl overflow-hidden min-h-[190px] shadow-card" style={{ background: "linear-gradient(135deg, #6bb2ee 0%, #3d86dd 50%, #1f5fb8 100%)" }}>
+            <div className="absolute -top-16 -end-14 size-52 rounded-full bg-white/15 blur-2xl pointer-events-none" />
+            <div className="absolute -bottom-20 -start-14 size-48 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+            <div className="absolute top-3 end-3 z-10">
+              <span className="inline-flex items-center justify-center size-14 rounded-full bg-white/20 text-white text-[11px] font-extrabold text-center leading-tight shadow-lg ring-2 ring-white/40">
+                {lang === "ar" ? "خصم\nخاص" : "Special\nOffer"}
+              </span>
             </div>
-            <div className="shrink-0 w-[130px] h-[140px] flex items-center justify-center">
-              <img src={banner.image || dentalBridge} alt="" loading="lazy" className="max-w-full max-h-full object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.35)]" />
+            <div className="relative flex items-center gap-3 p-4 pt-5">
+              <div className="flex-1 min-w-0 text-white">
+                <h2 className="font-display font-extrabold text-[22px] leading-tight drop-shadow-sm">
+                  {banner.title || (lang === "ar" ? ROLE_META[banner.role].ar : ROLE_META[banner.role].en)}
+                </h2>
+                <p className="mt-2 text-white/95 text-sm leading-snug">
+                  {banner.subtitle || (lang === "ar" ? "خصم حتى 15% على أدوات المختبرات" : "Up to 15% off lab tools")}
+                </p>
+                {banner.price && <div className="mt-1 font-display font-extrabold text-2xl text-yellow-300 drop-shadow">{banner.price}</div>}
+                <Link to="/supplies" className="mt-3 inline-flex h-10 px-5 rounded-full bg-white/20 text-white text-sm font-bold shadow-md hover:bg-white/30 transition items-center">
+                  {lang === "ar" ? "تسوق الآن" : "Shop now"}
+                </Link>
+              </div>
+              <div className="shrink-0 w-[130px] h-[140px] flex items-center justify-center">
+                <img src={banner.image || dentalBridge} alt="" loading="lazy" className="max-w-full max-h-full object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.35)]" />
+              </div>
+            </div>
+            {banners.length > 1 && (
+              <>
+                <button onClick={prev} className="absolute top-1/2 -translate-y-1/2 start-2 size-8 rounded-full bg-white/25 hover:bg-white/40 flex items-center justify-center text-white"><PrevIcon className="size-4" /></button>
+                <button onClick={next} className="absolute top-1/2 -translate-y-1/2 end-2 size-8 rounded-full bg-white/25 hover:bg-white/40 flex items-center justify-center text-white"><NextIcon className="size-4" /></button>
+              </>
+            )}
+            {banners.length > 1 && (
+              <div className="absolute bottom-2 inset-x-0 flex justify-center gap-1.5">
+                {banners.map((_, i) => (
+                  <button key={i} onClick={() => setIdx(i)} className={cn("h-1.5 rounded-full transition-all", i === idx ? "w-5 bg-white" : "w-1.5 bg-white/50")} />
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="relative rounded-3xl overflow-hidden min-h-[190px] shadow-card bg-gradient-to-r from-blue-600 to-sky-400">
+            <div className="absolute -top-16 -end-14 size-52 rounded-full bg-white/15 blur-2xl pointer-events-none" />
+            <div className="absolute -bottom-20 -start-14 size-48 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+            <div className="relative flex items-center gap-3 p-4 pt-5">
+              <div className="flex-1 min-w-0 text-white">
+                <h2 className="font-display font-extrabold text-[22px] leading-tight drop-shadow-sm">
+                  {lang === "ar" ? "هل تريد زيادة مبيعاتك؟" : "Want to increase your sales?"}
+                </h2>
+                <p className="mt-2 text-white/95 text-sm leading-snug">
+                  {lang === "ar" ? "أعلن معنا ليصل منتجك لجميع أطباء الأسنان" : "Advertise with us to reach all dentists"}
+                </p>
+                <a href={`https://wa.me/9647700000000`} target="_blank" rel="noreferrer" className="mt-3 inline-flex h-10 px-5 rounded-full bg-white/20 text-white text-sm font-bold shadow-md hover:bg-white/30 transition items-center">
+                  {lang === "ar" ? "تواصل للإعلان" : "Contact to advertise"}
+                </a>
+              </div>
+              <div className="shrink-0 w-[130px] h-[140px] flex items-center justify-center">
+                <Megaphone className="size-20 text-white/40 drop-shadow-[0_10px_20px_rgba(0,0,0,0.15)]" strokeWidth={1.5} />
+              </div>
             </div>
           </div>
-          {banners.length > 1 && (
-            <>
-              <button onClick={prev} aria-label="prev" className="absolute top-1/2 -translate-y-1/2 start-2 size-8 rounded-full bg-white/25 hover:bg-white/40 flex items-center justify-center text-white"><PrevIcon className="size-4" /></button>
-              <button onClick={next} aria-label="next" className="absolute top-1/2 -translate-y-1/2 end-2 size-8 rounded-full bg-white/25 hover:bg-white/40 flex items-center justify-center text-white"><NextIcon className="size-4" /></button>
-            </>
-          )}
-          <div className="absolute bottom-2 inset-x-0 flex justify-center gap-1.5">
-            {banners.map((_, i) => (
-              <button key={i} onClick={() => setIdx(i)} className={cn("h-1.5 rounded-full transition-all", i === idx ? "w-5 bg-white" : "w-1.5 bg-white/50")} aria-label={`slide ${i + 1}`} />
-            ))}
-          </div>
-        </div>
+        )}
       </section>
 
       {/* Categories */}
