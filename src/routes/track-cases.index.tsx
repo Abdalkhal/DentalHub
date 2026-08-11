@@ -6,7 +6,7 @@ import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { useOrders, type OrderStatus } from "@/lib/ordersStore";
 import { useDentistCases, getCaseProgress, getStageLabel } from "@/lib/caseTracking";
-import { useSession } from "@/lib/useAuth";
+import { useSession, useUserRole } from "@/lib/useAuth";
 import {
   User, Wrench, CalendarDays, Truck, Hash, Building2, ClipboardList,
   RefreshCw,
@@ -70,15 +70,22 @@ function TrackCases() {
   const { lang } = useI18n();
   const ar = lang === "ar";
   const { user } = useSession();
+  const { role } = useUserRole();
+  const dentistName = role?.accountType === "dentist" ? (role.name || "") : "";
   const localOrders = useOrders();
   const { cases: remoteCases, loading } = useDentistCases(user?.uid ?? "");
 
   const allOrders = useMemo(() => {
     const remote = remoteCases.map((c) => c.order);
-    const localIds = new Set(remote.map((r) => r.id));
-    const localOnly = localOrders.filter((o) => !localIds.has(o.id));
-    return [...remote, ...localOnly];
-  }, [remoteCases, localOrders]);
+    const remoteIds = new Set(remote.map((r) => r.id));
+    const localOnly = localOrders.filter((o) => !remoteIds.has(o.id));
+    const merged = [...remote, ...localOnly];
+    if (!dentistName) return merged;
+    return merged.filter((o) =>
+      o.doctor.toLowerCase().includes(dentistName.toLowerCase()) ||
+      (o.clinic || "").toLowerCase().includes(dentistName.toLowerCase())
+    );
+  }, [remoteCases, localOrders, dentistName]);
 
   const [filter, setFilter] = useState<string>("all");
 
