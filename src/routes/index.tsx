@@ -9,6 +9,11 @@ import { setClinicStoreUser } from "@/lib/clinicStore";
 import { NotificationBell } from "@/components/NotificationBell";
 import { getSnapshot } from "@/lib/ordersStore";
 import { useQuickOrders } from "@/lib/quickOrders";
+import { useAllOffers } from "@/lib/offers";
+import { useQuery } from "@tanstack/react-query";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/integrations/firebase/client";
+import type { UserRoleDoc } from "@/integrations/firebase/types";
 import dentalImplant from "@/assets/dental-implant.png";
 import dentalSupplies from "@/assets/dental-supplies-icon.png";
 import dentalBridge from "@/assets/dental-bridge.png";
@@ -17,7 +22,7 @@ import { BrandLogo } from "@/components/BrandLogo";
 import { useProductSearch, type SearchResult } from "@/lib/search";
 import {
   Bell, Globe, Search, ChevronLeft, ChevronRight,
-  ClipboardList, Plus, Sparkles, Stethoscope, User, Package,
+  ClipboardList, Plus, Sparkles, Stethoscope, User, Package, Megaphone,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -88,6 +93,24 @@ function Home() {
   const PrevIcon = dir === "rtl" ? ChevronRight : ChevronLeft;
 
   const quickItems = useQuickOrders();
+  const { data: realOffers = [] } = useAllOffers();
+
+  const { data: implantIds = new Set<string>() } = useQuery({
+    queryKey: ["implant-company-ids"],
+    queryFn: async () => {
+      const snap = await getDocs(collection(db, "user_roles"));
+      return new Set(
+        snap.docs
+          .map((d) => d.data() as UserRoleDoc)
+          .filter((u) => u.accountType === "implant")
+          .map((u) => u.userId)
+      );
+    },
+    staleTime: 60_000,
+  });
+
+  const implantOffers = realOffers.filter((o) => implantIds.has(o.supplierId));
+  const latestOffer = implantOffers[0];
   const quickPages = quickItems.length > 0 ? Array.from({ length: Math.ceil(quickItems.length / 3) }, (_, i) => quickItems.slice(i * 3, i * 3 + 3)) : [];
   const [quickPage, setQuickPage] = useState(0);
 
@@ -299,19 +322,30 @@ function Home() {
           <div className="relative bg-white border border-slate-200 rounded-2xl p-3 shadow-sm overflow-hidden">
             <div className="flex items-center justify-between mb-1">
               <p className="font-display font-extrabold text-[13px]">{lang === "ar" ? "عروض خاصة" : "Special Offers"}</p>
-              <Link className="text-[10px] font-bold text-primary" to="/implants">{lang === "ar" ? "عرض الكل" : "View all"}</Link>
+              <Link to="/offers" className="text-[10px] font-bold text-primary">{lang === "ar" ? "عرض الكل" : "View all"}</Link>
             </div>
-            <div className="relative flex items-center justify-center h-16 my-1">
-              <img src={dentalImplant} alt="" loading="lazy" className="max-h-full object-contain" />
-              <span className="absolute top-0 start-0 size-11 rounded-full bg-primary text-white text-[9px] font-extrabold text-center leading-tight flex items-center justify-center shadow-md">
-                {lang === "ar" ? "خصم\n15%" : "15%\nOFF"}
-              </span>
-            </div>
-            <p className="text-[10px] font-semibold text-slate-700 text-center truncate">{lang === "ar" ? "مجموعة زراعات" : "Implant Set"}</p>
-            <div className="flex items-baseline justify-center gap-1.5 mt-1">
-              <span className="font-display font-extrabold text-primary text-sm">$1250</span>
-              <span className="text-[10px] text-slate-400 line-through">$1470</span>
-            </div>
+            {latestOffer ? (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-center h-16">
+                  <img src={latestOffer.imageUrl || "/photo/implant.jpg"} alt="" loading="lazy" className="max-h-full object-contain" />
+                </div>
+                <p className="text-[10px] font-semibold text-slate-700 truncate text-center">{latestOffer.title}</p>
+                {latestOffer.description && <p className="text-[9px] text-slate-400 line-clamp-1 text-center">{latestOffer.description}</p>}
+                {latestOffer.price != null && (
+                  <p className="font-display font-extrabold text-primary text-sm text-center">
+                    {latestOffer.currency === "IQD" ? `${latestOffer.price.toLocaleString()} د.ع` : `$${latestOffer.price}`}
+                  </p>
+                )}
+                {latestOffer.expiryDate && (
+                  <p className="text-[9px] text-slate-400 text-center">{lang === "ar" ? "ينتهي" : "Expires"}: {latestOffer.expiryDate}</p>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-4 text-center">
+                <Megaphone className="size-8 text-slate-300 mb-1.5" />
+                <p className="text-[10px] font-semibold text-slate-400">{lang === "ar" ? "لا توجد عروض حالياً" : "No offers yet"}</p>
+              </div>
+            )}
             <Sparkles className="absolute -top-2 -end-2 size-8 text-primary/10" />
           </div>
         </div>
