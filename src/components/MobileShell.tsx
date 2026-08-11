@@ -18,10 +18,11 @@ export function MobileShell({
 }) {
   const { role } = useUserRole();
   const isLab = role?.accountType === "lab";
+  const isDentist = role?.accountType === "dentist";
   const [cartOpen, setCartOpen] = useState(false);
   return (
     <div className="min-h-screen w-full bg-slate-50 overflow-x-hidden flex justify-center">
-      <div className={cn("relative w-full min-h-screen bg-white flex flex-col", isLab ? "max-w-none" : "max-w-md", className)}>
+      <div className={cn("relative w-full min-h-screen flex flex-col", isDentist ? "bg-[#F0F7FF]" : "bg-white", isLab ? "max-w-none" : "max-w-md", className)}>
         <div className={cn("flex-1", hideBottomNav ? "pb-0" : "pb-24")}>{children}</div>
         {!hideBottomNav && <BottomTabBar onCartClick={() => setCartOpen(true)} />}
         <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} />
