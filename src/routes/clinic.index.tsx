@@ -71,7 +71,10 @@ function ClinicHome() {
                       <Plus className="size-3.5" />
                       {ar ? "مريض جديد" : "New Patient"}
                     </Link>
-                    <button className="h-10 px-4 rounded-xl bg-blue-700/40 text-white text-xs font-bold hover:bg-blue-700/60 transition flex items-center gap-1.5">
+                    <button
+                      onClick={() => navigate({ to: "/clinic/appointments" })}
+                      className="h-10 px-4 rounded-xl bg-blue-700/40 text-white text-xs font-bold hover:bg-blue-700/60 transition flex items-center gap-1.5"
+                    >
                       <Calendar className="size-3.5" />
                       {ar ? "مواعيد اليوم" : "Today's Visits"}
                     </button>

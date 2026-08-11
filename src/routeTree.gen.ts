@@ -49,6 +49,7 @@ import { Route as ClinicOrdersRouteImport } from './routes/clinic.orders'
 import { Route as ClinicMaterialsRouteImport } from './routes/clinic.materials'
 import { Route as ClinicFinanceRouteImport } from './routes/clinic.finance'
 import { Route as ClinicDoctorsRouteImport } from './routes/clinic.doctors'
+import { Route as ClinicAppointmentsRouteImport } from './routes/clinic.appointments'
 import { Route as BrandsBrandIdRouteImport } from './routes/brands.$brandId'
 import { Route as AccountSettingsRouteImport } from './routes/account.settings'
 import { Route as AccountHelpRouteImport } from './routes/account.help'
@@ -261,6 +262,11 @@ const ClinicDoctorsRoute = ClinicDoctorsRouteImport.update({
   path: '/clinic/doctors',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ClinicAppointmentsRoute = ClinicAppointmentsRouteImport.update({
+  id: '/clinic/appointments',
+  path: '/clinic/appointments',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BrandsBrandIdRoute = BrandsBrandIdRouteImport.update({
   id: '/brands/$brandId',
   path: '/brands/$brandId',
@@ -344,6 +350,7 @@ export interface FileRoutesByFullPath {
   '/account/help': typeof AccountHelpRouteWithChildren
   '/account/settings': typeof AccountSettingsRoute
   '/brands/$brandId': typeof BrandsBrandIdRoute
+  '/clinic/appointments': typeof ClinicAppointmentsRoute
   '/clinic/doctors': typeof ClinicDoctorsRoute
   '/clinic/finance': typeof ClinicFinanceRoute
   '/clinic/materials': typeof ClinicMaterialsRoute
@@ -397,6 +404,7 @@ export interface FileRoutesByTo {
   '/account/help': typeof AccountHelpRouteWithChildren
   '/account/settings': typeof AccountSettingsRoute
   '/brands/$brandId': typeof BrandsBrandIdRoute
+  '/clinic/appointments': typeof ClinicAppointmentsRoute
   '/clinic/doctors': typeof ClinicDoctorsRoute
   '/clinic/finance': typeof ClinicFinanceRoute
   '/clinic/materials': typeof ClinicMaterialsRoute
@@ -451,6 +459,7 @@ export interface FileRoutesById {
   '/account/help': typeof AccountHelpRouteWithChildren
   '/account/settings': typeof AccountSettingsRoute
   '/brands/$brandId': typeof BrandsBrandIdRoute
+  '/clinic/appointments': typeof ClinicAppointmentsRoute
   '/clinic/doctors': typeof ClinicDoctorsRoute
   '/clinic/finance': typeof ClinicFinanceRoute
   '/clinic/materials': typeof ClinicMaterialsRoute
@@ -506,6 +515,7 @@ export interface FileRouteTypes {
     | '/account/help'
     | '/account/settings'
     | '/brands/$brandId'
+    | '/clinic/appointments'
     | '/clinic/doctors'
     | '/clinic/finance'
     | '/clinic/materials'
@@ -559,6 +569,7 @@ export interface FileRouteTypes {
     | '/account/help'
     | '/account/settings'
     | '/brands/$brandId'
+    | '/clinic/appointments'
     | '/clinic/doctors'
     | '/clinic/finance'
     | '/clinic/materials'
@@ -612,6 +623,7 @@ export interface FileRouteTypes {
     | '/account/help'
     | '/account/settings'
     | '/brands/$brandId'
+    | '/clinic/appointments'
     | '/clinic/doctors'
     | '/clinic/finance'
     | '/clinic/materials'
@@ -662,6 +674,7 @@ export interface RootRouteChildren {
   ReportsRoute: typeof ReportsRoute
   SignupRoute: typeof SignupRoute
   BrandsBrandIdRoute: typeof BrandsBrandIdRoute
+  ClinicAppointmentsRoute: typeof ClinicAppointmentsRoute
   ClinicDoctorsRoute: typeof ClinicDoctorsRoute
   ClinicFinanceRoute: typeof ClinicFinanceRoute
   ClinicMaterialsRoute: typeof ClinicMaterialsRoute
@@ -971,6 +984,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ClinicDoctorsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/clinic/appointments': {
+      id: '/clinic/appointments'
+      path: '/clinic/appointments'
+      fullPath: '/clinic/appointments'
+      preLoaderRoute: typeof ClinicAppointmentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/brands/$brandId': {
       id: '/brands/$brandId'
       path: '/brands/$brandId'
@@ -1113,6 +1133,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReportsRoute: ReportsRoute,
   SignupRoute: SignupRoute,
   BrandsBrandIdRoute: BrandsBrandIdRoute,
+  ClinicAppointmentsRoute: ClinicAppointmentsRoute,
   ClinicDoctorsRoute: ClinicDoctorsRoute,
   ClinicFinanceRoute: ClinicFinanceRoute,
   ClinicMaterialsRoute: ClinicMaterialsRoute,

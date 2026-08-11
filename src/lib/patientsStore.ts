@@ -47,6 +47,8 @@ export type Visit = {
   procedure: string;
   note?: string;
   upcoming?: boolean;
+  time?: string;
+  status?: "confirmed" | "waiting" | "cancelled" | "completed";
 };
 
 export type PatientFile = {
