@@ -8,6 +8,7 @@ import { setPatientStoreUser } from "@/lib/patientsStore";
 import { setClinicStoreUser } from "@/lib/clinicStore";
 import { NotificationBell } from "@/components/NotificationBell";
 import { getSnapshot } from "@/lib/ordersStore";
+import { useQuickOrders } from "@/lib/quickOrders";
 import dentalImplant from "@/assets/dental-implant.png";
 import dentalSupplies from "@/assets/dental-supplies-icon.png";
 import dentalBridge from "@/assets/dental-bridge.png";
@@ -16,7 +17,7 @@ import { BrandLogo } from "@/components/BrandLogo";
 import { useProductSearch, type SearchResult } from "@/lib/search";
 import {
   Bell, Globe, Search, ChevronLeft, ChevronRight,
-  ClipboardList, Plus, Sparkles, Stethoscope, User,
+  ClipboardList, Plus, Sparkles, Stethoscope, User, Package,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -85,6 +86,10 @@ function Home() {
 
   const NextIcon = dir === "rtl" ? ChevronLeft : ChevronRight;
   const PrevIcon = dir === "rtl" ? ChevronRight : ChevronLeft;
+
+  const quickItems = useQuickOrders();
+  const quickPages = quickItems.length > 0 ? Array.from({ length: Math.ceil(quickItems.length / 3) }, (_, i) => quickItems.slice(i * 3, i * 3 + 3)) : [];
+  const [quickPage, setQuickPage] = useState(0);
 
   const categories = [
     { to: "/implants", title: lang === "ar" ? "زراعة الأسنان" : "Dental Implants", img: dentalImplant, ring: "ring-amber-200" },
@@ -253,25 +258,43 @@ function Home() {
       {/* Dual quick-section cards */}
       <section className="px-3 mt-4 pb-6">
         <div className="grid grid-cols-2 gap-2.5">
-          <div className="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm">
+          {/* Quick Orders */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm flex flex-col">
             <div className="flex items-center justify-between mb-2">
               <p className="font-display font-extrabold text-[13px]">{lang === "ar" ? "الطلبات السريعة" : "Quick Orders"}</p>
-              <Link className="text-[10px] font-bold text-primary" to="/orders">{lang === "ar" ? "عرض الكل" : "View all"}</Link>
+              <Link to="/quick-orders" className="text-[10px] font-bold text-primary">{lang === "ar" ? "عرض الكل" : "View all"}</Link>
             </div>
-            <ul className="grid grid-cols-2 gap-1.5">
-              {[
-                { name: lang === "ar" ? "زراعة" : "Implant", img: dentalImplant },
-                { name: lang === "ar" ? "قفازات" : "Gloves", img: dentalSupplies },
-                { name: lang === "ar" ? "جسر" : "Bridge", img: dentalBridge },
-                { name: lang === "ar" ? "مادة" : "Supply", img: dentalSupplies },
-              ].map((it) => (
-                <li key={it.name} className="relative rounded-xl bg-slate-50 border border-slate-200 p-1.5 flex flex-col items-center">
-                  <img src={it.img} alt="" loading="lazy" className="w-10 h-10 object-contain" />
-                  <p className="text-[9px] font-semibold text-slate-600 truncate max-w-full text-center mt-0.5">{it.name}</p>
-                  <button className="absolute -top-1 -end-1 size-5 rounded-full bg-primary text-white flex items-center justify-center shadow-sm"><Plus className="size-3" strokeWidth={3} /></button>
-                </li>
-              ))}
-            </ul>
+            {quickItems.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-center py-3">
+                <span className="size-10 rounded-full bg-sky-50 flex items-center justify-center">
+                  <ClipboardList className="size-5 text-primary" strokeWidth={2.2} />
+                </span>
+                <p className="mt-2 text-[10.5px] font-bold text-slate-700">{lang === "ar" ? "لا توجد طلبات بعد" : "No orders yet"}</p>
+                <p className="mt-0.5 text-[9.5px] text-slate-400 leading-snug">{lang === "ar" ? "ستظهر أكثر منتجاتك المطلوبة هنا" : "Your most ordered items appear here"}</p>
+              </div>
+            ) : (
+              <>
+                <div onScroll={(e) => { const el = e.currentTarget; const w = el.clientWidth || 1; const p = Math.round(Math.abs(el.scrollLeft) / w); if (p !== quickPage) setQuickPage(p); }} className="flex-1 flex overflow-x-auto snap-x snap-mandatory scrollbar-none -mx-1">
+                  {quickPages.map((page, pi) => (
+                    <ul key={pi} className="shrink-0 w-full snap-start flex items-start justify-around gap-1 px-1">
+                      {page.map((it) => (
+                        <li key={`${it.name}-${it.vendor}`} className="flex flex-col items-center gap-1 w-[31%]">
+                          {it.image ? <img src={it.image} alt="" loading="lazy" className="h-11 w-full object-contain" /> : <span className="h-11 w-full rounded-xl bg-slate-50 flex items-center justify-center"><Package className="size-5 text-slate-400" /></span>}
+                          <p className="text-[9px] font-semibold text-slate-700 text-center leading-tight h-6 overflow-hidden">{it.name}</p>
+                          <p className="text-[8px] text-slate-400 text-center leading-none truncate w-full">{it.vendor}</p>
+                          <button className="rounded-full bg-sky-50 border border-primary/25 text-primary text-[9px] font-bold px-2 py-[3px] active:scale-95 transition">+ {lang === "ar" ? "إعادة" : "Reorder"}</button>
+                        </li>
+                      ))}
+                    </ul>
+                  ))}
+                </div>
+                <div className="flex items-center justify-center gap-1 pt-2">
+                  {quickPages.map((_, i) => (
+                    <span key={i} className={cn("rounded-full transition-all", i === quickPage ? "size-2 bg-primary" : "size-1.5 bg-slate-300")} />
+                  ))}
+                </div>
+              </>
+            )}
           </div>
           <div className="relative bg-white border border-slate-200 rounded-2xl p-3 shadow-sm overflow-hidden">
             <div className="flex items-center justify-between mb-1">

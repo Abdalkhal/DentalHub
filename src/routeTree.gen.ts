@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as RegisterRouteImport } from './routes/register'
+import { Route as QuickOrdersRouteImport } from './routes/quick-orders'
 import { Route as ProductionRouteImport } from './routes/production'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as OrdersRouteImport } from './routes/orders'
@@ -73,6 +74,11 @@ const ReportsRoute = ReportsRouteImport.update({
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
   path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const QuickOrdersRoute = QuickOrdersRouteImport.update({
+  id: '/quick-orders',
+  path: '/quick-orders',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProductionRoute = ProductionRouteImport.update({
@@ -329,6 +335,7 @@ export interface FileRoutesByFullPath {
   '/orders': typeof OrdersRoute
   '/pricing': typeof PricingRoute
   '/production': typeof ProductionRoute
+  '/quick-orders': typeof QuickOrdersRoute
   '/register': typeof RegisterRoute
   '/reports': typeof ReportsRoute
   '/signup': typeof SignupRoute
@@ -381,6 +388,7 @@ export interface FileRoutesByTo {
   '/orders': typeof OrdersRoute
   '/pricing': typeof PricingRoute
   '/production': typeof ProductionRoute
+  '/quick-orders': typeof QuickOrdersRoute
   '/register': typeof RegisterRoute
   '/reports': typeof ReportsRoute
   '/signup': typeof SignupRoute
@@ -434,6 +442,7 @@ export interface FileRoutesById {
   '/orders': typeof OrdersRoute
   '/pricing': typeof PricingRoute
   '/production': typeof ProductionRoute
+  '/quick-orders': typeof QuickOrdersRoute
   '/register': typeof RegisterRoute
   '/reports': typeof ReportsRoute
   '/signup': typeof SignupRoute
@@ -488,6 +497,7 @@ export interface FileRouteTypes {
     | '/orders'
     | '/pricing'
     | '/production'
+    | '/quick-orders'
     | '/register'
     | '/reports'
     | '/signup'
@@ -540,6 +550,7 @@ export interface FileRouteTypes {
     | '/orders'
     | '/pricing'
     | '/production'
+    | '/quick-orders'
     | '/register'
     | '/reports'
     | '/signup'
@@ -592,6 +603,7 @@ export interface FileRouteTypes {
     | '/orders'
     | '/pricing'
     | '/production'
+    | '/quick-orders'
     | '/register'
     | '/reports'
     | '/signup'
@@ -645,6 +657,7 @@ export interface RootRouteChildren {
   OrdersRoute: typeof OrdersRoute
   PricingRoute: typeof PricingRoute
   ProductionRoute: typeof ProductionRoute
+  QuickOrdersRoute: typeof QuickOrdersRoute
   RegisterRoute: typeof RegisterRoute
   ReportsRoute: typeof ReportsRoute
   SignupRoute: typeof SignupRoute
@@ -697,6 +710,13 @@ declare module '@tanstack/react-router' {
       path: '/register'
       fullPath: '/register'
       preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/quick-orders': {
+      id: '/quick-orders'
+      path: '/quick-orders'
+      fullPath: '/quick-orders'
+      preLoaderRoute: typeof QuickOrdersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/production': {
@@ -1088,6 +1108,7 @@ const rootRouteChildren: RootRouteChildren = {
   OrdersRoute: OrdersRoute,
   PricingRoute: PricingRoute,
   ProductionRoute: ProductionRoute,
+  QuickOrdersRoute: QuickOrdersRoute,
   RegisterRoute: RegisterRoute,
   ReportsRoute: ReportsRoute,
   SignupRoute: SignupRoute,
