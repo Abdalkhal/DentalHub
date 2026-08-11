@@ -1484,7 +1484,7 @@ function ImplantProductsPanel() {
             </p>
           </div>
         ) : (
-          <div className="space-y-5">
+          <div className="grid grid-cols-2 gap-3">
             {groupedProducts.map(({ product, children }) => (
               <div key={product.id}>
                 <div

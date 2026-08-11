@@ -448,7 +448,7 @@ function ProfilePage() {
                   <div className="h-36 w-full bg-gray-50 flex items-center justify-center p-3">
                     {p.images.length > 0 ? (
                       <img
-                        src={p.images[0]}
+                        src={filterUrls[p.images[0]] || p.images[0]}
                         alt=""
                         className="size-full object-contain"
                         loading="lazy"
