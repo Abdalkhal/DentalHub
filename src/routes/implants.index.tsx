@@ -2494,19 +2494,18 @@ function BrowseImplants() {
           <div className="grid grid-cols-2 gap-3">
             {COUNTRIES.map((c) => {
               const count = countryCounts[c.slug] || 0;
+              const flagUrl = `https://flagcdn.com/w80/${countryCodeMap[c.slug] || c.slug}.png`;
               return (
-                <Link key={c.slug} to="/implants/$country" params={{ country: c.slug }} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition">
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className="size-12 rounded-xl bg-slate-50 flex items-center justify-center text-2xl overflow-hidden">
-                      <img src={`https://flagcdn.com/w80/${countryCodeMap[c.slug] || c.slug}.png`} alt={c.en} className="w-full h-full object-cover" loading="lazy" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; (e.target as HTMLImageElement).parentElement!.querySelector("span")!.style.display = "block"; }} />
-                      <span style={{ display: "none" }} className="text-2xl">{c.flag}</span>
+                <Link key={c.slug} to="/implants/$country" params={{ country: c.slug }} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition group">
+                  <div className="relative w-20 h-20 rounded-full bg-sky-50 mx-auto mb-3 flex items-center justify-center">
+                    <img src="/photo/implant.jpg" alt="" className="w-14 h-14 object-contain" loading="lazy" />
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full overflow-hidden shadow-sm border-2 border-white bg-white">
+                      <img src={flagUrl} alt={c.en} className="w-full h-full object-cover" loading="lazy" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; (e.target as HTMLImageElement).parentElement!.textContent = c.flag; }} />
+                      <span style={{ display: "none" }}>{c.flag}</span>
                     </span>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-bold text-sm truncate">{ar ? c.ar : c.en}</p>
-                      <p className="text-[11px] text-slate-500">{count} {ar ? "منتج" : "products"}</p>
-                    </div>
-                    <ChevronRight className="size-4 text-slate-300 shrink-0" />
                   </div>
+                  <p className="font-bold text-sm text-center">زرعات {ar ? c.ar : c.en}</p>
+                  <p className="text-[11px] text-slate-500 text-center mt-0.5">{count} {ar ? "منتج" : "products"}</p>
                 </Link>
               );
             })}
