@@ -4,7 +4,7 @@ import { MobileShell } from "@/components/MobileShell";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { useAllOffers } from "@/lib/offers";
+import { useImplantOffers } from "@/lib/implantOffers";
 import {
   Plus, X, Phone, MapPin, User, Briefcase, Upload, Megaphone,
 } from "lucide-react";
@@ -51,7 +51,7 @@ function OffersPage() {
   const [cat, setCat] = useState("all");
   const [classifieds, setClassifieds] = useState<Classified[]>(loadClassifieds);
   const [showForm, setShowForm] = useState(false);
-  const { data: realOffers = [], isLoading } = useAllOffers();
+  const { offers: realOffers = [], isLoading } = useImplantOffers();
 
   const filtered = useMemo(() => {
     return cat === "all" ? classifieds : classifieds.filter((c) => c.category === cat);

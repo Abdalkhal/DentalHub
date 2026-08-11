@@ -9,11 +9,7 @@ import { setClinicStoreUser } from "@/lib/clinicStore";
 import { NotificationBell } from "@/components/NotificationBell";
 import { getSnapshot } from "@/lib/ordersStore";
 import { useQuickOrders } from "@/lib/quickOrders";
-import { useAllOffers } from "@/lib/offers";
-import { useQuery } from "@tanstack/react-query";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "@/integrations/firebase/client";
-import type { UserRoleDoc } from "@/integrations/firebase/types";
+import { useImplantOffers } from "@/lib/implantOffers";
 import dentalImplant from "@/assets/dental-implant.png";
 import dentalSupplies from "@/assets/dental-supplies-icon.png";
 import dentalBridge from "@/assets/dental-bridge.png";
@@ -93,23 +89,7 @@ function Home() {
   const PrevIcon = dir === "rtl" ? ChevronRight : ChevronLeft;
 
   const quickItems = useQuickOrders();
-  const { data: realOffers = [] } = useAllOffers();
-
-  const { data: implantIds = new Set<string>() } = useQuery({
-    queryKey: ["implant-company-ids"],
-    queryFn: async () => {
-      const snap = await getDocs(collection(db, "user_roles"));
-      return new Set(
-        snap.docs
-          .map((d) => d.data() as UserRoleDoc)
-          .filter((u) => u.accountType === "implant")
-          .map((u) => u.userId)
-      );
-    },
-    staleTime: 60_000,
-  });
-
-  const implantOffers = realOffers.filter((o) => implantIds.has(o.supplierId));
+  const { offers: implantOffers = [] } = useImplantOffers();
   const latestOffer = implantOffers[0];
   const quickPages = quickItems.length > 0 ? Array.from({ length: Math.ceil(quickItems.length / 3) }, (_, i) => quickItems.slice(i * 3, i * 3 + 3)) : [];
   const [quickPage, setQuickPage] = useState(0);
