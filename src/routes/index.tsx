@@ -3,7 +3,7 @@ import { MobileShell } from "@/components/MobileShell";
 import { useI18n } from "@/lib/i18n";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import { useSession } from "@/lib/useAuth";
+import { useSession, useUserRole } from "@/lib/useAuth";
 import { setPatientStoreUser } from "@/lib/patientsStore";
 import { setClinicStoreUser } from "@/lib/clinicStore";
 import { NotificationBell } from "@/components/NotificationBell";
@@ -77,13 +77,24 @@ function Home() {
   const [caseCount, setCaseCount] = useState(0);
   const [searchQ, setSearchQ] = useState("");
   const { results: searchResults, loading: searchLoading } = useProductSearch(searchQ);
+  const { role } = useUserRole();
+  const dentistName = role?.accountType === "dentist" ? (role.name || "") : "";
 
   useEffect(() => {
-    const upd = () => setCaseCount(getSnapshot().filter((o) => o.status !== "completed").length);
+    const upd = () => {
+      let filtered = getSnapshot().filter((o) => o.status !== "completed");
+      if (dentistName) {
+        filtered = filtered.filter((o) =>
+          o.doctor.toLowerCase().includes(dentistName.toLowerCase()) ||
+          (o.clinic || "").toLowerCase().includes(dentistName.toLowerCase())
+        );
+      }
+      setCaseCount(filtered.length);
+    };
     upd();
     window.addEventListener("storage", upd);
     return () => window.removeEventListener("storage", upd);
-  }, []);
+  }, [dentistName]);
 
   const NextIcon = dir === "rtl" ? ChevronLeft : ChevronRight;
   const PrevIcon = dir === "rtl" ? ChevronRight : ChevronLeft;
