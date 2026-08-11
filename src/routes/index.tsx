@@ -309,7 +309,7 @@ function Home() {
                   <ClipboardList className="size-5 text-primary" strokeWidth={2.2} />
                 </span>
                 <p className="mt-2 text-[10.5px] font-bold text-slate-700">{lang === "ar" ? "لا توجد طلبات بعد" : "No orders yet"}</p>
-                <p className="mt-0.5 text-[9.5px] text-slate-400 leading-snug">{lang === "ar" ? "ستظهر أكثر منتجاتك المطلوبة هنا" : "Your most ordered items appear here"}</p>
+                <p className="mt-0.5 text-[9.5px] text-slate-400 leading-snug">{lang === "ar" ? "لا توجد طلبات مستلزمات سابقة حتى الآن" : "No previous supply orders yet"}</p>
               </div>
             ) : (
               <>
@@ -320,7 +320,7 @@ function Home() {
                         <li key={`${it.name}-${it.vendor}`} className="flex flex-col items-center gap-1 w-[31%]">
                           {it.image ? <img src={it.image} alt="" loading="lazy" className="h-11 w-full object-contain" /> : <span className="h-11 w-full rounded-xl bg-slate-50 flex items-center justify-center"><Package className="size-5 text-slate-400" /></span>}
                           <p className="text-[9px] font-semibold text-slate-700 text-center leading-tight h-6 overflow-hidden">{it.name}</p>
-                          <p className="text-[8px] text-slate-400 text-center leading-none truncate w-full">{it.vendor}</p>
+                          <p className="text-[8px] text-slate-400 text-center leading-none truncate w-full">{it.brand}</p>
                           <button className="rounded-full bg-sky-50 border border-primary/25 text-primary text-[9px] font-bold px-2 py-[3px] active:scale-95 transition">+ {lang === "ar" ? "إعادة" : "Reorder"}</button>
                         </li>
                       ))}

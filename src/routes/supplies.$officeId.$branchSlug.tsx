@@ -8,6 +8,7 @@ import { useProducts, useSignedImageUrls } from "@/lib/products";
 import { ProductGallery } from "@/components/ProductGallery";
 import { Plus, SearchX, ArrowUpDown, ImageOff, Check } from "lucide-react";
 import { addToCart } from "@/lib/cartStore";
+import { addToPurchaseHistory } from "@/lib/quickOrders";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/supplies/$officeId/$branchSlug")({
@@ -202,6 +203,10 @@ function AddToCartButton({
     addToCart({
       productId, productName, productImage, officeId,
       officeName, brand, category, unitPrice, currency, quantity: 1,
+    });
+    addToPurchaseHistory({
+      productId, productName, vendor: officeName, brand,
+      unitPrice, image: productImage, qty: 1,
     });
     setAdded(true);
     setTimeout(() => setAdded(false), 1500);
