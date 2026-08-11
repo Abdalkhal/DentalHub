@@ -4,7 +4,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
 import { useUserRole } from "@/lib/useAuth";
 import { auth, db } from "@/integrations/firebase/client";
 import { doc, updateDoc, deleteDoc } from "firebase/firestore";
@@ -27,17 +26,14 @@ import {
   Lock,
   Trash2,
   Save,
-  X,
   Eye,
   EyeOff,
   Loader2,
   ShieldAlert,
-  Check,
   Globe,
   ChevronLeft,
   ChevronRight,
   Camera,
-  DollarSign,
   FileText,
 } from "lucide-react";
 
@@ -50,6 +46,51 @@ function SettingsPage() {
   const { lang, dir } = useI18n();
   const ar = lang === "ar";
   const { role, loading } = useUserRole();
+
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [phoneError, setPhoneError] = useState("");
+  const [address, setAddress] = useState("");
+  const [labDescription, setLabDescription] = useState("");
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
+  const [mapUrl, setMapUrl] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [photoURL, setPhotoURL] = useState(role?.photoURL ?? "");
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
+  const [passwordCurrent, setPasswordCurrent] = useState("");
+  const [passwordNew, setPasswordNew] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [showPasswordFields, setShowPasswordFields] = useState(false);
+  const [showCurrentPw, setShowCurrentPw] = useState(false);
+  const [showNewPw, setShowNewPw] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteError, setDeleteError] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [showDeletePw, setShowDeletePw] = useState(false);
+
+  useEffect(() => {
+    if (role) {
+      setName(role.name || "");
+      setPhone(localDigitsFromStored(role.phone));
+      setAddress(role.address || "");
+      setLabDescription(role.labDescription || "");
+      setNotificationsEnabled(role.notificationsEnabled !== false);
+      setLatitude(role.latitude ?? null);
+      setLongitude(role.longitude ?? null);
+      setMapUrl(role.mapUrl || "");
+      setPhotoURL(role.photoURL || "");
+    }
+  }, [role]);
 
   if (loading) {
     return (
@@ -76,24 +117,6 @@ function SettingsPage() {
     );
   }
 
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [phoneError, setPhoneError] = useState("");
-  const [address, setAddress] = useState("");
-  const [labDescription, setLabDescription] = useState("");
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [latitude, setLatitude] = useState<number | null>(null);
-  const [longitude, setLongitude] = useState<number | null>(null);
-  const [mapUrl, setMapUrl] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [photoURL, setPhotoURL] = useState(role?.photoURL ?? "");
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [cropModalOpen, setCropModalOpen] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<string | null>(null);
-  const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
-
   const localDigitsFromStored = (stored: string | undefined | null): string => {
     if (!stored) return "";
     const digits = stored.replace(/\D/g, "");
@@ -101,20 +124,6 @@ function SettingsPage() {
     if (digits.startsWith("0")) return digits.slice(1).slice(0, 10);
     return digits.slice(0, 10);
   };
-
-  useEffect(() => {
-    if (role) {
-      setName(role.name || "");
-      setPhone(localDigitsFromStored(role.phone));
-      setAddress(role.address || "");
-      setLabDescription(role.labDescription || "");
-      setNotificationsEnabled(role.notificationsEnabled !== false);
-      setLatitude(role.latitude ?? null);
-      setLongitude(role.longitude ?? null);
-      setMapUrl(role.mapUrl || "");
-      setPhotoURL(role.photoURL || "");
-    }
-  }, [role]);
 
   const handlePhoneChange = (raw: string) => {
     let digits = raw.replace(/\D/g, "");
@@ -165,16 +174,6 @@ function SettingsPage() {
     }
   };
 
-  const [showPassword, setShowPassword] = useState(false);
-  const [passwordCurrent, setPasswordCurrent] = useState("");
-  const [passwordNew, setPasswordNew] = useState("");
-  const [passwordConfirm, setPasswordConfirm] = useState("");
-  const [passwordError, setPasswordError] = useState("");
-  const [changingPassword, setChangingPassword] = useState(false);
-  const [showPasswordFields, setShowPasswordFields] = useState(false);
-  const [showCurrentPw, setShowCurrentPw] = useState(false);
-  const [showNewPw, setShowNewPw] = useState(false);
-
   const handleChangePassword = async () => {
     setPasswordError("");
     if (!passwordCurrent || !passwordNew || !passwordConfirm) {
@@ -218,12 +217,6 @@ function SettingsPage() {
     }
   };
 
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deletePassword, setDeletePassword] = useState("");
-  const [deleteError, setDeleteError] = useState("");
-  const [deleting, setDeleting] = useState(false);
-  const [showDeletePw, setShowDeletePw] = useState(false);
-
   const handleDeleteAccount = async () => {
     setDeleteError("");
     if (!deletePassword) {
@@ -259,17 +252,6 @@ function SettingsPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <MobileShell>
-        <TopBar title={ar ? "الإعدادات" : "Settings"} showBack />
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="size-6 animate-spin text-muted-foreground" />
-        </div>
-      </MobileShell>
-    );
-  }
-
   const inputClass =
     "w-full h-11 rounded-xl border border-border bg-card px-4 text-sm font-medium placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-primary transition";
 
@@ -280,7 +262,7 @@ function SettingsPage() {
         {/* Section 1: Office Profile */}
         <section>
           <p className="text-xs font-bold text-muted-foreground mb-2 px-1">
-            {ar ? "إعدادات المكتب" : "Office Profile"}
+            {ar ? "الإعدادات" : "Office Profile"}
           </p>
           <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-soft">
             <div className="px-4 py-4 space-y-4">
@@ -333,12 +315,12 @@ function SettingsPage() {
               <Field
                 icon={Building2}
                 iconTone="bg-blue-100 text-blue-600"
-                label={ar ? "اسم المكتب / المتجر" : "Store / Office Name"}
+                label={ar ? "الاسم" : "Store / Office Name"}
               >
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder={ar ? "أدخل اسم المكتب" : "Enter office name"}
+                  placeholder={ar ? "أدخل الاسم" : "Enter office name"}
                   className={inputClass}
                 />
               </Field>
@@ -428,7 +410,7 @@ function SettingsPage() {
         {/* Section 2: Company Location */}
         <section>
           <p className="text-xs font-bold text-muted-foreground mb-2 px-1">
-            {ar ? "موقع الشركة على الخريطة" : "Company Location"}
+            {ar ? "موقع العيادة على الخريطة" : "Company Location"}
           </p>
           <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-soft">
             <a
@@ -441,7 +423,7 @@ function SettingsPage() {
                 <MapPin className="size-5" />
               </span>
               <span className="flex-1 text-sm font-semibold">
-                {ar ? "تحديد موقع الشركة الحالي" : "Determine Current Company Location"}
+                {ar ? "تحديد موقع العيادة الحالي" : "Determine Current Company Location"}
               </span>
               {mapUrl ? (
                 <span className="text-xs text-blue-600 font-medium">{ar ? "رابط" : "Link"}</span>
