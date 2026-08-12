@@ -3,6 +3,7 @@ import { MobileShell } from "@/components/MobileShell";
 import { useI18n } from "@/lib/i18n";
 import { useState } from "react";
 import { usePatients } from "@/lib/patientsStore";
+import { AddAppointmentModal } from "@/components/AddAppointmentModal";
 import dentalBridge from "@/assets/dental-bridge.png";
 import {
   ArrowRight, ArrowLeft, User, CreditCard, Users,
@@ -20,6 +21,7 @@ function ClinicHome() {
   const BackIcon = dir === "rtl" ? ArrowRight : ArrowLeft;
 
   const patients = usePatients();
+  const [showAddAppointment, setShowAddAppointment] = useState(false);
 
   return (
     <MobileShell hideBottomNav>
@@ -67,10 +69,13 @@ function ClinicHome() {
                     {ar ? "كل ما يخص عيادتك في مكان واحد" : "Everything for your clinic in one place"}
                   </p>
                   <div className="flex items-center gap-2 mt-3">
-                    <Link to="/patients" className="h-10 px-4 rounded-xl bg-white text-blue-600 text-xs font-bold shadow-sm hover:bg-blue-50 transition flex items-center gap-1.5">
+                    <button
+                      onClick={() => setShowAddAppointment(true)}
+                      className="h-10 px-4 rounded-xl bg-white text-blue-600 text-xs font-bold shadow-sm hover:bg-blue-50 transition flex items-center gap-1.5"
+                    >
                       <Plus className="size-3.5" />
-                      {ar ? "مريض جديد" : "New Patient"}
-                    </Link>
+                      {ar ? "إضافة موعد" : "Add Appointment"}
+                    </button>
                     <button
                       onClick={() => navigate({ to: "/clinic/appointments" })}
                       className="h-10 px-4 rounded-xl bg-blue-700/40 text-white text-xs font-bold hover:bg-blue-700/60 transition flex items-center gap-1.5"
@@ -141,6 +146,8 @@ function ClinicHome() {
           </div>
         </div>
       </div>
+
+      {showAddAppointment && <AddAppointmentModal onClose={() => setShowAddAppointment(false)} />}
     </MobileShell>
   );
 }

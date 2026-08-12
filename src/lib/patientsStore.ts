@@ -49,6 +49,10 @@ export type Visit = {
   upcoming?: boolean;
   time?: string;
   status?: "confirmed" | "waiting" | "cancelled" | "completed";
+  appointmentType?: string;
+  room?: string;
+  doctor?: string;
+  reminder?: boolean;
 };
 
 export type PatientFile = {
@@ -190,6 +194,27 @@ export function addPatient(input: PatientInput): Patient {
   state = [p, ...state];
   persist();
   return p;
+}
+
+export function findOrCreatePatient(name: string, phone: string): Patient {
+  const cleanName = name.trim();
+  const cleanPhone = phone.replace(/\D/g, "");
+  const existing = getPatients().find((p) => {
+    const pPhone = (p.phone || "").replace(/\D/g, "");
+    if (cleanPhone && pPhone && pPhone === cleanPhone) return true;
+    if (cleanName && p.name.trim().toLowerCase() === cleanName.toLowerCase()) return true;
+    return false;
+  });
+  if (existing) return existing;
+  return addPatient({
+    name: cleanName,
+    age: "",
+    gender: "male",
+    phone: cleanPhone,
+    history: EMPTY_HISTORY,
+    complaint: "",
+    status: "new",
+  });
 }
 
 export function updatePatient(id: string, patch: Partial<Patient>) {
