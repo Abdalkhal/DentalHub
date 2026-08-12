@@ -28,12 +28,39 @@ import {
   BookOpen,
   Settings,
   FlaskConical,
+  Heart,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useIsFavorited, toggleFavorite } from "@/lib/favoritesStore";
 
 const BRANCH_BACK_ICON: Record<string, typeof ArrowRight> = {
   rtl: ArrowRight,
   ltr: ArrowLeft,
 };
+
+function FavoriteHeart({
+  productId, title, vendor, price, currency, imageUrl, lang,
+}: {
+  productId: string; title: string; vendor: string; price: number;
+  currency: "USD" | "IQD"; imageUrl?: string; lang: "ar" | "en";
+}) {
+  const liked = useIsFavorited(productId);
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        toggleFavorite({
+          id: productId, title, vendor, price, currency, imageUrl,
+          addedAt: new Date().toISOString(),
+        }, lang);
+      }}
+      className="absolute top-3 right-3 z-10 size-8 rounded-xl flex items-center justify-center transition bg-white/80 backdrop-blur border border-slate-200 hover:bg-slate-50 shadow-sm"
+      aria-label={liked ? "Remove from favorites" : "Add to favorites"}
+    >
+      <Heart className={cn("size-4", liked ? "fill-red-500 text-red-500" : "text-gray-400")} />
+    </button>
+  );
+}
 import imgGeneral from "@/assets/branch-general.png";
 import imgOperative from "@/assets/branch-operative.png";
 import imgEndodontic from "@/assets/branch-endodontic.png";
@@ -309,7 +336,16 @@ function OfficePage() {
                 {filteredProducts.map((p) => {
                   const pImg = matchUrls[p.images[0]] ?? resolveProductImage(undefined);
                   return (
-                    <div key={p.id} className="bg-card border border-border rounded-2xl p-3 shadow-soft flex flex-col">
+                    <div key={p.id} className="bg-card border border-border rounded-2xl p-3 shadow-soft flex flex-col relative">
+                      <FavoriteHeart
+                        productId={p.id}
+                        title={lang === "ar" ? p.ar : p.en}
+                        vendor={p.brand || office?.ar || office?.en || ""}
+                        price={p.price}
+                        currency={p.currency ?? "USD"}
+                        imageUrl={p.images[0] ? matchUrls[p.images[0]] : undefined}
+                        lang={lang}
+                      />
                       <div className="w-full h-36 rounded-xl bg-surface flex items-center justify-center overflow-hidden mb-2.5">
                         {pImg ? (
                           <img src={pImg} alt="" className="size-full object-contain" loading="lazy" />

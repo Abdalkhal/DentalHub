@@ -32,8 +32,10 @@ import {
   BookOpen,
   Settings,
   FlaskConical,
+  Heart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useIsFavorited, toggleFavorite } from "@/lib/favoritesStore";
 import imgGeneral from "@/assets/branch-general.png";
 import imgOperative from "@/assets/branch-operative.png";
 import imgEndodontic from "@/assets/branch-endodontic.png";
@@ -492,13 +494,33 @@ function ProductCard({
   imgSrc,
   ar,
 }: {
-  product: { ar: string; en: string; brand: string; price: number; currency: string };
+  product: { id: string; ar: string; en: string; brand: string; price: number; currency: string };
   imgSrc: string | null;
   ar: boolean;
 }) {
   const [imgError, setImgError] = useState(false);
+  const liked = useIsFavorited(product.id);
+  const title = ar ? product.ar || product.en : product.en || product.ar;
   return (
-    <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all">
+    <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all relative">
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          toggleFavorite({
+            id: product.id,
+            title,
+            vendor: product.brand || "",
+            price: product.price,
+            currency: (product.currency as "USD" | "IQD") || "USD",
+            imageUrl: imgSrc ?? undefined,
+            addedAt: new Date().toISOString(),
+          }, ar ? "ar" : "en");
+        }}
+        className="absolute top-3 right-3 z-10 size-8 rounded-xl flex items-center justify-center transition bg-white/80 backdrop-blur border border-slate-200 hover:bg-slate-50 shadow-sm"
+        aria-label={liked ? "Remove from favorites" : "Add to favorites"}
+      >
+        <Heart className={cn("size-4", liked ? "fill-red-500 text-red-500" : "text-gray-400")} />
+      </button>
       <div className="h-28 w-full bg-gray-50 flex items-center justify-center p-2 relative">
         {imgSrc && !imgError ? (
           <img
@@ -514,7 +536,7 @@ function ProductCard({
       </div>
       <div className="p-2">
         <p className="font-display font-bold text-[11px] leading-tight line-clamp-2 text-slate-800">
-          {ar ? product.ar || product.en : product.en || product.ar}
+          {title}
         </p>
         {product.brand ? (
           <p className="text-[10px] text-slate-400 mt-0.5 truncate">{product.brand}</p>
