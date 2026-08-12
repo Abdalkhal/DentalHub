@@ -5,11 +5,35 @@ import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
 import { useAdminStore } from "@/lib/adminStore";
 import { useProducts, useSignedImageUrls } from "@/lib/products";
-import { ProductGallery } from "@/components/ProductGallery";
-import { Plus, SearchX, ArrowUpDown, ImageOff, Check } from "lucide-react";
+import { Plus, SearchX, ArrowUpDown, ImageOff, Check, Heart } from "lucide-react";
 import { addToCart } from "@/lib/cartStore";
 import { addToPurchaseHistory } from "@/lib/quickOrders";
 import { cn } from "@/lib/utils";
+import { useIsFavorited, toggleFavorite } from "@/lib/favoritesStore";
+
+function FavoriteHeart({
+  productId, title, vendor, price, currency, imageUrl, lang,
+}: {
+  productId: string; title: string; vendor: string; price: number;
+  currency: "USD" | "IQD"; imageUrl?: string; lang: "ar" | "en";
+}) {
+  const liked = useIsFavorited(productId);
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        toggleFavorite({
+          id: productId, title, vendor, price, currency, imageUrl,
+          addedAt: new Date().toISOString(),
+        }, lang);
+      }}
+      className="absolute top-2.5 right-2.5 z-10 size-8 rounded-xl flex items-center justify-center transition bg-white/80 backdrop-blur border border-slate-200 hover:bg-slate-50 shadow-sm"
+      aria-label={liked ? "Remove from favorites" : "Add to favorites"}
+    >
+      <Heart className={cn("size-4", liked ? "fill-rose-500 text-rose-500" : "text-slate-400")} />
+    </button>
+  );
+}
 
 export const Route = createFileRoute("/supplies/$officeId/$branchSlug")({
   component: BranchPage,
@@ -157,7 +181,16 @@ function BranchPage() {
               const urls = p.images.map((path) => urlMap[path]).filter(Boolean);
               const first = urls[0];
               return (
-                <div key={p.id} className="bg-card border border-border rounded-xl p-3 shadow-soft flex flex-col">
+                <div key={p.id} className="bg-card border border-border rounded-xl p-3 shadow-soft flex flex-col relative">
+                  <FavoriteHeart
+                    productId={p.id}
+                    title={lang === "ar" ? p.ar : p.en}
+                    vendor={p.brand || office?.ar || office?.en || ""}
+                    price={p.price}
+                    currency={p.currency ?? "USD"}
+                    imageUrl={p.images?.[0] ? urlMap[p.images[0]] : undefined}
+                    lang={lang}
+                  />
                   <div className="w-full h-36 rounded-lg bg-surface flex items-center justify-center overflow-hidden mb-2.5">
                     {first ? (
                       <img src={first} alt={lang === "ar" ? p.ar : p.en} loading="lazy" className="size-full object-contain" />

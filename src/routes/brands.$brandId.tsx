@@ -85,13 +85,12 @@ function BrandDetail() {
             size="sm"
             item={{
               id: brand.id,
-              kind: "implant",
-              titleAr: brand.ar,
-              titleEn: brand.name,
-              subAr: brand.countryAr,
-              subEn: brand.countryEn,
-              to: "/brands/$brandId",
-              params: { brandId: brand.id },
+              title: lang === "ar" ? brand.ar : brand.name,
+              vendor: lang === "ar" ? brand.countryAr : brand.countryEn,
+              price: 0,
+              currency: "USD",
+              imageUrl: undefined,
+              addedAt: new Date().toISOString(),
             }}
           />
           <div className="flex items-center gap-3">
