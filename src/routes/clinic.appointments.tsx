@@ -14,6 +14,9 @@ import {
   Bell,
   Sun,
   Moon,
+  Phone,
+  Stethoscope,
+  DoorOpen,
 } from "lucide-react";
 
 const TIME_SLOTS = [
@@ -49,6 +52,20 @@ const TREATMENT_ICONS: Record<string, string> = {
 
 function treatmentIcon(treatment: string): string {
   return TREATMENT_ICONS[treatment] ?? "🩺";
+}
+
+type TypeStyle = { border: string; badge: string; avatar: string };
+
+function typeStyle(type: string): TypeStyle {
+  const map: Record<string, TypeStyle> = {
+    "استشارة": { border: "border-purple-500", badge: "bg-purple-50 text-purple-700", avatar: "from-purple-100 to-purple-200 text-purple-700" },
+    "متابعة": { border: "border-blue-500", badge: "bg-blue-50 text-blue-700", avatar: "from-blue-100 to-sky-200 text-blue-700" },
+    "مراجعة بعد العلاج": { border: "border-teal-500", badge: "bg-teal-50 text-teal-700", avatar: "from-teal-100 to-teal-200 text-teal-700" },
+    "طوارئ": { border: "border-red-500", badge: "bg-red-50 text-red-700", avatar: "from-red-100 to-rose-200 text-red-700" },
+    "فحص دوري": { border: "border-amber-500", badge: "bg-amber-50 text-amber-700", avatar: "from-amber-100 to-orange-200 text-amber-700" },
+    "استشارة اونلاين": { border: "border-indigo-500", badge: "bg-indigo-50 text-indigo-700", avatar: "from-indigo-100 to-indigo-200 text-indigo-700" },
+  };
+  return map[type] ?? { border: "border-blue-500", badge: "bg-blue-50 text-blue-700", avatar: "from-blue-100 to-sky-200 text-blue-700" };
 }
 
 function formatMonthYear(date: Date, ar: boolean): string {
@@ -353,36 +370,73 @@ function AppointmentsPage() {
 }
 
 function AppointmentCard({ appt }: { appt: Appointment }) {
+  const style = typeStyle(appt.appointmentType);
+  const initial = appt.patientName.trim().charAt(0) || "؟";
   return (
-    <div className="bg-white border border-slate-100 rounded-xl p-2.5 shadow-sm hover:shadow-md transition">
-      <div className="flex items-center gap-2.5">
-        <div className="size-9 rounded-xl bg-slate-100 flex items-center justify-center text-lg shrink-0 overflow-hidden">
-          {appt.patientName.trim().charAt(0)}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <p className="text-xs font-bold text-slate-800 truncate">{appt.patientName}</p>
-            <span className="text-[9px] font-bold text-slate-400 shrink-0">{appt.time}</span>
+    <div className="relative flex gap-2.5">
+      {/* Timeline node + connector */}
+      <div className="relative w-4 shrink-0 flex justify-center">
+        <span className="absolute top-6 size-3 rounded-full bg-blue-500 ring-4 ring-blue-100" />
+        <span className="absolute top-0 bottom-0 w-px bg-blue-100" />
+      </div>
+
+      {/* Card */}
+      <div className={cn(
+        "flex-1 bg-white rounded-2xl p-4 shadow-sm hover:shadow-md transition border border-slate-100 border-s-4",
+        style.border,
+      )}>
+        {/* Header */}
+        <div className="flex items-start gap-3">
+          <span className={cn("size-11 rounded-full bg-gradient-to-br flex items-center justify-center font-display font-extrabold text-lg shrink-0 shadow-sm", style.avatar)}>
+            {initial}
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-gray-900 text-base truncate">{appt.patientName}</p>
+            {appt.phone && (
+              <p className="text-xs text-gray-500 mt-0.5" dir="ltr">{appt.phone}</p>
+            )}
           </div>
-          <p className="text-[10px] text-slate-500 truncate flex items-center gap-1">
-            <span>{treatmentIcon(appt.treatment)}</span>
-            {appt.treatment}
-          </p>
+          <span className={cn("shrink-0 text-xs px-2.5 py-1 rounded-full font-medium", style.badge)}>
+            {appt.appointmentType}
+          </span>
         </div>
-        <span className="shrink-0 text-[9px] font-bold bg-sky-50 text-sky-700 px-2 py-0.5 rounded-md">
-          {appt.appointmentType}
-        </span>
-      </div>
-      <div className="flex items-center gap-2 mt-1.5 pl-11">
-        {appt.doctor && (
-          <span className="text-[9px] text-slate-400 truncate">👨‍⚕️ {appt.doctor}</span>
+
+        {/* Meta row */}
+        <div className="flex items-center flex-wrap gap-x-3 gap-y-1.5 mt-3 pt-3 border-t border-slate-100">
+          <span className="flex items-center gap-1 text-xs text-gray-600">
+            <span className="text-sm leading-none">{treatmentIcon(appt.treatment)}</span>
+            {appt.treatment}
+          </span>
+          {appt.doctor && (
+            <span className="flex items-center gap-1 text-xs text-gray-600">
+              <Stethoscope className="size-3.5 text-slate-400" />
+              {appt.doctor}
+            </span>
+          )}
+          {appt.clinicRoom && (
+            <span className="flex items-center gap-1 text-xs text-gray-600">
+              <DoorOpen className="size-3.5 text-slate-400" />
+              {appt.clinicRoom}
+            </span>
+          )}
+        </div>
+
+        {/* Notes */}
+        {appt.notes && (
+          <p className="text-xs text-gray-500 mt-2 leading-snug">{appt.notes}</p>
         )}
-        {appt.clinicRoom && (
-          <span className="text-[9px] text-slate-400 truncate">📍 {appt.clinicRoom}</span>
-        )}
       </div>
-      {appt.notes && (
-        <p className="text-[10px] text-slate-400 mt-1.5 pl-11">{appt.notes}</p>
+
+      {/* Call action */}
+      {appt.phone && (
+        <a
+          href={`tel:${appt.phone}`}
+          onClick={(e) => e.stopPropagation()}
+          className="self-center shrink-0 size-9 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 transition"
+          aria-label="Call patient"
+        >
+          <Phone className="size-4" />
+        </a>
       )}
     </div>
   );
