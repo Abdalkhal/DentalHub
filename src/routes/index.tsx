@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { useSession, useUserRole } from "@/lib/useAuth";
 import { setPatientStoreUser } from "@/lib/patientsStore";
 import { setClinicStoreUser } from "@/lib/clinicStore";
+import { setAppointmentsStoreUser } from "@/lib/appointmentsStore";
 import { NotificationBell } from "@/components/NotificationBell";
 import { getSnapshot } from "@/lib/ordersStore";
 import { useQuickOrders } from "@/lib/quickOrders";
@@ -60,6 +61,7 @@ function Home() {
     const uid = user?.uid || "";
     setPatientStoreUser(uid);
     setClinicStoreUser(uid);
+    setAppointmentsStoreUser(uid);
   }, [user?.uid]);
 
   useEffect(() => {

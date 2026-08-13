@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { X, ChevronLeft, ChevronRight, Calendar, Clock, Bell, User, Phone, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
-import { findOrCreatePatient, addVisit } from "@/lib/patientsStore";
+import { addAppointment } from "@/lib/appointmentsStore";
 import { useClinic } from "@/lib/clinicStore";
 import { useUserRole } from "@/lib/useAuth";
 import { toast } from "sonner";
@@ -93,17 +93,16 @@ export function AddAppointmentModal({ onClose }: { onClose: () => void }) {
       toast.error(ar ? "اسم المريض مطلوب" : "Patient name is required");
       return;
     }
-    const patient = findOrCreatePatient(name, phone);
-    addVisit(patient.id, {
+    addAppointment({
+      patientName: name.trim(),
+      phone: phone.replace(/\D/g, ""),
       date,
       time: formatFullTime(),
-      procedure: treatment,
-      note: notes.trim() || undefined,
-      upcoming: true,
-      status: "confirmed",
       appointmentType,
-      room: room.trim() || undefined,
+      clinicRoom: room.trim(),
       doctor: doctor === "main" ? mainDoctor : (doctors.find((d) => d.id === doctor)?.name || mainDoctor),
+      treatment,
+      notes: notes.trim(),
       reminder,
     });
     toast.success(ar ? "تم إضافة الموعد بنجاح" : "Appointment added successfully");

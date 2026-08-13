@@ -1,19 +1,19 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
-import { usePatients } from "@/lib/patientsStore";
-import type { Visit } from "@/lib/patientsStore";
+import { useAppointments, type Appointment } from "@/lib/appointmentsStore";
+import { cn } from "@/lib/utils";
 import {
   ChevronLeft,
   ChevronRight,
   Clock,
-  Check,
   Users,
   CalendarCheck,
-  Clock3,
-  XCircle,
+  Bell,
+  Sun,
+  Moon,
 } from "lucide-react";
 
 const TIME_SLOTS = [
@@ -31,63 +31,28 @@ const DAY_LABELS = [
   { key: 6, ar: "السبت", en: "Sat" },
 ];
 
-const PROCEDURE_ICONS: Record<string, string> = {
-  تنظيف: "🧹",
-  "تنظيف الأسنان": "🧹",
-  cleaning: "🧹",
-  حشوة: "🦷",
-  حشو: "🦷",
-  filling: "🦷",
-  "علاج عصب": "⚡",
-  "سحب عصب": "⚡",
-  rootcanal: "⚡",
-  rct: "⚡",
-  خلع: "🔧",
-  extraction: "🔧",
-  تقويم: "😬",
-  ortho: "😬",
-  زراعة: "🔩",
-  implant: "🔩",
-  تلبيسة: "👑",
-  crown: "👑",
-  bridge: "🌉",
-  جسر: "🌉",
-  فحص: "🔍",
-  examination: "🔍",
-  checkup: "🔍",
+const MONTHS_AR = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+const MONTHS_EN = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const WEEKDAYS_AR = ["أحد", "إثنين", "ثلاثاء", "أربعاء", "خميس", "جمعة", "سبت"];
+const WEEKDAYS_EN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+const TREATMENT_ICONS: Record<string, string> = {
+  "تنظيف اسنان": "🧹",
+  "حشوة": "🦷",
+  "علاج جذور": "⚡",
+  "خلع": "🔧",
+  "زراعة اسنان": "🔩",
+  "تركيب تاج": "👑",
+  "تقويم": "😬",
+  "تبييض": "✨",
 };
 
-function procedureIcon(procedure: string): string {
-  const lower = procedure.toLowerCase().trim();
-  for (const [key, icon] of Object.entries(PROCEDURE_ICONS)) {
-    if (lower.includes(key.toLowerCase())) return icon;
-  }
-  return "🩺";
-}
-
-function statusConfig(
-  status: Visit["status"],
-  upcoming?: boolean,
-): { label: { ar: string; en: string }; bg: string; icon: typeof Check } {
-  if (status === "completed") return { label: { ar: "مكتمل", en: "Completed" }, bg: "bg-emerald-100 text-emerald-700", icon: Check };
-  if (status === "confirmed") return { label: { ar: "مؤكد", en: "Confirmed" }, bg: "bg-sky-100 text-sky-700", icon: Check };
-  if (status === "waiting") return { label: { ar: "انتظار", en: "Waiting" }, bg: "bg-amber-100 text-amber-700", icon: Clock3 };
-  if (status === "cancelled") return { label: { ar: "ملغي", en: "Cancelled" }, bg: "bg-rose-100 text-rose-700", icon: XCircle };
-  if (upcoming) return { label: { ar: "مؤكد", en: "Confirmed" }, bg: "bg-sky-100 text-sky-700", icon: Check };
-  return { label: { ar: "مكتمل", en: "Completed" }, bg: "bg-emerald-100 text-emerald-700", icon: Check };
-}
-
-function getTimeFromId(id: string): string {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
-  const idx = hash % TIME_SLOTS.length;
-  return TIME_SLOTS[idx];
+function treatmentIcon(treatment: string): string {
+  return TREATMENT_ICONS[treatment] ?? "🩺";
 }
 
 function formatMonthYear(date: Date, ar: boolean): string {
-  const months = ar
-    ? ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"]
-    : ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const months = ar ? MONTHS_AR : MONTHS_EN;
   return `${months[date.getMonth()]} ${date.getFullYear()}`;
 }
 
@@ -103,6 +68,11 @@ function dayOfWeek(d: Date): number {
   return day === 0 ? 6 : day - 1;
 }
 
+function hourSlot(time: string): string {
+  const hh = time?.split(":")[0] ?? "08";
+  return `${hh}:00`;
+}
+
 export const Route = createFileRoute("/clinic/appointments")({
   component: AppointmentsPage,
 });
@@ -110,13 +80,14 @@ export const Route = createFileRoute("/clinic/appointments")({
 function AppointmentsPage() {
   const { lang } = useI18n();
   const ar = lang === "ar";
-  const navigate = useNavigate();
-  const patients = usePatients();
+  const appointments = useAppointments();
   const today = new Date();
   const todayStr = toDateStr(today);
 
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const [monthOffset, setMonthOffset] = useState(0);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [calMonth, setCalMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
 
   const baseDate = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
 
@@ -133,43 +104,56 @@ function AppointmentsPage() {
     return days;
   }, [monthOffset, baseDate.getMonth(), baseDate.getFullYear()]);
 
-  const appointments = useMemo(() => {
-    const result: { patientName: string; patientAvatar?: string; patientId: string; visit: Visit }[] = [];
-    for (const p of patients) {
-      for (const v of p.visits) {
-        if (v.date === selectedDate) {
-          if (v.upcoming === false && v.status !== "cancelled") continue;
-          result.push({
-            patientName: p.name,
-            patientAvatar: p.avatar,
-            patientId: p.id,
-            visit: v,
-          });
-        }
-      }
-    }
-    result.sort((a, b) => {
-      const ta = a.visit.time || getTimeFromId(a.visit.id);
-      const tb = b.visit.time || getTimeFromId(b.visit.id);
-      return ta.localeCompare(tb);
-    });
-    return result;
-  }, [patients, selectedDate]);
+  const dayAppointments = useMemo(
+    () => appointments.filter((a) => a.date === selectedDate),
+    [appointments, selectedDate],
+  );
+
+  const sorted = useMemo(
+    () => [...dayAppointments].sort((a, b) => (a.time || "00:00").localeCompare(b.time || "00:00")),
+    [dayAppointments],
+  );
 
   const stats = useMemo(() => {
-    const total = appointments.length;
-    const confirmed = appointments.filter((a) => (a.visit.status ?? (a.visit.upcoming ? "confirmed" : "completed")) === "confirmed").length;
-    const waiting = appointments.filter((a) => a.visit.status === "waiting").length;
-    const cancelled = appointments.filter((a) => a.visit.status === "cancelled").length;
-    const completed = appointments.filter((a) => a.visit.status === "completed").length;
-    return { total, confirmed, waiting, cancelled, completed };
-  }, [appointments]);
+    const total = dayAppointments.length;
+    const morning = dayAppointments.filter((a) => {
+      const h = Number((a.time || "00:00").split(":")[0]);
+      return h < 12;
+    }).length;
+    const evening = total - morning;
+    const reminders = dayAppointments.filter((a) => a.reminder).length;
+    return { total, morning, evening, reminders };
+  }, [dayAppointments]);
 
   const changeMonth = (dir: -1 | 1) => setMonthOffset((o) => o + dir);
 
   const goToToday = () => {
     setMonthOffset(0);
     setSelectedDate(todayStr);
+  };
+
+  const calDays = useMemo(() => {
+    const year = calMonth.getFullYear();
+    const month = calMonth.getMonth();
+    const first = new Date(year, month, 1);
+    const startDow = first.getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const cells: (number | null)[] = [];
+    for (let i = 0; i < startDow; i++) cells.push(null);
+    for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+    while (cells.length % 7 !== 0) cells.push(null);
+    return { year, month, cells };
+  }, [calMonth]);
+
+  const changeCalMonth = (dir: -1 | 1) =>
+    setCalMonth((m) => new Date(m.getFullYear(), m.getMonth() + dir, 1));
+
+  const jumpToDate = (ds: string) => {
+    const d = new Date(ds + "T00:00:00");
+    const diff = (d.getFullYear() - today.getFullYear()) * 12 + (d.getMonth() - today.getMonth());
+    setMonthOffset(diff);
+    setSelectedDate(ds);
+    setShowCalendar(false);
   };
 
   const nowHour = new Date().getHours();
@@ -186,9 +170,13 @@ function AppointmentsPage() {
           <button onClick={() => changeMonth(-1)} className="size-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition">
             {ar ? <ChevronRight className="size-4 text-slate-600" /> : <ChevronLeft className="size-4 text-slate-600" />}
           </button>
-          <h2 className="font-display font-extrabold text-base text-slate-800">
+          <button
+            onClick={() => setShowCalendar(true)}
+            className="flex items-center gap-1.5 font-display font-extrabold text-base text-slate-800 px-3 py-1 rounded-xl hover:bg-slate-100 transition"
+          >
             {formatMonthYear(baseDate, ar)}
-          </h2>
+            <CalendarCheck className="size-4 text-[#007AFF]" />
+          </button>
           <button onClick={() => changeMonth(1)} className="size-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition">
             {ar ? <ChevronLeft className="size-4 text-slate-600" /> : <ChevronRight className="size-4 text-slate-600" />}
           </button>
@@ -203,9 +191,7 @@ function AppointmentsPage() {
             const isCurrentMonth = d.getMonth() === baseDate.getMonth();
             const dow = dayOfWeek(d);
             const dayLabel = DAY_LABELS[dow];
-            const apptCount = patients.reduce((count, p) => {
-              return count + p.visits.filter((v) => v.date === ds && (v.upcoming !== false || v.status === "cancelled")).length;
-            }, 0);
+            const apptCount = appointments.filter((a) => a.date === ds).length;
 
             return (
               <button
@@ -245,34 +231,10 @@ function AppointmentsPage() {
 
         {/* Stats cards */}
         <div className="grid grid-cols-4 gap-2">
-          <StatCard
-            ar={ar}
-            label={{ ar: "الإجمالي", en: "Total" }}
-            value={stats.total}
-            color="bg-sky-50 text-sky-700"
-            icon={Users}
-          />
-          <StatCard
-            ar={ar}
-            label={{ ar: "مؤكد", en: "Confirmed" }}
-            value={stats.confirmed}
-            color="bg-indigo-50 text-indigo-700"
-            icon={CalendarCheck}
-          />
-          <StatCard
-            ar={ar}
-            label={{ ar: "انتظار", en: "Waiting" }}
-            value={stats.waiting}
-            color="bg-amber-50 text-amber-700"
-            icon={Clock3}
-          />
-          <StatCard
-            ar={ar}
-            label={{ ar: "ملغي", en: "Cancelled" }}
-            value={stats.cancelled}
-            color="bg-rose-50 text-rose-700"
-            icon={XCircle}
-          />
+          <StatCard ar={ar} label={{ ar: "الإجمالي", en: "Total" }} value={stats.total} color="bg-sky-50 text-sky-700" icon={Users} />
+          <StatCard ar={ar} label={{ ar: "صباحاً", en: "Morning" }} value={stats.morning} color="bg-amber-50 text-amber-700" icon={Sun} />
+          <StatCard ar={ar} label={{ ar: "مساءً", en: "Evening" }} value={stats.evening} color="bg-indigo-50 text-indigo-700" icon={Moon} />
+          <StatCard ar={ar} label={{ ar: "تذكير", en: "Reminders" }} value={stats.reminders} color="bg-rose-50 text-rose-700" icon={Bell} />
         </div>
 
         {/* Timeline */}
@@ -284,13 +246,8 @@ function AppointmentsPage() {
 
           <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
             {TIME_SLOTS.map((slot) => {
-              const slotAppts = appointments.filter((a) => {
-                const t = a.visit.time || getTimeFromId(a.visit.id);
-                return t === slot;
-              });
-
-              const isCurrentHour =
-                selectedDate === todayStr && parseInt(slot.split(":")[0]) === nowHour;
+              const slotAppts = sorted.filter((a) => hourSlot(a.time) === slot);
+              const isCurrentHour = selectedDate === todayStr && parseInt(slot.split(":")[0]) === nowHour;
 
               return (
                 <div key={slot} className={`flex border-b border-slate-50 last:border-b-0 ${isCurrentHour ? "bg-blue-50/30" : ""}`}>
@@ -306,43 +263,9 @@ function AppointmentsPage() {
                     {slotAppts.length === 0 ? (
                       <div className="h-6" />
                     ) : (
-                      slotAppts.map((a) => {
-                        const sCfg = statusConfig(a.visit.status, a.visit.upcoming);
-                        const icon = procedureIcon(a.visit.procedure);
-                        return (
-                          <div
-                            key={a.visit.id}
-                            className="bg-white border border-slate-100 rounded-xl p-2.5 shadow-sm hover:shadow-md transition cursor-pointer"
-                            onClick={() => navigate({ to: "/patients/$patientId", params: { patientId: a.patientId } })}
-                          >
-                            <div className="flex items-center gap-2.5">
-                              <div className="size-9 rounded-xl bg-slate-100 flex items-center justify-center text-lg shrink-0 overflow-hidden">
-                                {a.patientAvatar ? (
-                                  <img src={a.patientAvatar} alt="" className="size-full object-cover" />
-                                ) : (
-                                  a.patientName.trim().charAt(0)
-                                )}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs font-bold text-slate-800 truncate">
-                                  {a.patientName}
-                                </p>
-                                <p className="text-[10px] text-slate-500 truncate flex items-center gap-1">
-                                  <span>{icon}</span>
-                                  {a.visit.procedure}
-                                </p>
-                              </div>
-                              <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${sCfg.bg} flex items-center gap-1`}>
-                                <sCfg.icon className="size-3" />
-                                {ar ? sCfg.label.ar : sCfg.label.en}
-                              </span>
-                            </div>
-                            {a.visit.note && (
-                              <p className="text-[10px] text-slate-400 mt-1.5 ml-11">{a.visit.note}</p>
-                            )}
-                          </div>
-                        );
-                      })
+                      slotAppts.map((a) => (
+                        <AppointmentCard key={a.id} appt={a} />
+                      ))
                     )}
                   </div>
                 </div>
@@ -362,7 +285,7 @@ function AppointmentsPage() {
         </div>
 
         {/* Empty state */}
-        {appointments.length === 0 && (
+        {dayAppointments.length === 0 && (
           <div className="py-10 text-center">
             <CalendarCheck className="size-10 text-slate-300 mx-auto mb-2" />
             <p className="text-sm font-bold text-slate-400">
@@ -371,7 +294,97 @@ function AppointmentsPage() {
           </div>
         )}
       </div>
+
+      {/* Calendar Modal */}
+      {showCalendar && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setShowCalendar(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm rounded-3xl bg-white p-4 shadow-2xl"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <button type="button" onClick={() => changeCalMonth(-1)} className="size-9 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center">
+                {ar ? <ChevronRight className="size-4" /> : <ChevronLeft className="size-4" />}
+              </button>
+              <p className="font-display font-bold text-sm">
+                {ar ? `${MONTHS_AR[calDays.month]} ${calDays.year}` : `${MONTHS_EN[calDays.month]} ${calDays.year}`}
+              </p>
+              <button type="button" onClick={() => changeCalMonth(1)} className="size-9 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center">
+                {ar ? <ChevronLeft className="size-4" /> : <ChevronRight className="size-4" />}
+              </button>
+            </div>
+            <div className="grid grid-cols-7 gap-1 mb-1">
+              {(ar ? WEEKDAYS_AR : WEEKDAYS_EN).map((d) => (
+                <span key={d} className="text-center text-[10px] font-bold text-muted-foreground py-1">{d}</span>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {calDays.cells.map((d, i) => {
+                if (d === null) return <span key={`e-${i}`} />;
+                const ds = toDateStr(new Date(calDays.year, calDays.month, d));
+                const isSelected = ds === selectedDate;
+                const hasAppt = appointments.some((a) => a.date === ds);
+                return (
+                  <button
+                    key={ds}
+                    type="button"
+                    onClick={() => jumpToDate(ds)}
+                    className={cn(
+                      "h-10 rounded-xl text-sm font-semibold transition flex items-center justify-center relative",
+                      isSelected ? "bg-[#007AFF] text-white shadow-sm" : "hover:bg-slate-100",
+                    )}
+                  >
+                    {d}
+                    {hasAppt && (
+                      <span className={cn("absolute bottom-1 size-1 rounded-full", isSelected ? "bg-white" : "bg-[#007AFF]")} />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </MobileShell>
+  );
+}
+
+function AppointmentCard({ appt }: { appt: Appointment }) {
+  return (
+    <div className="bg-white border border-slate-100 rounded-xl p-2.5 shadow-sm hover:shadow-md transition">
+      <div className="flex items-center gap-2.5">
+        <div className="size-9 rounded-xl bg-slate-100 flex items-center justify-center text-lg shrink-0 overflow-hidden">
+          {appt.patientName.trim().charAt(0)}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5">
+            <p className="text-xs font-bold text-slate-800 truncate">{appt.patientName}</p>
+            <span className="text-[9px] font-bold text-slate-400 shrink-0">{appt.time}</span>
+          </div>
+          <p className="text-[10px] text-slate-500 truncate flex items-center gap-1">
+            <span>{treatmentIcon(appt.treatment)}</span>
+            {appt.treatment}
+          </p>
+        </div>
+        <span className="shrink-0 text-[9px] font-bold bg-sky-50 text-sky-700 px-2 py-0.5 rounded-md">
+          {appt.appointmentType}
+        </span>
+      </div>
+      <div className="flex items-center gap-2 mt-1.5 pl-11">
+        {appt.doctor && (
+          <span className="text-[9px] text-slate-400 truncate">👨‍⚕️ {appt.doctor}</span>
+        )}
+        {appt.clinicRoom && (
+          <span className="text-[9px] text-slate-400 truncate">📍 {appt.clinicRoom}</span>
+        )}
+      </div>
+      {appt.notes && (
+        <p className="text-[10px] text-slate-400 mt-1.5 pl-11">{appt.notes}</p>
+      )}
+    </div>
   );
 }
 
