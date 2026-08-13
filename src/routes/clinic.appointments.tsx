@@ -18,6 +18,15 @@ import {
   Sun,
   Moon,
 } from "lucide-react";
+import {
+  ToothIcon,
+  CrownToothIcon,
+  RootCanalIcon,
+  ImplantIcon,
+  BracesIcon,
+  SparkleToothIcon,
+  ExtractionIcon,
+} from "@/components/DentalIcons";
 
 const TIME_SLOTS = [
   "08:00", "09:00", "10:00", "11:00", "12:00",
@@ -39,19 +48,19 @@ const MONTHS_EN = ["January", "February", "March", "April", "May", "June", "July
 const WEEKDAYS_AR = ["أحد", "إثنين", "ثلاثاء", "أربعاء", "خميس", "جمعة", "سبت"];
 const WEEKDAYS_EN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-const TREATMENT_ICONS: Record<string, string> = {
-  "تنظيف اسنان": "🧹",
-  "حشوة": "🦷",
-  "علاج جذور": "⚡",
-  "خلع": "🔧",
-  "زراعة اسنان": "🔩",
-  "تركيب تاج": "👑",
-  "تقويم": "😬",
-  "تبييض": "✨",
+const TREATMENT_ICONS: Record<string, typeof ToothIcon> = {
+  "تنظيف اسنان": SparkleToothIcon,
+  "حشوة": ToothIcon,
+  "علاج جذور": RootCanalIcon,
+  "خلع": ExtractionIcon,
+  "زراعة اسنان": ImplantIcon,
+  "تركيب تاج": CrownToothIcon,
+  "تقويم": BracesIcon,
+  "تبييض": SparkleToothIcon,
 };
 
-function treatmentIcon(treatment: string): string {
-  return TREATMENT_ICONS[treatment] ?? "🩺";
+function treatmentIcon(treatment: string): typeof ToothIcon {
+  return TREATMENT_ICONS[treatment] ?? ToothIcon;
 }
 
 function format12h(slot: string, ar: boolean): string {
@@ -438,6 +447,7 @@ function AppointmentCard({ appt, ar }: { appt: Appointment; ar: boolean }) {
   const theme = statusTheme(appt);
   const initial = appt.patientName.trim().charAt(0) || "؟";
   const StatusIcon = theme.icon;
+  const TreatmentIcon = treatmentIcon(appt.treatment);
   return (
     <div className={cn(
       "flex items-center gap-3 py-2.5 px-4 rounded-2xl border transition",
@@ -449,8 +459,8 @@ function AppointmentCard({ appt, ar }: { appt: Appointment; ar: boolean }) {
         {initial}
       </span>
       {/* Treatment icon box */}
-      <span className="size-9 rounded-xl bg-white/70 border border-white/80 flex items-center justify-center text-lg shrink-0">
-        {treatmentIcon(appt.treatment)}
+      <span className="w-8 h-8 rounded-lg bg-blue-50/80 text-blue-600 flex items-center justify-center shrink-0">
+        <TreatmentIcon className="size-5" />
       </span>
       {/* Name + treatment subtitle */}
       <div className="flex-1 min-w-0">
