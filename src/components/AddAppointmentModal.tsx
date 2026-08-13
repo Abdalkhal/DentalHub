@@ -104,6 +104,7 @@ export function AddAppointmentModal({ onClose }: { onClose: () => void }) {
       treatment,
       notes: notes.trim(),
       reminder,
+      status: "confirmed",
     });
     toast.success(ar ? "تم إضافة الموعد بنجاح" : "Appointment added successfully");
     onClose();

@@ -12,6 +12,7 @@ export type Appointment = {
   treatment: string;
   notes: string;
   reminder: boolean;
+  status?: "confirmed" | "waiting" | "cancelled" | "completed";
   createdAt: string;
 };
 

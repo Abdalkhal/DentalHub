@@ -10,14 +10,13 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Check,
+  XCircle,
   Users,
   CalendarCheck,
   Bell,
   Sun,
   Moon,
-  Phone,
-  Stethoscope,
-  DoorOpen,
 } from "lucide-react";
 
 const TIME_SLOTS = [
@@ -55,18 +54,70 @@ function treatmentIcon(treatment: string): string {
   return TREATMENT_ICONS[treatment] ?? "🩺";
 }
 
-type TypeStyle = { border: string; badge: string; avatar: string };
+function format12h(slot: string, ar: boolean): string {
+  const [hStr, mm] = slot.split(":");
+  const hh = parseInt(hStr || "0", 10);
+  const suffix = hh < 12 ? "ص" : "م";
+  let hour = hh % 12;
+  if (hour === 0) hour = 12;
+  const hh12 = String(hour).padStart(2, "0");
+  if (!ar) return `${hh12}:${mm} ${hh < 12 ? "AM" : "PM"}`;
+  return `${hh12}:${mm} ${suffix}`;
+}
 
-function typeStyle(type: string): TypeStyle {
-  const map: Record<string, TypeStyle> = {
-    "استشارة": { border: "border-purple-500", badge: "bg-purple-50 text-purple-700", avatar: "from-purple-100 to-purple-200 text-purple-700" },
-    "متابعة": { border: "border-blue-500", badge: "bg-blue-50 text-blue-700", avatar: "from-blue-100 to-sky-200 text-blue-700" },
-    "مراجعة بعد العلاج": { border: "border-teal-500", badge: "bg-teal-50 text-teal-700", avatar: "from-teal-100 to-teal-200 text-teal-700" },
-    "طوارئ": { border: "border-red-500", badge: "bg-red-50 text-red-700", avatar: "from-red-100 to-rose-200 text-red-700" },
-    "فحص دوري": { border: "border-amber-500", badge: "bg-amber-50 text-amber-700", avatar: "from-amber-100 to-orange-200 text-amber-700" },
-    "استشارة اونلاين": { border: "border-indigo-500", badge: "bg-indigo-50 text-indigo-700", avatar: "from-indigo-100 to-indigo-200 text-indigo-700" },
-  };
-  return map[type] ?? { border: "border-blue-500", badge: "bg-blue-50 text-blue-700", avatar: "from-blue-100 to-sky-200 text-blue-700" };
+type Theme = {
+  bg: string;
+  border: string;
+  badge: string;
+  icon: typeof Check;
+  label: { ar: string; en: string };
+};
+
+function statusTheme(appt: Appointment): Theme {
+  const status = appt.status ?? "confirmed";
+  if (appt.appointmentType === "متابعة" && status === "confirmed") {
+    return {
+      bg: "bg-purple-50/60",
+      border: "border-purple-100",
+      badge: "bg-purple-100 text-purple-700",
+      icon: Check,
+      label: { ar: "متابعة", en: "Follow-up" },
+    };
+  }
+  switch (status) {
+    case "completed":
+      return {
+        bg: "bg-emerald-50/60",
+        border: "border-emerald-100",
+        badge: "bg-emerald-100 text-emerald-700",
+        icon: Check,
+        label: { ar: "مكتمل", en: "Completed" },
+      };
+    case "waiting":
+      return {
+        bg: "bg-amber-50/60",
+        border: "border-amber-100",
+        badge: "bg-amber-100 text-amber-700",
+        icon: Clock,
+        label: { ar: "انتظار", en: "Waiting" },
+      };
+    case "cancelled":
+      return {
+        bg: "bg-rose-50/60",
+        border: "border-rose-100",
+        badge: "bg-rose-100 text-rose-700",
+        icon: XCircle,
+        label: { ar: "ملغي", en: "Cancelled" },
+      };
+    default:
+      return {
+        bg: "bg-blue-50/60",
+        border: "border-blue-100",
+        badge: "bg-blue-100 text-blue-700",
+        icon: Check,
+        label: { ar: "مؤكد", en: "Confirmed" },
+      };
+  }
 }
 
 function formatMonthYear(date: Date, ar: boolean): string {
@@ -185,6 +236,8 @@ function AppointmentsPage() {
   const nowHour = new Date().getHours();
   const nowMin = new Date().getMinutes();
   const currentTimePercent = ((nowHour - 8 + nowMin / 60) / 10) * 100;
+  const nowTimeStr = `${String(nowHour).padStart(2, "0")}:${String(nowMin).padStart(2, "0")}`;
+  const currentTime12h = format12h(nowTimeStr, ar);
 
   return (
     <MobileShell>
@@ -270,27 +323,27 @@ function AppointmentsPage() {
             {ar ? "الجدول الزمني" : "Timeline"}
           </h3>
 
-          <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
+          <div className="relative bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
             {TIME_SLOTS.map((slot) => {
               const slotAppts = sorted.filter((a) => hourSlot(a.time) === slot);
               const isCurrentHour = selectedDate === todayStr && parseInt(slot.split(":")[0]) === nowHour;
 
               return (
                 <div key={slot} className={`flex border-b border-slate-50 last:border-b-0 ${isCurrentHour ? "bg-blue-50/30" : ""}`}>
-                  <div className="w-14 shrink-0 py-3 flex flex-col items-center justify-start border-r border-slate-50">
+                  <div className="w-16 shrink-0 py-3 flex flex-col items-center justify-start border-r border-slate-50">
                     <span className={`text-[11px] font-bold ${isCurrentHour ? "text-[#007AFF]" : "text-slate-400"}`}>
-                      {slot}
+                      {format12h(slot, ar)}
                     </span>
                     {isCurrentHour && (
                       <span className="text-[9px] font-bold text-[#007AFF] mt-0.5">{ar ? "الآن" : "Now"}</span>
                     )}
                   </div>
-                  <div className="flex-1 py-2 px-2 space-y-1.5">
+                  <div className="flex-1 py-1.5 px-2 space-y-1.5">
                     {slotAppts.length === 0 ? (
                       <div className="h-6" />
                     ) : (
                       slotAppts.map((a) => (
-                        <AppointmentCard key={a.id} appt={a} />
+                        <AppointmentCard key={a.id} appt={a} ar={ar} />
                       ))
                     )}
                   </div>
@@ -301,10 +354,13 @@ function AppointmentsPage() {
             {/* Current time indicator */}
             {selectedDate === todayStr && currentTimePercent > 0 && currentTimePercent < 100 && (
               <div
-                className="absolute left-14 right-0 border-t border-[#007AFF] z-10"
+                className="absolute inset-x-0 z-10 flex items-center pointer-events-none"
                 style={{ top: `${currentTimePercent}%` }}
               >
-                <div className="absolute -left-1.5 -top-1.5 size-3 rounded-full bg-[#007AFF] border-2 border-white" />
+                <span className="bg-[#007AFF] text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm shrink-0 -translate-y-1/2">
+                  {currentTime12h}
+                </span>
+                <span className="flex-1 h-px bg-[#007AFF]" />
               </div>
             )}
           </div>
@@ -378,75 +434,34 @@ function AppointmentsPage() {
   );
 }
 
-function AppointmentCard({ appt }: { appt: Appointment }) {
-  const style = typeStyle(appt.appointmentType);
+function AppointmentCard({ appt, ar }: { appt: Appointment; ar: boolean }) {
+  const theme = statusTheme(appt);
   const initial = appt.patientName.trim().charAt(0) || "؟";
+  const StatusIcon = theme.icon;
   return (
-    <div className="relative flex gap-2.5">
-      {/* Timeline node + connector */}
-      <div className="relative w-4 shrink-0 flex justify-center">
-        <span className="absolute top-6 size-3 rounded-full bg-blue-500 ring-4 ring-blue-100" />
-        <span className="absolute top-0 bottom-0 w-px bg-blue-100" />
+    <div className={cn(
+      "flex items-center gap-3 py-2.5 px-4 rounded-2xl border transition",
+      theme.bg,
+      theme.border,
+    )}>
+      {/* Right: avatar */}
+      <span className="size-10 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 text-slate-700 flex items-center justify-center font-bold text-sm shrink-0">
+        {initial}
+      </span>
+      {/* Treatment icon box */}
+      <span className="size-9 rounded-xl bg-white/70 border border-white/80 flex items-center justify-center text-lg shrink-0">
+        {treatmentIcon(appt.treatment)}
+      </span>
+      {/* Name + treatment subtitle */}
+      <div className="flex-1 min-w-0">
+        <p className="font-semibold text-gray-900 text-sm truncate">{appt.patientName}</p>
+        <p className="text-xs text-gray-500 truncate">{appt.treatment}</p>
       </div>
-
-      {/* Card */}
-      <div className={cn(
-        "flex-1 bg-white rounded-2xl p-4 shadow-sm hover:shadow-md transition border border-slate-100 border-s-4",
-        style.border,
-      )}>
-        {/* Header */}
-        <div className="flex items-start gap-3">
-          <span className={cn("size-11 rounded-full bg-gradient-to-br flex items-center justify-center font-display font-extrabold text-lg shrink-0 shadow-sm", style.avatar)}>
-            {initial}
-          </span>
-          <div className="flex-1 min-w-0">
-            <p className="font-bold text-gray-900 text-base truncate">{appt.patientName}</p>
-            {appt.phone && (
-              <p className="text-xs text-gray-500 mt-0.5" dir="ltr">{appt.phone}</p>
-            )}
-          </div>
-          <span className={cn("shrink-0 text-xs px-2.5 py-1 rounded-full font-medium", style.badge)}>
-            {appt.appointmentType}
-          </span>
-        </div>
-
-        {/* Meta row */}
-        <div className="flex items-center flex-wrap gap-x-3 gap-y-1.5 mt-3 pt-3 border-t border-slate-100">
-          <span className="flex items-center gap-1 text-xs text-gray-600">
-            <span className="text-sm leading-none">{treatmentIcon(appt.treatment)}</span>
-            {appt.treatment}
-          </span>
-          {appt.doctor && (
-            <span className="flex items-center gap-1 text-xs text-gray-600">
-              <Stethoscope className="size-3.5 text-slate-400" />
-              {appt.doctor}
-            </span>
-          )}
-          {appt.clinicRoom && (
-            <span className="flex items-center gap-1 text-xs text-gray-600">
-              <DoorOpen className="size-3.5 text-slate-400" />
-              {appt.clinicRoom}
-            </span>
-          )}
-        </div>
-
-        {/* Notes */}
-        {appt.notes && (
-          <p className="text-xs text-gray-500 mt-2 leading-snug">{appt.notes}</p>
-        )}
-      </div>
-
-      {/* Call action */}
-      {appt.phone && (
-        <a
-          href={`tel:${appt.phone}`}
-          onClick={(e) => e.stopPropagation()}
-          className="self-center shrink-0 size-9 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 transition"
-          aria-label="Call patient"
-        >
-          <Phone className="size-4" />
-        </a>
-      )}
+      {/* Left: status badge */}
+      <span className={cn("shrink-0 rounded-full px-3 py-1 text-xs font-medium flex items-center gap-1", theme.badge)}>
+        <StatusIcon className="size-3.5" />
+        {ar ? theme.label.ar : theme.label.en}
+      </span>
     </div>
   );
 }
