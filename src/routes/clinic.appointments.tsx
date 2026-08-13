@@ -10,9 +10,6 @@ import {
   ChevronRight,
   Clock,
   Check,
-  Plus,
-  UserPlus,
-  Bell,
   Users,
   CalendarCheck,
   Clock3,
@@ -373,30 +370,6 @@ function AppointmentsPage() {
             </p>
           </div>
         )}
-
-        {/* Quick actions */}
-        <div className="flex gap-2">
-          <button
-            onClick={() => navigate({ to: "/patients" })}
-            className="flex-1 h-11 rounded-2xl bg-[#007AFF] text-white font-display font-bold text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-blue-200 hover:bg-blue-600 transition"
-          >
-            <Plus className="size-4" />
-            {ar ? "موعد جديد" : "New Appointment"}
-          </button>
-          <button
-            onClick={() => navigate({ to: "/patients" })}
-            className="flex-1 h-11 rounded-2xl bg-white border border-slate-200 text-slate-700 font-display font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-slate-50 transition"
-          >
-            <UserPlus className="size-4" />
-            {ar ? "مريض جديد" : "New Patient"}
-          </button>
-          <button
-            className="h-11 px-4 rounded-2xl bg-white border border-slate-200 text-slate-700 font-display font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-slate-50 transition"
-          >
-            <Bell className="size-4" />
-            {ar ? "تذكير" : "Remind"}
-          </button>
-        </div>
       </div>
     </MobileShell>
   );
