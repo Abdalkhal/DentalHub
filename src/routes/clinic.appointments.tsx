@@ -81,8 +81,7 @@ function toDateStr(d: Date): string {
 }
 
 function dayOfWeek(d: Date): number {
-  let day = d.getDay();
-  return day === 0 ? 6 : day - 1;
+  return d.getDay();
 }
 
 function hourSlot(time: string): string {
@@ -102,16 +101,14 @@ function AppointmentsPage() {
   const todayStr = toDateStr(today);
 
   const [selectedDate, setSelectedDate] = useState(todayStr);
-  const [monthOffset, setMonthOffset] = useState(0);
   const [showCalendar, setShowCalendar] = useState(false);
   const [calMonth, setCalMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
 
-  const baseDate = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
+  const selectedDateObj = useMemo(() => new Date(selectedDate + "T00:00:00"), [selectedDate]);
 
   const weekDays = useMemo(() => {
-    const startOfWeek = new Date(baseDate);
-    const dow = dayOfWeek(startOfWeek);
-    startOfWeek.setDate(startOfWeek.getDate() - dow);
+    const startOfWeek = new Date(selectedDateObj);
+    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
     const days: Date[] = [];
     for (let i = 0; i < 7; i++) {
       const d = new Date(startOfWeek);
@@ -119,7 +116,7 @@ function AppointmentsPage() {
       days.push(d);
     }
     return days;
-  }, [monthOffset, baseDate.getMonth(), baseDate.getFullYear()]);
+  }, [selectedDateObj]);
 
   const dayAppointments = useMemo(
     () => appointments.filter((a) => a.date === selectedDate),
@@ -142,10 +139,19 @@ function AppointmentsPage() {
     return { total, morning, evening, reminders };
   }, [dayAppointments]);
 
-  const changeMonth = (dir: -1 | 1) => setMonthOffset((o) => o + dir);
+  const changeMonth = (dir: -1 | 1) => {
+    setSelectedDate((prev) => {
+      const d = new Date(prev + "T00:00:00");
+      const day = d.getDate();
+      d.setDate(1);
+      d.setMonth(d.getMonth() + dir);
+      const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+      d.setDate(Math.min(day, lastDay));
+      return toDateStr(d);
+    });
+  };
 
   const goToToday = () => {
-    setMonthOffset(0);
     setSelectedDate(todayStr);
   };
 
@@ -166,9 +172,6 @@ function AppointmentsPage() {
     setCalMonth((m) => new Date(m.getFullYear(), m.getMonth() + dir, 1));
 
   const jumpToDate = (ds: string) => {
-    const d = new Date(ds + "T00:00:00");
-    const diff = (d.getFullYear() - today.getFullYear()) * 12 + (d.getMonth() - today.getMonth());
-    setMonthOffset(diff);
     setSelectedDate(ds);
     setShowCalendar(false);
   };
@@ -191,7 +194,7 @@ function AppointmentsPage() {
             onClick={() => setShowCalendar(true)}
             className="flex items-center gap-1.5 font-display font-extrabold text-base text-slate-800 px-3 py-1 rounded-xl hover:bg-slate-100 transition"
           >
-            {formatMonthYear(baseDate, ar)}
+            {formatMonthYear(selectedDateObj, ar)}
             <CalendarCheck className="size-4 text-[#007AFF]" />
           </button>
           <button onClick={() => changeMonth(1)} className="size-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition">
@@ -205,7 +208,7 @@ function AppointmentsPage() {
             const ds = toDateStr(d);
             const isToday = ds === todayStr;
             const isSelected = ds === selectedDate;
-            const isCurrentMonth = d.getMonth() === baseDate.getMonth();
+            const isCurrentMonth = d.getMonth() === selectedDateObj.getMonth();
             const dow = dayOfWeek(d);
             const dayLabel = DAY_LABELS[dow];
             const apptCount = appointments.filter((a) => a.date === ds).length;
@@ -216,10 +219,10 @@ function AppointmentsPage() {
                 onClick={() => setSelectedDate(ds)}
                 className={`flex flex-col items-center shrink-0 w-12 py-2 rounded-2xl transition-all text-center ${
                   isSelected
-                    ? "bg-gradient-to-b from-[#007AFF] to-[#0056CC] text-white shadow-lg shadow-blue-200"
+                    ? "bg-blue-600 text-white shadow-md"
                     : isToday
-                      ? "bg-blue-50 text-blue-600 border border-blue-200"
-                      : "bg-white text-slate-500 border border-slate-100 hover:border-slate-200"
+                      ? "text-blue-600 hover:bg-gray-100"
+                      : "text-gray-600 hover:bg-gray-100"
                 } ${!isCurrentMonth ? "opacity-30" : ""}`}
               >
                 <span className="text-[10px] font-bold leading-none mb-1">
