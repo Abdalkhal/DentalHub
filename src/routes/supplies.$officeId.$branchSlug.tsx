@@ -123,8 +123,8 @@ function BranchPage() {
       <div className="px-4 pt-4">
         <p className="text-xs text-muted-foreground mb-3">
           {lang === "ar" ? office.ar : office.en} ·{" "}
-          {lang === "ar" ? office.city.ar : office.city.en} /{" "}
-          {lang === "ar" ? office.area.ar : office.area.en} · {items.length}{" "}
+          {lang === "ar" ? office.city?.ar ?? "" : office.city?.en ?? ""} /{" "}
+          {lang === "ar" ? office.area?.ar ?? "" : office.area?.en ?? ""} · {items.length}{" "}
           {lang === "ar" ? "منتج" : "products"}
         </p>
         <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 mb-2">

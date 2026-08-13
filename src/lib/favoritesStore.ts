@@ -11,7 +11,9 @@ export type FavItem = {
   addedAt: string;
 };
 
-const favorites = createLocalStore<FavItem[]>("dh:favorites", []);
+const favorites = createLocalStore<FavItem[]>("dh:favorites", [], {
+  migrate: (data) => (Array.isArray(data) ? (data as FavItem[]) : []),
+});
 
 export function useFavorites() {
   return favorites.useStore();

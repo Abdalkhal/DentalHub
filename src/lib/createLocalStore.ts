@@ -27,6 +27,9 @@ export function createLocalStore<T>(
       if (!raw) return defaultValue;
       const parsed = JSON.parse(raw);
       if (options?.migrate) return options.migrate(parsed);
+      if (Array.isArray(defaultValue)) {
+        return (Array.isArray(parsed) ? parsed : defaultValue) as T;
+      }
       return { ...defaultValue, ...parsed } as T;
     } catch {
       return defaultValue;

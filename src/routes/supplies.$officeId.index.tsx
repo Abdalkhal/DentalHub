@@ -203,7 +203,7 @@ function OfficePage() {
       )}
       <div className="px-4 pt-4">
         <p className="text-xs text-muted-foreground mb-4">
-          {lang === "ar" ? office.area.ar : office.area.en}
+          {lang === "ar" ? office.area?.ar ?? "" : office.area?.en ?? ""}
         </p>
 
         {/* ── Active branch filter indicator ──────── */}
