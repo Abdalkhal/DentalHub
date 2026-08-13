@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
-import { useAppointments, type Appointment } from "@/lib/appointmentsStore";
+import { useAppointments, setAppointmentsStoreUser, type Appointment } from "@/lib/appointmentsStore";
+import { useSession } from "@/lib/useAuth";
 import { cn } from "@/lib/utils";
 import {
   ChevronLeft,
@@ -97,8 +98,13 @@ function AppointmentsPage() {
   const { lang } = useI18n();
   const ar = lang === "ar";
   const appointments = useAppointments();
+  const { user } = useSession();
   const today = new Date();
   const todayStr = toDateStr(today);
+
+  useEffect(() => {
+    setAppointmentsStoreUser(user?.uid || "");
+  }, [user?.uid]);
 
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const [showCalendar, setShowCalendar] = useState(false);
