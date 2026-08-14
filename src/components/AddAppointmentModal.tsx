@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { X, ChevronLeft, ChevronRight, Calendar, Clock, Bell, User, Phone, Check } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, ChevronDown, Calendar, Clock, Bell, User, Phone, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { addAppointment } from "@/lib/appointmentsStore";
@@ -28,7 +28,60 @@ function maskTime(raw: string): string {
   if (digits.length === 0) return "";
   const hh = digits.slice(0, 2);
   const mm = digits.slice(2);
-  return mm.length ? `${hh}:${mm}` : hh;
+  if (digits.length < 2) return hh;
+  return `${hh}:${mm}`;
+}
+
+function Select({
+  value,
+  onChange,
+  options,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = options.find((o) => o.value === value);
+  return (
+    <div className="relative">
+      {open && <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />}
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full h-11 rounded-xl bg-card border border-border px-3 text-sm flex items-center justify-between gap-2 text-start focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-primary"
+      >
+        <span className="truncate">{selected?.label ?? value}</span>
+        <ChevronDown className={cn("size-4 text-muted-foreground shrink-0 transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div className="absolute z-20 inset-x-0 mt-1 rounded-xl border border-gray-100 shadow-xl bg-white py-1 max-h-56 overflow-auto">
+          {options.map((o) => {
+            const isSelected = o.value === value;
+            return (
+              <button
+                key={o.value}
+                type="button"
+                onClick={() => {
+                  onChange(o.value);
+                  setOpen(false);
+                }}
+                className={cn(
+                  "w-full text-sm py-2 px-3 rounded-lg transition-colors flex items-center justify-between gap-2 text-start",
+                  isSelected
+                    ? "bg-blue-100/70 text-blue-800 font-semibold"
+                    : "text-gray-700 hover:bg-blue-50 hover:text-blue-700",
+                )}
+              >
+                <span className="truncate">{o.label}</span>
+                {isSelected && <Check className="size-3.5 shrink-0" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function AddAppointmentModal({ onClose }: { onClose: () => void }) {
@@ -189,12 +242,14 @@ export function AddAppointmentModal({ onClose }: { onClose: () => void }) {
           <div className="grid grid-cols-2 gap-2.5">
             <div>
               <p className="text-[11px] font-bold text-muted-foreground mb-1.5">{ar ? "نوع الموعد" : "Appointment Type"}</p>
-              <select value={appointmentType} onChange={(e) => setAppointmentType(e.target.value)} className="w-full h-11 rounded-xl bg-card border border-border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-primary">
-                {APPOINTMENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
+              <Select
+                value={appointmentType}
+                onChange={setAppointmentType}
+                options={APPOINTMENT_TYPES.map((t) => ({ value: t, label: t }))}
+              />
             </div>
             <div>
-              <p className="text-[11px] font-bold text-muted-foreground mb-1.5">{ar ? "العيادة / الغرفة" : "Clinic / Room"}</p>
+              <p className="text-[11px] font-bold text-muted-foreground mb-1.5">{ar ? "العيادة / الغرفة (اختياري)" : "Clinic / Room (Optional)"}</p>
               <input
                 value={room}
                 onChange={(e) => setRoom(e.target.value)}
@@ -208,15 +263,19 @@ export function AddAppointmentModal({ onClose }: { onClose: () => void }) {
           <div className="grid grid-cols-2 gap-2.5">
             <div>
               <p className="text-[11px] font-bold text-muted-foreground mb-1.5">{ar ? "الطبيب" : "Doctor"}</p>
-              <select value={doctor} onChange={(e) => setDoctor(e.target.value)} className="w-full h-11 rounded-xl bg-card border border-border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-primary">
-                {doctorOptions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-              </select>
+              <Select
+                value={doctor}
+                onChange={setDoctor}
+                options={doctorOptions.map((d) => ({ value: d.id, label: d.name }))}
+              />
             </div>
             <div>
               <p className="text-[11px] font-bold text-muted-foreground mb-1.5">{ar ? "العلاج / الخدمة" : "Treatment / Service"}</p>
-              <select value={treatment} onChange={(e) => setTreatment(e.target.value)} className="w-full h-11 rounded-xl bg-card border border-border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-primary">
-                {TREATMENTS.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
+              <Select
+                value={treatment}
+                onChange={setTreatment}
+                options={TREATMENTS.map((t) => ({ value: t, label: t }))}
+              />
             </div>
           </div>
 
