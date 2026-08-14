@@ -351,6 +351,8 @@ function ImplantProductsPanel() {
   const [brand, setBrand] = useState("");
   const [country, setCountry] = useState("KR");
   const [line, setLine] = useState("");
+  const [accessoryCategory, setAccessoryCategory] = useState("");
+  const [accessorySubType, setAccessorySubType] = useState("");
   const [selectedDiameters, setSelectedDiameters] = useState<string[]>([]);
   const [selectedLengths, setSelectedLengths] = useState<string[]>([]);
   const [accessoryRows, setAccessoryRows] = useState<AccessoryRow[]>([]);
@@ -380,6 +382,8 @@ function ImplantProductsPanel() {
     setBrand("");
     setCountry("KR");
     setLine("");
+    setAccessoryCategory("");
+    setAccessorySubType("");
     setSelectedDiameters([]);
     setSelectedLengths([]);
     setAccessoryRows([]);
@@ -408,6 +412,8 @@ function ImplantProductsPanel() {
     setBrand(p.brand);
     setCountry(p.country || p.implantSpec?.country || "KR");
     setLine(p.implantSpec?.connectionType || "");
+    setAccessoryCategory("");
+    setAccessorySubType(p.productType === "accessory" ? p.ar : "");
     setSelectedDiameters((p.implantSpec?.diameters ?? []).map(String));
     setSelectedLengths((p.implantSpec?.lengths ?? []).map(String));
     setAccessoryRows(
@@ -1227,32 +1233,60 @@ function ImplantProductsPanel() {
                   <div className="space-y-4">
                     <div>
                       <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
-                        {ar ? "اسم الإكسسوار" : "Accessory Name"}{" "}
+                        {ar ? "اسم الإكسسوار الرئيسي" : "Main Accessory Category"}{" "}
                         <span className="text-rose-500">*</span>
                       </label>
-                      <input
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder={ar ? "مثال: Abutment Straight" : "e.g. Abutment Straight"}
-                        className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
-                      />
+                      <select
+                        value={accessoryCategory}
+                        onChange={(e) => {
+                          setAccessoryCategory(e.target.value);
+                          setAccessorySubType("");
+                          setName("");
+                        }}
+                        className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition appearance-none"
+                      >
+                        <option value="">{ar ? "-- اختر الفئة --" : "-- Select category --"}</option>
+                        {ACCESSORY_CATEGORIES.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {ar ? c.ar : c.en}
+                          </option>
+                        ))}
+                      </select>
                     </div>
 
                     <div>
                       <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
-                        {ar ? "نوع الإكسسوار" : "Accessory Type"}
+                        {ar ? "نوع وشكل الإكسسوار التفصيلي" : "Detailed Sub-type"}{" "}
+                        <span className="text-rose-500">*</span>
                       </label>
                       <select
-                        value={line}
-                        onChange={(e) => setLine(e.target.value)}
-                        className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition appearance-none"
+                        value={accessorySubType}
+                        onChange={(e) => {
+                          setAccessorySubType(e.target.value);
+                          setName(e.target.value);
+                        }}
+                        disabled={!accessoryCategory}
+                        className={cn(
+                          "w-full h-12 rounded-xl border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition appearance-none",
+                          !accessoryCategory
+                            ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed"
+                            : "bg-slate-50 border-border",
+                        )}
                       >
-                        <option value="">{ar ? "-- اختر النوع --" : "-- Select type --"}</option>
-                        <option value="Abutment">Abutment</option>
-                        <option value="Healing Screw">Healing Screw</option>
-                        <option value="Scan Body">Scan Body</option>
-                        <option value="Digital Analog">Digital Analog</option>
+                        <option value="">{ar ? "-- اختر النوع --" : "-- Select sub-type --"}</option>
+                        {(ACCESSORY_CATEGORIES.find((c) => c.id === accessoryCategory)?.subTypes ?? []).map((st) => (
+                          <option key={st.en} value={ar ? st.ar : st.en}>
+                            {ar ? st.ar : st.en}
+                          </option>
+                        ))}
                       </select>
+                      {accessoryCategory && accessorySubType && (
+                        <p className="mt-1.5 text-[11px] text-blue-600 bg-blue-50 border border-blue-100 rounded-lg px-2.5 py-1.5">
+                          {ar
+                            ? `المعاينة: ${ACCESSORY_CATEGORIES.find((c) => c.id === accessoryCategory)?.ar ?? ""} · ${accessorySubType}`
+                            : `Preview: ${ACCESSORY_CATEGORIES.find((c) => c.id === accessoryCategory)?.en ?? ""} · ${accessorySubType}`}
+                        </p>
+                      )}
                     </div>
 
                     <div>
