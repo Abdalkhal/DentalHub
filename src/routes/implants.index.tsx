@@ -627,7 +627,7 @@ function ImplantProductsPanel() {
           <button
             type="button"
             onClick={() => setShowForm(false)}
-            className="flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground transition mb-1"
+            className="flex items-center gap-2 text-sm font-semibold text-[#7A94A8] hover:text-[#1C6FB5] transition mb-1"
           >
             <ArrowLeft className="size-4" />
             {ar ? "رجوع إلى المنتجات" : "Back to products"}
@@ -635,22 +635,22 @@ function ImplantProductsPanel() {
 
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
-              <h2 className="font-display font-bold text-xl text-foreground">
+              <h2 className="font-display font-bold text-xl text-[#17324A]">
                 {ar ? "إضافة منتج جديد" : "Add New Product"}
               </h2>
-              <p className="text-sm text-muted-foreground mt-0.5">
+              <p className="text-sm text-[#7A94A8] mt-0.5">
                 {ar ? "أضف زرعة وإكسسواراتها بسهولة" : "Add implant and its accessories easily"}
               </p>
             </div>
-            <div className="flex rounded-2xl bg-slate-100 p-1">
+            <div className="flex rounded-2xl bg-[#E7F4FE] p-1">
               <button
                 type="button"
                 onClick={() => setProductType("main_implant")}
                 className={cn(
                   "flex items-center gap-1.5 h-10 px-5 rounded-xl text-sm font-bold transition",
                   productType === "main_implant"
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-slate-500 hover:text-slate-700",
+                    ? "bg-[#2E93E0] text-white shadow-sm"
+                    : "text-[#7A94A8] hover:text-[#17324A]",
                 )}
               >
                 <Settings className="size-4" />
@@ -662,8 +662,8 @@ function ImplantProductsPanel() {
                 className={cn(
                   "flex items-center gap-1.5 h-10 px-5 rounded-xl text-sm font-bold transition",
                   productType === "accessory"
-                    ? "bg-blue-500 text-white shadow-sm"
-                    : "text-slate-500 hover:text-slate-700",
+                    ? "bg-[#2E93E0] text-white shadow-sm"
+                    : "text-[#7A94A8] hover:text-[#17324A]",
                 )}
               >
                 <Paperclip className="size-4" />
@@ -674,10 +674,10 @@ function ImplantProductsPanel() {
 
           {productType === "main_implant" ? (
             <>
-              <div className="bg-white border border-border/50 rounded-3xl p-5 shadow-md">
+              <div className="bg-white border border-[#D3E8F7] rounded-3xl p-5 shadow-md">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div>
-                    <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+                    <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
                       {ar ? "صورة المنتج" : "Product Image"}
                     </label>
 
@@ -686,7 +686,7 @@ function ImplantProductsPanel() {
                         {editing.images.map((path) => (
                           <div
                             key={path}
-                            className="relative size-20 rounded-xl bg-slate-50 border border-border overflow-hidden group"
+                            className="relative size-20 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] overflow-hidden group"
                           >
                             {editUrlMap[path] ? (
                               <img
@@ -712,7 +712,7 @@ function ImplantProductsPanel() {
                     )}
 
                     {imageFiles.length + (editing?.images.length ?? 0) < MAX_PRODUCT_IMAGES && (
-                      <label className="w-full aspect-square max-w-[280px] rounded-2xl border-2 border-dashed border-border bg-slate-50 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/40 hover:bg-sky-50/30 transition group">
+                      <label className="w-full aspect-square max-w-[280px] rounded-2xl border-2 border-dashed border-[#D3E8F7] bg-[#F5FAFE] flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/40 hover:bg-sky-50/30 transition group">
                         <Image className="size-10 text-slate-300 group-hover:text-primary transition" />
                         <p className="text-xs text-slate-400 group-hover:text-primary transition font-semibold">
                           {ar ? "إضافة صورة (PNG, JPG)" : "Add Image (PNG, JPG)"}
@@ -735,7 +735,7 @@ function ImplantProductsPanel() {
                         {imagePreviews.map((url, idx) => (
                           <div
                             key={idx}
-                            className="relative size-20 rounded-xl bg-slate-50 border border-border overflow-hidden shadow-sm"
+                            className="relative size-20 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] overflow-hidden shadow-sm"
                           >
                             <img src={url} alt="" className="size-full object-cover" />
                             <button
@@ -753,7 +753,7 @@ function ImplantProductsPanel() {
 
                   <div className="space-y-4">
                     <div>
-                      <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+                      <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
                         {ar ? "اسم الزرعة" : "Implant Name"}{" "}
                         <span className="text-rose-500">*</span>
                       </label>
@@ -761,12 +761,12 @@ function ImplantProductsPanel() {
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder={ar ? "مثال: Straumann BLX" : "e.g. Straumann BLX"}
-                        className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+                        className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
                       />
                     </div>
 
                     <div>
-                      <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+                      <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
                         {ar ? "الشركة المصنعة" : "Manufacturer"}{" "}
                         <span className="text-rose-500">*</span>
                       </label>
@@ -775,7 +775,7 @@ function ImplantProductsPanel() {
                         onChange={(e) => setBrand(e.target.value)}
                         placeholder={ar ? "مثال: Straumann" : "e.g. Straumann"}
                         list="brand-suggestions"
-                        className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+                        className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
                       />
                       <datalist id="brand-suggestions">
                         {brandSuggestions.map((b) => (
@@ -785,35 +785,36 @@ function ImplantProductsPanel() {
                     </div>
 
                     <div>
-                      <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+                      <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
                         {ar ? "بلد الصنع" : "Country of Manufacture"}
                       </label>
                       <CountryCombobox value={country} onChange={setCountry} lang={lang} />
                     </div>
 
                     <div>
-                      <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+                      <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
                         {ar ? "خط المنتج (اختياري)" : "Product Line (Optional)"}
                       </label>
                       <input
                         value={line}
                         onChange={(e) => setLine(e.target.value)}
                         placeholder={ar ? "مثال: BLX" : "e.g. BLX"}
-                        className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+                        className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
                       />
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white border border-border/50 rounded-3xl p-5 space-y-4 shadow-md">
-                <h3 className="font-display font-bold text-base text-foreground">
+              <div className="bg-white border border-[#D3E8F7] rounded-3xl p-5 space-y-4 shadow-md">
+                <h3 className="font-display font-bold text-base text-[#1C6FB5] flex items-center gap-1.5">
+                  <span className="size-1.5 rounded-full bg-[#1C6FB5]" />
                   {ar ? "أطوال وأقطار الزرعة" : "Implant Dimensions"}
                 </h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                   <div className="flex items-center justify-center">
-                    <div className="relative w-full max-w-[200px] aspect-[3/4] max-h-64 bg-slate-100 rounded-2xl border-2 border-slate-200 overflow-hidden">
+                    <div className="relative w-full max-w-[200px] aspect-[3/4] max-h-64 bg-[#E7F4FE] rounded-2xl border-2 border-[#D3E8F7] overflow-hidden">
                       {previewImageUrl ? (
                         <>
                           <img
@@ -929,7 +930,7 @@ function ImplantProductsPanel() {
 
                   <div className="md:col-span-2 space-y-4">
                     <div>
-                      <label className="text-xs font-semibold text-muted-foreground mb-2 block">
+                      <label className="text-xs font-semibold text-[#17324A] mb-2 block">
                         {ar ? "الأقطار (mm):" : "Diameters (mm):"}
                       </label>
                       <TagInput
@@ -941,7 +942,7 @@ function ImplantProductsPanel() {
                     </div>
 
                     <div>
-                      <label className="text-xs font-semibold text-muted-foreground mb-2 block">
+                      <label className="text-xs font-semibold text-[#17324A] mb-2 block">
                         {ar ? "الأطوال (mm):" : "Lengths (mm):"}
                       </label>
                       <TagInput
@@ -953,9 +954,9 @@ function ImplantProductsPanel() {
                     </div>
 
                     {selectedDiameters.length > 0 || selectedLengths.length > 0 ? (
-                      <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5 flex items-center gap-2">
-                        <div className="size-2 rounded-full bg-blue-500 animate-pulse shrink-0" />
-                        <span className="text-sm font-semibold text-blue-700">
+                      <div className="bg-[#E7F4FE] border border-[#BFE1F7] rounded-xl px-4 py-2.5 flex items-center gap-2">
+                        <div className="size-2 rounded-full bg-[#2E93E0] animate-pulse shrink-0" />
+                        <span className="text-sm font-semibold text-[#1C6FB5]">
                           {ar ? "المقاس المحدد:" : "Selected size:"}{" "}
                           {selectedDiameters.length > 0
                             ? `${ar ? "قطر" : "Ø"} ${[...selectedDiameters].sort((a, b) => Number(a) - Number(b)).join(" / ")} mm`
@@ -967,8 +968,8 @@ function ImplantProductsPanel() {
                         </span>
                       </div>
                     ) : (
-                      <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5">
-                        <span className="text-sm text-slate-400">
+                      <div className="bg-[#F5FAFE] border border-[#D3E8F7] rounded-xl px-4 py-2.5">
+                        <span className="text-sm text-[#7A94A8]">
                           {ar ? "أدخل قطرًا وطولًا للزرعة" : "Enter implant diameter and length"}
                         </span>
                       </div>
@@ -979,11 +980,11 @@ function ImplantProductsPanel() {
             </>
           ) : (
             <>
-              <div className="bg-white border border-border/50 rounded-3xl p-5 shadow-md">
+              <div className="bg-white border border-[#D3E8F7] rounded-3xl p-5 shadow-md">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-4">
                     <div>
-                      <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+                      <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
                         {ar ? "اسم الإكسسوار الرئيسي" : "Main Accessory Category"}{" "}
                         <span className="text-rose-500">*</span>
                       </label>
@@ -994,7 +995,7 @@ function ImplantProductsPanel() {
                           setAccessorySubType("");
                           setName("");
                         }}
-                        className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition appearance-none"
+                        className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition appearance-none"
                       >
                         <option value="">{ar ? "-- اختر الفئة --" : "-- Select category --"}</option>
                         {ACCESSORY_CATEGORIES.map((c) => (
@@ -1006,7 +1007,7 @@ function ImplantProductsPanel() {
                     </div>
 
                     <div>
-                      <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+                      <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
                         {ar ? "نوع وشكل الإكسسوار التفصيلي" : "Detailed Sub-type"}{" "}
                         <span className="text-rose-500">*</span>
                       </label>
@@ -1018,10 +1019,10 @@ function ImplantProductsPanel() {
                         }}
                         disabled={!accessoryCategory}
                         className={cn(
-                          "w-full h-12 rounded-xl border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition appearance-none",
+                          "w-full h-12 rounded-xl border px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition appearance-none",
                           !accessoryCategory
-                            ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed"
-                            : "bg-slate-50 border-border",
+                            ? "bg-[#F5FAFE] border-[#D3E8F7] text-[#7A94A8] cursor-not-allowed"
+                            : "bg-[#F5FAFE] border-[#D3E8F7] text-[#17324A]",
                         )}
                       >
                         <option value="">{ar ? "-- اختر النوع --" : "-- Select sub-type --"}</option>
@@ -1032,7 +1033,7 @@ function ImplantProductsPanel() {
                         ))}
                       </select>
                       {accessoryCategory && accessorySubType && (
-                        <p className="mt-1.5 text-[11px] text-blue-600 bg-blue-50 border border-blue-100 rounded-lg px-2.5 py-1.5">
+                        <p className="mt-1.5 text-[11px] text-[#1C6FB5] bg-[#E7F4FE] border border-[#BFE1F7] rounded-lg px-2.5 py-1.5">
                           {ar
                             ? `المعاينة: ${ACCESSORY_CATEGORIES.find((c) => c.id === accessoryCategory)?.ar ?? ""} · ${accessorySubType}`
                             : `Preview: ${ACCESSORY_CATEGORIES.find((c) => c.id === accessoryCategory)?.en ?? ""} · ${accessorySubType}`}
@@ -1041,25 +1042,13 @@ function ImplantProductsPanel() {
                     </div>
 
                     <div>
-                      <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
-                        {ar ? "المواصفات" : "Specifications"}
-                      </label>
-                      <input
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        placeholder={ar ? "مثال: Titanium Grade 5" : "e.g. Titanium Grade 5"}
-                        className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+                      <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
                         {ar ? "ربط مع زرعة أساسية" : "Link to Main Implant"}
                       </label>
                       <select
                         value={parentId}
                         onChange={(e) => setParentId(e.target.value)}
-                        className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition appearance-none"
+                        className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition appearance-none"
                       >
                         <option value="">
                           {ar ? "-- اختر الزرعة الأساسية --" : "-- Select main implant --"}
@@ -1082,7 +1071,7 @@ function ImplantProductsPanel() {
                   </div>
 
                   <div>
-                    <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+                    <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
                       {ar ? "صورة المنتج" : "Product Image"}
                     </label>
 
@@ -1091,7 +1080,7 @@ function ImplantProductsPanel() {
                         {editing.images.map((path) => (
                           <div
                             key={path}
-                            className="relative size-16 rounded-xl bg-slate-50 border border-border overflow-hidden group"
+                            className="relative size-16 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] overflow-hidden group"
                           >
                             {editUrlMap[path] ? (
                               <img
@@ -1117,7 +1106,7 @@ function ImplantProductsPanel() {
                     )}
 
                     {imageFiles.length + (editing?.images.length ?? 0) < MAX_PRODUCT_IMAGES && (
-                      <label className="w-full h-40 rounded-2xl border-2 border-dashed border-border bg-slate-50 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/40 hover:bg-sky-50/30 transition group">
+                      <label className="w-full h-40 rounded-2xl border-2 border-dashed border-[#D3E8F7] bg-[#F5FAFE] flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/40 hover:bg-sky-50/30 transition group">
                         <Upload className="size-8 text-slate-400 group-hover:text-primary transition" />
                         <p className="text-xs text-slate-400 group-hover:text-primary transition font-semibold">
                           {ar ? "اضغط لرفع صورة" : "Tap to upload image"}
@@ -1141,7 +1130,7 @@ function ImplantProductsPanel() {
                         {imagePreviews.map((url, idx) => (
                           <div
                             key={idx}
-                            className="relative size-16 rounded-xl bg-slate-50 border border-border overflow-hidden shadow-sm"
+                            className="relative size-16 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] overflow-hidden shadow-sm"
                           >
                             <img src={url} alt="" className="size-full object-cover" />
                             <button
@@ -1162,24 +1151,25 @@ function ImplantProductsPanel() {
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div className="bg-white border border-border/50 rounded-3xl p-5 space-y-4 shadow-md">
-              <h3 className="font-display font-bold text-base text-foreground">
+            <div className={cn("bg-white border border-[#D3E8F7] rounded-3xl p-5 space-y-4 shadow-md", productType === "accessory" && "md:col-span-2")}>
+              <h3 className="font-display font-bold text-base text-[#1C6FB5] flex items-center gap-1.5">
+                <span className="size-1.5 rounded-full bg-[#1C6FB5]" />
                 {ar ? "السعر والمخزون" : "Price & Stock"}
               </h3>
 
               <div>
-                <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+                <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
                   {ar ? "العملة" : "Currency"}
                 </label>
-                <div className="flex rounded-xl bg-slate-50 border border-border overflow-hidden w-fit">
+                <div className="flex rounded-xl bg-[#F5FAFE] border border-[#D3E8F7] overflow-hidden w-fit">
                   <button
                     type="button"
                     onClick={() => setCurrency("USD")}
                     className={cn(
                       "px-4 py-2.5 text-sm font-bold transition",
                       currency === "USD"
-                        ? "bg-primary text-primary-foreground"
-                        : "text-slate-500 hover:text-slate-700",
+                        ? "bg-[#2E93E0] text-white"
+                        : "text-[#7A94A8] hover:text-[#17324A]",
                     )}
                   >
                     $
@@ -1190,8 +1180,8 @@ function ImplantProductsPanel() {
                     className={cn(
                       "px-4 py-2.5 text-sm font-bold transition",
                       currency === "IQD"
-                        ? "bg-primary text-primary-foreground"
-                        : "text-slate-500 hover:text-slate-700",
+                        ? "bg-[#2E93E0] text-white"
+                        : "text-[#7A94A8] hover:text-[#17324A]",
                     )}
                   >
                     IQD
@@ -1200,7 +1190,7 @@ function ImplantProductsPanel() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+                <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
                   {ar ? "السعر الأساسي للزرعة" : "Base Implant Price"}{" "}
                   <span className="text-rose-500">*</span>
                 </label>
@@ -1210,12 +1200,12 @@ function ImplantProductsPanel() {
                   onChange={(e) => setPrice(e.target.value)}
                   placeholder="0"
                   dir="ltr"
-                  className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+                  className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+                <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
                   {ar ? "أدنى كمية طلب (اختياري)" : "Min Order Qty (Optional)"}
                 </label>
                 <input
@@ -1225,12 +1215,12 @@ function ImplantProductsPanel() {
                   placeholder="1"
                   min="1"
                   dir="ltr"
-                  className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+                  className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+                <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
                   {ar ? "الكمية المتوفرة" : "Available Quantity"}
                 </label>
                 <input
@@ -1240,18 +1230,20 @@ function ImplantProductsPanel() {
                   placeholder="100"
                   min="0"
                   dir="ltr"
-                  className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+                  className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
                 />
               </div>
             </div>
 
-            <div className="bg-white border border-border/50 rounded-3xl p-5 space-y-4 shadow-md">
-              <h3 className="font-display font-bold text-base text-foreground">
-                {ar ? "معلومات إضافية" : "Additional Information"}
-              </h3>
+            {productType === "main_implant" && (
+              <div className="bg-white border border-[#D3E8F7] rounded-3xl p-5 space-y-4 shadow-md">
+                <h3 className="font-display font-bold text-base text-[#1C6FB5] flex items-center gap-1.5">
+                  <span className="size-1.5 rounded-full bg-[#1C6FB5]" />
+                  {ar ? "معلومات إضافية" : "Additional Information"}
+                </h3>
 
               <div>
-                <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+                <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
                   {ar ? "الوصف (اختياري)" : "Description (Optional)"}
                 </label>
                 <textarea
@@ -1263,15 +1255,15 @@ function ImplantProductsPanel() {
                       : "Product description, features, uses..."
                   }
                   rows={4}
-                  className="w-full rounded-xl bg-slate-50 border border-border px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition resize-none"
+                  className="w-full rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition resize-none"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+                <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
                   {ar ? "المرفقات (اختياري)" : "Attachments (Optional)"}
                 </label>
-                <label className="w-full h-28 rounded-xl border-2 border-dashed border-border bg-slate-50 flex flex-col items-center justify-center gap-1.5 cursor-pointer hover:border-primary/40 hover:bg-sky-50/30 transition group">
+                <label className="w-full h-28 rounded-xl border-2 border-dashed border-[#D3E8F7] bg-[#F5FAFE] flex flex-col items-center justify-center gap-1.5 cursor-pointer hover:border-primary/40 hover:bg-sky-50/30 transition group">
                   <Paperclip className="size-6 text-slate-400 group-hover:text-primary transition" />
                   <p className="text-xs text-slate-400 group-hover:text-primary transition font-medium">
                     {ar
@@ -1320,6 +1312,7 @@ function ImplantProductsPanel() {
                 )}
               </div>
             </div>
+            )}
           </div>
 
           {formError && (
@@ -1334,11 +1327,12 @@ function ImplantProductsPanel() {
               onClick={submit}
               disabled={busy}
               className={cn(
-                "flex-1 h-14 rounded-2xl font-display font-bold flex items-center justify-center gap-2 transition shadow-card",
+                "flex-1 h-14 rounded-2xl font-display font-bold flex items-center justify-center gap-2 transition shadow-lg text-white",
                 busy
                   ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                  : "bg-primary text-primary-foreground hover:opacity-90",
+                  : "hover:opacity-95",
               )}
+              style={busy ? undefined : { background: "linear-gradient(to right, #2AA6D1, #4FC3E8)" }}
             >
               {busy ? <Loader2 className="size-5 animate-spin" /> : null}
               {busy
@@ -1356,7 +1350,7 @@ function ImplantProductsPanel() {
             <button
               type="button"
               onClick={() => setShowForm(false)}
-              className="h-14 px-8 rounded-2xl font-display font-bold flex items-center gap-2 transition bg-slate-100 hover:bg-slate-200 text-slate-600"
+              className="h-14 px-8 rounded-2xl font-display font-bold flex items-center gap-2 transition bg-[#E7F4FE] hover:bg-[#DCEEFB] text-[#1C6FB5]"
             >
               {ar ? "إلغاء" : "Cancel"}
             </button>
@@ -1774,7 +1768,7 @@ function ImplantDetailView({
                           ),
                         )
                       }
-                      className="w-full h-9 rounded-lg bg-white border border-border px-1.5 text-[10px] font-semibold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+                      className="w-full h-9 rounded-lg bg-white border border-border px-1.5 text-[10px] font-semibold outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
                     >
                       <option value="">{ar ? "-- اختر الفئة --" : "-- Select category --"}</option>
                       {ACCESSORY_CATEGORIES.map((c) => (
@@ -1793,7 +1787,7 @@ function ImplantDetailView({
                       }
                       disabled={!acc.type}
                       className={cn(
-                        "w-full h-9 rounded-lg border px-2 text-[11px] outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition",
+                        "w-full h-9 rounded-lg border px-2 text-[11px] outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition",
                         !acc.type
                           ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed"
                           : "bg-white border-border",
@@ -1817,7 +1811,7 @@ function ImplantDetailView({
                         )
                       }
                       placeholder={ar ? "المواصفات" : "Specifications"}
-                      className="w-full h-9 rounded-lg bg-white border border-border px-2 text-[11px] outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+                      className="w-full h-9 rounded-lg bg-white border border-border px-2 text-[11px] outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
                     />
 
                     <div className="flex gap-1">
@@ -1836,7 +1830,7 @@ function ImplantDetailView({
                           min="0"
                           step="0.01"
                           dir="ltr"
-                          className="w-full h-9 rounded-lg bg-white border border-border px-2 text-[11px] outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+                          className="w-full h-9 rounded-lg bg-white border border-border px-2 text-[11px] outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
                         />
                       </div>
                       <div className="flex rounded-lg bg-white border border-border overflow-hidden shrink-0">
@@ -2044,19 +2038,19 @@ function OffersPanel({ companyId }: { companyId: string }) {
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
               {ar ? "العنوان" : "Title"}
             </label>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder={ar ? "مثال: خصم 20% على الزرعات" : "e.g. 20% off implants"}
-              className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+              className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
             />
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
               {ar ? "الوصف" : "Description"}
             </label>
             <textarea
@@ -2064,12 +2058,12 @@ function OffersPanel({ companyId }: { companyId: string }) {
               onChange={(e) => setDescription(e.target.value)}
               placeholder={ar ? "تفاصيل العرض..." : "Offer details..."}
               rows={3}
-              className="w-full rounded-xl bg-slate-50 border border-border px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition resize-none"
+              className="w-full rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition resize-none"
             />
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
               {ar ? "تاريخ الانتهاء" : "Expiry date"}
             </label>
             <div className="relative">
@@ -2077,14 +2071,14 @@ function OffersPanel({ companyId }: { companyId: string }) {
                 type="date"
                 value={expiryDate}
                 onChange={(e) => setExpiryDate(e.target.value)}
-                className="w-full h-12 rounded-xl bg-slate-50 border border-border pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+                className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
               />
               <Calendar className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
             </div>
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
               {ar ? "السعر والعملة" : "Price and Currency"}
             </label>
             <div className="flex items-center gap-2">
@@ -2096,9 +2090,9 @@ function OffersPanel({ companyId }: { companyId: string }) {
                 min="0"
                 step="0.01"
                 dir="ltr"
-                className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+                className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
               />
-              <div className="flex rounded-xl bg-slate-50 border border-border overflow-hidden shrink-0">
+              <div className="flex rounded-xl bg-[#F5FAFE] border-[#D3E8F7] overflow-hidden shrink-0">
                 <button
                   type="button"
                   onClick={() => setCurrency("USD")}
@@ -2128,11 +2122,11 @@ function OffersPanel({ companyId }: { companyId: string }) {
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
               {ar ? "صورة العرض" : "Offer image"}
             </label>
             {imagePreview ? (
-              <div className="relative w-full h-40 rounded-xl bg-slate-50 border border-border overflow-hidden">
+              <div className="relative w-full h-40 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] overflow-hidden">
                 <img src={imagePreview} alt="" className="size-full object-cover" />
                 <button
                   type="button"
@@ -2146,7 +2140,7 @@ function OffersPanel({ companyId }: { companyId: string }) {
                 </button>
               </div>
             ) : editing?.imageUrl ? (
-              <div className="relative w-full h-40 rounded-xl bg-slate-50 border border-border overflow-hidden">
+              <div className="relative w-full h-40 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] overflow-hidden">
                 {urlMap[editing.imageUrl] ? (
                   <img src={urlMap[editing.imageUrl]} alt="" className="size-full object-cover" />
                 ) : (
@@ -2156,7 +2150,7 @@ function OffersPanel({ companyId }: { companyId: string }) {
                 )}
               </div>
             ) : (
-              <label className="w-full h-32 rounded-xl border-2 border-dashed border-border bg-slate-50 flex flex-col items-center justify-center gap-1.5 cursor-pointer hover:border-primary/40 hover:bg-sky-50/30 transition group">
+              <label className="w-full h-32 rounded-xl border-2 border-dashed border-[#D3E8F7] bg-[#F5FAFE] flex flex-col items-center justify-center gap-1.5 cursor-pointer hover:border-primary/40 hover:bg-sky-50/30 transition group">
                 <Upload className="size-6 text-slate-400 group-hover:text-primary transition" />
                 <p className="text-xs text-slate-400 group-hover:text-primary transition font-medium">
                   {ar ? "اضغط لرفع صورة" : "Tap to upload image"}
