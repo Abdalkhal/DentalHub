@@ -1,10 +1,11 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
 import { useProducts, useSignedImageUrls } from "@/lib/products";
+import { ProductImageCarousel } from "@/components/ProductImageCarousel";
 import { useOffers } from "@/lib/offers";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/integrations/firebase/client";
@@ -128,6 +129,7 @@ function ProfilePage() {
   const { accountId } = Route.useParams();
   const { lang } = useI18n();
   const ar = lang === "ar";
+  const navigate = useNavigate();
 
   const { data: account, isLoading } = useQuery({
     queryKey: ["profile-account", accountId],
@@ -372,9 +374,9 @@ function ProfilePage() {
                 {filteredProducts.length > 0 ? (
                   <div className="grid grid-cols-2 gap-4">
                     {filteredProducts.map((p) => {
-                      const imgSrc = p.images.length > 0 ? filterUrls[p.images[0]] : null;
+                      const urls = p.images.map((path) => filterUrls[path]).filter(Boolean);
                       return (
-                      <ProductCard key={p.id} product={p} imgSrc={imgSrc} ar={ar} />
+                      <ProductCard key={p.id} product={p} urls={urls} ar={ar} />
                       );
                     })}
                   </div>
@@ -445,27 +447,35 @@ function ProfilePage() {
               {ar ? "المنتجات" : "Products"}
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {products.slice(0, 6).map((p) => (
-                <div key={p.id} className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all">
-                  <div className="h-36 w-full bg-gray-50 flex items-center justify-center p-3">
-                    {p.images.length > 0 ? (
-                      <img
-                        src={filterUrls[p.images[0]] || p.images[0]}
-                        alt=""
-                        className="size-full object-contain"
-                        loading="lazy"
+              {products.slice(0, 6).map((p) => {
+                const urls = p.images.map((path) => filterUrls[path]).filter(Boolean);
+                return (
+                  <div
+                    key={p.id}
+                    onClick={() => navigate({ to: "/products/$productId", params: { productId: p.id } })}
+                    className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all cursor-pointer"
+                  >
+                    {urls.length > 0 ? (
+                      <ProductImageCarousel
+                        urls={urls}
+                        alt={ar ? p.ar : p.en}
+                        className="w-full h-36 bg-gray-50"
+                        imageClassName="h-36"
+                        showArrows={false}
                       />
                     ) : (
-                      <Package className="size-10 text-slate-300" />
+                      <div className="h-36 w-full bg-gray-50 flex items-center justify-center p-3">
+                        <Package className="size-10 text-slate-300" />
+                      </div>
                     )}
+                    <div className="p-3">
+                      <p className="font-display font-bold text-sm truncate text-slate-800">{ar ? p.ar : p.en}</p>
+                      <p className="text-[11px] text-slate-400 truncate mt-0.5">{p.brand}</p>
+                      <p className="text-blue-600 font-bold mt-2">{fmtPrice(p)}</p>
+                    </div>
                   </div>
-                  <div className="p-3">
-                    <p className="font-display font-bold text-sm truncate text-slate-800">{ar ? p.ar : p.en}</p>
-                    <p className="text-[11px] text-slate-400 truncate mt-0.5">{p.brand}</p>
-                    <p className="text-blue-600 font-bold mt-2">{fmtPrice(p)}</p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
             {products.length > 6 && (
               <p className="text-xs text-muted-foreground text-center mt-2">
@@ -491,18 +501,21 @@ function ProfilePage() {
 
 function ProductCard({
   product,
-  imgSrc,
+  urls,
   ar,
 }: {
   product: { id: string; ar: string; en: string; brand: string; price: number; currency: string };
-  imgSrc: string | null;
+  urls: string[];
   ar: boolean;
 }) {
-  const [imgError, setImgError] = useState(false);
+  const navigate = useNavigate();
   const liked = useIsFavorited(product.id);
   const title = ar ? product.ar || product.en : product.en || product.ar;
   return (
-    <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all relative">
+    <div
+      onClick={() => navigate({ to: "/products/$productId", params: { productId: product.id } })}
+      className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all relative cursor-pointer"
+    >
       <button
         onClick={(e) => {
           e.stopPropagation();
@@ -512,7 +525,7 @@ function ProductCard({
             vendor: product.brand || "",
             price: product.price,
             currency: (product.currency as "USD" | "IQD") || "USD",
-            imageUrl: imgSrc ?? undefined,
+            imageUrl: urls[0],
             addedAt: new Date().toISOString(),
           }, ar ? "ar" : "en");
         }}
@@ -521,19 +534,19 @@ function ProductCard({
       >
         <Heart className={cn("size-4", liked ? "fill-red-500 text-red-500" : "text-gray-400")} />
       </button>
-      <div className="h-28 w-full bg-gray-50 flex items-center justify-center p-2 relative">
-        {imgSrc && !imgError ? (
-          <img
-            src={imgSrc}
-            alt=""
-            className="size-full object-contain"
-            loading="lazy"
-            onError={() => setImgError(true)}
-          />
-        ) : (
+      {urls.length > 0 ? (
+        <ProductImageCarousel
+          urls={urls}
+          alt={title}
+          className="w-full h-28 bg-gray-50"
+          imageClassName="h-28"
+          showArrows={false}
+        />
+      ) : (
+        <div className="h-28 w-full bg-gray-50 flex items-center justify-center">
           <Package className="size-7 text-slate-300" />
-        )}
-      </div>
+        </div>
+      )}
       <div className="p-2">
         <p className="font-display font-bold text-[11px] leading-tight line-clamp-2 text-slate-800">
           {title}

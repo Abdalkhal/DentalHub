@@ -1,11 +1,11 @@
-import { createFileRoute, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useAdminStore } from "@/lib/adminStore";
 import { useI18n } from "@/lib/i18n";
 import { useProducts, useSignedImageUrls } from "@/lib/products";
-import { resolveProductImage } from "@/lib/productImage";
+import { ProductImageCarousel } from "@/components/ProductImageCarousel";
 import {
   SearchX,
   Megaphone,
@@ -131,6 +131,7 @@ function OfficePage() {
   const { data: PRODUCTS = [] } = useProducts();
   const office = OFFICES.find((o) => o.id === officeId);
   const { t, lang, dir } = useI18n();
+  const navigate = useNavigate();
   const BackIcon = BRANCH_BACK_ICON[dir] ?? ArrowRight;
   const isVisitor = useRouterState({
     select: (s) =>
@@ -334,9 +335,13 @@ function OfficePage() {
             ) : (
               <div className="grid grid-cols-2 gap-4">
                 {filteredProducts.map((p) => {
-                  const pImg = matchUrls[p.images[0]] ?? resolveProductImage(undefined);
+                  const urls = p.images.map((path) => matchUrls[path]).filter(Boolean);
                   return (
-                    <div key={p.id} className="bg-card border border-border rounded-2xl p-3 shadow-soft flex flex-col relative">
+                    <div
+                      key={p.id}
+                      onClick={() => navigate({ to: "/products/$productId", params: { productId: p.id } })}
+                      className="bg-card border border-border rounded-2xl p-3 shadow-soft flex flex-col relative cursor-pointer"
+                    >
                       <FavoriteHeart
                         productId={p.id}
                         title={lang === "ar" ? p.ar : p.en}
@@ -346,13 +351,19 @@ function OfficePage() {
                         imageUrl={p.images[0] ? matchUrls[p.images[0]] : undefined}
                         lang={lang}
                       />
-                      <div className="w-full h-36 rounded-xl bg-surface flex items-center justify-center overflow-hidden mb-2.5">
-                        {pImg ? (
-                          <img src={pImg} alt="" className="size-full object-contain" loading="lazy" />
-                        ) : (
+                      {urls.length > 0 ? (
+                        <ProductImageCarousel
+                          urls={urls}
+                          alt={lang === "ar" ? p.ar : p.en}
+                          className="w-full h-36 rounded-xl bg-surface mb-2.5"
+                          imageClassName="h-36"
+                          showArrows={false}
+                        />
+                      ) : (
+                        <div className="w-full h-36 rounded-xl bg-surface flex items-center justify-center overflow-hidden mb-2.5">
                           <span className="text-2xl">📦</span>
-                        )}
-                      </div>
+                        </div>
+                      )}
                       <p className="font-display font-bold text-sm leading-snug line-clamp-2">{lang === "ar" ? p.ar : p.en}</p>
                       <p className="text-[11px] text-muted-foreground mt-1">{p.brand}</p>
                       <p className="mt-1.5 font-display font-extrabold text-primary">${p.price}</p>

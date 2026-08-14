@@ -1,10 +1,11 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
 import { useAdminStore } from "@/lib/adminStore";
 import { useProducts, useSignedImageUrls } from "@/lib/products";
+import { ProductImageCarousel } from "@/components/ProductImageCarousel";
 import { Plus, SearchX, ArrowUpDown, ImageOff, Check, Heart } from "lucide-react";
 import { addToCart } from "@/lib/cartStore";
 import { addToPurchaseHistory } from "@/lib/quickOrders";
@@ -49,6 +50,7 @@ function BranchPage() {
   const office = OFFICES.find((o) => o.id === officeId);
   const branch = BRANCHES.find((b) => b.slug === branchSlug);
   const { t, lang } = useI18n();
+  const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [sort, setSort] = useState<Sort>("default");
@@ -179,9 +181,14 @@ function BranchPage() {
           <div className="grid grid-cols-2 gap-4">
             {items.map((p) => {
               const urls = p.images.map((path) => urlMap[path]).filter(Boolean);
-              const first = urls[0];
+              const openProduct = () =>
+                navigate({ to: "/products/$productId", params: { productId: p.id } });
               return (
-                <div key={p.id} className="bg-card border border-border rounded-xl p-3 shadow-soft flex flex-col relative">
+                <div
+                  key={p.id}
+                  onClick={openProduct}
+                  className="bg-card border border-border rounded-xl p-3 shadow-soft flex flex-col relative cursor-pointer"
+                >
                   <FavoriteHeart
                     productId={p.id}
                     title={lang === "ar" ? p.ar : p.en}
@@ -191,13 +198,19 @@ function BranchPage() {
                     imageUrl={p.images?.[0] ? urlMap[p.images[0]] : undefined}
                     lang={lang}
                   />
-                  <div className="w-full h-36 rounded-lg bg-surface flex items-center justify-center overflow-hidden mb-2.5">
-                    {first ? (
-                      <img src={first} alt={lang === "ar" ? p.ar : p.en} loading="lazy" className="size-full object-contain" />
-                    ) : (
+                  {urls.length > 0 ? (
+                    <ProductImageCarousel
+                      urls={urls}
+                      alt={lang === "ar" ? p.ar : p.en}
+                      className="w-full h-36 rounded-lg bg-surface mb-2.5"
+                      imageClassName="h-36"
+                      showArrows={false}
+                    />
+                  ) : (
+                    <div className="w-full h-36 rounded-lg bg-surface flex items-center justify-center mb-2.5">
                       <ImageOff className="size-8 text-muted-foreground" />
-                    )}
-                  </div>
+                    </div>
+                  )}
                   <p className="font-display font-bold text-sm leading-snug line-clamp-2">{lang === "ar" ? p.ar : p.en}</p>
                   <p className="text-[11px] text-muted-foreground mt-0.5">{p.brand}</p>
                   <div className="flex items-center justify-between mt-2">
@@ -206,7 +219,7 @@ function BranchPage() {
                   </div>
                   <AddToCartButton
                     productId={p.id} productName={lang === "ar" ? p.ar : p.en}
-                    productImage={p.images?.[0] ? urlMap[p.images[0]] : undefined}
+                    productImage={urls[0]}
                     officeId={officeId} officeName={lang === "ar" ? office?.ar ?? "" : office?.en ?? ""}
                     brand={p.brand} category={p.branch} unitPrice={p.price}
                     currency={p.currency ?? "USD"} inStock={p.inStock ?? false} lang={lang}
@@ -232,7 +245,8 @@ function AddToCartButton({
 }) {
   const [added, setAdded] = useState(false);
 
-  const handleAdd = () => {
+  const handleAdd = (e: React.MouseEvent) => {
+    e.stopPropagation();
     addToCart({
       productId, productName, productImage, officeId,
       officeName, brand, category, unitPrice, currency, quantity: 1,

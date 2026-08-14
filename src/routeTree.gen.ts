@@ -37,6 +37,7 @@ import { Route as FavoritesIndexRouteImport } from './routes/favorites.index'
 import { Route as ClinicIndexRouteImport } from './routes/clinic.index'
 import { Route as BrandsIndexRouteImport } from './routes/brands.index'
 import { Route as ProfileAccountIdRouteImport } from './routes/profile.$accountId'
+import { Route as ProductsProductIdRouteImport } from './routes/products.$productId'
 import { Route as PatientsPatientIdRouteImport } from './routes/patients.$patientId'
 import { Route as LabsExploreRouteImport } from './routes/labs.explore'
 import { Route as LabsDashboardRouteImport } from './routes/labs.dashboard'
@@ -202,6 +203,11 @@ const ProfileAccountIdRoute = ProfileAccountIdRouteImport.update({
   path: '/profile/$accountId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProductsProductIdRoute = ProductsProductIdRouteImport.update({
+  id: '/products/$productId',
+  path: '/products/$productId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PatientsPatientIdRoute = PatientsPatientIdRouteImport.update({
   id: '/patients/$patientId',
   path: '/patients/$patientId',
@@ -363,6 +369,7 @@ export interface FileRoutesByFullPath {
   '/labs/dashboard': typeof LabsDashboardRoute
   '/labs/explore': typeof LabsExploreRoute
   '/patients/$patientId': typeof PatientsPatientIdRoute
+  '/products/$productId': typeof ProductsProductIdRoute
   '/profile/$accountId': typeof ProfileAccountIdRoute
   '/brands/': typeof BrandsIndexRoute
   '/clinic/': typeof ClinicIndexRoute
@@ -417,6 +424,7 @@ export interface FileRoutesByTo {
   '/labs/dashboard': typeof LabsDashboardRoute
   '/labs/explore': typeof LabsExploreRoute
   '/patients/$patientId': typeof PatientsPatientIdRoute
+  '/products/$productId': typeof ProductsProductIdRoute
   '/profile/$accountId': typeof ProfileAccountIdRoute
   '/brands': typeof BrandsIndexRoute
   '/clinic': typeof ClinicIndexRoute
@@ -472,6 +480,7 @@ export interface FileRoutesById {
   '/labs/dashboard': typeof LabsDashboardRoute
   '/labs/explore': typeof LabsExploreRoute
   '/patients/$patientId': typeof PatientsPatientIdRoute
+  '/products/$productId': typeof ProductsProductIdRoute
   '/profile/$accountId': typeof ProfileAccountIdRoute
   '/brands/': typeof BrandsIndexRoute
   '/clinic/': typeof ClinicIndexRoute
@@ -528,6 +537,7 @@ export interface FileRouteTypes {
     | '/labs/dashboard'
     | '/labs/explore'
     | '/patients/$patientId'
+    | '/products/$productId'
     | '/profile/$accountId'
     | '/brands/'
     | '/clinic/'
@@ -582,6 +592,7 @@ export interface FileRouteTypes {
     | '/labs/dashboard'
     | '/labs/explore'
     | '/patients/$patientId'
+    | '/products/$productId'
     | '/profile/$accountId'
     | '/brands'
     | '/clinic'
@@ -636,6 +647,7 @@ export interface FileRouteTypes {
     | '/labs/dashboard'
     | '/labs/explore'
     | '/patients/$patientId'
+    | '/products/$productId'
     | '/profile/$accountId'
     | '/brands/'
     | '/clinic/'
@@ -687,6 +699,7 @@ export interface RootRouteChildren {
   LabsDashboardRoute: typeof LabsDashboardRoute
   LabsExploreRoute: typeof LabsExploreRoute
   PatientsPatientIdRoute: typeof PatientsPatientIdRoute
+  ProductsProductIdRoute: typeof ProductsProductIdRoute
   ProfileAccountIdRoute: typeof ProfileAccountIdRoute
   BrandsIndexRoute: typeof BrandsIndexRoute
   ClinicIndexRoute: typeof ClinicIndexRoute
@@ -898,6 +911,13 @@ declare module '@tanstack/react-router' {
       path: '/profile/$accountId'
       fullPath: '/profile/$accountId'
       preLoaderRoute: typeof ProfileAccountIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/products/$productId': {
+      id: '/products/$productId'
+      path: '/products/$productId'
+      fullPath: '/products/$productId'
+      preLoaderRoute: typeof ProductsProductIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/patients/$patientId': {
@@ -1146,6 +1166,7 @@ const rootRouteChildren: RootRouteChildren = {
   LabsDashboardRoute: LabsDashboardRoute,
   LabsExploreRoute: LabsExploreRoute,
   PatientsPatientIdRoute: PatientsPatientIdRoute,
+  ProductsProductIdRoute: ProductsProductIdRoute,
   ProfileAccountIdRoute: ProfileAccountIdRoute,
   BrandsIndexRoute: BrandsIndexRoute,
   ClinicIndexRoute: ClinicIndexRoute,
