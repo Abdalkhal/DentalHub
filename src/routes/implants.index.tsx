@@ -220,7 +220,7 @@ type AccessoryRow = {
   imagePreview: string;
   existingImageUrl: string;
   type: string;
-  name: string;
+  subType: string;
   specs: string;
   price: string;
   currency: Currency;
@@ -232,13 +232,101 @@ function emptyAccessory(): AccessoryRow {
     imageFile: null,
     imagePreview: "",
     existingImageUrl: "",
-    type: "Abutment",
-    name: "",
+    type: "",
+    subType: "",
     specs: "",
     price: "",
     currency: "USD",
   };
 }
+
+const LEGACY_TYPE_MAP: Record<string, string> = {
+  Abutment: "abutment",
+  "Healing Screw": "healing-cover",
+  "Scan Body": "digital",
+  "Digital Analog": "digital",
+};
+
+const ACCESSORY_CATEGORIES: {
+  id: string;
+  ar: string;
+  en: string;
+  subTypes: { ar: string; en: string }[];
+}[] = [
+  {
+    id: "abutment",
+    ar: "الأبوتمنت",
+    en: "Abutment",
+    subTypes: [
+      { ar: "أبوتمنت مستقيم", en: "Straight Abutment" },
+      { ar: "أبوتمنت زاوي 15°", en: "Angled Abutment 15°" },
+      { ar: "أبوتمنت زاوي 17°", en: "Angled Abutment 17°" },
+      { ar: "أبوتمنت زاوي 25°", en: "Angled Abutment 25°" },
+      { ar: "أبوتمنت زاوي 30°", en: "Angled Abutment 30°" },
+      { ar: "مالتي يونيت مستقيم", en: "Multi-Unit Straight" },
+      { ar: "مالتي يونيت زاوي 17°", en: "Multi-Unit Angled 17°" },
+      { ar: "مالتي يونيت زاوي 30°", en: "Multi-Unit Angled 30°" },
+      { ar: "بول أبوتمنت / لوكايتر", en: "Ball Abutment & Locator Attachment" },
+      { ar: "قاعدة تيتانيوم للرقمي (Ti-Base)", en: "Ti-Base Abutment for CAD/CAM" },
+      { ar: "أبوتمنت مؤقت (PEEK / تيتانيوم)", en: "PEEK & Titanium Temporary Abutments" },
+      { ar: "دعامة قابلة للصب (UCLA)", en: "UCLA Castable Abutment" },
+      { ar: "أبوتمنت زركونيا", en: "Zirconia Abutment" },
+      { ar: "أبوتمنت التئام تشريحي", en: "Anatomic Healing Abutment" },
+    ],
+  },
+  {
+    id: "healing-cover",
+    ar: "براغي الالتئام والتغطية",
+    en: "Healing & Cover Screws",
+    subTypes: [
+      { ar: "برغي التئام GH 1mm - GH 7mm", en: "Healing Abutment GH 1mm to GH 7mm" },
+      { ar: "برغي التئام عريض Ø 4.5mm", en: "Wide Healing Abutment Ø 4.5mm" },
+      { ar: "برغي التئام عريض Ø 6.0mm", en: "Wide Healing Abutment Ø 6.0mm" },
+      { ar: "برغي تغطية جراحي قياسي", en: "Surgical Cover Screw Standard" },
+      { ar: "برغي تغطية جراحي ممتد +0.5mm", en: "Surgical Cover Screw Extended +0.5mm" },
+    ],
+  },
+  {
+    id: "digital",
+    ar: "أدوات المسح الرقمي والطبعات",
+    en: "Digital & Impression Tools",
+    subTypes: [
+      { ar: "سكان بدي فموي", en: "Intraoral Scan Body" },
+      { ar: "سكان بدي مخباري", en: "Desktop Lab Scan Body" },
+      { ar: "سكان بدي مالتي يونيت", en: "Multi-Unit Scan Body" },
+      { ar: "أنالوج رقمي للطباعة ثلاثية الأبعاد", en: "Digital Model Analog for 3D Print" },
+      { ar: "كوبنغ طبعة مفتوحة", en: "Open Tray Impression Coping" },
+      { ar: "كوبنغ طبعة مغلقة", en: "Closed Tray Impression Coping" },
+      { ar: "أنالوج مخبري تقليدي", en: "Traditional Plaster Lab Analog" },
+      { ar: "أنالوج مخبري مالتي يونيت", en: "Multi-Unit Lab Analog" },
+      { ar: "مسمار مسح رقمي", en: "Scan Post" },
+    ],
+  },
+  {
+    id: "screws",
+    ar: "البراغي والأجزاء الميكانيكية",
+    en: "Screws & Mechanical Components",
+    subTypes: [
+      { ar: "برغي الأبوتمنت السريري النهائي", en: "Final Clinical Abutment Screw" },
+      { ar: "برغي تجربة مخبري", en: "Laboratory Try-in Screw" },
+      { ar: "برغي تعويضي مالتي يونيت", en: "Multi-Unit Prosthetic Screw" },
+      { ar: "كوبنغ حرق بلاستيكي", en: "Burn-out Plastic Coping" },
+      { ar: "ناقل زراعة", en: "Implant Carrier / Transfer Coping" },
+    ],
+  },
+  {
+    id: "surgical-tools",
+    ar: "الأدوات الجراحية والمخبرية",
+    en: "Surgical & Lab Tools",
+    subTypes: [
+      { ar: "مفك براغي قصير", en: "Torque Wrench Driver Short" },
+      { ar: "مفك براغي طويل", en: "Torque Wrench Driver Long" },
+      { ar: "موسّع مثقب", en: "Drill Extender" },
+      { ar: "أداة استخراج المونتر", en: "Mounter Extractor Tool" },
+      { ar: "أداة استرجاع البراغي", en: "Screw Retrieval Tool" },
+    ],
+  },
+];
 
 function ImplantProductsPanel() {
   const { lang } = useI18n();
@@ -328,8 +416,8 @@ function ImplantProductsPanel() {
         imageFile: null,
         imagePreview: "",
         existingImageUrl: a.imageUrl || "",
-        type: a.type || "Abutment",
-        name: a.name || "",
+        type: LEGACY_TYPE_MAP[a.type] ?? a.type ?? "",
+        subType: a.name || "",
         specs: a.specs || "",
         price: a.price ? String(a.price) : "",
         currency: a.currency || "USD",
@@ -410,10 +498,10 @@ function ImplantProductsPanel() {
       }
 
       const savedAccessories: ProductAccessory[] = accessoryRows
-        .filter((a) => a.type && a.name.trim())
+        .filter((a) => a.type && a.subType)
         .map((a) => ({
-          type: a.type,
-          name: a.name.trim(),
+          type: ACCESSORY_CATEGORIES.find((c) => c.id === a.type)?.en ?? a.type,
+          name: a.subType,
           specs: a.specs.trim(),
           price: Math.max(0, parseFloat(a.price) || 0),
           imageUrl: a.existingImageUrl || "",
@@ -927,10 +1015,10 @@ function ImplantProductsPanel() {
                           <GripVertical className="size-3" />
                         </span>
                         <span className="text-[10px] font-bold text-muted-foreground">
-                          {ar ? "نوع الإكسسوار" : "Accessory Type"}
+                          {ar ? "اسم الإكسسوار الرئيسي" : "Main Category"}
                         </span>
                         <span className="text-[10px] font-bold text-muted-foreground">
-                          {ar ? "اسم الإكسسوار" : "Accessory Name"}
+                          {ar ? "نوع الإكسسوار التفصيلي" : "Detailed Sub-type"}
                         </span>
                         <span className="text-[10px] font-bold text-muted-foreground">
                           {ar ? "المواصفات" : "Specifications"}
@@ -944,11 +1032,14 @@ function ImplantProductsPanel() {
                       </div>
                       <div className="divide-y divide-slate-100">
                         {accessoryRows.map((acc) => {
-                          const typeColors: Record<string, string> = {
-                            Abutment: "bg-blue-100 text-blue-700 border-blue-200",
-                            "Healing Screw": "bg-green-100 text-green-700 border-green-200",
-                            "Scan Body": "bg-purple-100 text-purple-700 border-purple-200",
-                            "Digital Analog": "bg-orange-100 text-orange-700 border-orange-200",
+                          const selectedCat = ACCESSORY_CATEGORIES.find((c) => c.id === acc.type);
+                          const subTypes = selectedCat?.subTypes ?? [];
+                          const catColors: Record<string, string> = {
+                            abutment: "bg-blue-100 text-blue-700 border-blue-200",
+                            "healing-cover": "bg-green-100 text-green-700 border-green-200",
+                            digital: "bg-purple-100 text-purple-700 border-purple-200",
+                            screws: "bg-orange-100 text-orange-700 border-orange-200",
+                            "surgical-tools": "bg-rose-100 text-rose-700 border-rose-200",
                           };
                           return (
                             <div
@@ -991,27 +1082,39 @@ function ImplantProductsPanel() {
                               <select
                                 value={acc.type}
                                 onChange={(e) =>
-                                  updateAccessoryRow(acc.key, { type: e.target.value })
+                                  updateAccessoryRow(acc.key, { type: e.target.value, subType: "" })
                                 }
                                 className={cn(
                                   "w-full h-9 rounded-lg border px-2 text-[11px] font-semibold outline-none focus:ring-2 focus:ring-primary/20 transition",
-                                  typeColors[acc.type] || "bg-white border-border",
+                                  catColors[acc.type] || "bg-white border-border",
                                 )}
                               >
-                                <option value="Abutment">Abutment</option>
-                                <option value="Healing Screw">Healing Screw</option>
-                                <option value="Scan Body">Scan Body</option>
-                                <option value="Digital Analog">Digital Analog</option>
+                                <option value="">{ar ? "-- اختر الفئة --" : "-- Select category --"}</option>
+                                {ACCESSORY_CATEGORIES.map((c) => (
+                                  <option key={c.id} value={c.id}>
+                                    {ar ? c.ar : c.en}
+                                  </option>
+                                ))}
                               </select>
 
-                              <input
-                                value={acc.name}
+                              <select
+                                value={acc.subType}
                                 onChange={(e) =>
-                                  updateAccessoryRow(acc.key, { name: e.target.value })
+                                  updateAccessoryRow(acc.key, { subType: e.target.value })
                                 }
-                                placeholder={ar ? "اسم الإكسسوار" : "Accessory name"}
-                                className="w-full h-9 rounded-lg bg-white border border-border px-2 text-[11px] outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
-                              />
+                                disabled={!acc.type}
+                                className={cn(
+                                  "w-full h-9 rounded-lg border px-2 text-[11px] outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition",
+                                  !acc.type ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed" : "bg-white border-border",
+                                )}
+                              >
+                                <option value="">{ar ? "-- اختر النوع --" : "-- Select sub-type --"}</option>
+                                {subTypes.map((st) => (
+                                  <option key={st.en} value={ar ? st.ar : st.en}>
+                                    {ar ? st.ar : st.en}
+                                  </option>
+                                ))}
+                              </select>
 
                               <input
                                 value={acc.specs}
@@ -1090,6 +1193,30 @@ function ImplantProductsPanel() {
                   <p className="text-xs text-slate-400 text-center py-8">
                     {ar ? "لا توجد إكسسوارات مضافة بعد" : "No accessories added yet"}
                   </p>
+                )}
+
+                {accessoryRows.some((a) => a.subType) && (
+                  <div className="mt-3 rounded-xl bg-blue-50/60 border border-blue-100 px-3 py-2.5">
+                    <p className="text-[10px] font-bold text-blue-700 mb-1.5">
+                      {ar ? "معاينة الإكسسوارات المحددة:" : "Selected accessories preview:"}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {accessoryRows
+                        .filter((a) => a.subType)
+                        .map((a) => {
+                          const cat = ACCESSORY_CATEGORIES.find((c) => c.id === a.type);
+                          return (
+                            <span
+                              key={a.key}
+                              className="inline-flex items-center gap-1 rounded-full bg-white border border-blue-200 text-blue-700 text-[10px] font-semibold px-2.5 py-1"
+                            >
+                              <span className="text-blue-400">●</span>
+                              {ar ? cat?.ar : cat?.en} · {a.subType}
+                            </span>
+                          );
+                        })}
+                    </div>
+                  </div>
                 )}
               </div>
             </>
@@ -1660,8 +1787,8 @@ function ImplantDetailView({
       imageFile: null,
       imagePreview: "",
       existingImageUrl: a.imageUrl || "",
-      type: a.type || "Abutment",
-      name: a.name || "",
+      type: LEGACY_TYPE_MAP[a.type] ?? a.type ?? "",
+      subType: a.name || "",
       specs: a.specs || "",
       price: a.price ? String(a.price) : "",
       currency: a.currency || "USD",
@@ -1691,10 +1818,10 @@ function ImplantDetailView({
             return;
           }
         }
-        if (acc.type && acc.name.trim()) {
+        if (acc.type && acc.subType) {
           saved.push({
-            type: acc.type,
-            name: acc.name.trim(),
+            type: ACCESSORY_CATEGORIES.find((c) => c.id === acc.type)?.en ?? acc.type,
+            name: acc.subType,
             specs: acc.specs.trim(),
             price: Math.max(0, parseFloat(acc.price) || 0),
             imageUrl,
@@ -1857,27 +1984,43 @@ function ImplantDetailView({
                       value={acc.type}
                       onChange={(e) =>
                         setAccItems((prev) =>
-                          prev.map((a) => (a.key === acc.key ? { ...a, type: e.target.value } : a)),
+                          prev.map((a) =>
+                            a.key === acc.key ? { ...a, type: e.target.value, subType: "" } : a,
+                          ),
                         )
                       }
                       className="w-full h-9 rounded-lg bg-white border border-border px-1.5 text-[10px] font-semibold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
                     >
-                      <option value="Abutment">Abutment</option>
-                      <option value="Healing Screw">Healing Screw</option>
-                      <option value="Scan Body">Scan Body</option>
-                      <option value="Digital Analog">Digital Analog</option>
+                      <option value="">{ar ? "-- اختر الفئة --" : "-- Select category --"}</option>
+                      {ACCESSORY_CATEGORIES.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {ar ? c.ar : c.en}
+                        </option>
+                      ))}
                     </select>
 
-                    <input
-                      value={acc.name}
+                    <select
+                      value={acc.subType}
                       onChange={(e) =>
                         setAccItems((prev) =>
-                          prev.map((a) => (a.key === acc.key ? { ...a, name: e.target.value } : a)),
+                          prev.map((a) => (a.key === acc.key ? { ...a, subType: e.target.value } : a)),
                         )
                       }
-                      placeholder={ar ? "اسم الإكسسوار" : "Accessory name"}
-                      className="w-full h-9 rounded-lg bg-white border border-border px-2 text-[11px] outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
-                    />
+                      disabled={!acc.type}
+                      className={cn(
+                        "w-full h-9 rounded-lg border px-2 text-[11px] outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition",
+                        !acc.type
+                          ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed"
+                          : "bg-white border-border",
+                      )}
+                    >
+                      <option value="">{ar ? "-- اختر النوع --" : "-- Select sub-type --"}</option>
+                      {(ACCESSORY_CATEGORIES.find((c) => c.id === acc.type)?.subTypes ?? []).map((st) => (
+                        <option key={st.en} value={ar ? st.ar : st.en}>
+                          {ar ? st.ar : st.en}
+                        </option>
+                      ))}
+                    </select>
 
                     <input
                       value={acc.specs}
