@@ -43,6 +43,25 @@ export type ProductAccessory = {
   currency: Currency;
 };
 
+export type BoneGraftPackSize = {
+  volume: string;
+  priceUsd: number;
+  priceIqd: number;
+  available: boolean;
+};
+
+export type BoneGraftSpec = {
+  graftType: string;
+  form: string;
+  materialSource: string;
+  composition: string;
+  particleSize: string;
+  sterilizationMethod: string;
+  shelfLife: string;
+  features: string[];
+  packSizes: BoneGraftPackSize[];
+};
+
 export type Product = {
   id: string;
   branch: string;
@@ -64,6 +83,7 @@ export type Product = {
   accessories?: ProductAccessory[];
   productType?: "main_implant" | "accessory";
   parentId?: string | null;
+  boneGraft?: BoneGraftSpec;
 };
 
 const fromDoc = (id: string, data: Record<string, unknown>): Product => {
@@ -104,6 +124,7 @@ const fromDoc = (id: string, data: Record<string, unknown>): Product => {
     accessories: (data.accessories as ProductAccessory[] | null) ?? undefined,
     productType: (data.productType as "main_implant" | "accessory") ?? undefined,
     parentId: (data.parentId as string | null) ?? undefined,
+    boneGraft: (data.boneGraft as BoneGraftSpec | null) ?? undefined,
   };
 };
 
@@ -144,6 +165,9 @@ export function useUpsertProduct() {
       const cleanAccessories = p.accessories
         ? (removeUndefined(p.accessories) as ProductAccessory[])
         : null;
+      const cleanBoneGraft = p.boneGraft
+        ? (removeUndefined(p.boneGraft) as BoneGraftSpec)
+        : null;
       await setDoc(
         ref,
         {
@@ -168,6 +192,7 @@ export function useUpsertProduct() {
           accessories: cleanAccessories,
           productType: p.productType ?? null,
           parentId: p.parentId ?? null,
+          boneGraft: cleanBoneGraft,
         },
         { merge: true },
       );

@@ -7,6 +7,7 @@ import type { UserRoleDoc } from "@/integrations/firebase/types";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { RoleGuard } from "@/components/RoleGuard";
+import { TagInput } from "@/components/TagInput";
 import {
   Dialog,
   DialogContent,
@@ -1478,8 +1479,8 @@ function ImplantProductsPanel() {
   const [brand, setBrand] = useState("");
   const [materialGrade, setMaterialGrade] = useState("");
   const [surfaceTreatment, setSurfaceTreatment] = useState("");
-  const [diametersStr, setDiametersStr] = useState("");
-  const [lengthsStr, setLengthsStr] = useState("");
+  const [diameters, setDiameters] = useState<string[]>([]);
+  const [lengths, setLengths] = useState<string[]>([]);
   const [connectionType, setConnectionType] = useState("Internal Hex");
   const [recommendedTorque, setRecommendedTorque] = useState("");
   const [kitType, setKitType] = useState<"implant" | "surgical_kit">("implant");
@@ -1513,8 +1514,8 @@ function ImplantProductsPanel() {
     setPrice("");
     setMaterialGrade("");
     setSurfaceTreatment("");
-    setDiametersStr("");
-    setLengthsStr("");
+    setDiameters([]);
+    setLengths([]);
     setConnectionType("Internal Hex");
     setRecommendedTorque("");
     setKitType("implant");
@@ -1541,8 +1542,8 @@ function ImplantProductsPanel() {
     setPrice(p.price ? String(p.price) : "");
     setMaterialGrade(p.implantSpec?.materialGrade ?? "");
     setSurfaceTreatment(p.implantSpec?.surfaceTreatment ?? "");
-    setDiametersStr((p.implantSpec?.diameters ?? []).join(", "));
-    setLengthsStr((p.implantSpec?.lengths ?? []).join(", "));
+    setDiameters((p.implantSpec?.diameters ?? []).map(String));
+    setLengths((p.implantSpec?.lengths ?? []).map(String));
     setConnectionType(p.implantSpec?.connectionType ?? "Internal Hex");
     setRecommendedTorque(p.implantSpec?.recommendedTorque ?? "");
     setKitType(p.implantSpec?.kitType ?? "implant");
@@ -1579,11 +1580,8 @@ function ImplantProductsPanel() {
     setEditing({ ...editing, images: editing.images.filter((img) => img !== path) });
   };
 
-  const parseNumbers = (str: string): number[] =>
-    str
-      .split(/[,،\s]+/)
-      .map((s) => parseFloat(s.trim()))
-      .filter((n) => !isNaN(n) && n > 0);
+  const toNums = (arr: string[]): number[] =>
+    arr.map((s) => parseFloat(s)).filter((n) => !isNaN(n) && n > 0);
 
   const submit = async () => {
     setFormError("");
@@ -1625,8 +1623,8 @@ function ImplantProductsPanel() {
         implantSpec: {
           materialGrade: materialGrade.trim() || undefined,
           surfaceTreatment: surfaceTreatment.trim() || undefined,
-          diameters: parseNumbers(diametersStr),
-          lengths: parseNumbers(lengthsStr),
+          diameters: toNums(diameters),
+          lengths: toNums(lengths),
           connectionType: connectionType.trim() || undefined,
           recommendedTorque: recommendedTorque.trim() || undefined,
           kitType,
@@ -1906,24 +1904,22 @@ function ImplantProductsPanel() {
               <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
                 {ar ? "الأقطار (مم)" : "Diameters (mm)"}
               </label>
-              <input
-                value={diametersStr}
-                onChange={(e) => setDiametersStr(e.target.value)}
-                placeholder="3.5, 4.0, 4.5"
-                dir="ltr"
-                className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+              <TagInput
+                value={diameters}
+                onChange={setDiameters}
+                prefix="Ø"
+                placeholder="3.3"
               />
             </div>
             <div>
               <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
                 {ar ? "الأطوال (مم)" : "Lengths (mm)"}
               </label>
-              <input
-                value={lengthsStr}
-                onChange={(e) => setLengthsStr(e.target.value)}
-                placeholder="8.5, 10, 11.5"
-                dir="ltr"
-                className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+              <TagInput
+                value={lengths}
+                onChange={setLengths}
+                suffix="mm"
+                placeholder="10"
               />
             </div>
           </div>

@@ -4,6 +4,8 @@ import { doc, updateDoc } from "firebase/firestore";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { RoleGuard } from "@/components/RoleGuard";
+import { TagInput } from "@/components/TagInput";
+import { BoneGraftModal } from "@/components/BoneGraftModal";
 import { COUNTRIES, SURGICAL_GUIDE_COMPANIES, IMPLANTS } from "@/data/implants";
 import {
   useProducts,
@@ -252,6 +254,7 @@ function ImplantProductsPanel() {
   );
 
   const [showForm, setShowForm] = useState(false);
+  const [showBoneGraft, setShowBoneGraft] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
@@ -260,8 +263,8 @@ function ImplantProductsPanel() {
   const [brand, setBrand] = useState("");
   const [country, setCountry] = useState("KR");
   const [line, setLine] = useState("");
-  const [selectedDiameters, setSelectedDiameters] = useState<number[]>([]);
-  const [selectedLengths, setSelectedLengths] = useState<number[]>([]);
+  const [selectedDiameters, setSelectedDiameters] = useState<string[]>([]);
+  const [selectedLengths, setSelectedLengths] = useState<string[]>([]);
   const [accessoryRows, setAccessoryRows] = useState<AccessoryRow[]>([]);
   const [price, setPrice] = useState("");
   const [currency, setCurrency] = useState<Currency>("USD");
@@ -317,8 +320,8 @@ function ImplantProductsPanel() {
     setBrand(p.brand);
     setCountry(p.country || p.implantSpec?.country || "KR");
     setLine(p.implantSpec?.connectionType || "");
-    setSelectedDiameters(p.implantSpec?.diameters || []);
-    setSelectedLengths(p.implantSpec?.lengths || []);
+    setSelectedDiameters((p.implantSpec?.diameters ?? []).map(String));
+    setSelectedLengths((p.implantSpec?.lengths ?? []).map(String));
     setAccessoryRows(
       (p.accessories || []).map((a) => ({
         key: crypto.randomUUID(),
@@ -367,14 +370,6 @@ function ImplantProductsPanel() {
     if (!editing) return;
     await removeProductImage(path);
     setEditing({ ...editing, images: editing.images.filter((img) => img !== path) });
-  };
-
-  const toggleDiameter = (d: number) => {
-    setSelectedDiameters((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));
-  };
-
-  const toggleLength = (l: number) => {
-    setSelectedLengths((prev) => (prev.includes(l) ? prev.filter((x) => x !== l) : [...prev, l]));
   };
 
   const addAccessoryRow = () => {
@@ -446,8 +441,12 @@ function ImplantProductsPanel() {
             : {
                 country,
                 connectionType: line.trim() || undefined,
-                diameters: selectedDiameters.length > 0 ? selectedDiameters : undefined,
-                lengths: selectedLengths.length > 0 ? selectedLengths : undefined,
+                diameters: selectedDiameters.length > 0
+                  ? selectedDiameters.map(Number).filter((n) => !isNaN(n) && n > 0)
+                  : undefined,
+                lengths: selectedLengths.length > 0
+                  ? selectedLengths.map(Number).filter((n) => !isNaN(n) && n > 0)
+                  : undefined,
               },
         accessories: savedAccessories.length > 0 ? savedAccessories : undefined,
         productType,
@@ -525,13 +524,22 @@ function ImplantProductsPanel() {
   return (
     <div className="space-y-4">
       {!showForm && (
-        <button
-          onClick={openAdd}
-          className="w-full h-14 rounded-2xl bg-primary text-primary-foreground font-display font-bold flex items-center justify-center gap-2 hover:opacity-90 transition shadow-card"
-        >
-          <Plus className="size-5" />
-          {ar ? "إضافة زرعة جديدة" : "Add New Implant"}
-        </button>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={openAdd}
+            className="h-14 rounded-2xl bg-primary text-primary-foreground font-display font-bold flex items-center justify-center gap-2 hover:opacity-90 transition shadow-card"
+          >
+            <Plus className="size-5" />
+            {ar ? "إضافة زرعة جديدة" : "Add New Implant"}
+          </button>
+          <button
+            onClick={() => setShowBoneGraft(true)}
+            className="h-14 rounded-2xl bg-emerald-600 text-white font-display font-bold flex items-center justify-center gap-2 hover:opacity-90 transition shadow-card"
+          >
+            <Plus className="size-5" />
+            {ar ? "إضافة بون كرافت" : "Add Bone Graft"}
+          </button>
+        </div>
       )}
 
       {showForm && (
@@ -842,48 +850,26 @@ function ImplantProductsPanel() {
                   <div className="md:col-span-2 space-y-4">
                     <div>
                       <label className="text-xs font-semibold text-muted-foreground mb-2 block">
-                        {ar ? "الأقطار المتاحة (mm):" : "Available Diameters (mm):"}
+                        {ar ? "الأقطار (mm):" : "Diameters (mm):"}
                       </label>
-                      <div className="flex flex-wrap gap-2">
-                        {[3.3, 3.75, 4.1, 4.5, 5.0, 6.0].map((d) => (
-                          <button
-                            key={d}
-                            type="button"
-                            onClick={() => toggleDiameter(d)}
-                            className={cn(
-                              "h-10 px-4 rounded-xl text-sm font-bold transition border",
-                              selectedDiameters.includes(d)
-                                ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                                : "bg-white text-slate-600 border-slate-200 hover:border-primary/40 hover:bg-sky-50",
-                            )}
-                          >
-                            &Oslash; {d}
-                          </button>
-                        ))}
-                      </div>
+                      <TagInput
+                        value={selectedDiameters}
+                        onChange={setSelectedDiameters}
+                        prefix="Ø"
+                        placeholder="3.3"
+                      />
                     </div>
 
                     <div>
                       <label className="text-xs font-semibold text-muted-foreground mb-2 block">
-                        {ar ? "الأطوال المتاحة (mm):" : "Available Lengths (mm):"}
+                        {ar ? "الأطوال (mm):" : "Lengths (mm):"}
                       </label>
-                      <div className="flex flex-wrap gap-2">
-                        {[6, 8, 10, 11.5, 13, 14.5, 16, 18].map((l) => (
-                          <button
-                            key={l}
-                            type="button"
-                            onClick={() => toggleLength(l)}
-                            className={cn(
-                              "size-12 rounded-xl text-sm font-bold transition border flex items-center justify-center",
-                              selectedLengths.includes(l)
-                                ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                                : "bg-white text-slate-600 border-slate-200 hover:border-primary/40 hover:bg-sky-50",
-                            )}
-                          >
-                            {l}
-                          </button>
-                        ))}
-                      </div>
+                      <TagInput
+                        value={selectedLengths}
+                        onChange={setSelectedLengths}
+                        suffix="mm"
+                        placeholder="10"
+                      />
                     </div>
 
                     {selectedDiameters.length > 0 || selectedLengths.length > 0 ? (
@@ -892,18 +878,18 @@ function ImplantProductsPanel() {
                         <span className="text-sm font-semibold text-blue-700">
                           {ar ? "المقاس المحدد:" : "Selected size:"}{" "}
                           {selectedDiameters.length > 0
-                            ? `${ar ? "قطر" : "Ø"} ${selectedDiameters.sort((a, b) => a - b).join(" / ")} mm`
+                            ? `${ar ? "قطر" : "Ø"} ${[...selectedDiameters].sort((a, b) => Number(a) - Number(b)).join(" / ")} mm`
                             : ""}
                           {selectedDiameters.length > 0 && selectedLengths.length > 0 ? " × " : ""}
                           {selectedLengths.length > 0
-                            ? `${ar ? "طول" : "L"} ${selectedLengths.sort((a, b) => a - b).join(" / ")} mm`
+                            ? `${ar ? "طول" : "L"} ${[...selectedLengths].sort((a, b) => Number(a) - Number(b)).join(" / ")} mm`
                             : ""}
                         </span>
                       </div>
                     ) : (
                       <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5">
                         <span className="text-sm text-slate-400">
-                          {ar ? "اختر قطرًا وطولًا للزرعة" : "Select implant diameter and length"}
+                          {ar ? "أدخل قطرًا وطولًا للزرعة" : "Enter implant diameter and length"}
                         </span>
                       </div>
                     )}
@@ -1646,6 +1632,8 @@ function ImplantProductsPanel() {
             ))}
           </div>
         ))}
+
+      {showBoneGraft && <BoneGraftModal onClose={() => setShowBoneGraft(false)} />}
     </div>
   );
 }
