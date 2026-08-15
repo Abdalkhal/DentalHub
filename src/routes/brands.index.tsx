@@ -68,7 +68,7 @@ function BrandsIndex() {
         {groups.map(([letter, list]) => (
           <section key={letter} className="mt-5">
             <h2 className="font-display font-extrabold text-sm text-primary mb-2">{letter}</h2>
-            <ul className="grid grid-cols-2 gap-3">
+            <ul className="grid grid-cols-3 gap-3">
               {list.map((b) => {
                 const itemCount = b.products.length;
                 return (

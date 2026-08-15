@@ -1,8 +1,28 @@
+import { useState } from "react";
 import type { Brand } from "@/data/brands";
 import { cn } from "@/lib/utils";
 
-/** Crisp typographic brand mark rendered as vector text (no raster logos). */
+/** Brand logo image when available, otherwise a crisp typographic mark. */
 export function BrandLogo({ brand, className }: { brand: Brand; className?: string }) {
+  const [failed, setFailed] = useState(false);
+
+  if (brand.image && !failed) {
+    return (
+      <span
+        className={cn("flex items-center justify-center overflow-hidden select-none", className)}
+        aria-label={brand.name}
+      >
+        <img
+          src={brand.image}
+          alt={brand.name}
+          loading="lazy"
+          className="h-full w-full object-contain"
+          onError={() => setFailed(true)}
+        />
+      </span>
+    );
+  }
+
   const words = brand.name.split(" ");
   return (
     <span

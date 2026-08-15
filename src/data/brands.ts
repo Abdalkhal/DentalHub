@@ -4,6 +4,7 @@ import {
   seedColor,
   seedSlug,
 } from "./brands-extra";
+import { BRAND_IMAGES, BRAND_NAMES } from "./brand-images";
 
 export type BrandCategory = "fillings" | "devices" | "endo" | "impression";
 
@@ -37,6 +38,8 @@ export type Brand = {
   ar: string;
   /** brand color used for the typographic logo tile */
   color: string;
+  /** brand logo image URL (falls back to typographic mark when missing) */
+  image?: string;
   countryAr: string;
   countryEn: string;
   distributors: number;
@@ -364,7 +367,28 @@ for (const seed of BRAND_SEEDS_P_Z) {
   });
 }
 
+// Attach scraped logo images to existing brands (matched by slug).
+for (const b of BRANDS) {
+  if (!b.image && BRAND_IMAGES[b.id]) b.image = BRAND_IMAGES[b.id];
+}
 
+// Add brands from the dentalstation list that aren't already present (catalog-only).
+const existingIds = new Set(BRANDS.map((b) => b.id));
+for (const [slug, name] of Object.entries(BRAND_NAMES)) {
+  if (existingIds.has(slug)) continue;
+  existingIds.add(slug);
+  BRANDS.push({
+    id: slug,
+    name,
+    ar: name,
+    color: seedColor(name),
+    image: BRAND_IMAGES[slug],
+    countryAr: "",
+    countryEn: "",
+    distributors: 0,
+    products: [],
+  });
+}
 
 export const POPULAR_BRAND_IDS = [
   "3m",

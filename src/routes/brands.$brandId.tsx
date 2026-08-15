@@ -197,8 +197,8 @@ function BrandDetail() {
             }}
           />
           <div className="flex items-center gap-3">
-            <span className="size-20 rounded-2xl bg-card flex items-center justify-center shadow-sm shrink-0">
-              <BrandLogo brand={brand} />
+            <span className="size-20 rounded-2xl bg-card flex items-center justify-center shadow-sm shrink-0 p-2">
+              <BrandLogo brand={brand} className="w-full h-full" />
             </span>
             <div className="min-w-0">
               <h1 className="font-display font-extrabold text-lg leading-tight">
