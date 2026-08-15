@@ -115,15 +115,8 @@ function ImplantCompanyDashboard() {
   const mapsUrl = getMapsUrl(role ?? {});
 
   return (
-    <MobileShell hideBottomNav className="bg-transparent">
-      <div
-        className="min-h-full"
-        style={{
-          backgroundImage:
-            "radial-gradient(circle, rgba(99,102,241,0.08) 1px, transparent 1px), linear-gradient(to bottom right, #f8fafc, #ffffff, #eef2ff)",
-          backgroundSize: "20px 20px, 100% 100%",
-        }}
-      >
+    <MobileShell>
+      <div className="min-h-full">
         <div className="px-4 pt-4 pb-2">
           <div className="flex items-center justify-between">
             <Link
