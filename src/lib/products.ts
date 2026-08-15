@@ -65,6 +65,7 @@ export type BoneGraftSpec = {
 export type Product = {
   id: string;
   branch: string;
+  subCategory?: string;
   ar: string;
   en: string;
   brand: string;
@@ -91,6 +92,7 @@ const fromDoc = (id: string, data: Record<string, unknown>): Product => {
   return {
     id,
     branch: (data.branch as string) ?? "",
+    subCategory: (data.subCategory as string) ?? undefined,
     ar: (data.ar as string) ?? "",
     en: (data.en as string) ?? "",
     brand: (data.brand as string) ?? "",
@@ -173,6 +175,7 @@ export function useUpsertProduct() {
         {
           id: p.id,
           branch: p.branch,
+          subCategory: p.subCategory ?? null,
           ar: p.ar,
           en: p.en,
           brand: p.brand,

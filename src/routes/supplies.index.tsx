@@ -16,6 +16,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { CITIES } from "@/data/offices";
+import { subcategoriesOf } from "@/data/subcategories";
 import { useAdminStore } from "@/lib/adminStore";
 import {
   useProducts,
@@ -291,11 +292,14 @@ function ProductsPanel() {
   const remove = useDeleteProduct();
 
   const [branchFilter, setBranchFilter] = useState<string>("all");
+  const [subFilter, setSubFilter] = useState<string>("");
 
   const myProducts = useMemo(() => {
     if (branchFilter === "all") return allProducts;
-    return allProducts.filter((p) => p.branch === branchFilter);
-  }, [allProducts, branchFilter]);
+    let list = allProducts.filter((p) => p.branch === branchFilter);
+    if (subFilter) list = list.filter((p) => p.subCategory === subFilter);
+    return list;
+  }, [allProducts, branchFilter, subFilter]);
 
   const branchOptions = [
     { value: "general", ar: "مواد عامة", en: "General" },
@@ -329,6 +333,7 @@ function ProductsPanel() {
   const [currency, setCurrency] = useState<Currency>("USD");
   const [stock, setStock] = useState("");
   const [branch, setBranch] = useState("general");
+  const [subCategory, setSubCategory] = useState("");
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState("");
   const [imageFiles, setImageFiles] = useState<File[]>([]);
@@ -360,6 +365,7 @@ function ProductsPanel() {
     setCurrency("USD");
     setStock("");
     setBranch(branchFilter !== "all" ? branchFilter : "general");
+    setSubCategory("");
     setImageFiles([]);
     setImagePreviews([]);
     setCatDropdownOpen(false);
@@ -376,6 +382,7 @@ function ProductsPanel() {
     setCurrency(p.currency || "USD");
     setStock(String(p.stock ?? 0));
     setBranch(p.branch);
+    setSubCategory(p.subCategory ?? "");
     setImageFiles([]);
     setImagePreviews([]);
     setFormError("");
@@ -488,6 +495,7 @@ function ProductsPanel() {
       await upsert.mutateAsync({
         id: productId,
         branch,
+        subCategory: subCategory || undefined,
         ar: nameAr.trim(),
         en: nameEn.trim() || nameAr.trim(),
         brand: brand.trim(),
@@ -532,7 +540,8 @@ function ProductsPanel() {
       {!showForm && (
         <button
           onClick={openAdd}
-          className="w-full h-14 rounded-2xl bg-primary text-primary-foreground font-display font-bold flex items-center justify-center gap-2 hover:opacity-90 transition shadow-card"
+          className="w-full h-14 rounded-2xl text-white font-display font-bold flex items-center justify-center gap-2 hover:opacity-95 transition shadow-lg"
+          style={{ background: "linear-gradient(to right, #2AA6D1, #4FC3E8)" }}
         >
           <Plus className="size-5" />
           {ar ? "إضافة منتج جديد" : "Add new product"}
@@ -541,14 +550,15 @@ function ProductsPanel() {
 
       {/* Product form card */}
       {showForm && (
-        <div className="bg-card border border-border rounded-3xl p-5 shadow-card space-y-4">
+        <div className="bg-white border border-[#D3E8F7] rounded-3xl p-5 shadow-card space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="font-display font-bold text-lg">
+            <h3 className="font-display font-bold text-lg text-[#1C6FB5] flex items-center gap-1.5">
+              <span className="size-1.5 rounded-full bg-[#1C6FB5]" />
               {editing ? (ar ? "تعديل منتج" : "Edit product") : ar ? "منتج جديد" : "New product"}
             </h3>
             <button
               onClick={() => setShowForm(false)}
-              className="size-9 rounded-xl bg-muted hover:bg-slate-200 flex items-center justify-center transition"
+              className="size-9 rounded-xl bg-[#E7F4FE] hover:bg-[#DCEEFB] text-[#1C6FB5] flex items-center justify-center transition"
             >
               <X className="size-4" />
             </button>
@@ -556,14 +566,14 @@ function ProductsPanel() {
 
           {/* Category */}
           <div>
-            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
               {ar ? "الفئة" : "Category"}
             </label>
             <div ref={catRef} className="relative">
               <button
                 type="button"
                 onClick={() => setCatDropdownOpen(!catDropdownOpen)}
-                className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition flex items-center justify-between"
+                className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition flex items-center justify-between"
               >
                 <span className={branch ? "" : "text-muted-foreground/60"}>
                   {branch
@@ -586,6 +596,7 @@ function ProductsPanel() {
                       type="button"
                       onClick={() => {
                         setBranch(b.value);
+                        setSubCategory("");
                         setCatDropdownOpen(false);
                       }}
                       className={`w-full px-4 py-2.5 text-sm transition-colors flex items-center justify-between hover:bg-blue-50 hover:text-blue-600 ${
@@ -602,48 +613,69 @@ function ProductsPanel() {
             </div>
           </div>
 
+          {/* Sub-category */}
+          {subcategoriesOf(branch).length > 0 && (
+            <div>
+              <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
+                {ar ? "التصنيف الفرعي (اختياري)" : "Sub-category (Optional)"}
+              </label>
+              <select
+                value={subCategory}
+                onChange={(e) => setSubCategory(e.target.value)}
+                className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition appearance-none"
+              >
+                <option value="">{ar ? "-- اختر التصنيف الفرعي --" : "-- Select sub-category --"}</option>
+                {subcategoriesOf(branch).map((s) => (
+                  <option key={s.en} value={s.en}>
+                    {ar ? s.ar : s.en}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Name ar */}
           <div>
-            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
               {ar ? "اسم المنتج (عربي)" : "Product name (Arabic)"}
             </label>
             <input
               value={nameAr}
               onChange={(e) => setNameAr(e.target.value)}
               placeholder={ar ? "مثال: كومبوزيت ضوئي" : "e.g. Light-cured composite"}
-              className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+              className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
             />
           </div>
 
           {/* Name en */}
           <div>
-            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
               {ar ? "اسم المنتج (انكليزي)" : "Product name (English)"}
             </label>
             <input
               value={nameEn}
               onChange={(e) => setNameEn(e.target.value)}
               placeholder={ar ? "اختياري" : "Optional"}
-              className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+              className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
             />
           </div>
 
           {/* Brand */}
           <div>
-            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
               {ar ? "الماركة" : "Brand"}
             </label>
             <input
               value={brand}
               onChange={(e) => setBrand(e.target.value)}
               placeholder={ar ? "مثال: 3M" : "e.g. 3M"}
-              className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+              className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
             />
           </div>
 
           {/* Price + Currency row */}
           <div>
-            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
               {ar ? "السعر" : "Price"}
             </label>
             <div className="flex gap-2">
@@ -655,11 +687,11 @@ function ProductsPanel() {
                   onFocus={(e) => e.target.select()}
                   placeholder="0"
                   dir="ltr"
-                  className="w-full h-12 rounded-xl bg-slate-50 border border-border ps-12 pe-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] ps-12 pe-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />
                 <DollarSign className="absolute start-4 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
               </div>
-              <div className="flex rounded-xl bg-slate-50 border border-border overflow-hidden shrink-0">
+              <div className="flex rounded-xl bg-[#F5FAFE] border-[#D3E8F7] overflow-hidden shrink-0">
                 <button
                   type="button"
                   onClick={() => setCurrency("USD")}
@@ -690,7 +722,7 @@ function ProductsPanel() {
 
           {/* Stock */}
           <div>
-            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
               {ar ? "الكمية المتوفرة" : "Available quantity"}
             </label>
             <div className="relative">
@@ -701,7 +733,7 @@ function ProductsPanel() {
                 onFocus={(e) => e.target.select()}
                 placeholder="0"
                 dir="ltr"
-                className="w-full h-12 rounded-xl bg-slate-50 border border-border ps-12 pe-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] ps-12 pe-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               />
               <Layers className="absolute start-4 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
             </div>
@@ -709,7 +741,7 @@ function ProductsPanel() {
 
           {/* Product images */}
           <div>
-            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
               {ar ? "صور المنتج" : "Product images"}
             </label>
 
@@ -719,7 +751,7 @@ function ProductsPanel() {
                 {editing.images.map((path, idx) => (
                   <div
                     key={path}
-                    className="relative size-16 rounded-xl bg-slate-50 border border-border overflow-hidden group"
+                    className="relative size-16 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] overflow-hidden group"
                   >
                     {editUrlMap[path] ? (
                       <img src={editUrlMap[path]} alt="" className="size-full object-cover" />
@@ -742,7 +774,7 @@ function ProductsPanel() {
 
             {/* New image upload zone */}
             {imageFiles.length + (editing?.images.length ?? 0) < MAX_PRODUCT_IMAGES && (
-              <label className="w-full h-32 rounded-xl border-2 border-dashed border-border bg-slate-50 flex flex-col items-center justify-center gap-1.5 cursor-pointer hover:border-primary/40 hover:bg-sky-50/30 transition group">
+              <label className="w-full h-32 rounded-xl border-2 border-dashed border-[#D3E8F7] bg-[#F5FAFE] flex flex-col items-center justify-center gap-1.5 cursor-pointer hover:border-primary/40 hover:bg-sky-50/30 transition group">
                 <Upload className="size-6 text-slate-400 group-hover:text-primary transition" />
                 <p className="text-xs text-slate-400 group-hover:text-primary transition font-medium">
                   {ar ? "اضغط لرفع صورة المنتج" : "Tap to upload product image"}
@@ -766,7 +798,7 @@ function ProductsPanel() {
                 {imagePreviews.map((url, idx) => (
                   <div
                     key={idx}
-                    className="relative size-16 rounded-xl bg-slate-50 border border-border overflow-hidden shadow-sm"
+                    className="relative size-16 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] overflow-hidden shadow-sm"
                   >
                     <img src={url} alt="" className="size-full object-cover" />
                     <button
@@ -798,8 +830,9 @@ function ProductsPanel() {
               "w-full h-14 rounded-2xl font-display font-bold flex items-center justify-center gap-2 transition shadow-card",
               busy
                 ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                : "bg-primary text-primary-foreground hover:opacity-90",
+                : "text-white hover:opacity-95",
             )}
+            style={busy ? undefined : { background: "linear-gradient(to right, #2AA6D1, #4FC3E8)" }}
           >
             {busy ? <Loader2 className="size-5 animate-spin" /> : null}
             {busy
@@ -823,7 +856,10 @@ function ProductsPanel() {
           {activeBranchName && (
             <div>
               <button
-                onClick={() => setBranchFilter("all")}
+                onClick={() => {
+                  setBranchFilter("all");
+                  setSubFilter("");
+                }}
                 className="flex items-center gap-2 text-sm font-bold text-primary hover:text-primary/80 transition mb-3"
               >
                 <ChevronRight className="size-4" />
@@ -845,6 +881,36 @@ function ProductsPanel() {
                   </p>
                 </div>
               </div>
+
+              {subcategoriesOf(activeBranchName.value).length > 0 && (
+                <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 mt-3 scrollbar-hide">
+                  <button
+                    onClick={() => setSubFilter("")}
+                    className={cn(
+                      "shrink-0 h-9 px-3.5 rounded-full text-xs font-bold border transition whitespace-nowrap",
+                      subFilter === ""
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-card text-foreground border-border hover:bg-accent",
+                    )}
+                  >
+                    {ar ? "الكل" : "All"}
+                  </button>
+                  {subcategoriesOf(activeBranchName.value).map((s) => (
+                    <button
+                      key={s.en}
+                      onClick={() => setSubFilter(s.en)}
+                      className={cn(
+                        "shrink-0 h-9 px-3.5 rounded-full text-xs font-bold border transition whitespace-nowrap",
+                        subFilter === s.en
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-card text-foreground border-border hover:bg-accent",
+                      )}
+                    >
+                      {ar ? s.ar : s.en}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -861,7 +927,10 @@ function ProductsPanel() {
                   return (
                     <button
                       key={b.value}
-                      onClick={() => setBranchFilter(b.value)}
+                      onClick={() => {
+                        setBranchFilter(b.value);
+                        setSubFilter("");
+                      }}
                       className="group text-start bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-200 active:scale-[0.98]"
                     >
                       <div className="relative h-24 bg-gradient-to-b from-slate-50 to-white flex items-center justify-center overflow-hidden">
@@ -948,6 +1017,15 @@ function ProductsPanel() {
                 {/* Brand */}
                 {p.brand && (
                   <p className="text-[11px] text-muted-foreground mt-1 truncate">{p.brand}</p>
+                )}
+
+                {/* Sub-category */}
+                {p.subCategory && (
+                  <span className="inline-block mt-1.5 text-[10px] font-bold bg-sky-50 text-sky-700 rounded-full px-2 py-0.5">
+                    {ar
+                      ? subcategoriesOf(p.branch).find((s) => s.en === p.subCategory)?.ar ?? p.subCategory
+                      : p.subCategory}
+                  </span>
                 )}
 
                 {/* Price */}
@@ -1129,7 +1207,8 @@ function OffersPanel({ supplierId }: { supplierId: string }) {
       {!showForm && (
         <button
           onClick={openAdd}
-          className="w-full h-14 rounded-2xl bg-primary text-primary-foreground font-display font-bold flex items-center justify-center gap-2 hover:opacity-90 transition shadow-card"
+          className="w-full h-14 rounded-2xl text-white font-display font-bold flex items-center justify-center gap-2 hover:opacity-95 transition shadow-lg"
+          style={{ background: "linear-gradient(to right, #2AA6D1, #4FC3E8)" }}
         >
           <Plus className="size-5" />
           <Megaphone className="size-5" />
@@ -1138,33 +1217,34 @@ function OffersPanel({ supplierId }: { supplierId: string }) {
       )}
 
       {showForm && (
-        <div className="bg-card border border-border rounded-3xl p-5 shadow-card space-y-4">
+        <div className="bg-white border border-[#D3E8F7] rounded-3xl p-5 shadow-card space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="font-display font-bold text-lg">
+            <h3 className="font-display font-bold text-lg text-[#1C6FB5] flex items-center gap-1.5">
+              <span className="size-1.5 rounded-full bg-[#1C6FB5]" />
               {editing ? (ar ? "تعديل عرض" : "Edit offer") : ar ? "عرض جديد" : "New offer"}
             </h3>
             <button
               onClick={() => setShowForm(false)}
-              className="size-9 rounded-xl bg-muted hover:bg-slate-200 flex items-center justify-center transition"
+              className="size-9 rounded-xl bg-[#E7F4FE] hover:bg-[#DCEEFB] text-[#1C6FB5] flex items-center justify-center transition"
             >
               <X className="size-4" />
             </button>
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
               {ar ? "العنوان" : "Title"}
             </label>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder={ar ? "مثال: خصم 20% على الكومبوزيت" : "e.g. 20% off composites"}
-              className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+              className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
             />
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
               {ar ? "الوصف" : "Description"}
             </label>
             <textarea
@@ -1172,12 +1252,12 @@ function OffersPanel({ supplierId }: { supplierId: string }) {
               onChange={(e) => setDescription(e.target.value)}
               placeholder={ar ? "تفاصيل العرض..." : "Offer details..."}
               rows={3}
-              className="w-full rounded-xl bg-slate-50 border border-border px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition resize-none"
+              className="w-full rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition resize-none"
             />
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
               {ar ? "تاريخ الانتهاء" : "Expiry date"}
             </label>
             <div className="relative">
@@ -1185,18 +1265,18 @@ function OffersPanel({ supplierId }: { supplierId: string }) {
                 type="date"
                 value={expiryDate}
                 onChange={(e) => setExpiryDate(e.target.value)}
-                className="w-full h-12 rounded-xl bg-slate-50 border border-border pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+                className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
               />
               <Calendar className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
             </div>
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
               {ar ? "صورة العرض" : "Offer image"}
             </label>
             {imagePreview ? (
-              <div className="relative w-full h-40 rounded-xl bg-slate-50 border border-border overflow-hidden">
+              <div className="relative w-full h-40 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] overflow-hidden">
                 <img src={imagePreview} alt="" className="size-full object-cover" />
                 <button
                   type="button"
@@ -1210,7 +1290,7 @@ function OffersPanel({ supplierId }: { supplierId: string }) {
                 </button>
               </div>
             ) : editing?.imageUrl ? (
-              <div className="relative w-full h-40 rounded-xl bg-slate-50 border border-border overflow-hidden">
+              <div className="relative w-full h-40 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] overflow-hidden">
                 {urlMap[editing.imageUrl] ? (
                   <img src={urlMap[editing.imageUrl]} alt="" className="size-full object-cover" />
                 ) : (
@@ -1220,7 +1300,7 @@ function OffersPanel({ supplierId }: { supplierId: string }) {
                 )}
               </div>
             ) : (
-              <label className="w-full h-32 rounded-xl border-2 border-dashed border-border bg-slate-50 flex flex-col items-center justify-center gap-1.5 cursor-pointer hover:border-primary/40 hover:bg-sky-50/30 transition group">
+              <label className="w-full h-32 rounded-xl border-2 border-dashed border-[#D3E8F7] bg-[#F5FAFE] flex flex-col items-center justify-center gap-1.5 cursor-pointer hover:border-primary/40 hover:bg-sky-50/30 transition group">
                 <Upload className="size-6 text-slate-400 group-hover:text-primary transition" />
                 <p className="text-xs text-slate-400 group-hover:text-primary transition font-medium">
                   {ar ? "اضغط لرفع صورة" : "Tap to upload image"}
@@ -1250,8 +1330,9 @@ function OffersPanel({ supplierId }: { supplierId: string }) {
               "w-full h-14 rounded-2xl font-display font-bold flex items-center justify-center gap-2 transition shadow-card",
               busy
                 ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                : "bg-primary text-primary-foreground hover:opacity-90",
+                : "text-white hover:opacity-95",
             )}
+            style={busy ? undefined : { background: "linear-gradient(to right, #2AA6D1, #4FC3E8)" }}
           >
             {busy ? <Loader2 className="size-5 animate-spin" /> : null}
             {busy
@@ -1663,7 +1744,8 @@ function ImplantProductsPanel() {
       {!showForm && (
         <button
           onClick={openAdd}
-          className="w-full h-14 rounded-2xl bg-primary text-primary-foreground font-display font-bold flex items-center justify-center gap-2 hover:opacity-90 transition shadow-card mb-4"
+          className="w-full h-14 rounded-2xl text-white font-display font-bold flex items-center justify-center gap-2 hover:opacity-95 transition shadow-lg mb-4"
+          style={{ background: "linear-gradient(to right, #2AA6D1, #4FC3E8)" }}
         >
           <Plus className="size-5" />
           {ar ? "إضافة منتج زرعات جديد" : "Add new implant product"}
@@ -1686,7 +1768,7 @@ function ImplantProductsPanel() {
               </DialogTitle>
               <button
                 onClick={() => setShowForm(false)}
-                className="size-9 rounded-xl bg-muted hover:bg-slate-200 flex items-center justify-center transition cursor-pointer"
+                className="size-9 rounded-xl bg-[#E7F4FE] hover:bg-[#DCEEFB] text-[#1C6FB5] flex items-center justify-center transition cursor-pointer"
               >
                 <X className="size-4" />
               </button>
@@ -1703,43 +1785,43 @@ function ImplantProductsPanel() {
           </DialogHeader>
 
           <div>
-            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
               {ar ? "اسم المنتج (عربي)" : "Product name (Arabic)"}
             </label>
             <input
               value={nameAr}
               onChange={(e) => setNameAr(e.target.value)}
               placeholder={ar ? "مثال: AnyRidge" : "e.g. AnyRidge"}
-              className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+              className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
             />
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
               {ar ? "اسم المنتج (انكليزي)" : "Product name (English)"}
             </label>
             <input
               value={nameEn}
               onChange={(e) => setNameEn(e.target.value)}
               placeholder="Optional"
-              className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+              className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
             />
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
               {ar ? "العلامة التجارية" : "Brand"}
             </label>
             <input
               value={brand}
               onChange={(e) => setBrand(e.target.value)}
               placeholder={ar ? "مثال: MegaGen" : "e.g. MegaGen"}
-              className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+              className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
             />
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
               {ar ? "السعر الابتدائي (دولار)" : "Starting price (USD)"}
             </label>
             <input
@@ -1750,12 +1832,12 @@ function ImplantProductsPanel() {
               step="0.01"
               placeholder="0.00"
               dir="ltr"
-              className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+              className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
             />
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
               {ar ? "نوع المنتج" : "Product type"}
             </label>
             <div className="flex gap-2">
@@ -1784,37 +1866,37 @@ function ImplantProductsPanel() {
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
               {ar ? "درجة المادة" : "Material grade"}
             </label>
             <input
               value={materialGrade}
               onChange={(e) => setMaterialGrade(e.target.value)}
               placeholder={ar ? "مثال: Titanium Grade 5" : "e.g. Titanium Grade 5"}
-              className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+              className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
             />
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
               {ar ? "معالجة السطح" : "Surface treatment"}
             </label>
             <input
               value={surfaceTreatment}
               onChange={(e) => setSurfaceTreatment(e.target.value)}
               placeholder={ar ? "مثال: SLA" : "e.g. SLA Surface"}
-              className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+              className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
             />
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
               {ar ? "نوع الاتصال" : "Connection type"}
             </label>
             <select
               value={connectionType}
               onChange={(e) => setConnectionType(e.target.value)}
-              className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+              className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
             >
               {connectionOptions.map((c) => (
                 <option key={c} value={c}>
@@ -1825,13 +1907,13 @@ function ImplantProductsPanel() {
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
               {ar ? "بلد الصنع" : "Manufacturing country"}
             </label>
             <select
               value={country}
               onChange={(e) => setCountry(e.target.value)}
-              className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+              className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
             >
               {countryOptions.map((c) => (
                 <option key={c.value} value={c.value}>
@@ -1842,7 +1924,7 @@ function ImplantProductsPanel() {
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
               {ar ? "التصنيف" : "Classification"}
             </label>
             <div className="flex gap-2">
@@ -1871,7 +1953,7 @@ function ImplantProductsPanel() {
 
           {implantType === "immediate" && (
             <div>
-              <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+              <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
                 {ar ? "النوع الفرعي" : "Sub-type"}
               </label>
               <div className="flex gap-2">
@@ -1901,7 +1983,7 @@ function ImplantProductsPanel() {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+              <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
                 {ar ? "الأقطار (مم)" : "Diameters (mm)"}
               </label>
               <TagInput
@@ -1912,7 +1994,7 @@ function ImplantProductsPanel() {
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+              <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
                 {ar ? "الأطوال (مم)" : "Lengths (mm)"}
               </label>
               <TagInput
@@ -1926,7 +2008,7 @@ function ImplantProductsPanel() {
 
           {kitType === "surgical_kit" && (
             <div>
-              <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+              <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
                 {ar ? "عزم الدوران الموصى به" : "Recommended torque"}
               </label>
               <input
@@ -1934,13 +2016,13 @@ function ImplantProductsPanel() {
                 onChange={(e) => setRecommendedTorque(e.target.value)}
                 placeholder={ar ? "مثال: 35-45 Ncm" : "e.g. 35-45 Ncm"}
                 dir="ltr"
-                className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+                className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
               />
             </div>
           )}
 
           <div>
-            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
               {ar ? "رابط الكتالوج" : "Catalog URL"}
             </label>
             <input
@@ -1948,25 +2030,25 @@ function ImplantProductsPanel() {
               onChange={(e) => setCatalogUrl(e.target.value)}
               placeholder="https://..."
               dir="ltr"
-              className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+              className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
             />
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
               {ar ? "الشهادات (ISO/FDA)" : "Certifications (ISO/FDA)"}
             </label>
             <input
               value={certificationsStr}
               onChange={(e) => setCertificationsStr(e.target.value)}
               placeholder={ar ? "مثال: ISO 13485, FDA" : "e.g. ISO 13485, FDA"}
-              className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+              className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
             />
           </div>
 
           {/* Images */}
           <div>
-            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
               {ar ? "صور المنتج" : "Product images"}
             </label>
             {editing && editing.images.length > 0 && (
@@ -1974,7 +2056,7 @@ function ImplantProductsPanel() {
                 {editing.images.map((path) => (
                   <div
                     key={path}
-                    className="relative size-16 rounded-xl bg-slate-50 border border-border overflow-hidden group"
+                    className="relative size-16 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] overflow-hidden group"
                   >
                     {editUrlMap[path] ? (
                       <img src={editUrlMap[path]} alt="" className="size-full object-cover" />
@@ -1995,7 +2077,7 @@ function ImplantProductsPanel() {
               </div>
             )}
             {imageFiles.length + (editing?.images.length ?? 0) < MAX_PRODUCT_IMAGES && (
-              <label className="w-full h-32 rounded-xl border-2 border-dashed border-border bg-slate-50 flex flex-col items-center justify-center gap-1.5 cursor-pointer hover:border-primary/40 hover:bg-sky-50/30 transition group">
+              <label className="w-full h-32 rounded-xl border-2 border-dashed border-[#D3E8F7] bg-[#F5FAFE] flex flex-col items-center justify-center gap-1.5 cursor-pointer hover:border-primary/40 hover:bg-sky-50/30 transition group">
                 <Upload className="size-6 text-slate-400 group-hover:text-primary transition" />
                 <p className="text-xs text-slate-400 group-hover:text-primary transition font-medium">
                   {ar ? "اضغط لرفع صورة" : "Tap to upload image"}
@@ -2014,7 +2096,7 @@ function ImplantProductsPanel() {
                 {imagePreviews.map((url, idx) => (
                   <div
                     key={idx}
-                    className="relative size-16 rounded-xl bg-slate-50 border border-border overflow-hidden shadow-sm"
+                    className="relative size-16 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] overflow-hidden shadow-sm"
                   >
                     <img src={url} alt="" className="size-full object-cover" />
                     <button
@@ -2044,8 +2126,9 @@ function ImplantProductsPanel() {
               "w-full h-14 rounded-2xl font-display font-bold flex items-center justify-center gap-2 transition shadow-card",
               busy
                 ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                : "bg-primary text-primary-foreground hover:opacity-90",
+                : "text-white hover:opacity-95",
             )}
+            style={busy ? undefined : { background: "linear-gradient(to right, #2AA6D1, #4FC3E8)" }}
           >
             {busy ? <Loader2 className="size-5 animate-spin" /> : null}
             {busy
