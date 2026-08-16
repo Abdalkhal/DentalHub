@@ -24,6 +24,7 @@ import {
   Baby,
   HeartPulse,
   ShoppingCart,
+  Check,
   Layers,
   Wrench,
   Cog,
@@ -37,6 +38,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsFavorited, toggleFavorite } from "@/lib/favoritesStore";
+import { addToCart } from "@/lib/cartStore";
 import imgGeneral from "@/assets/branch-general.png";
 import imgOperative from "@/assets/branch-operative.png";
 import imgEndodontic from "@/assets/branch-endodontic.png";
@@ -376,7 +378,14 @@ function ProfilePage() {
                     {filteredProducts.map((p) => {
                       const urls = p.images.map((path) => filterUrls[path]).filter(Boolean);
                       return (
-                      <ProductCard key={p.id} product={p} urls={urls} ar={ar} />
+                      <ProductCard
+                        key={p.id}
+                        product={p}
+                        urls={urls}
+                        ar={ar}
+                        officeId={accountId}
+                        officeName={account.name || ""}
+                      />
                       );
                     })}
                   </div>
@@ -503,14 +512,37 @@ function ProductCard({
   product,
   urls,
   ar,
+  officeId,
+  officeName,
 }: {
   product: { id: string; ar: string; en: string; brand: string; price: number; currency: string };
   urls: string[];
   ar: boolean;
+  officeId: string;
+  officeName: string;
 }) {
   const navigate = useNavigate();
   const liked = useIsFavorited(product.id);
+  const [added, setAdded] = useState(false);
   const title = ar ? product.ar || product.en : product.en || product.ar;
+
+  const handleAdd = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    addToCart({
+      productId: product.id,
+      productName: title,
+      productImage: urls[0],
+      officeId,
+      officeName,
+      brand: product.brand,
+      unitPrice: product.price,
+      currency: (product.currency as "USD" | "IQD") || "USD",
+      quantity: 1,
+    });
+    setAdded(true);
+    setTimeout(() => setAdded(false), 1500);
+  };
+
   return (
     <div
       onClick={() => navigate({ to: "/products/$productId", params: { productId: product.id } })}
@@ -560,9 +592,15 @@ function ProductCard({
               ? `${product.price.toLocaleString()} د.ع`
               : `$${product.price.toFixed(2)}`}
           </p>
-          <button className="h-6 px-2 rounded-md bg-primary/10 text-primary text-[10px] font-bold flex items-center gap-0.5 hover:bg-primary/20 transition">
-            <ShoppingCart className="size-2.5" />
-            {ar ? "طلب" : "Order"}
+          <button
+            onClick={handleAdd}
+            className={cn(
+              "h-6 px-2 rounded-md text-[10px] font-bold flex items-center gap-0.5 transition",
+              added ? "bg-emerald-100 text-emerald-700" : "bg-primary/10 text-primary hover:bg-primary/20",
+            )}
+          >
+            {added ? <Check className="size-2.5" /> : <ShoppingCart className="size-2.5" />}
+            {added ? (ar ? "تمت الإضافة" : "Added") : ar ? "أضف للسلة" : "Add to cart"}
           </button>
         </div>
       </div>

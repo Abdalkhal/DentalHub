@@ -8,6 +8,7 @@ import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { RoleGuard } from "@/components/RoleGuard";
 import { TagInput } from "@/components/TagInput";
+import { NotificationBell } from "@/components/NotificationBell";
 import {
   Dialog,
   DialogContent,
@@ -223,6 +224,7 @@ function SupplyDashboard() {
           </Link>
 
           <div className="flex items-center gap-2">
+            <NotificationBell userId={supplierId} />
             <button
               type="button"
               onClick={toggle}

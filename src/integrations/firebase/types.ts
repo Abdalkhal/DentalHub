@@ -43,6 +43,8 @@ export type OrderDoc = {
   supplierId: string;
   dentistId: string;
   dentistName: string;
+  dentistPhone?: string;
+  dentistAddress?: string;
   productId: string;
   productName: string;
   productImage?: string;

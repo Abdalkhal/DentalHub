@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useSearch } from "@tanstack/react-router";
+import { createFileRoute, Link, useSearch, useNavigate } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
@@ -22,6 +22,7 @@ import {
   type OrderStatus,
 } from "@/lib/ordersStore";
 import { useCart, addToCart } from "@/lib/cartStore";
+import { placeCartOrder } from "@/lib/orders";
 import {
   Search,
   Eye,
@@ -36,6 +37,8 @@ import {
   Clock,
   Loader2,
   Plus,
+  Phone,
+  MapPin,
 } from "lucide-react";
 import { OrderStatusTracker, type SupplyOrderStatus } from "@/components/OrderStatusTracker";
 
@@ -290,7 +293,30 @@ function DentistOrders() {
   const { lang } = useI18n();
   const ar = lang === "ar";
   const { user } = useSession();
+  const { role } = useUserRole();
+  const navigate = useNavigate();
   const cart = useCart();
+  const [placing, setPlacing] = useState(false);
+
+  const handlePlaceOrder = async () => {
+    if (!user || cart.length === 0) return;
+    setPlacing(true);
+    try {
+      const count = await placeCartOrder({
+        id: user.uid,
+        name: role?.name || (ar ? "طبيب أسنان" : "Dentist"),
+        phone: role?.phone,
+        address: role?.address,
+      });
+      toast.success(
+        ar ? `تم إرسال ${count} طلب بنجاح` : `${count} order(s) placed successfully`,
+      );
+    } catch (e: any) {
+      toast.error(ar ? `فشل إرسال الطلب: ${e?.message || e}` : `Order failed: ${e?.message || e}`);
+    } finally {
+      setPlacing(false);
+    }
+  };
 
   const { data: myOrders = [], isLoading } = useQuery({
     queryKey: ["dentist-orders", user?.uid],
@@ -329,20 +355,23 @@ function DentistOrders() {
 
         {cart.length > 0 && (
           <div className="bg-sky-50 border border-sky-200 rounded-2xl p-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mb-3">
               <div>
                 <p className="font-bold text-sm text-sky-800">{ar ? "سلة التسوق" : "Shopping Cart"}</p>
                 <p className="text-xs text-sky-600 mt-0.5">
                   {cart.length} {ar ? "منتجات" : "products"} · ${cart.reduce((s, i) => s + i.unitPrice * i.quantity, 0).toFixed(2)}
                 </p>
               </div>
-              <Link
-                to="/supplies"
-                className="h-9 px-4 rounded-xl bg-sky-500 text-white font-bold text-xs flex items-center"
-              >
-                {ar ? "مراجعة الطلب" : "Review order"}
-              </Link>
             </div>
+
+            <button
+              onClick={handlePlaceOrder}
+              disabled={placing}
+              className="w-full h-11 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-bold text-sm flex items-center justify-center gap-2 transition disabled:opacity-60"
+            >
+              {placing ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+              {placing ? (ar ? "جارٍ الإرسال..." : "Placing...") : ar ? "إتمام الطلب" : "Complete order"}
+            </button>
           </div>
         )}
 
@@ -377,8 +406,18 @@ function DentistOrders() {
                       <span className="size-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
                         <Package className="size-4" />
                       </span>
-                      <div>
-                        <p className="font-bold text-sm">{o.productName || (ar ? "منتج" : "Product")}</p>
+                      <div className="min-w-0">
+                        <button
+                          onClick={() =>
+                            o.productId &&
+                            navigate({ to: "/products/$productId", params: { productId: o.productId } })
+                          }
+                          className="block max-w-full text-start"
+                        >
+                          <p className="font-bold text-sm truncate hover:text-primary transition">
+                            {o.productName || (ar ? "منتج" : "Product")}
+                          </p>
+                        </button>
                         <p className="text-[10px] text-slate-400">
                           #{o.id.slice(0, 8).toUpperCase()} · {o.createdAt ? formatShortDate(o.createdAt as unknown as string) : ""}
                         </p>
@@ -585,6 +624,23 @@ function SupplierOrders() {
                       </p>
                     </div>
                   </div>
+
+                  {(o.dentistPhone || o.dentistAddress) && (
+                    <div className="mb-3 rounded-xl bg-slate-50 border border-slate-100 p-2.5 space-y-1 text-[11px]">
+                      {o.dentistAddress && (
+                        <p className="flex items-start gap-1.5 text-slate-600">
+                          <MapPin className="size-3.5 shrink-0 mt-0.5 text-slate-400" />
+                          <span className="leading-snug">{ar ? "عنوان التوصيل" : "Delivery address"}: {o.dentistAddress}</span>
+                        </p>
+                      )}
+                      {o.dentistPhone && (
+                        <p className="flex items-center gap-1.5 text-slate-600">
+                          <Phone className="size-3.5 shrink-0 text-slate-400" />
+                          <span dir="ltr">{o.dentistPhone}</span>
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   <div className="pt-2 border-t border-border">
                     <OrderStatusTracker

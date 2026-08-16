@@ -29,9 +29,11 @@ import {
   Settings,
   FlaskConical,
   Heart,
+  Plus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsFavorited, toggleFavorite } from "@/lib/favoritesStore";
+import { addToCart } from "@/lib/cartStore";
 
 const BRANCH_BACK_ICON: Record<string, typeof ArrowRight> = {
   rtl: ArrowRight,
@@ -367,6 +369,26 @@ function OfficePage() {
                       <p className="font-display font-bold text-sm leading-snug line-clamp-2">{lang === "ar" ? p.ar : p.en}</p>
                       <p className="text-[11px] text-muted-foreground mt-1">{p.brand}</p>
                       <p className="mt-1.5 font-display font-extrabold text-primary">${p.price}</p>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addToCart({
+                            productId: p.id,
+                            productName: lang === "ar" ? p.ar : p.en,
+                            productImage: urls[0],
+                            officeId: p.companyId || officeId,
+                            officeName: lang === "ar" ? office?.ar ?? "" : office?.en ?? "",
+                            brand: p.brand,
+                            unitPrice: p.price,
+                            currency: p.currency ?? "USD",
+                            quantity: 1,
+                          });
+                        }}
+                        className="mt-2 w-full h-9 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 text-xs font-bold flex items-center justify-center gap-1.5 transition"
+                      >
+                        <Plus className="size-3.5" />
+                        {lang === "ar" ? "أضف للسلة" : "Add to cart"}
+                      </button>
                     </div>
                   );
                 })}

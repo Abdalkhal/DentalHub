@@ -29,7 +29,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
+    <div className="fixed inset-0 z-50 flex justify-center">
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-md bg-white h-full shadow-2xl animate-in slide-in-from-right flex flex-col">
         <div className="flex items-center justify-between px-4 h-14 border-b shrink-0">
