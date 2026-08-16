@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useSearch, useNavigate } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
 import { z } from "zod";
 import { db } from "@/integrations/firebase/client";
@@ -296,6 +296,7 @@ function DentistOrders() {
   const { role } = useUserRole();
   const navigate = useNavigate();
   const cart = useCart();
+  const queryClient = useQueryClient();
   const [placing, setPlacing] = useState(false);
 
   const handlePlaceOrder = async () => {
@@ -308,6 +309,7 @@ function DentistOrders() {
         phone: role?.phone,
         address: role?.address,
       });
+      await queryClient.invalidateQueries({ queryKey: ["dentist-orders", user.uid] });
       toast.success(
         ar ? `تم إرسال ${count} طلب بنجاح` : `${count} order(s) placed successfully`,
       );
