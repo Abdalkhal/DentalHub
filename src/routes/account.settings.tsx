@@ -46,6 +46,7 @@ function SettingsPage() {
   const { lang, dir } = useI18n();
   const ar = lang === "ar";
   const { role, loading } = useUserRole();
+  const isDentist = role?.accountType === "dentist";
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -410,7 +411,11 @@ function SettingsPage() {
         {/* Section 2: Company Location */}
         <section>
           <p className="text-xs font-bold text-muted-foreground mb-2 px-1">
-            {ar ? "موقع العيادة على الخريطة" : "Company Location"}
+            {ar
+              ? isDentist
+                ? "موقع العيادة على الخريطة"
+                : "موقع المكتب على الخريطة"
+              : "Company Location"}
           </p>
           <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-soft">
             <a
@@ -423,7 +428,11 @@ function SettingsPage() {
                 <MapPin className="size-5" />
               </span>
               <span className="flex-1 text-sm font-semibold">
-                {ar ? "تحديد موقع العيادة الحالي" : "Determine Current Company Location"}
+                {ar
+                  ? isDentist
+                    ? "تحديد موقع العيادة الحالي"
+                    : "تحديد موقع المكتب الحالي"
+                  : "Determine Current Company Location"}
               </span>
               {mapUrl ? (
                 <span className="text-xs text-blue-600 font-medium">{ar ? "رابط" : "Link"}</span>

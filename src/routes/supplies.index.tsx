@@ -202,7 +202,11 @@ function SupplyDashboard() {
             className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition"
           >
             <div className="size-12 rounded-full bg-primary/10 ring-2 ring-primary/20 flex items-center justify-center overflow-hidden">
-              <UserCircle2 className="size-7 text-primary" />
+              {role?.photoURL ? (
+                <img src={role.photoURL} alt="" className="size-full object-cover" />
+              ) : (
+                <UserCircle2 className="size-7 text-primary" />
+              )}
             </div>
             <div>
               <p className="font-display font-bold text-sm text-foreground">
@@ -983,7 +987,7 @@ function ProductsPanel() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-3">
           {myProducts.map((p) => {
             const isOut = (p.stock ?? 0) === 0;
             return (
@@ -1446,7 +1450,11 @@ function ImplantDashboard() {
             className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition"
           >
             <div className="size-12 rounded-full bg-primary/10 ring-2 ring-primary/20 flex items-center justify-center overflow-hidden">
-              <UserCircle2 className="size-7 text-primary" />
+              {role?.photoURL ? (
+                <img src={role.photoURL} alt="" className="size-full object-cover" />
+              ) : (
+                <UserCircle2 className="size-7 text-primary" />
+              )}
             </div>
             <div>
               <p className="font-display font-bold text-sm text-foreground">
