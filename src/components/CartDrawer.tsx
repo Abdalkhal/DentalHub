@@ -1,7 +1,12 @@
-import { X, Plus, Minus, Trash2, ShoppingCart, ChevronRight } from "lucide-react";
+import { useState } from "react";
+import { X, Plus, Minus, Trash2, ShoppingCart, Loader2 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useCart, removeFromCart, updateCartQuantity, cartTotal, cartByOffice } from "@/lib/cartStore";
 import { useI18n } from "@/lib/i18n";
 import { useNavigate } from "@tanstack/react-router";
+import { useUserRole, useSession } from "@/lib/useAuth";
+import { placeCartOrder } from "@/lib/orders";
+import { toast } from "sonner";
 
 export function CartBadge({ count }: { count: number }) {
   if (count === 0) return null;
@@ -23,8 +28,32 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
   const ar = lang === "ar";
   const cart = useCart();
   const navigate = useNavigate();
+  const { user } = useSession();
+  const { role } = useUserRole();
+  const queryClient = useQueryClient();
+  const [placing, setPlacing] = useState(false);
   const total = cartTotal();
   const grouped = cartByOffice();
+
+  const handlePlaceOrder = async () => {
+    if (!user || cart.length === 0) return;
+    setPlacing(true);
+    try {
+      await placeCartOrder({
+        id: user.uid,
+        name: role?.name || (ar ? "طبيب أسنان" : "Dentist"),
+        phone: role?.phone,
+        address: role?.address,
+      });
+      await queryClient.invalidateQueries({ queryKey: ["dentist-orders", user.uid] });
+      toast.success(ar ? "تم إرسال الطلب بنجاح" : "Order placed successfully");
+      onClose();
+    } catch (e: any) {
+      toast.error(ar ? `فشل إرسال الطلب: ${e?.message || e}` : `Order failed: ${e?.message || e}`);
+    } finally {
+      setPlacing(false);
+    }
+  };
 
   if (!open) return null;
 
@@ -122,12 +151,12 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
               </div>
 
               <button
-                onClick={() => { onClose(); navigate({ to: "/orders" }); }}
-                className="w-full h-12 rounded-xl bg-primary text-primary-foreground font-bold flex items-center justify-center gap-2"
+                onClick={handlePlaceOrder}
+                disabled={placing}
+                className="w-full h-12 rounded-xl bg-primary text-primary-foreground font-bold flex items-center justify-center gap-2 disabled:opacity-60"
               >
-                <ShoppingCart className="size-4" />
-                {ar ? "إتمام الطلب" : "Place order"}
-                <ChevronRight className="size-4 ms-auto" />
+                {placing ? <Loader2 className="size-4 animate-spin" /> : <ShoppingCart className="size-4" />}
+                {placing ? (ar ? "جارٍ الإرسال..." : "Placing...") : ar ? "إتمام الطلب" : "Complete order"}
               </button>
             </div>
           </>
