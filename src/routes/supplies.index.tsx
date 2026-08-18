@@ -126,6 +126,21 @@ const BRANCH_BADGE: Record<string, typeof Package> = {
   "lab-materials": FlaskConical,
 };
 
+function formatPriceInput(raw: string): string {
+  const cleaned = raw.replace(/[^\d.]/g, "");
+  if (!cleaned) return "";
+  const [intPart, ...rest] = cleaned.split(".");
+  let int = intPart.replace(/^0+(?=\d)/, "");
+  if (!int) int = "0";
+  const withCommas = int.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const dec = rest.join("").slice(0, 2);
+  return dec.length ? `${withCommas}.${dec}` : withCommas;
+}
+
+function parsePriceInput(raw: string): number {
+  return Number(raw.replace(/,/g, "")) || 0;
+}
+
 export const Route = createFileRoute("/supplies/")({
   component: SuppliesIndex,
 });
@@ -332,7 +347,6 @@ function ProductsPanel() {
 
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
-  const [nameAr, setNameAr] = useState("");
   const [nameEn, setNameEn] = useState("");
   const [brand, setBrand] = useState("");
   const [price, setPrice] = useState("");
@@ -364,7 +378,6 @@ function ProductsPanel() {
 
   const openAdd = () => {
     setEditing(null);
-    setNameAr("");
     setNameEn("");
     setBrand("");
     setPrice("");
@@ -381,10 +394,9 @@ function ProductsPanel() {
 
   const openEdit = (p: Product) => {
     setEditing(p);
-    setNameAr(p.ar);
-    setNameEn(p.en);
+    setNameEn(p.en || p.ar);
     setBrand(p.brand);
-    setPrice(String(p.price));
+    setPrice(formatPriceInput(String(p.price ?? "")));
     setCurrency(p.currency || "USD");
     setStock(String(p.stock ?? 0));
     setBranch(p.branch);
@@ -461,17 +473,11 @@ function ProductsPanel() {
   const submit = async () => {
     setFormError("");
 
-    if (!nameAr.trim()) {
-      setFormError(
-        ar ? "الرجاء إدخال اسم المنتج بالعربية" : "Please enter the Arabic product name",
-      );
-      return;
-    }
-    if (!nameEn.trim() && !nameAr.trim()) {
+    if (!nameEn.trim()) {
       setFormError(ar ? "الرجاء إدخال اسم المنتج" : "Please enter a product name");
       return;
     }
-    if (!price.trim() || Number(price) <= 0) {
+    if (!price.trim() || parsePriceInput(price) <= 0) {
       setFormError(ar ? "الرجاء إدخال سعر صحيح" : "Please enter a valid price");
       return;
     }
@@ -502,10 +508,10 @@ function ProductsPanel() {
         id: productId,
         branch,
         subCategory: subCategory || undefined,
-        ar: nameAr.trim(),
-        en: nameEn.trim() || nameAr.trim(),
+        ar: nameEn.trim(),
+        en: nameEn.trim(),
         brand: brand.trim(),
-        price: Number(price) || 0,
+        price: parsePriceInput(price),
         currency,
         stock: Number(stock) || 0,
         inStock: Number(stock) > 0,
@@ -640,28 +646,15 @@ function ProductsPanel() {
             </div>
           )}
 
-          {/* Name ar */}
+          {/* Name */}
           <div>
             <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-              {ar ? "اسم المنتج (عربي)" : "Product name (Arabic)"}
-            </label>
-            <input
-              value={nameAr}
-              onChange={(e) => setNameAr(e.target.value)}
-              placeholder={ar ? "مثال: كومبوزيت ضوئي" : "e.g. Light-cured composite"}
-              className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
-            />
-          </div>
-
-          {/* Name en */}
-          <div>
-            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-              {ar ? "اسم المنتج (انكليزي)" : "Product name (English)"}
+              {ar ? "اسم المنتج" : "Product name"}
             </label>
             <input
               value={nameEn}
               onChange={(e) => setNameEn(e.target.value)}
-              placeholder={ar ? "اختياري" : "Optional"}
+              placeholder={ar ? "مثال: كومبوزيت ضوئي" : "e.g. Light-cured composite"}
               className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
             />
           </div>
@@ -685,17 +678,17 @@ function ProductsPanel() {
               {ar ? "السعر" : "Price"}
             </label>
             <div className="flex gap-2">
-              <div className="relative flex-1">
+              <div className="flex-1">
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   value={price}
-                  onChange={(e) => setPrice(e.target.value)}
+                  onChange={(e) => setPrice(formatPriceInput(e.target.value))}
                   onFocus={(e) => e.target.select()}
                   placeholder="0"
                   dir="ltr"
-                  className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] ps-12 pe-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
                 />
-                <DollarSign className="absolute start-4 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
               </div>
               <div className="flex rounded-xl bg-[#F5FAFE] border-[#D3E8F7] overflow-hidden shrink-0">
                 <button

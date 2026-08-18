@@ -96,6 +96,8 @@ function Account() {
     }
   };
 
+  const isSupplier = role?.accountType === "supply" || role?.accountType === "implant";
+
   const rows: Array<{
     icon: typeof Settings;
     label: string;
@@ -103,12 +105,16 @@ function Account() {
     to?: string;
     onClick?: () => void;
   }> = [
-    {
-      icon: Users,
-      label: lang === "ar" ? "فواتير الأطباء" : "Doctor Invoices",
-      tone: "bg-[oklch(0.93_0.06_220)] ring-[oklch(0.82_0.1_220)] text-[oklch(0.45_0.18_220)]",
-      onClick: () => navigate({ to: "/account/balances" }),
-    },
+    ...(isSupplier
+      ? [
+          {
+            icon: Users,
+            label: lang === "ar" ? "فواتير الأطباء" : "Doctor Invoices",
+            tone: "bg-[oklch(0.93_0.06_220)] ring-[oklch(0.82_0.1_220)] text-[oklch(0.45_0.18_220)]",
+            onClick: () => navigate({ to: "/doctor-invoices" }),
+          },
+        ]
+      : []),
     {
       icon: Settings,
       label: t("settings"),

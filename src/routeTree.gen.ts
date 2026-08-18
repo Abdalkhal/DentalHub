@@ -34,6 +34,7 @@ import { Route as PatientsIndexRouteImport } from './routes/patients.index'
 import { Route as LabsIndexRouteImport } from './routes/labs.index'
 import { Route as ImplantsIndexRouteImport } from './routes/implants.index'
 import { Route as FavoritesIndexRouteImport } from './routes/favorites.index'
+import { Route as DoctorInvoicesIndexRouteImport } from './routes/doctor-invoices.index'
 import { Route as ClinicIndexRouteImport } from './routes/clinic.index'
 import { Route as BrandsIndexRouteImport } from './routes/brands.index'
 import { Route as ProfileAccountIdRouteImport } from './routes/profile.$accountId'
@@ -45,6 +46,7 @@ import { Route as LabsCasesRouteImport } from './routes/labs.cases'
 import { Route as LabsLabIdRouteImport } from './routes/labs.$labId'
 import { Route as LabMyServicesRouteImport } from './routes/lab.my-services'
 import { Route as ImplantsCountryRouteImport } from './routes/implants.$country'
+import { Route as DoctorInvoicesInvoiceIdRouteImport } from './routes/doctor-invoices.$invoiceId'
 import { Route as ClinicReportsRouteImport } from './routes/clinic.reports'
 import { Route as ClinicOrdersRouteImport } from './routes/clinic.orders'
 import { Route as ClinicMaterialsRouteImport } from './routes/clinic.materials'
@@ -188,6 +190,11 @@ const FavoritesIndexRoute = FavoritesIndexRouteImport.update({
   path: '/favorites/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DoctorInvoicesIndexRoute = DoctorInvoicesIndexRouteImport.update({
+  id: '/doctor-invoices/',
+  path: '/doctor-invoices/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ClinicIndexRoute = ClinicIndexRouteImport.update({
   id: '/clinic/',
   path: '/clinic/',
@@ -241,6 +248,11 @@ const LabMyServicesRoute = LabMyServicesRouteImport.update({
 const ImplantsCountryRoute = ImplantsCountryRouteImport.update({
   id: '/implants/$country',
   path: '/implants/$country',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DoctorInvoicesInvoiceIdRoute = DoctorInvoicesInvoiceIdRouteImport.update({
+  id: '/doctor-invoices/$invoiceId',
+  path: '/doctor-invoices/$invoiceId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ClinicReportsRoute = ClinicReportsRouteImport.update({
@@ -362,6 +374,7 @@ export interface FileRoutesByFullPath {
   '/clinic/materials': typeof ClinicMaterialsRoute
   '/clinic/orders': typeof ClinicOrdersRoute
   '/clinic/reports': typeof ClinicReportsRoute
+  '/doctor-invoices/$invoiceId': typeof DoctorInvoicesInvoiceIdRoute
   '/implants/$country': typeof ImplantsCountryRoute
   '/lab/my-services': typeof LabMyServicesRoute
   '/labs/$labId': typeof LabsLabIdRouteWithChildren
@@ -373,6 +386,7 @@ export interface FileRoutesByFullPath {
   '/profile/$accountId': typeof ProfileAccountIdRoute
   '/brands/': typeof BrandsIndexRoute
   '/clinic/': typeof ClinicIndexRoute
+  '/doctor-invoices/': typeof DoctorInvoicesIndexRoute
   '/favorites/': typeof FavoritesIndexRoute
   '/implants/': typeof ImplantsIndexRoute
   '/labs/': typeof LabsIndexRoute
@@ -417,6 +431,7 @@ export interface FileRoutesByTo {
   '/clinic/materials': typeof ClinicMaterialsRoute
   '/clinic/orders': typeof ClinicOrdersRoute
   '/clinic/reports': typeof ClinicReportsRoute
+  '/doctor-invoices/$invoiceId': typeof DoctorInvoicesInvoiceIdRoute
   '/implants/$country': typeof ImplantsCountryRoute
   '/lab/my-services': typeof LabMyServicesRoute
   '/labs/$labId': typeof LabsLabIdRouteWithChildren
@@ -428,6 +443,7 @@ export interface FileRoutesByTo {
   '/profile/$accountId': typeof ProfileAccountIdRoute
   '/brands': typeof BrandsIndexRoute
   '/clinic': typeof ClinicIndexRoute
+  '/doctor-invoices': typeof DoctorInvoicesIndexRoute
   '/favorites': typeof FavoritesIndexRoute
   '/implants': typeof ImplantsIndexRoute
   '/labs': typeof LabsIndexRoute
@@ -473,6 +489,7 @@ export interface FileRoutesById {
   '/clinic/materials': typeof ClinicMaterialsRoute
   '/clinic/orders': typeof ClinicOrdersRoute
   '/clinic/reports': typeof ClinicReportsRoute
+  '/doctor-invoices/$invoiceId': typeof DoctorInvoicesInvoiceIdRoute
   '/implants/$country': typeof ImplantsCountryRoute
   '/lab/my-services': typeof LabMyServicesRoute
   '/labs/$labId': typeof LabsLabIdRouteWithChildren
@@ -484,6 +501,7 @@ export interface FileRoutesById {
   '/profile/$accountId': typeof ProfileAccountIdRoute
   '/brands/': typeof BrandsIndexRoute
   '/clinic/': typeof ClinicIndexRoute
+  '/doctor-invoices/': typeof DoctorInvoicesIndexRoute
   '/favorites/': typeof FavoritesIndexRoute
   '/implants/': typeof ImplantsIndexRoute
   '/labs/': typeof LabsIndexRoute
@@ -530,6 +548,7 @@ export interface FileRouteTypes {
     | '/clinic/materials'
     | '/clinic/orders'
     | '/clinic/reports'
+    | '/doctor-invoices/$invoiceId'
     | '/implants/$country'
     | '/lab/my-services'
     | '/labs/$labId'
@@ -541,6 +560,7 @@ export interface FileRouteTypes {
     | '/profile/$accountId'
     | '/brands/'
     | '/clinic/'
+    | '/doctor-invoices/'
     | '/favorites/'
     | '/implants/'
     | '/labs/'
@@ -585,6 +605,7 @@ export interface FileRouteTypes {
     | '/clinic/materials'
     | '/clinic/orders'
     | '/clinic/reports'
+    | '/doctor-invoices/$invoiceId'
     | '/implants/$country'
     | '/lab/my-services'
     | '/labs/$labId'
@@ -596,6 +617,7 @@ export interface FileRouteTypes {
     | '/profile/$accountId'
     | '/brands'
     | '/clinic'
+    | '/doctor-invoices'
     | '/favorites'
     | '/implants'
     | '/labs'
@@ -640,6 +662,7 @@ export interface FileRouteTypes {
     | '/clinic/materials'
     | '/clinic/orders'
     | '/clinic/reports'
+    | '/doctor-invoices/$invoiceId'
     | '/implants/$country'
     | '/lab/my-services'
     | '/labs/$labId'
@@ -651,6 +674,7 @@ export interface FileRouteTypes {
     | '/profile/$accountId'
     | '/brands/'
     | '/clinic/'
+    | '/doctor-invoices/'
     | '/favorites/'
     | '/implants/'
     | '/labs/'
@@ -692,6 +716,7 @@ export interface RootRouteChildren {
   ClinicMaterialsRoute: typeof ClinicMaterialsRoute
   ClinicOrdersRoute: typeof ClinicOrdersRoute
   ClinicReportsRoute: typeof ClinicReportsRoute
+  DoctorInvoicesInvoiceIdRoute: typeof DoctorInvoicesInvoiceIdRoute
   ImplantsCountryRoute: typeof ImplantsCountryRoute
   LabMyServicesRoute: typeof LabMyServicesRoute
   LabsLabIdRoute: typeof LabsLabIdRouteWithChildren
@@ -703,6 +728,7 @@ export interface RootRouteChildren {
   ProfileAccountIdRoute: typeof ProfileAccountIdRoute
   BrandsIndexRoute: typeof BrandsIndexRoute
   ClinicIndexRoute: typeof ClinicIndexRoute
+  DoctorInvoicesIndexRoute: typeof DoctorInvoicesIndexRoute
   FavoritesIndexRoute: typeof FavoritesIndexRoute
   ImplantsIndexRoute: typeof ImplantsIndexRoute
   LabsIndexRoute: typeof LabsIndexRoute
@@ -892,6 +918,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FavoritesIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/doctor-invoices/': {
+      id: '/doctor-invoices/'
+      path: '/doctor-invoices'
+      fullPath: '/doctor-invoices/'
+      preLoaderRoute: typeof DoctorInvoicesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/clinic/': {
       id: '/clinic/'
       path: '/clinic'
@@ -967,6 +1000,13 @@ declare module '@tanstack/react-router' {
       path: '/implants/$country'
       fullPath: '/implants/$country'
       preLoaderRoute: typeof ImplantsCountryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/doctor-invoices/$invoiceId': {
+      id: '/doctor-invoices/$invoiceId'
+      path: '/doctor-invoices/$invoiceId'
+      fullPath: '/doctor-invoices/$invoiceId'
+      preLoaderRoute: typeof DoctorInvoicesInvoiceIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/clinic/reports': {
@@ -1159,6 +1199,7 @@ const rootRouteChildren: RootRouteChildren = {
   ClinicMaterialsRoute: ClinicMaterialsRoute,
   ClinicOrdersRoute: ClinicOrdersRoute,
   ClinicReportsRoute: ClinicReportsRoute,
+  DoctorInvoicesInvoiceIdRoute: DoctorInvoicesInvoiceIdRoute,
   ImplantsCountryRoute: ImplantsCountryRoute,
   LabMyServicesRoute: LabMyServicesRoute,
   LabsLabIdRoute: LabsLabIdRouteWithChildren,
@@ -1170,6 +1211,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProfileAccountIdRoute: ProfileAccountIdRoute,
   BrandsIndexRoute: BrandsIndexRoute,
   ClinicIndexRoute: ClinicIndexRoute,
+  DoctorInvoicesIndexRoute: DoctorInvoicesIndexRoute,
   FavoritesIndexRoute: FavoritesIndexRoute,
   ImplantsIndexRoute: ImplantsIndexRoute,
   LabsIndexRoute: LabsIndexRoute,

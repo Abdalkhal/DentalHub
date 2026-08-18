@@ -9,6 +9,7 @@ export type CartItem = {
   officeName: string;
   brand?: string;
   category?: string;
+  specs?: Record<string, string>;
   quantity: number;
   unitPrice: number;
   currency: "USD" | "IQD";
@@ -119,6 +120,17 @@ export function cartTotal(): { count: number; subtotal: number } {
     count: cart.reduce((s, i) => s + i.quantity, 0),
     subtotal: cart.reduce((s, i) => s + i.unitPrice * i.quantity, 0),
   };
+}
+
+export function cartSummary(): {
+  count: number;
+  subtotal: number;
+  shipping: number;
+  total: number;
+} {
+  const { count, subtotal } = cartTotal();
+  const shipping = 0;
+  return { count, subtotal, shipping, total: subtotal + shipping };
 }
 
 export function cartByOffice(): Record<string, CartItem[]> {

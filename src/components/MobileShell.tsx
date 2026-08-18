@@ -90,10 +90,10 @@ function BottomTabBar({ onCartClick }: { onCartClick: () => void }) {
       {cartCount > 0 && (
         <button
           onClick={onCartClick}
-          className="absolute -top-5 right-4 size-12 rounded-2xl bg-rose-500 text-white shadow-lg flex items-center justify-center hover:bg-rose-600 transition active:scale-95"
+          className="absolute -top-5 right-4 size-12 rounded-2xl bg-[#0E6E66] text-white shadow-lg flex items-center justify-center hover:bg-[#0B5952] transition active:scale-95"
         >
           <ShoppingCart className="size-5" />
-          <span className="absolute -top-1 -right-1 size-5 rounded-full bg-white text-rose-600 text-[10px] font-extrabold flex items-center justify-center ring-2 ring-rose-500">
+          <span className="absolute -top-1 -right-1 size-5 rounded-full bg-white text-[#0E6E66] text-[10px] font-extrabold flex items-center justify-center ring-2 ring-[#0E6E66]">
             {cartCount > 9 ? "9+" : cartCount}
           </span>
         </button>

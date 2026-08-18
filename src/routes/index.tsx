@@ -14,6 +14,7 @@ import { useImplantOffers } from "@/lib/implantOffers";
 import dentalImplant from "@/assets/dental-implant.png";
 import dentalSupplies from "@/assets/dental-supplies-icon.png";
 import dentalBridge from "@/assets/dental-bridge.png";
+import clinicHero from "@/assets/clinic-hero.jpg";
 import { BRANDS } from "@/data/brands";
 import { BrandLogo } from "@/components/BrandLogo";
 import { useProductSearch, type SearchResult } from "@/lib/search";
@@ -111,7 +112,7 @@ function Home() {
     { to: "/implants", title: lang === "ar" ? "زراعة الأسنان" : "Dental Implants", img: dentalImplant, ring: "ring-amber-200" },
     { to: "/supplies", title: lang === "ar" ? "مستلزمات طبية" : "Dental Supplies", img: dentalSupplies, ring: "ring-emerald-200" },
     { to: "/labs", title: lang === "ar" ? "المختبرات" : "Laboratories", img: dentalBridge, ring: "ring-sky-200" },
-    { to: "/clinic", title: lang === "ar" ? "عيادتي" : "My Clinic", img: null, ring: "ring-violet-200", icon: Stethoscope },
+    { to: "/clinic", title: lang === "ar" ? "عيادتي" : "My Clinic", img: clinicHero, ring: "ring-violet-200", icon: Stethoscope },
   ];
 
   return (

@@ -35,7 +35,40 @@ export type UserRoleDoc = {
   dob?: string;
   labDescription?: string;
   notificationsEnabled?: boolean;
+  clinicName?: string;
   createdAt: Timestamp;
+};
+
+export type InvoiceItem = {
+  productId: string;
+  name: string;
+  quantity: number;
+  price: number;
+  currency: "USD" | "IQD";
+  availability?: "available" | "not_available";
+};
+
+export type InvoiceStatus = "pending" | "confirmed" | "shipped" | "delivered" | "rejected";
+
+export type InvoiceDoc = {
+  id: string;
+  orderNumber: string;
+  officeId: string;
+  doctorId: string;
+  doctorName: string;
+  clinicName: string;
+  doctorPhone: string;
+  doctorAddress?: string;
+  doctorCity?: string;
+  items: InvoiceItem[];
+  total: number;
+  status: InvoiceStatus;
+  createdAt: Timestamp;
+  confirmedAt?: Timestamp | null;
+  shippedAt?: Timestamp | null;
+  deliveredAt?: Timestamp | null;
+  rejectedAt?: Timestamp | null;
+  note?: string;
 };
 
 export type OrderDoc = {

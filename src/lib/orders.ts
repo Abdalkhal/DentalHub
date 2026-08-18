@@ -1,9 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { db } from "@/integrations/firebase/client";
-import { collection, getDocs, query, where, orderBy, Timestamp, addDoc, serverTimestamp } from "firebase/firestore";
-import type { OrderDoc } from "@/integrations/firebase/types";
-import { createNotification } from "@/components/NotificationBell";
-import { getCart, clearCart } from "@/lib/cartStore";
+import {
+  collection, getDocs, query, where, orderBy, Timestamp,
+  doc, setDoc, serverTimestamp,
+} from "firebase/firestore";
+import type { OrderDoc, InvoiceItem } from "@/integrations/firebase/types";
+import { getCart, clearCart, type CartItem } from "@/lib/cartStore";
 
 const fromDoc = (id: string, data: Record<string, unknown>): OrderDoc => ({
   id,
@@ -26,46 +28,109 @@ const fromDoc = (id: string, data: Record<string, unknown>): OrderDoc => ({
 
 export const ordersQueryKey = ["orders"] as const;
 
-export async function placeCartOrder(dentist: {
-  id: string;
-  name: string;
-  phone?: string;
-  address?: string;
-}): Promise<number> {
+function generateOrderNumber(): string {
+  return `DNT-${Math.floor(1000 + Math.random() * 9000)}`;
+}
+
+/**
+ * Checkout: groups cart items per office and, for each office, writes an
+ * Invoice document + a Notification document in a single atomic batch.
+ * Returns the number of invoices created plus the first invoice id.
+ */
+export async function placeCartOrder(
+  dentist: {
+    id: string;
+    name: string;
+    phone?: string;
+    address?: string;
+    city?: string;
+    clinicName?: string;
+  },
+  opts?: {
+    note?: string;
+    discount?: { code?: string; discountUSD?: number; discountIQD?: number };
+  },
+): Promise<{ count: number; invoiceId?: string }> {
   const items = getCart();
-  let created = 0;
+
+  const byOffice = new Map<string, CartItem[]>();
   for (const item of items) {
-    const total = (item.unitPrice || 0) * (item.quantity || 1);
-    const ref = await addDoc(collection(db, "orders"), {
-      supplierId: item.officeId,
-      dentistId: dentist.id,
-      dentistName: dentist.name,
-      dentistPhone: dentist.phone || "",
-      dentistAddress: dentist.address || "",
-      productId: item.productId,
-      productName: item.productName,
-      productImage: item.productImage || "",
-      quantity: item.quantity || 1,
-      unitPrice: item.unitPrice || 0,
+    const list = byOffice.get(item.officeId) ?? [];
+    list.push(item);
+    byOffice.set(item.officeId, list);
+  }
+
+  let created = 0;
+  let firstInvoiceId: string | undefined;
+  for (const [officeId, officeItems] of byOffice) {
+    const invoiceId = doc(collection(db, "invoices")).id;
+    const orderNumber = generateOrderNumber();
+    const invoiceItems: InvoiceItem[] = officeItems.map((i) => ({
+      productId: i.productId,
+      name: i.productName,
+      quantity: i.quantity || 1,
+      price: i.unitPrice || 0,
+      currency: i.currency === "IQD" ? "IQD" : "USD",
+    }));
+    const total = officeItems.reduce((s, i) => s + (i.unitPrice || 0) * (i.quantity || 1), 0);
+    const totalUSD = officeItems
+      .filter((i) => i.currency !== "IQD")
+      .reduce((s, i) => s + (i.unitPrice || 0) * (i.quantity || 1), 0);
+    const totalIQD = officeItems
+      .filter((i) => i.currency === "IQD")
+      .reduce((s, i) => s + (i.unitPrice || 0) * (i.quantity || 1), 0);
+
+    // 1) Persist the order as an Invoice (status pending). This must succeed
+    //    and must never be deleted — it is the dentist's order record.
+    await setDoc(doc(db, "invoices", invoiceId), {
+      id: invoiceId,
+      orderNumber,
+      officeId,
+      doctorId: dentist.id,
+      doctorName: dentist.name,
+      clinicName: dentist.clinicName || dentist.name,
+      doctorPhone: dentist.phone || "",
+      doctorAddress: dentist.address || "",
+      doctorCity: dentist.city || "",
+      items: invoiceItems,
       total,
-      currency: item.currency || "USD",
+      totalUSD,
+      totalIQD,
+      note: opts?.note || "",
+      discount: opts?.discount ?? null,
       status: "pending",
       createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
+      confirmedAt: null,
+      shippedAt: null,
+      deliveredAt: null,
+      rejectedAt: null,
     });
-    await createNotification({
-      userId: item.officeId,
-      title: dentist.name,
-      body: dentist.address
-        ? `طلب ${item.productName} × ${item.quantity || 1} — ${dentist.address}`
-        : `طلب ${item.productName} × ${item.quantity || 1}`,
-      type: "order_new",
-      orderId: ref.id,
-    });
+
+    // 2) Notify the office (best-effort, non-blocking) with deep-link data.
+    try {
+      const itemLabel = invoiceItems.length === 1 ? "منتج" : "منتجات";
+      await setDoc(doc(db, "notifications", `${officeId}_${Date.now()}_${created}`), {
+        id: `${officeId}_${Date.now()}_${created}`,
+        userId: officeId,
+        title: `طلب جديد من ${dentist.name}`,
+        body: dentist.address
+          ? `رقم الفاتورة ${orderNumber} · ${invoiceItems.length} ${itemLabel} — ${dentist.address}`
+          : `رقم الفاتورة ${orderNumber} · ${invoiceItems.length} ${itemLabel}`,
+        type: "order_new",
+        orderId: invoiceId,
+        invoiceId,
+        isRead: false,
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+      });
+    } catch {}
+
+    if (!firstInvoiceId) firstInvoiceId = invoiceId;
     created++;
   }
+
   clearCart();
-  return created;
+  return { count: created, invoiceId: firstInvoiceId };
 }
 
 export function useOrders(supplierId?: string) {

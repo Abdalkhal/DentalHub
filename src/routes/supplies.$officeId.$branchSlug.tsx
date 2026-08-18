@@ -6,11 +6,10 @@ import { useI18n } from "@/lib/i18n";
 import { useAdminStore } from "@/lib/adminStore";
 import { useProducts, useSignedImageUrls } from "@/lib/products";
 import { ProductImageCarousel } from "@/components/ProductImageCarousel";
-import { Plus, SearchX, ArrowUpDown, ImageOff, Check, Heart } from "lucide-react";
-import { addToCart } from "@/lib/cartStore";
-import { addToPurchaseHistory } from "@/lib/quickOrders";
+import { SearchX, ArrowUpDown, ImageOff, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsFavorited, toggleFavorite } from "@/lib/favoritesStore";
+import { ProductAddToCart } from "@/components/ProductAddToCart";
 
 function FavoriteHeart({
   productId, title, vendor, price, currency, imageUrl, lang,
@@ -217,7 +216,7 @@ function BranchPage() {
                     <span className="font-display font-extrabold text-primary text-sm">${p.price}</span>
                     <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-semibold ${p.inStock ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive"}`}>{p.inStock ? t("in_stock") : t("out_of_stock")}</span>
                   </div>
-                  <AddToCartButton
+                  <ProductAddToCart
                     productId={p.id} productName={lang === "ar" ? p.ar : p.en}
                     productImage={urls[0]}
                     officeId={officeId} officeName={lang === "ar" ? office?.ar ?? "" : office?.en ?? ""}
@@ -231,49 +230,5 @@ function BranchPage() {
         )}
       </div>
     </MobileShell>
-  );
-}
-
-function AddToCartButton({
-  productId, productName, productImage, officeId,
-  officeName, brand, category, unitPrice, currency, inStock, lang,
-}: {
-  productId: string; productName: string; productImage?: string;
-  officeId: string; officeName: string; brand?: string; category?: string;
-  unitPrice: number; currency: "USD" | "IQD"; inStock: boolean;
-  lang: "ar" | "en";
-}) {
-  const [added, setAdded] = useState(false);
-
-  const handleAdd = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    addToCart({
-      productId, productName, productImage, officeId,
-      officeName, brand, category, unitPrice, currency, quantity: 1,
-    });
-    addToPurchaseHistory({
-      productId, productName, vendor: officeName, brand,
-      unitPrice, image: productImage, qty: 1,
-    });
-    setAdded(true);
-    setTimeout(() => setAdded(false), 1500);
-  };
-
-  return (
-    <button
-      disabled={!inStock}
-      onClick={handleAdd}
-      className={cn(
-        "w-full mt-2 h-9 rounded-lg flex items-center justify-center gap-1.5 transition-all text-xs font-bold",
-        added
-          ? "bg-emerald-500 text-white"
-          : "bg-primary/10 text-primary hover:bg-primary/20",
-        !inStock && "opacity-40",
-      )}
-      aria-label="Add to cart"
-    >
-      {added ? <Check className="size-3.5" /> : <Plus className="size-3.5" />}
-      {added ? (lang === "ar" ? "تمت الإضافة" : "Added") : (lang === "ar" ? "أضف للسلة" : "Add to cart")}
-    </button>
   );
 }

@@ -1,21 +1,43 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { ProductImageCarousel } from "@/components/ProductImageCarousel";
-import { useProducts, useSignedImageUrls } from "@/lib/products";
+import { ProductAddToCart } from "@/components/ProductAddToCart";
+import { useProducts, useSignedImageUrls, type Product } from "@/lib/products";
 import { useI18n } from "@/lib/i18n";
-import { addToCart } from "@/lib/cartStore";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/integrations/firebase/client";
 import type { UserRoleDoc } from "@/integrations/firebase/types";
-import { Check, ShoppingCart, MapPin, Package, Loader2 } from "lucide-react";
+import { MapPin, Package, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/products/$productId")({
   component: ProductDetailsPage,
 });
+
+function humanizeSpecKey(key: string): string {
+  return key
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/^./, (c) => c.toUpperCase());
+}
+
+function specsFromProduct(p: Product): Record<string, string> | undefined {
+  const s = p.implantSpec;
+  if (!s) return undefined;
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(s)) {
+    if (value === undefined || value === null || value === "") continue;
+    if (key === "catalogUrl" || key === "certifications") continue;
+    if (Array.isArray(value)) {
+      if (value.length) out[humanizeSpecKey(key)] = value.join("، ");
+    } else {
+      out[humanizeSpecKey(key)] = String(value);
+    }
+  }
+  return Object.keys(out).length ? out : undefined;
+}
 
 function ProductDetailsPage() {
   const { productId } = Route.useParams();
@@ -23,8 +45,6 @@ function ProductDetailsPage() {
   const ar = lang === "ar";
   const { data: products = [], isLoading } = useProducts();
   const product = products.find((p) => p.id === productId);
-
-  const [added, setAdded] = useState(false);
 
   const allPaths = useMemo(() => product?.images ?? [], [product]);
   const { data: urlMap = {} } = useSignedImageUrls(allPaths);
@@ -71,23 +91,6 @@ function ProductDetailsPage() {
     product.currency === "IQD"
       ? `${product.price.toLocaleString()} د.ع`
       : `$${product.price.toFixed(2)}`;
-
-  const handleAdd = () => {
-    addToCart({
-      productId: product.id,
-      productName: name,
-      productImage: urls[0],
-      officeId: product.companyId || "",
-      officeName: supplier?.name || (ar ? "مكتب" : "Office"),
-      brand: product.brand,
-      category: product.branch,
-      unitPrice: product.price,
-      currency: product.currency,
-      quantity: 1,
-    });
-    setAdded(true);
-    setTimeout(() => setAdded(false), 1500);
-  };
 
   return (
     <MobileShell>
@@ -155,20 +158,20 @@ function ProductDetailsPage() {
           )}
 
           {/* Add to cart */}
-          <button
-            onClick={handleAdd}
-            disabled={!product.inStock}
-            className={cn(
-              "w-full h-12 rounded-2xl font-display font-extrabold text-sm flex items-center justify-center gap-2 transition shadow-card",
-              added ? "bg-emerald-600 text-white" : "bg-primary text-primary-foreground hover:opacity-90",
-              !product.inStock && "opacity-50",
-            )}
-          >
-            {added ? <Check className="size-4" /> : <ShoppingCart className="size-4" />}
-            {added
-              ? ar ? "تمت الإضافة للسلة" : "Added to cart"
-              : ar ? "إضافة للسلة" : "Add to cart"}
-          </button>
+          <ProductAddToCart
+            productId={product.id}
+            productName={name}
+            productImage={urls[0]}
+            officeId={product.companyId || ""}
+            officeName={supplier?.name || (ar ? "مكتب" : "Office")}
+            brand={product.brand}
+            category={product.branch}
+            specs={specsFromProduct(product)}
+            unitPrice={product.price}
+            currency={product.currency}
+            inStock={product.inStock}
+            lang={ar ? "ar" : "en"}
+          />
         </div>
       </div>
     </MobileShell>

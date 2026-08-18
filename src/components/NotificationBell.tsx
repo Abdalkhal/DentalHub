@@ -6,6 +6,7 @@ import {
 import { db } from "@/integrations/firebase/client";
 import { Bell, CheckCheck, Package, Truck, CheckCircle2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useNavigate } from "@tanstack/react-router";
 
 type Notification = {
   id: string;
@@ -16,12 +17,14 @@ type Notification = {
   isRead: boolean;
   createdAt: number;
   orderId?: string;
+  invoiceId?: string;
+  expiresAt?: number;
 };
 
-export function createNotification(data: Omit<Notification, "id" | "isRead" | "createdAt">) {
+export function createNotification(data: Omit<Notification, "id" | "isRead" | "createdAt" | "expiresAt">) {
   const id = `${data.userId}_${Date.now()}`;
   return setDoc(doc(db, "notifications", id), {
-    ...data, id, isRead: false, createdAt: Date.now(),
+    ...data, id, isRead: false, createdAt: Date.now(), expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
   });
 }
 
@@ -35,6 +38,7 @@ export function NotificationBell({ userId }: { userId: string }) {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const ref = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -48,7 +52,12 @@ export function NotificationBell({ userId }: { userId: string }) {
     if (!userId) return;
     const q = query(collection(db, "notifications"), where("userId", "==", userId), orderBy("createdAt", "desc"));
     return onSnapshot(q, (snap) => {
-      setNotifications(snap.docs.map((d) => ({ ...d.data(), id: d.id } as Notification)));
+      const now = Date.now();
+      setNotifications(
+        snap.docs
+          .map((d) => ({ ...d.data(), id: d.id } as Notification))
+          .filter((n) => !n.expiresAt || n.expiresAt > now),
+      );
     });
   }, [userId]);
 
@@ -56,6 +65,14 @@ export function NotificationBell({ userId }: { userId: string }) {
 
   const markRead = async (id: string) => {
     await updateDoc(doc(db, "notifications", id), { isRead: true });
+  };
+
+  const handleItemClick = (n: Notification) => {
+    markRead(n.id);
+    if (n.invoiceId) {
+      setOpen(false);
+      navigate({ to: "/doctor-invoices/$invoiceId", params: { invoiceId: n.invoiceId } });
+    }
   };
 
   const markAllRead = async () => {
@@ -111,7 +128,7 @@ export function NotificationBell({ userId }: { userId: string }) {
                 return (
                   <button
                     key={n.id}
-                    onClick={() => markRead(n.id)}
+                    onClick={() => handleItemClick(n)}
                     className={cn(
                       "w-full text-start px-4 py-3 flex gap-3 border-b border-gray-50 hover:bg-sky-50/50 transition",
                       !n.isRead && "bg-sky-50/30",

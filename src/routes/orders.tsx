@@ -1,10 +1,10 @@
-import { createFileRoute, Link, useSearch, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useSearch } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import { z } from "zod";
 import { db } from "@/integrations/firebase/client";
-import type { OrderDoc } from "@/integrations/firebase/types";
+import type { InvoiceDoc, InvoiceStatus } from "@/integrations/firebase/types";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { EditOrderModal } from "@/components/EditOrderModal";
@@ -21,7 +21,7 @@ import {
   type Order,
   type OrderStatus,
 } from "@/lib/ordersStore";
-import { useCart, addToCart } from "@/lib/cartStore";
+import { useCart } from "@/lib/cartStore";
 import { placeCartOrder } from "@/lib/orders";
 import {
   Search,
@@ -33,14 +33,9 @@ import {
   Syringe,
   Layers,
   Package,
-  Building2,
-  Clock,
   Loader2,
   Plus,
-  Phone,
-  MapPin,
 } from "lucide-react";
-import { OrderStatusTracker, type SupplyOrderStatus } from "@/components/OrderStatusTracker";
 
 const ordersSearchSchema = z.object({
   status: z.enum(["all", "in_progress", "completed", "delayed"]).catch("all"),
@@ -53,7 +48,6 @@ export const Route = createFileRoute("/orders")({
 
 type FilterStatus = "all" | "in_progress" | "completed" | "delayed";
 type WorkType = "crown" | "veneer" | "implant" | "clear_aligner";
-type SupplierOrderStatus = "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled";
 
 const WORK_TYPES: Record<WorkType, { ar: string; en: string; icon: typeof Crown; color: string }> = {
   crown: { ar: "تاج", en: "Crown", icon: Crown, color: "text-amber-500 bg-amber-50" },
@@ -62,15 +56,23 @@ const WORK_TYPES: Record<WorkType, { ar: string; en: string; icon: typeof Crown;
   clear_aligner: { ar: "مصفف شفاف", en: "Clear Aligner", icon: Layers, color: "text-violet-500 bg-violet-50" },
 };
 
-function formatShortDate(iso: string): string {
-  if (!iso) return "-";
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return iso;
+function formatShortDate(v: unknown): string {
+  if (!v) return "-";
+  let d: Date;
+  const o = v as { toDate?: () => Date; toMillis?: () => number };
+  if (typeof o.toDate === "function") d = o.toDate();
+  else if (typeof o.toMillis === "function") d = new Date(o.toMillis());
+  else d = new Date(v as string);
+  if (isNaN(d.getTime())) return "-";
   return `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}/${d.getFullYear()}`;
 }
 
-function fmtPrice(n: number): string {
-  return n.toLocaleString() + " د.ع";
+function createdAtMs(v: unknown): number {
+  if (!v) return 0;
+  const o = v as { toMillis?: () => number };
+  if (typeof o.toMillis === "function") return o.toMillis();
+  const d = new Date(v as string);
+  return isNaN(d.getTime()) ? 0 : d.getTime();
 }
 
 /* ── Main Component ─────────────────────────────── */
@@ -91,7 +93,7 @@ function Orders() {
     );
   }
 
-  if (role?.accountType === "supply") return <SupplierOrders />;
+  if (role?.accountType === "supply" || role?.accountType === "implant") return <SupplierOrders />;
   if (role?.accountType === "dentist") return <DentistOrders />;
   return <LabOrders />;
 }
@@ -294,7 +296,6 @@ function DentistOrders() {
   const ar = lang === "ar";
   const { user } = useSession();
   const { role } = useUserRole();
-  const navigate = useNavigate();
   const cart = useCart();
   const queryClient = useQueryClient();
   const [placing, setPlacing] = useState(false);
@@ -303,13 +304,15 @@ function DentistOrders() {
     if (!user || cart.length === 0) return;
     setPlacing(true);
     try {
-      const count = await placeCartOrder({
+      const { count } = await placeCartOrder({
         id: user.uid,
         name: role?.name || (ar ? "طبيب أسنان" : "Dentist"),
         phone: role?.phone,
         address: role?.address,
+        city: role?.city,
+        clinicName: role?.clinicName,
       });
-      await queryClient.invalidateQueries({ queryKey: ["dentist-orders", user.uid] });
+      await queryClient.invalidateQueries({ queryKey: ["dentist-invoices", user.uid] });
       toast.success(
         ar ? `تم إرسال ${count} طلب بنجاح` : `${count} order(s) placed successfully`,
       );
@@ -321,16 +324,17 @@ function DentistOrders() {
   };
 
   const { data: myOrders = [], isLoading } = useQuery({
-    queryKey: ["dentist-orders", user?.uid],
-    queryFn: async (): Promise<OrderDoc[]> => {
+    queryKey: ["dentist-invoices", user?.uid],
+    queryFn: async (): Promise<InvoiceDoc[]> => {
       if (!user?.uid) return [];
       const q = query(
-        collection(db, "orders"),
-        where("dentistId", "==", user.uid),
-        orderBy("createdAt", "desc"),
+        collection(db, "invoices"),
+        where("doctorId", "==", user.uid),
       );
       const snap = await getDocs(q);
-      return snap.docs.map((d) => ({ id: d.id, ...d.data() } as OrderDoc));
+      return snap.docs
+        .map((d) => ({ id: d.id, ...d.data() } as InvoiceDoc))
+        .sort((a, b) => createdAtMs(b.createdAt) - createdAtMs(a.createdAt));
     },
     enabled: !!user?.uid,
     staleTime: 30_000,
@@ -401,6 +405,7 @@ function DentistOrders() {
           <div className="space-y-2">
             {myOrders.map((o) => {
               const s = (o.status as string) || "pending";
+              const itemCount = (o.items || []).reduce((sum, i) => sum + (i.quantity || 1), 0);
               return (
                 <div key={o.id} className="bg-card border border-border rounded-2xl p-4 shadow-soft">
                   <div className="flex items-center justify-between mb-2">
@@ -409,58 +414,35 @@ function DentistOrders() {
                         <Package className="size-4" />
                       </span>
                       <div className="min-w-0">
-                        <button
-                          onClick={() =>
-                            o.productId &&
-                            navigate({ to: "/products/$productId", params: { productId: o.productId } })
-                          }
-                          className="block max-w-full text-start"
-                        >
-                          <p className="font-bold text-sm truncate hover:text-primary transition">
-                            {o.productName || (ar ? "منتج" : "Product")}
-                          </p>
-                        </button>
+                        <p className="font-bold text-sm truncate">
+                          {o.items?.[0]?.name || (ar ? "منتج" : "Product")}
+                          {itemCount > 1 ? ` +${itemCount - 1}` : ""}
+                        </p>
                         <p className="text-[10px] text-slate-400">
-                          #{o.id.slice(0, 8).toUpperCase()} · {o.createdAt ? formatShortDate(o.createdAt as unknown as string) : ""}
+                          {o.orderNumber || ""} · {o.createdAt ? formatShortDate(o.createdAt as unknown as string) : ""}
                         </p>
                       </div>
                     </div>
                     <span className={cn(
                       "text-[10px] font-bold px-2 py-0.5 rounded-full",
-                      s === "delivered" ? "bg-emerald-100 text-emerald-700" :
-                      s === "cancelled" ? "bg-rose-100 text-rose-700" :
+                      s === "delivered" || s === "confirmed" ? "bg-emerald-100 text-emerald-700" :
+                      s === "shipped" ? "bg-sky-100 text-sky-700" :
+                      s === "rejected" ? "bg-rose-100 text-rose-700" :
                       "bg-amber-100 text-amber-700",
                     )}>
                       {s === "pending" ? (ar ? "قيد الانتظار" : "Pending") :
-                       s === "confirmed" ? (ar ? "مؤكد" : "Confirmed") :
+                       s === "confirmed" ? (ar ? "تم التأكيد" : "Confirmed") :
+                       s === "shipped" ? (ar ? "تم الشحن" : "Shipped") :
                        s === "delivered" ? (ar ? "تم التسليم" : "Delivered") :
-                       s === "cancelled" ? (ar ? "ملغي" : "Cancelled") : s}
+                       s === "rejected" ? (ar ? "ملغاة" : "Rejected") : s}
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span>×{o.quantity || 1} · {fmtPrice(o.total || 0)}</span>
-                    {s === "delivered" && (
-                      <button
-                        onClick={() => {
-                          addToCart({
-                            id: `reorder_${Date.now().toString(36)}`,
-                            productId: o.productId ?? o.id,
-                            productName: o.productName || (ar ? "منتج" : "Product"),
-                            productImage: o.productImage,
-                            officeId: o.supplierId,
-                            officeName: "",
-                            unitPrice: o.unitPrice || 0,
-                            currency: (o.currency as "USD" | "IQD") || "USD",
-                            quantity: o.quantity || 1,
-                          });
-                        }}
-                        className="h-8 px-3 rounded-lg bg-primary/10 text-primary text-[11px] font-bold hover:bg-primary/20 transition flex items-center gap-1"
-                      >
-                        <Plus className="size-3" />
-                        {ar ? "إعادة الطلب" : "Reorder"}
-                      </button>
-                    )}
+                    <span>{itemCount} {ar ? "منتجات" : "products"}</span>
+                    <span className="font-display font-extrabold text-sm text-foreground">
+                      ${(o.total || 0).toFixed(2)}
+                    </span>
                   </div>
                 </div>
               );
@@ -481,38 +463,32 @@ function SupplierOrders() {
   const supplierId = role?.userId ?? "";
 
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | SupplierOrderStatus>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | InvoiceStatus>("all");
 
   const { data: supplierOrders = [], isLoading } = useQuery({
-    queryKey: ["supplier-orders", supplierId],
-    queryFn: async (): Promise<OrderDoc[]> => {
+    queryKey: ["supplier-invoices", supplierId],
+    queryFn: async (): Promise<InvoiceDoc[]> => {
       if (!supplierId) return [];
       const q = query(
-        collection(db, "orders"),
-        where("supplierId", "==", supplierId),
-        orderBy("createdAt", "desc"),
+        collection(db, "invoices"),
+        where("officeId", "==", supplierId),
       );
       const snap = await getDocs(q);
-      return snap.docs.map((d) => ({ id: d.id, ...d.data() } as OrderDoc));
+      return snap.docs
+        .map((d) => ({ id: d.id, ...d.data() } as InvoiceDoc))
+        .sort((a, b) => createdAtMs(b.createdAt) - createdAtMs(a.createdAt));
     },
     enabled: !!supplierId,
     staleTime: 30_000,
   });
 
-  const handleSupplierStatusChange = async (orderId: string, status: string) => {
-    const { doc, updateDoc } = await import("firebase/firestore");
-    await updateDoc(doc(db, "orders", orderId), { status, updatedAt: new Date().toISOString() });
-    toast.success(ar ? "تم تحديث الحالة" : "Status updated");
-  };
-
-  const statusOptions: { id: "all" | SupplierOrderStatus; ar: string; en: string }[] = [
+  const statusOptions: { id: "all" | InvoiceStatus; ar: string; en: string }[] = [
     { id: "all", ar: "الكل", en: "All" },
     { id: "pending", ar: "قيد الانتظار", en: "Pending" },
-    { id: "confirmed", ar: "مؤكد", en: "Confirmed" },
-    { id: "processing", ar: "قيد التجهيز", en: "Processing" },
+    { id: "confirmed", ar: "تم التأكيد", en: "Confirmed" },
     { id: "shipped", ar: "تم الشحن", en: "Shipped" },
     { id: "delivered", ar: "تم التسليم", en: "Delivered" },
-    { id: "cancelled", ar: "ملغي", en: "Cancelled" },
+    { id: "rejected", ar: "مرفوضة", en: "Rejected" },
   ];
 
   const filteredOrders = useMemo(() => {
@@ -522,9 +498,9 @@ function SupplierOrders() {
       if (search.trim()) {
         const q = search.toLowerCase();
         return (
-          o.id.toLowerCase().includes(q) ||
-          (o.dentistName || "").toLowerCase().includes(q) ||
-          (o.productName || "").toLowerCase().includes(q)
+          (o.orderNumber || "").toLowerCase().includes(q) ||
+          (o.doctorName || "").toLowerCase().includes(q) ||
+          (o.clinicName || "").toLowerCase().includes(q)
         );
       }
       return true;
@@ -541,7 +517,7 @@ function SupplierOrders() {
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder={ar ? "ابحث عن طلب أو طبيب…" : "Search order or doctor…"}
+            placeholder={ar ? "ابحث عن فاتورة أو طبيب…" : "Search invoice or doctor…"}
             className="w-full h-11 rounded-2xl bg-card border border-border ps-10 pe-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-primary"
           />
         </div>
@@ -564,7 +540,7 @@ function SupplierOrders() {
         </div>
 
         <p className="text-xs text-muted-foreground">
-          {filteredOrders.length} {ar ? "طلب" : "order"}
+          {filteredOrders.length} {ar ? "فاتورة" : "invoice"}
         </p>
 
         <div className="space-y-2">
@@ -576,81 +552,57 @@ function SupplierOrders() {
             <div className="text-center py-16 text-sm text-muted-foreground">
               <Package className="size-10 mx-auto mb-3 text-muted-foreground/40" />
               {supplierOrders.length === 0
-                ? ar ? "لا توجد طلبات مبيعات حتى الآن" : "No sales orders yet"
-                : ar ? "لا توجد طلبات مطابقة" : "No matching orders"}
+                ? ar ? "لا توجد فواتير حتى الآن" : "No invoices yet"
+                : ar ? "لا توجد نتائج مطابقة" : "No matching invoices"}
             </div>
           ) : (
             filteredOrders.map((o) => {
               const s = (o.status as string) || "pending";
+              const itemCount = (o.items || []).reduce((sum, i) => sum + (i.quantity || 1), 0);
               return (
-                <div key={o.id} className="bg-card border border-border rounded-2xl p-4 shadow-soft">
+                <Link
+                  key={o.id}
+                  to="/doctor-invoices/$invoiceId"
+                  params={{ invoiceId: o.id }}
+                  className="block bg-card border border-border rounded-2xl p-4 shadow-soft hover:border-primary/40 transition"
+                >
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2.5">
                       <span className="size-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
                         <Package className="size-4" />
                       </span>
-                      <div>
+                      <div className="min-w-0">
                         <p className="font-mono text-xs font-bold text-muted-foreground">
-                          #{o.id.slice(0, 8).toUpperCase()}
+                          {o.orderNumber || `#${o.id.slice(0, 8).toUpperCase()}`}
                         </p>
-                        <p className="font-display font-bold text-sm">
-                          {o.productName || (ar ? "منتج" : "Product")}
+                        <p className="font-display font-bold text-sm truncate">
+                          {o.doctorName || (ar ? "طبيب" : "Doctor")}
+                          {o.clinicName ? ` · ${o.clinicName}` : ""}
                         </p>
                       </div>
                     </div>
+                    <span className={cn(
+                      "text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0",
+                      s === "delivered" || s === "confirmed" ? "bg-emerald-100 text-emerald-700" :
+                      s === "shipped" ? "bg-sky-100 text-sky-700" :
+                      s === "rejected" ? "bg-rose-100 text-rose-700" :
+                      "bg-amber-100 text-amber-700",
+                    )}>
+                      {s === "pending" ? (ar ? "قيد الانتظار" : "Pending") :
+                       s === "confirmed" ? (ar ? "تم التأكيد" : "Confirmed") :
+                       s === "shipped" ? (ar ? "تم الشحن" : "Shipped") :
+                       s === "delivered" ? (ar ? "تم التسليم" : "Delivered") :
+                       s === "rejected" ? (ar ? "مرفوضة" : "Rejected") : s}
+                    </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
-                    <div>
-                      <p className="text-muted-foreground">{ar ? "الطبيب" : "Doctor"}</p>
-                      <p className="font-semibold text-foreground flex items-center gap-1 truncate">
-                        <Building2 className="size-3 shrink-0" />
-                        {o.dentistName || "-"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">{ar ? "التاريخ" : "Date"}</p>
-                      <p className="font-semibold text-foreground flex items-center gap-1">
-                        <Clock className="size-3" />
-                        {o.createdAt ? formatShortDate(o.createdAt as unknown as string) : "-"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">{ar ? "الكمية" : "Qty"}</p>
-                      <p className="font-semibold text-foreground">×{o.quantity || 1}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">{ar ? "المبلغ" : "Total"}</p>
-                      <p className="font-display font-extrabold text-sm text-emerald-600">
-                        {fmtPrice(o.total || 0)}
-                      </p>
-                    </div>
+                  <div className="flex items-center justify-between text-xs text-slate-500">
+                    <span>{itemCount} {ar ? "منتجات" : "products"} · {o.createdAt ? formatShortDate(o.createdAt as unknown as string) : "-"}</span>
+                    <span className="font-display font-extrabold text-sm text-emerald-600">
+                      ${(o.total || 0).toFixed(2)}
+                    </span>
                   </div>
-
-                  {(o.dentistPhone || o.dentistAddress) && (
-                    <div className="mb-3 rounded-xl bg-slate-50 border border-slate-100 p-2.5 space-y-1 text-[11px]">
-                      {o.dentistAddress && (
-                        <p className="flex items-start gap-1.5 text-slate-600">
-                          <MapPin className="size-3.5 shrink-0 mt-0.5 text-slate-400" />
-                          <span className="leading-snug">{ar ? "عنوان التوصيل" : "Delivery address"}: {o.dentistAddress}</span>
-                        </p>
-                      )}
-                      {o.dentistPhone && (
-                        <p className="flex items-center gap-1.5 text-slate-600">
-                          <Phone className="size-3.5 shrink-0 text-slate-400" />
-                          <span dir="ltr">{o.dentistPhone}</span>
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="pt-2 border-t border-border">
-                    <OrderStatusTracker
-                      currentStatus={s as SupplyOrderStatus}
-                      onStatusChange={(newStatus) => handleSupplierStatusChange(o.id, newStatus)}
-                    />
-                  </div>
-                </div>
+                </Link>
               );
             })
           )}
