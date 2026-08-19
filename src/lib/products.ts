@@ -277,14 +277,13 @@ export function useProductsByCountry(countrySlug: string) {
   return useQuery({
     queryKey: [...productsQueryKey, "by-country", countryCode],
     queryFn: async (): Promise<Product[]> => {
-      const q = query(
-        collection(db, "products"),
-        where("category", "==", "implant"),
-        where("country", "==", countryCode),
-        orderBy("createdAt", "asc"),
-      );
+      // Only filter on a single equality field (automatic index) so this
+      // works without a composite index; country is filtered client-side.
+      const q = query(collection(db, "products"), where("category", "==", "implant"));
       const snap = await getDocs(q);
-      return snap.docs.map((d) => fromDoc(d.id, d.data()));
+      return snap.docs
+        .map((d) => fromDoc(d.id, d.data()))
+        .filter((p) => p.country === countryCode || p.implantSpec?.country === countryCode);
     },
     staleTime: 30_000,
   });

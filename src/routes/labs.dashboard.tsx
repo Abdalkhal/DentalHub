@@ -62,21 +62,20 @@ export const Route = createFileRoute("/labs/dashboard")({
   component: LabDashboard,
 });
 
-type WorkType = "crown" | "veneer" | "implant" | "clear_aligner";
+type WorkType = "zircon" | "inlay_onlay" | "night_guard" | "ceramic" | "implant" | "lumineer" | "e_max" | "veneer";
 
 const WORK_TYPES: Record<
   WorkType,
   { ar: string; en: string; icon: LucideIcon; color: string }
 > = {
-  crown: { ar: "تاج", en: "Crown", icon: Crown, color: "text-amber-500 bg-amber-50" },
-  veneer: { ar: "قشرة", en: "Veneer", icon: Sparkles, color: "text-sky-500 bg-sky-50" },
+  zircon: { ar: "زيركون", en: "Zircon", icon: Crown, color: "text-amber-500 bg-amber-50" },
+  inlay_onlay: { ar: "إنلاي وأونلاي", en: "Inlay & Onlay", icon: Sparkles, color: "text-orange-500 bg-orange-50" },
+  night_guard: { ar: "واقي ليلي", en: "Night Guard", icon: Layers, color: "text-violet-500 bg-violet-50" },
+  ceramic: { ar: "سيراميك", en: "Ceramic", icon: Sparkles, color: "text-pink-500 bg-pink-50" },
   implant: { ar: "زرعة", en: "Implant", icon: Syringe, color: "text-emerald-500 bg-emerald-50" },
-  clear_aligner: {
-    ar: "مصفف شفاف",
-    en: "Clear Aligner",
-    icon: Layers,
-    color: "text-violet-500 bg-violet-50",
-  },
+  lumineer: { ar: "لومينير", en: "Lumineer", icon: Sparkles, color: "text-sky-500 bg-sky-50" },
+  e_max: { ar: "إيماكس", en: "E-Max", icon: Sparkles, color: "text-rose-500 bg-rose-50" },
+  veneer: { ar: "فينير", en: "Veneer", icon: Sparkles, color: "text-cyan-500 bg-cyan-50" },
 };
 
 const STATUS_META: Record<OrderStatus, { ar: string; en: string; color: string; dot: string }> = {
@@ -190,7 +189,12 @@ function StatCard({
 }
 
 function WorkTypeBadge({ type }: { type: WorkType }) {
-  const wt = WORK_TYPES[type];
+  const wt = WORK_TYPES[type] ?? {
+    ar: type,
+    en: type,
+    icon: Crown,
+    color: "text-slate-500 bg-slate-50",
+  };
   const Icon = wt.icon;
   return (
     <span

@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { RoleGuard } from "@/components/RoleGuard";
+import { createNotification } from "@/components/NotificationBell";
 import { useI18n } from "@/lib/i18n";
 import { useInvoice, updateInvoiceStatus, updateInvoiceItemAvailability } from "@/lib/invoices";
 import type { InvoiceStatus } from "@/integrations/firebase/types";
@@ -101,6 +102,21 @@ function InvoiceDetailInner() {
     setBusyIdx(index);
     try {
       await updateInvoiceItemAvailability(inv.id, index, value);
+
+      if (value === "not_available") {
+        const item = inv.items[index];
+        if (item && inv.doctorId) {
+          await createNotification({
+            userId: inv.doctorId,
+            title: ar ? "تحديث الطلب" : "Order update",
+            body: ar
+              ? `العنصر "${item.name}" غير متوفر حالياً في طلبك ${inv.orderNumber}`
+              : `Item "${item.name}" is currently unavailable in your order ${inv.orderNumber}`,
+            type: "order_status",
+            orderId: inv.id,
+          });
+        }
+      }
     } catch (e: any) {
       toast.error(ar ? `فشل التحديث: ${e?.message || e}` : `Update failed: ${e?.message || e}`);
     } finally {

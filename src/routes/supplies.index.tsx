@@ -9,6 +9,7 @@ import { TopBar } from "@/components/TopBar";
 import { RoleGuard } from "@/components/RoleGuard";
 import { TagInput } from "@/components/TagInput";
 import { NotificationBell } from "@/components/NotificationBell";
+import { BrandAutocomplete } from "@/components/BrandAutocomplete";
 import {
   Dialog,
   DialogContent,
@@ -664,11 +665,10 @@ function ProductsPanel() {
             <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
               {ar ? "الماركة" : "Brand"}
             </label>
-            <input
+            <BrandAutocomplete
               value={brand}
-              onChange={(e) => setBrand(e.target.value)}
+              onChange={setBrand}
               placeholder={ar ? "مثال: 3M" : "e.g. 3M"}
-              className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
             />
           </div>
 

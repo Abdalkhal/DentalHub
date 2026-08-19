@@ -37,10 +37,14 @@ type Props = {
 };
 
 const WORK_TYPES = [
-  { value: "crown", ar: "تاج", en: "Crown" },
-  { value: "veneer", ar: "قشرة تجميلية", en: "Veneer" },
+  { value: "zircon", ar: "زيركون", en: "Zircon" },
+  { value: "inlay_onlay", ar: "إنلاي وأونلاي", en: "Inlay & Onlay" },
+  { value: "night_guard", ar: "واقي ليلي", en: "Night Guard" },
+  { value: "ceramic", ar: "سيراميك", en: "Ceramic" },
   { value: "implant", ar: "زرعة", en: "Implant" },
-  { value: "clear_aligner", ar: "مصفف شفاف", en: "Clear Aligner" },
+  { value: "lumineer", ar: "لومينير", en: "Lumineer" },
+  { value: "e_max", ar: "إيماكس", en: "E-Max" },
+  { value: "veneer", ar: "فينير", en: "Veneer" },
 ];
 
 const inputClass =

@@ -6,6 +6,7 @@ import { TopBar } from "@/components/TopBar";
 import { RoleGuard } from "@/components/RoleGuard";
 import { TagInput } from "@/components/TagInput";
 import { BoneGraftModal } from "@/components/BoneGraftModal";
+import { NotificationBell } from "@/components/NotificationBell";
 import { COUNTRIES, SURGICAL_GUIDE_COMPANIES, IMPLANTS } from "@/data/implants";
 import {
   useProducts,
@@ -141,6 +142,7 @@ function ImplantCompanyDashboard() {
             </Link>
 
             <div className="flex items-center gap-2">
+              <NotificationBell userId={companyId} />
               <button
                 type="button"
                 onClick={toggle}
@@ -341,6 +343,7 @@ function ImplantProductsPanel() {
   const [name, setName] = useState("");
   const [brand, setBrand] = useState("");
   const [country, setCountry] = useState("KR");
+  const [implantCategory, setImplantCategory] = useState<"comprehensive" | "basal" | "non_immediate">("comprehensive");
   const [line, setLine] = useState("");
   const [accessoryCategory, setAccessoryCategory] = useState("");
   const [accessorySubType, setAccessorySubType] = useState("");
@@ -372,6 +375,7 @@ function ImplantProductsPanel() {
     setName("");
     setBrand("");
     setCountry("KR");
+    setImplantCategory("comprehensive");
     setLine("");
     setAccessoryCategory("");
     setAccessorySubType("");
@@ -402,6 +406,13 @@ function ImplantProductsPanel() {
     setName(p.ar);
     setBrand(p.brand);
     setCountry(p.country || p.implantSpec?.country || "KR");
+    setImplantCategory(
+      p.implantSpec?.implantType === "non-immediate"
+        ? "non_immediate"
+        : p.implantSpec?.subType === "basal"
+          ? "basal"
+          : "comprehensive",
+    );
     setLine(p.implantSpec?.connectionType || "");
     setAccessoryCategory("");
     setAccessorySubType(p.productType === "accessory" ? p.ar : "");
@@ -513,6 +524,8 @@ function ImplantProductsPanel() {
             ? undefined
             : {
                 country,
+                implantType: implantCategory === "non_immediate" ? "non-immediate" : "immediate",
+                subType: implantCategory === "basal" ? "basal" : undefined,
                 connectionType: line.trim() || undefined,
                 diameters: selectedDiameters.length > 0
                   ? selectedDiameters.map(Number).filter((n) => !isNaN(n) && n > 0)
@@ -782,6 +795,25 @@ function ImplantProductsPanel() {
                         {ar ? "بلد الصنع" : "Country of Manufacture"}
                       </label>
                       <CountryCombobox value={country} onChange={setCountry} lang={lang} />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
+                        {ar ? "نوع الزرعة" : "Implant Type"}
+                      </label>
+                      <select
+                        value={implantCategory}
+                        onChange={(e) =>
+                          setImplantCategory(e.target.value as "comprehensive" | "basal" | "non_immediate")
+                        }
+                        className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
+                      >
+                        <option value="comprehensive">
+                          {ar ? "فورية (شاملة)" : "Immediate (Comprehensive)"}
+                        </option>
+                        <option value="basal">{ar ? "فورية (قاعدية)" : "Immediate (Basal)"}</option>
+                        <option value="non_immediate">{ar ? "غير فورية" : "Non-Immediate"}</option>
+                      </select>
                     </div>
 
                     <div>

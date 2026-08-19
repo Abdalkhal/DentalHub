@@ -2,24 +2,36 @@ import { createFileRoute, notFound, useRouterState } from "@tanstack/react-route
 import { useMemo, useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
+import { ProductAddToCart } from "@/components/ProductAddToCart";
 import { COUNTRIES } from "@/data/implants";
 import { useProductsByCountry, useSignedImageUrls, type Product } from "@/lib/products";
+import { useImplantCompanyNames } from "@/lib/implantOffers";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Cpu, EyeOff, Loader2 } from "lucide-react";
 
-type ImplantFilter = "all" | "immediate" | "non-immediate";
+type ImplantFilter = "all" | "comprehensive" | "basal" | "non_immediate";
+type ImplantCategory = Exclude<ImplantFilter, "all">;
 
-const TYPE_LABEL: Record<ImplantFilter, string> = {
-  all: "filter_all",
-  immediate: "filter_immediate",
-  "non-immediate": "filter_delayed",
+function implantCategoryOf(
+  spec: { implantType?: string; subType?: string } | undefined,
+): ImplantCategory | null {
+  if (!spec) return null;
+  if (spec.implantType === "non-immediate") return "non_immediate";
+  if (spec.implantType === "immediate") return spec.subType === "basal" ? "basal" : "comprehensive";
+  return null;
+}
+
+const CATEGORY_LABEL: Record<ImplantCategory, { ar: string; en: string }> = {
+  comprehensive: { ar: "فورية (شاملة)", en: "Immediate (Comprehensive)" },
+  basal: { ar: "فورية (قاعدية)", en: "Immediate (Basal)" },
+  non_immediate: { ar: "غير فورية", en: "Non-Immediate" },
 };
 
-const TYPE_TONE: Record<ImplantFilter, string> = {
-  all: "",
-  immediate: "bg-[oklch(0.93_0.06_30)] ring-[oklch(0.85_0.1_30)] text-[oklch(0.5_0.18_30)]",
-  "non-immediate":
+const CATEGORY_TONE: Record<ImplantCategory, string> = {
+  comprehensive: "bg-[oklch(0.93_0.06_30)] ring-[oklch(0.85_0.1_30)] text-[oklch(0.5_0.18_30)]",
+  basal: "bg-[oklch(0.93_0.06_140)] ring-[oklch(0.85_0.1_140)] text-[oklch(0.5_0.18_140)]",
+  non_immediate:
     "bg-[oklch(0.93_0.06_250)] ring-[oklch(0.82_0.1_250)] text-[oklch(0.45_0.18_256)]",
 };
 
@@ -37,7 +49,6 @@ function CountryPage() {
   const { t, lang } = useI18n();
   const ar = lang === "ar";
   const [filter, setFilter] = useState<ImplantFilter>("all");
-  const [subFilter, setSubFilter] = useState<string>("all");
   const isVisitor = useRouterState({
     select: (s) =>
       s.location.state != null &&
@@ -45,15 +56,12 @@ function CountryPage() {
   });
 
   const { data: products = [], isLoading } = useProductsByCountry(country.slug);
+  const companyNames = useImplantCompanyNames();
 
   const filtered = useMemo(() => {
-    let list = products;
-    if (filter !== "all") list = list.filter((p) => p.implantSpec?.implantType === filter);
-    if (filter === "immediate" && subFilter !== "all") {
-      list = list.filter((p) => p.implantSpec?.subType === subFilter);
-    }
-    return list;
-  }, [products, filter, subFilter]);
+    if (filter === "all") return products;
+    return products.filter((p) => implantCategoryOf(p.implantSpec) === filter);
+  }, [products, filter]);
 
   const allPaths = useMemo(() => {
     const productPaths = products.flatMap((p) => p.images);
@@ -66,8 +74,9 @@ function CountryPage() {
 
   const filters: { key: ImplantFilter; ar: string; en: string }[] = [
     { key: "all", ar: "الكل", en: "All" },
-    { key: "immediate", ar: "فورية", en: "Immediate" },
-    { key: "non-immediate", ar: "غير فورية", en: "Non-immediate" },
+    { key: "comprehensive", ar: "فورية (شاملة)", en: "Immediate (Comprehensive)" },
+    { key: "basal", ar: "فورية (قاعدية)", en: "Immediate (Basal)" },
+    { key: "non_immediate", ar: "غير فورية", en: "Non-Immediate" },
   ];
 
   return (
@@ -110,29 +119,6 @@ function CountryPage() {
           })}
         </div>
 
-        {filter === "immediate" && (
-          <div className="flex gap-2 overflow-x-auto -mx-4 px-4 pb-1 scrollbar-hide">
-            {[
-              { key: "all", ar: "الكل (فورية)", en: "All Immediate" },
-              { key: "basal", ar: "Basal", en: "Basal" },
-              { key: "compressive", ar: "Compressive", en: "Compressive" },
-            ].map((s) => (
-              <button
-                key={s.key}
-                onClick={() => setSubFilter(s.key)}
-                className={cn(
-                  "h-8 px-3 rounded-full text-[11px] font-bold whitespace-nowrap transition border",
-                  subFilter === s.key
-                    ? "bg-[oklch(0.93_0.06_30)] text-[oklch(0.5_0.18_30)] border-[oklch(0.85_0.1_30)]"
-                    : "bg-card text-muted-foreground border-border hover:bg-accent",
-                )}
-              >
-                {ar ? s.ar : s.en}
-              </button>
-            ))}
-          </div>
-        )}
-
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="size-6 animate-spin text-primary" />
@@ -157,7 +143,7 @@ function CountryPage() {
               const lens = spec?.lengths ?? [];
               const imgUrl =
                 p.images.length > 0 && imageUrlMap[p.images[0]] ? imageUrlMap[p.images[0]] : null;
-              const typeLabel = spec?.implantType as ImplantFilter | undefined;
+              const category = implantCategoryOf(spec);
 
               return (
                 <li key={p.id} className="bg-card border border-border rounded-2xl p-4 shadow-soft">
@@ -182,20 +168,14 @@ function CountryPage() {
                             {spec.connectionType}
                           </span>
                         )}
-                        {typeLabel && TYPE_TONE[typeLabel] && (
+                        {category && (
                           <span
                             className={cn(
                               "px-2.5 py-1 rounded-full ring-1 shadow-sm text-[11px] font-semibold",
-                              TYPE_TONE[typeLabel],
+                              CATEGORY_TONE[category],
                             )}
                           >
-                            {ar
-                              ? typeLabel === "immediate"
-                                ? "فورية"
-                                : "غير فورية"
-                              : typeLabel === "immediate"
-                                ? "Immediate"
-                                : "Non-immediate"}
+                            {ar ? CATEGORY_LABEL[category].ar : CATEGORY_LABEL[category].en}
                           </span>
                         )}
                       </div>
@@ -277,6 +257,20 @@ function CountryPage() {
                       </div>
                     </div>
                   )}
+
+                  <ProductAddToCart
+                    productId={p.id}
+                    productName={ar ? p.ar || p.en : p.en || p.ar}
+                    productImage={imgUrl ?? undefined}
+                    officeId={p.companyId || ""}
+                    officeName={companyNames[p.companyId || ""] || p.brand || (ar ? "شركة زرعات" : "Implant Company")}
+                    brand={p.brand}
+                    category="implant"
+                    unitPrice={p.price}
+                    currency={p.currency || "USD"}
+                    inStock={p.inStock ?? true}
+                    lang={ar ? "ar" : "en"}
+                  />
                 </li>
               );
             })}
