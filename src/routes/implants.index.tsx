@@ -58,6 +58,8 @@ import {
   ChevronRight,
   Bone,
   Stethoscope,
+  Check,
+  Ruler,
 } from "lucide-react";
 
 export const Route = createFileRoute("/implants/")({
@@ -1641,21 +1643,9 @@ function ImplantDetailView({
   const nextImage = () =>
     setActiveImage((i) => (i + 1) % Math.max(urls.length, 1));
 
-  const categoryLabel = (acc: ProductAccessory) => {
-    if (!ar) return acc.type;
-    return ACCESSORY_CATEGORIES.find((c) => c.en === acc.type)?.ar ?? acc.type;
-  };
-
   const countryCode = product.country || product.implantSpec?.country;
   const country = countryCode ? countryByCode[countryCode] : null;
   const spec = product.implantSpec;
-  const typeLabel =
-    spec?.implantType === "non-immediate"
-      ? { ar: "غير فورية", en: "Non-Immediate", tone: "bg-amber-100 text-amber-700" }
-      : spec?.subType === "basal"
-        ? { ar: "فورية (قاعدية)", en: "Immediate (Basal)", tone: "bg-emerald-100 text-emerald-700" }
-        : { ar: "فورية", en: "Immediate", tone: "bg-emerald-100 text-emerald-700" };
-  const accessories = product.accessories ?? [];
 
   const fmtPrice = (p: Product) => {
     const isIQD = p.currency === "IQD";
@@ -1663,6 +1653,100 @@ function ImplantDetailView({
     const sym = isIQD ? "د.ع" : "$";
     return isIQD ? `${val} ${sym}` : `${sym}${val}`;
   };
+
+  // Sizes: pull diameters & lengths from the stock matrix (only sizes that
+  // actually have stock entries); fall back to legacy lists if no matrix.
+  const dimensionStocks = spec?.dimensionStocks ?? [];
+  const diameters = useMemo(() => {
+    if (dimensionStocks.length > 0) {
+      return [...new Set(dimensionStocks.map((s) => Number(s.diameter)))];
+    }
+    return spec?.diameters ?? [];
+  }, [dimensionStocks, spec?.diameters]);
+  const lengths = useMemo(() => {
+    if (dimensionStocks.length > 0) {
+      return [...new Set(dimensionStocks.map((s) => Number(s.length)))];
+    }
+    return spec?.lengths ?? [];
+  }, [dimensionStocks, spec?.lengths]);
+  const [selectedDiameter, setSelectedDiameter] = useState<number | null>(null);
+  const [selectedLength, setSelectedLength] = useState<number | null>(null);
+  const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
+
+  const selectedStock = useMemo(() => {
+    if (selectedDiameter == null || selectedLength == null) return null;
+    const match = dimensionStocks.find(
+      (s) => Number(s.diameter) === Number(selectedDiameter) && Number(s.length) === Number(selectedLength),
+    );
+    return match ? match.quantity : 0;
+  }, [selectedDiameter, selectedLength, dimensionStocks]);
+
+  // Group accessories by their category so multiple items of the same type
+  // (e.g. several Abutments) are listed under a single category header.
+  const accessories = product.accessories ?? [];
+  const categoryIdOf = (type: string): string =>
+    LEGACY_TYPE_MAP[type] ??
+    ACCESSORY_CATEGORIES.find((c) => c.en === type)?.id ??
+    type;
+  const groupedAccessories = useMemo(() => {
+    const map: Record<string, ProductAccessory[]> = {};
+    for (const acc of accessories) {
+      const id = categoryIdOf(acc.type);
+      if (!map[id]) map[id] = [];
+      map[id].push(acc);
+    }
+    return map;
+  }, [accessories]);
+  const orderedCategoryIds = useMemo(() => {
+    const ids = ACCESSORY_CATEGORIES.map((c) => c.id).filter((id) => groupedAccessories[id]?.length);
+    for (const id of Object.keys(groupedAccessories)) {
+      if (!ids.includes(id)) ids.push(id);
+    }
+    return ids;
+  }, [groupedAccessories]);
+  const categoryLabelOf = (id: string) => {
+    const c = ACCESSORY_CATEGORIES.find((cc) => cc.id === id);
+    if (c) return ar ? c.ar : c.en;
+    return id;
+  };
+
+  const fmtAccessoryPrice = (acc: ProductAccessory) =>
+    acc.currency === "IQD"
+      ? `${Number(acc.price).toLocaleString()} د.ع`
+      : `$${Number(acc.price).toFixed(2)}`;
+
+  const toggleCategory = (id: string) => {
+    setExpandedCats((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const renderAccessoryCard = (acc: ProductAccessory, i: number, extraClass?: string) => (
+    <div
+      key={`${acc.name}-${i}`}
+      className={cn("bg-card border border-border rounded-2xl p-3 shadow-soft", extraClass)}
+    >
+      <div className="aspect-square rounded-xl bg-slate-100 overflow-hidden mb-2.5 flex items-center justify-center">
+        {acc.imageUrl && accImageUrlMap[acc.imageUrl] ? (
+          <img src={accImageUrlMap[acc.imageUrl]} alt={acc.name} className="size-full object-cover" />
+        ) : (
+          <Package className="size-8 text-slate-300" />
+        )}
+      </div>
+      <p className="text-sm font-bold truncate">{acc.name}</p>
+      {acc.specs && (
+        <span className="inline-block mt-1.5 text-[10px] font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md truncate max-w-full">
+          {acc.specs}
+        </span>
+      )}
+      {acc.price > 0 && (
+        <p className="mt-1.5 text-sm font-display font-bold text-primary">{fmtAccessoryPrice(acc)}</p>
+      )}
+    </div>
+  );
 
   return (
     <div className="space-y-4">
@@ -1740,38 +1824,152 @@ function ImplantDetailView({
         {product.brand && (
           <p className="text-sm text-muted-foreground mt-1">{product.brand}</p>
         )}
-        <div className="flex items-end justify-between mt-3">
-          <p className="font-display font-extrabold text-2xl text-primary">{fmtPrice(product)}</p>
-          <p className="text-xs text-muted-foreground">
-            {ar ? "المخزون" : "Stock"}: {product.stock}
+        <p className="font-display font-extrabold text-2xl text-primary mt-3">
+          {fmtPrice(product)}
+        </p>
+
+        {product.description && (
+          <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
+            {product.description}
           </p>
-        </div>
-        <div className="flex flex-wrap gap-2 mt-3">
-          {country && (
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold bg-slate-100 text-slate-700 px-2.5 py-1 rounded-full border border-slate-200">
-              <span className="text-sm leading-none">{countryCodeToFlag(country.code)}</span>
-              {ar ? country.ar : country.en} ({country.code})
-            </span>
-          )}
-          {spec?.implantType && (
-            <span className={cn("text-[11px] font-bold px-2.5 py-1 rounded-full", typeLabel.tone)}>
-              {ar ? typeLabel.ar : typeLabel.en}
-            </span>
-          )}
-          <span
-            className={cn(
-              "text-[11px] font-bold px-2.5 py-1 rounded-full",
-              product.inStock ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700",
-            )}
-          >
-            {product.inStock ? (ar ? "متوفر" : "In Stock") : ar ? "غير متوفر" : "Out of Stock"}
-          </span>
+        )}
+
+        <div className="grid grid-cols-2 gap-3 mt-4">
+          <div className="bg-[#F5FAFE] border border-[#D3E8F7] rounded-2xl px-4 py-3">
+            <p className="text-[11px] font-semibold text-[#7A94A8]">
+              {ar ? "الشركة المصنعة" : "Manufacturer"}
+            </p>
+            <p className="font-display font-bold text-sm text-[#17324A] mt-1 truncate">
+              {product.brand || (ar ? "غير محدد" : "N/A")}
+            </p>
+          </div>
+          <div className="bg-[#F5FAFE] border border-[#D3E8F7] rounded-2xl px-4 py-3">
+            <p className="text-[11px] font-semibold text-[#7A94A8]">
+              {ar ? "بلد المنشأ" : "Country of Origin"}
+            </p>
+            <p className="font-display font-bold text-sm text-[#17324A] mt-1 flex items-center gap-1.5 truncate">
+              {country ? (
+                <>
+                  <span className="text-base leading-none">{countryCodeToFlag(country.code)}</span>
+                  {ar ? country.ar : country.en}
+                </>
+              ) : (
+                ar ? "غير محدد" : "N/A"
+              )}
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Attached accessories */}
-      <div>
-        <h3 className="font-display font-bold text-base mb-3">
+      {/* Sizes: select diameter & length to view availability */}
+      {diameters.length > 0 || lengths.length > 0 ? (
+        <div className="bg-card border border-border rounded-3xl p-5 shadow-card space-y-4">
+          <div className="flex items-center gap-2">
+            <Ruler className="size-4 text-primary" />
+            <h3 className="font-display font-bold text-base">
+              {ar ? "الأقطار والأطوال" : "Diameters & Lengths"}
+            </h3>
+          </div>
+
+          {diameters.length > 0 && (
+            <div>
+              <label className="text-xs font-semibold text-[#17324A] mb-2 block">
+                {ar ? "القطر (mm):" : "Diameter (mm):"}
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {diameters.map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => setSelectedDiameter(selectedDiameter === d ? null : d)}
+                    className={cn(
+                      "h-11 px-4 rounded-xl text-sm font-bold border transition flex items-center gap-1.5",
+                      selectedDiameter === d
+                        ? "bg-[#2E93E0] text-white border-[#2E93E0] shadow-sm"
+                        : "bg-[#F5FAFE] border-[#D3E8F7] text-[#17324A] hover:border-[#2E93E0]",
+                    )}
+                  >
+                    {selectedDiameter === d && <Check className="size-4" />}
+                    <span dir="ltr">{d}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {lengths.length > 0 && (
+            <div>
+              <label className="text-xs font-semibold text-[#17324A] mb-2 block">
+                {ar ? "الطول (mm):" : "Length (mm):"}
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {lengths.map((l) => (
+                  <button
+                    key={l}
+                    type="button"
+                    onClick={() => setSelectedLength(selectedLength === l ? null : l)}
+                    className={cn(
+                      "h-11 px-4 rounded-xl text-sm font-bold border transition flex items-center gap-1.5",
+                      selectedLength === l
+                        ? "bg-[#2E93E0] text-white border-[#2E93E0] shadow-sm"
+                        : "bg-[#F5FAFE] border-[#D3E8F7] text-[#17324A] hover:border-[#2E93E0]",
+                    )}
+                  >
+                    {selectedLength === l && <Check className="size-4" />}
+                    <span dir="ltr">{l}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div
+            className={cn(
+              "rounded-2xl px-4 py-3.5 flex items-center gap-3",
+              selectedStock == null
+                ? "bg-[#F5FAFE] border border-[#D3E8F7]"
+                : selectedStock > 0
+                  ? "bg-emerald-50 border border-emerald-200"
+                  : "bg-rose-50 border border-rose-200",
+            )}
+          >
+            <Package
+              className={cn(
+                "size-5 shrink-0",
+                selectedStock == null
+                  ? "text-[#7A94A8]"
+                  : selectedStock > 0
+                    ? "text-emerald-600"
+                    : "text-rose-500",
+              )}
+            />
+            {selectedStock == null ? (
+              <p className="text-sm text-[#7A94A8]">
+                {ar
+                  ? "اختر القطر والطول لعرض الكمية المتوفرة"
+                  : "Select a diameter and length to view available quantity"}
+              </p>
+            ) : (
+              <p className="text-sm font-semibold text-[#17324A]">
+                {ar ? "الكمية المتوفرة:" : "Available quantity:"}{" "}
+                <span
+                  dir="ltr"
+                  className={cn(
+                    "font-display font-extrabold text-lg",
+                    selectedStock > 0 ? "text-emerald-700" : "text-rose-600",
+                  )}
+                >
+                  {selectedStock}
+                </span>
+              </p>
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Accessories grouped by category */}
+      <div className="space-y-5">
+        <h3 className="font-display font-bold text-base">
           {ar ? "الإكسسوارات الملحقة" : "Attached Accessories"}
         </h3>
         {accessories.length === 0 ? (
@@ -1779,46 +1977,45 @@ function ImplantDetailView({
             {ar ? "لا توجد إكسسوارات ملحقة" : "No attached accessories"}
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
-            {accessories.map((acc, i) => (
-              <div
-                key={`${acc.name}-${i}`}
-                className="bg-card border border-border rounded-2xl p-3 shadow-soft"
-              >
-                <div className="aspect-square rounded-xl bg-slate-100 overflow-hidden mb-2.5 flex items-center justify-center">
-                  {acc.imageUrl && accImageUrlMap[acc.imageUrl] ? (
-                    <img
-                      src={accImageUrlMap[acc.imageUrl]}
-                      alt={acc.name}
-                      className="size-full object-cover"
-                    />
-                  ) : (
-                    <Package className="size-8 text-slate-300" />
-                  )}
-                </div>
-                <p className="text-sm font-bold truncate">{acc.name}</p>
-                <div className="flex flex-wrap gap-1.5 mt-1.5">
-                  <span className="inline-block text-[10px] font-semibold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md">
-                    {categoryLabel(acc)}
-                  </span>
-                  {acc.specs && (
-                    <span className="inline-block text-[10px] font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
-                      {acc.specs}
+          orderedCategoryIds.map((catId) => {
+            const items = groupedAccessories[catId];
+            const expanded = expandedCats.has(catId);
+            return (
+              <div key={catId} className="space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="h-4 w-1 rounded-full bg-[#2E93E0] shrink-0" />
+                    <h4 className="font-display font-bold text-sm text-[#17324A] truncate">
+                      {categoryLabelOf(catId)}
+                    </h4>
+                    <span className="text-[11px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-md shrink-0">
+                      {items.length}
                     </span>
-                  )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => toggleCategory(catId)}
+                    className="text-[11px] font-bold text-[#2E93E0] hover:text-[#1C6FB5] transition shrink-0"
+                  >
+                    {expanded ? (ar ? "عرض أقل" : "Show less") : (ar ? "عرض الكل" : "View all")}
+                  </button>
                 </div>
-                {acc.price > 0 && (
-                  <p className="mt-2 text-sm font-display font-bold text-primary">
-                    {acc.currency === "IQD"
-                      ? `${acc.price.toLocaleString()} د.ع`
-                      : `$${acc.price.toFixed(2)}`}
-                  </p>
+                {expanded ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    {items.map((acc, i) => renderAccessoryCard(acc, i))}
+                  </div>
+                ) : (
+                  <div className="flex gap-3 overflow-x-auto -mx-4 px-4 pb-1 scrollbar-hide">
+                    {items.map((acc, i) => renderAccessoryCard(acc, i, "w-40 shrink-0"))}
+                  </div>
                 )}
               </div>
-            ))}
-          </div>
+            );
+          })
         )}
       </div>
+
+
 
       {/* Zoom preview */}
       {zoomOpen && urls.length > 0 && (
