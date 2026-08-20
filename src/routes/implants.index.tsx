@@ -5,7 +5,6 @@ import { doc, updateDoc } from "firebase/firestore";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { RoleGuard } from "@/components/RoleGuard";
-import { TagInput } from "@/components/TagInput";
 import { BoneGraftModal } from "@/components/BoneGraftModal";
 import { NotificationBell } from "@/components/NotificationBell";
 import { COUNTRIES, SURGICAL_GUIDE_COMPANIES, IMPLANTS } from "@/data/implants";
@@ -224,6 +223,20 @@ type AccessoryRow = {
   currency: Currency;
 };
 
+type VariantRow = {
+  key: string;
+  diameter: string;
+  length: string;
+  stock: string;
+};
+
+const emptyVariant = (): VariantRow => ({
+  key: crypto.randomUUID(),
+  diameter: "",
+  length: "",
+  stock: "0",
+});
+
 const LEGACY_TYPE_MAP: Record<string, string> = {
   Abutment: "abutment",
   "Healing Screw": "healing-cover",
@@ -339,14 +352,11 @@ function ImplantProductsPanel() {
   const [line, setLine] = useState("");
   const [accessoryCategory, setAccessoryCategory] = useState("");
   const [accessorySubType, setAccessorySubType] = useState("");
-  const [selectedDiameters, setSelectedDiameters] = useState<string[]>([]);
-  const [selectedLengths, setSelectedLengths] = useState<string[]>([]);
-  const [dimensionStocks, setDimensionStocks] = useState<Record<string, string>>({});
+  const [variants, setVariants] = useState<VariantRow[]>([emptyVariant()]);
   const [accessoryRows, setAccessoryRows] = useState<AccessoryRow[]>([]);
   const [price, setPrice] = useState("");
   const [currency, setCurrency] = useState<Currency>("USD");
   const [minOrderQty, setMinOrderQty] = useState("");
-  const [stock, setStock] = useState("100");
   const [description, setDescription] = useState("");
   const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
   const [attachmentNames, setAttachmentNames] = useState<string[]>([]);
@@ -372,14 +382,11 @@ function ImplantProductsPanel() {
     setLine("");
     setAccessoryCategory("");
     setAccessorySubType("");
-    setSelectedDiameters([]);
-    setSelectedLengths([]);
-    setDimensionStocks({});
+    setVariants([emptyVariant()]);
     setAccessoryRows([]);
     setPrice("");
     setCurrency("USD");
     setMinOrderQty("");
-    setStock("100");
     setDescription("");
     setAttachmentFiles([]);
     setAttachmentNames([]);
@@ -410,15 +417,22 @@ function ImplantProductsPanel() {
     setLine(p.implantSpec?.connectionType || "");
     setAccessoryCategory("");
     setAccessorySubType(p.productType === "accessory" ? p.ar : "");
-    setSelectedDiameters((p.implantSpec?.diameters ?? []).map(String));
-    setSelectedLengths((p.implantSpec?.lengths ?? []).map(String));
-    setDimensionStocks(
-      Object.fromEntries(
-        (p.implantSpec?.dimensionStocks ?? []).map((s) => [
-          `${s.diameter}x${s.length}`,
-          String(s.quantity),
-        ]),
-      ),
+    const srcVariants = (
+      p.implantSpec?.variants ?? p.implantSpec?.dimensionStocks ?? []
+    ).map((v) => ({
+      diameter: Number(v.diameter) || 0,
+      length: Number(v.length) || 0,
+      stock: Number((v as { stock?: number }).stock ?? (v as { quantity?: number }).quantity ?? 0),
+    }));
+    setVariants(
+      srcVariants.length > 0
+        ? srcVariants.map((v) => ({
+            key: crypto.randomUUID(),
+            diameter: v.diameter ? String(v.diameter) : "",
+            length: v.length ? String(v.length) : "",
+            stock: String(v.stock),
+          }))
+        : [emptyVariant()],
     );
     setAccessoryRows(
       (p.accessories || []).map((a) => ({
@@ -434,7 +448,6 @@ function ImplantProductsPanel() {
       })),
     );
     setPrice(p.price ? String(p.price) : "");
-    setStock(p.stock ? String(p.stock) : "100");
     setCurrency(p.currency || "USD");
     setMinOrderQty("");
     setDescription(p.description || "");
@@ -468,6 +481,18 @@ function ImplantProductsPanel() {
     if (!editing) return;
     await removeProductImage(path);
     setEditing({ ...editing, images: editing.images.filter((img) => img !== path) });
+  };
+
+  const updateVariant = (key: string, field: "diameter" | "length" | "stock", value: string) => {
+    setVariants((prev) => prev.map((v) => (v.key === key ? { ...v, [field]: value } : v)));
+  };
+
+  const addVariant = () => {
+    setVariants((prev) => [...prev, emptyVariant()]);
+  };
+
+  const removeVariant = (key: string) => {
+    setVariants((prev) => (prev.length > 1 ? prev.filter((v) => v.key !== key) : prev));
   };
 
   const submit = async () => {
@@ -541,17 +566,19 @@ function ImplantProductsPanel() {
             currency: a.currency,
           }));
 
-        const dimensionStocksArr = selectedDiameters
-          .flatMap((d) =>
-            selectedLengths.map((l) => ({
-              diameter: Number(d),
-              length: Number(l),
-              quantity: Math.max(0, parseInt(dimensionStocks[`${d}x${l}`] || "0") || 0),
-            })),
-          )
-          .filter((s) => s.quantity > 0);
-        const dimensionTotal = dimensionStocksArr.reduce((sum, s) => sum + s.quantity, 0);
-        const finalStock = dimensionTotal > 0 ? dimensionTotal : Math.max(0, parseInt(stock) || 0);
+        const variantsArr = variants
+          .map((v) => ({
+            diameter: Number(v.diameter),
+            length: Number(v.length),
+            stock: Math.max(0, parseInt(v.stock || "0") || 0),
+          }))
+          .filter(
+            (v) =>
+              !isNaN(v.diameter) && v.diameter > 0 && !isNaN(v.length) && v.length > 0,
+          );
+        const totalStock = variantsArr.reduce((sum, v) => sum + v.stock, 0);
+        const uniqueDiameters = [...new Set(variantsArr.map((v) => v.diameter))];
+        const uniqueLengths = [...new Set(variantsArr.map((v) => v.length))];
 
         await upsert.mutateAsync({
           id: productId,
@@ -561,8 +588,8 @@ function ImplantProductsPanel() {
           brand: finalBrand,
           price: Math.max(0, parseFloat(price) || 0),
           currency,
-          stock: finalStock,
-          inStock: finalStock > 0,
+          stock: totalStock,
+          inStock: totalStock > 0,
           images: [...(editing?.images ?? []), ...uploadedPaths],
           category: "implant",
           country,
@@ -573,13 +600,9 @@ function ImplantProductsPanel() {
             implantType: implantCategory === "non_immediate" ? "non-immediate" : "immediate",
             subType: implantCategory === "basal" ? "basal" : undefined,
             connectionType: line.trim() || undefined,
-            diameters: selectedDiameters.length > 0
-              ? selectedDiameters.map(Number).filter((n) => !isNaN(n) && n > 0)
-              : undefined,
-            lengths: selectedLengths.length > 0
-              ? selectedLengths.map(Number).filter((n) => !isNaN(n) && n > 0)
-              : undefined,
-            dimensionStocks: dimensionStocksArr.length > 0 ? dimensionStocksArr : undefined,
+            diameters: uniqueDiameters.length > 0 ? uniqueDiameters : undefined,
+            lengths: uniqueLengths.length > 0 ? uniqueLengths : undefined,
+            variants: variantsArr.length > 0 ? variantsArr : undefined,
           },
           accessories: savedAccessories.length > 0 ? savedAccessories : undefined,
           productType: "main_implant",
@@ -988,109 +1011,70 @@ function ImplantProductsPanel() {
                   <div className="md:col-span-2 space-y-4">
                     <div>
                       <label className="text-xs font-semibold text-[#17324A] mb-2 block">
-                        {ar ? "الأقطار فقط:" : "Diameters only:"}
+                        {ar ? "القياسات المتوفرة" : "Available Sizes"}
                       </label>
-                      <TagInput
-                        value={selectedDiameters}
-                        onChange={setSelectedDiameters}
-                        prefix="Ø"
-                        placeholder="3.3"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-semibold text-[#17324A] mb-2 block">
-                        {ar ? "الأطوال فقط:" : "Lengths only:"}
-                      </label>
-                      <TagInput
-                        value={selectedLengths}
-                        onChange={setSelectedLengths}
-                        prefix="mm"
-                        placeholder="10"
-                      />
-                    </div>
-
-                    {selectedDiameters.length > 0 || selectedLengths.length > 0 ? (
-                      <div className="bg-[#E7F4FE] border border-[#BFE1F7] rounded-xl px-4 py-2.5 flex items-center gap-2">
-                        <div className="size-2 rounded-full bg-[#2E93E0] animate-pulse shrink-0" />
-                        <span className="text-sm font-semibold text-[#1C6FB5]">
-                          {ar ? "المقاس المحدد:" : "Selected size:"}{" "}
-                          {selectedDiameters.length > 0
-                            ? `${ar ? "قطر" : "Ø"} ${[...selectedDiameters].sort((a, b) => Number(a) - Number(b)).join(" / ")} mm`
-                            : ""}
-                          {selectedDiameters.length > 0 && selectedLengths.length > 0 ? " × " : ""}
-                          {selectedLengths.length > 0
-                            ? `${ar ? "طول" : "L"} ${[...selectedLengths].sort((a, b) => Number(a) - Number(b)).join(" / ")} mm`
-                            : ""}
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="bg-[#F5FAFE] border border-[#D3E8F7] rounded-xl px-4 py-2.5">
-                        <span className="text-sm text-[#7A94A8]">
-                          {ar ? "أدخل قطرًا وطولًا للزرعة" : "Enter implant diameter and length"}
-                        </span>
-                      </div>
-                    )}
-
-                    {selectedDiameters.length > 0 && selectedLengths.length > 0 && (
-                      <div>
-                        <label className="text-xs font-semibold text-[#17324A] mb-2 block">
-                          {ar ? "الكمية المتوفرة لكل مقاس" : "Available Quantity per Size"}
-                        </label>
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-xs border-collapse">
-                            <thead>
-                              <tr>
-                                <th className="border border-[#D3E8F7] bg-[#F5FAFE] px-2 py-2 text-[#17324A] font-bold whitespace-nowrap">
-                                  {ar ? "القطر \\ الطول" : "Ø \\ L"}
-                                </th>
-                                {[...selectedLengths]
-                                  .sort((a, b) => Number(a) - Number(b))
-                                  .map((l) => (
-                                    <th
-                                      key={l}
-                                      className="border border-[#D3E8F7] bg-[#F5FAFE] px-2 py-2 text-[#17324A] font-bold whitespace-nowrap"
-                                    >
-                                      {l}
-                                    </th>
-                                  ))}
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {[...selectedDiameters]
-                                .sort((a, b) => Number(a) - Number(b))
-                                .map((d) => (
-                                  <tr key={d}>
-                                    <td className="border border-[#D3E8F7] bg-[#F5FAFE] px-2 py-2 text-center font-bold text-[#17324A] whitespace-nowrap">
-                                      {d}
-                                    </td>
-                                    {[...selectedLengths]
-                                      .sort((a, b) => Number(a) - Number(b))
-                                      .map((l) => (
-                                        <td key={`${d}-${l}`} className="border border-[#D3E8F7] p-1">
-                                          <input
-                                            type="number"
-                                            min="0"
-                                            dir="ltr"
-                                            placeholder="0"
-                                            value={dimensionStocks[`${d}x${l}`] ?? ""}
-                                            onChange={(e) =>
-                                              setDimensionStocks((prev) => ({
-                                                ...prev,
-                                                [`${d}x${l}`]: e.target.value,
-                                              }))
-                                            }
-                                            className="w-full h-9 rounded-lg bg-white border border-[#D3E8F7] px-2 text-center text-[11px] outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
-                                          />
-                                        </td>
-                                      ))}
-                                  </tr>
-                                ))}
-                            </tbody>
-                          </table>
+                      <div className="space-y-2.5">
+                        <div className="grid grid-cols-[1fr_1fr_1fr_44px] gap-2 px-1 text-[10px] font-bold text-[#7A94A8]">
+                          <span>{ar ? "القطر (Ø mm)" : "Diameter (Ø mm)"}</span>
+                          <span>{ar ? "الطول (mm)" : "Length (mm)"}</span>
+                          <span>{ar ? "الكمية المتوفرة" : "Available Qty"}</span>
+                          <span />
                         </div>
+                        {variants.map((v) => (
+                          <div
+                            key={v.key}
+                            className="grid grid-cols-[1fr_1fr_1fr_44px] gap-2 items-center"
+                          >
+                            <input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              dir="ltr"
+                              placeholder="3.3"
+                              value={v.diameter}
+                              onChange={(e) => updateVariant(v.key, "diameter", e.target.value)}
+                              className="w-full h-11 rounded-lg bg-white border border-[#D3E8F7] px-3 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
+                            />
+                            <input
+                              type="number"
+                              step="0.5"
+                              min="0"
+                              dir="ltr"
+                              placeholder="10"
+                              value={v.length}
+                              onChange={(e) => updateVariant(v.key, "length", e.target.value)}
+                              className="w-full h-11 rounded-lg bg-white border border-[#D3E8F7] px-3 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
+                            />
+                            <input
+                              type="number"
+                              min="0"
+                              dir="ltr"
+                              placeholder="0"
+                              value={v.stock}
+                              onChange={(e) => updateVariant(v.key, "stock", e.target.value)}
+                              className="w-full h-11 rounded-lg bg-white border border-[#D3E8F7] px-3 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeVariant(v.key)}
+                              disabled={variants.length <= 1}
+                              className="size-11 rounded-lg border border-rose-200 text-rose-500 hover:bg-rose-50 flex items-center justify-center transition disabled:opacity-30"
+                              aria-label={ar ? "حذف القياس" : "Delete size"}
+                            >
+                              <Trash2 className="size-4" />
+                            </button>
+                          </div>
+                        ))}
                       </div>
-                    )}
+                      <button
+                        type="button"
+                        onClick={addVariant}
+                        className="mt-2.5 w-full h-11 rounded-xl border-2 border-dashed border-[#BFE1F7] bg-white text-[#2E93E0] text-sm font-bold flex items-center justify-center gap-1.5 hover:bg-sky-50/40 transition"
+                      >
+                        <Plus className="size-4" />
+                        {ar ? "إضافة قياس جديد" : "Add New Size"}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1334,26 +1318,6 @@ function ImplantProductsPanel() {
                   dir="ltr"
                   className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
                 />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-                  {ar ? "إجمالي الكمية المتوفرة (اختياري)" : "Total Available Quantity (Optional)"}
-                </label>
-                <input
-                  type="number"
-                  value={stock}
-                  onChange={(e) => setStock(e.target.value)}
-                  placeholder="100"
-                  min="0"
-                  dir="ltr"
-                  className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
-                />
-                <p className="text-[10px] text-[#7A94A8] mt-1">
-                  {ar
-                    ? "يُحتسب تلقائياً من كميات المقاسات أعلاه إن وُجدت"
-                    : "Auto-calculated from the per-size quantities above if set"}
-                </p>
               </div>
             </div>
 
@@ -1654,32 +1618,51 @@ function ImplantDetailView({
     return isIQD ? `${val} ${sym}` : `${sym}${val}`;
   };
 
-  // Sizes: pull diameters & lengths from the stock matrix (only sizes that
-  // actually have stock entries); fall back to legacy lists if no matrix.
-  const dimensionStocks = spec?.dimensionStocks ?? [];
+  // Sizes: pull diameters & lengths from the variants matrix (only sizes that
+  // actually have stock entries); fall back to legacy dimensionStocks/lists.
+  const stockMatrix = useMemo(() => {
+    const v = spec?.variants ?? [];
+    if (v.length > 0) {
+      return v.map((x) => ({
+        diameter: Number(x.diameter),
+        length: Number(x.length),
+        quantity: Number(x.stock),
+      }));
+    }
+    const ds = spec?.dimensionStocks ?? [];
+    if (ds.length > 0) {
+      return ds.map((x) => ({
+        diameter: Number(x.diameter),
+        length: Number(x.length),
+        quantity: Number(x.quantity),
+      }));
+    }
+    return [];
+  }, [spec?.variants, spec?.dimensionStocks]);
+
   const diameters = useMemo(() => {
-    if (dimensionStocks.length > 0) {
-      return [...new Set(dimensionStocks.map((s) => Number(s.diameter)))];
+    if (stockMatrix.length > 0) {
+      return [...new Set(stockMatrix.map((s) => s.diameter))];
     }
     return spec?.diameters ?? [];
-  }, [dimensionStocks, spec?.diameters]);
+  }, [stockMatrix, spec?.diameters]);
   const lengths = useMemo(() => {
-    if (dimensionStocks.length > 0) {
-      return [...new Set(dimensionStocks.map((s) => Number(s.length)))];
+    if (stockMatrix.length > 0) {
+      return [...new Set(stockMatrix.map((s) => s.length))];
     }
     return spec?.lengths ?? [];
-  }, [dimensionStocks, spec?.lengths]);
+  }, [stockMatrix, spec?.lengths]);
   const [selectedDiameter, setSelectedDiameter] = useState<number | null>(null);
   const [selectedLength, setSelectedLength] = useState<number | null>(null);
   const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
 
   const selectedStock = useMemo(() => {
     if (selectedDiameter == null || selectedLength == null) return null;
-    const match = dimensionStocks.find(
-      (s) => Number(s.diameter) === Number(selectedDiameter) && Number(s.length) === Number(selectedLength),
+    const match = stockMatrix.find(
+      (s) => s.diameter === Number(selectedDiameter) && s.length === Number(selectedLength),
     );
     return match ? match.quantity : 0;
-  }, [selectedDiameter, selectedLength, dimensionStocks]);
+  }, [selectedDiameter, selectedLength, stockMatrix]);
 
   // Group accessories by their category so multiple items of the same type
   // (e.g. several Abutments) are listed under a single category header.
