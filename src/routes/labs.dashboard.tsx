@@ -6,7 +6,7 @@ import { onSnapshot, doc } from "firebase/firestore";
 import { useI18n } from "@/lib/i18n";
 import { useSession } from "@/lib/useAuth";
 import { cn } from "@/lib/utils";
-import { NewOrderModal, type NewOrder } from "@/components/NewOrderModal";
+import { CombinedLabOrderModal, type CombinedLabOrder } from "@/components/CombinedLabOrderModal";
 import { EditOrderModal } from "@/components/EditOrderModal";
 import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
 import { toast } from "sonner";
@@ -290,29 +290,35 @@ function LabDashboard() {
     setSelectedOrder((prev) => (prev?.id === id ? { ...prev, status: newStatus } : prev));
   };
 
-  const handleCreateOrder = (newOrder: NewOrder) => {
-    const units = newOrder.unitsCount || 0;
-    const price = newOrder.unitPrice || 0;
-    const disc = newOrder.discount || 0;
-    const total = Math.max(0, units * price - disc);
+  const handleCreateOrder = (o: CombinedLabOrder) => {
+    const materialLabel: Record<string, string> = {
+      zirconia: "زيركون",
+      emax: "إيماكس",
+      pfm: "سيراميك على معدن",
+      build_up: "طبقات",
+    };
+    const units = o.unitsCount || 0;
+    const price = o.unitPriceIQD || 0;
+    const disc = o.discountAmountIQD || 0;
+    const total = Math.max(0, o.finalTotalIQD);
     addOrder({
       id: crypto.randomUUID(),
       orderNumber: getNextOrderNumber(),
       caseId: getNextCaseId(),
       receivedDate: new Date().toISOString(),
-      dueDate: newOrder.date,
-      patient: newOrder.patient,
-      doctor: newOrder.dentist,
-      workType: newOrder.workType,
+      dueDate: o.deliveryDate,
+      patient: o.patientName,
+      doctor: o.doctorName,
+      workType: materialLabel[o.material] ?? o.material,
       status: "delayed",
-      agent: newOrder.agent,
+      agent: "",
       unitsCount: units,
       unitPrice: price,
-      currency: newOrder.currency,
+      currency: "IQD",
       discount: disc,
       price: total,
-      notes: newOrder.notes,
-      clinic: newOrder.clinic,
+      notes: o.notes,
+      clinic: o.clinicName,
     });
   };
 
@@ -820,7 +826,7 @@ function LabDashboard() {
       )}
 
       {/* New Order Modal */}
-      <NewOrderModal
+      <CombinedLabOrderModal
         open={showNewOrder}
         onClose={() => setShowNewOrder(false)}
         onSubmit={handleCreateOrder}

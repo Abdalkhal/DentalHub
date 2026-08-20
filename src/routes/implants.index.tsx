@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { doc, updateDoc } from "firebase/firestore";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
@@ -17,6 +18,7 @@ import {
   useSignedImageUrls,
   MAX_PRODUCT_IMAGES,
   COUNTRY_CODE_TO_SLUG,
+  productsQueryKey,
   type Product,
   type ProductAccessory,
   type Currency,
@@ -52,6 +54,7 @@ import {
   Paperclip,
   Settings,
   SlidersHorizontal,
+  ChevronLeft,
   ChevronRight,
   Bone,
   Stethoscope,
@@ -219,20 +222,6 @@ type AccessoryRow = {
   currency: Currency;
 };
 
-function emptyAccessory(): AccessoryRow {
-  return {
-    key: crypto.randomUUID(),
-    imageFile: null,
-    imagePreview: "",
-    existingImageUrl: "",
-    type: "",
-    subType: "",
-    specs: "",
-    price: "",
-    currency: "USD",
-  };
-}
-
 const LEGACY_TYPE_MAP: Record<string, string> = {
   Abutment: "abutment",
   "Healing Screw": "healing-cover",
@@ -327,6 +316,7 @@ function ImplantProductsPanel() {
   const { data: allProducts = [], isLoading } = useProducts();
   const upsert = useUpsertProduct();
   const remove = useDeleteProduct();
+  const queryClient = useQueryClient();
 
   const companyId = auth.currentUser?.uid ?? "";
 
@@ -349,6 +339,7 @@ function ImplantProductsPanel() {
   const [accessorySubType, setAccessorySubType] = useState("");
   const [selectedDiameters, setSelectedDiameters] = useState<string[]>([]);
   const [selectedLengths, setSelectedLengths] = useState<string[]>([]);
+  const [dimensionStocks, setDimensionStocks] = useState<Record<string, string>>({});
   const [accessoryRows, setAccessoryRows] = useState<AccessoryRow[]>([]);
   const [price, setPrice] = useState("");
   const [currency, setCurrency] = useState<Currency>("USD");
@@ -381,6 +372,7 @@ function ImplantProductsPanel() {
     setAccessorySubType("");
     setSelectedDiameters([]);
     setSelectedLengths([]);
+    setDimensionStocks({});
     setAccessoryRows([]);
     setPrice("");
     setCurrency("USD");
@@ -418,6 +410,14 @@ function ImplantProductsPanel() {
     setAccessorySubType(p.productType === "accessory" ? p.ar : "");
     setSelectedDiameters((p.implantSpec?.diameters ?? []).map(String));
     setSelectedLengths((p.implantSpec?.lengths ?? []).map(String));
+    setDimensionStocks(
+      Object.fromEntries(
+        (p.implantSpec?.dimensionStocks ?? []).map((s) => [
+          `${s.diameter}x${s.length}`,
+          String(s.quantity),
+        ]),
+      ),
+    );
     setAccessoryRows(
       (p.accessories || []).map((a) => ({
         key: crypto.randomUUID(),
@@ -471,74 +471,120 @@ function ImplantProductsPanel() {
   const submit = async () => {
     setFormError("");
     if (!name.trim()) {
-      setFormError(ar ? "الرجاء إدخال اسم الزرعة" : "Please enter the implant name");
+      setFormError(ar ? "الرجاء إدخال اسم المنتج" : "Please enter the product name");
       return;
     }
-    if (!brand.trim()) {
+    if (productType !== "accessory" && !brand.trim()) {
       setFormError(ar ? "الرجاء إدخال اسم الشركة" : "Please enter the company name");
       return;
     }
 
+    const parentImplant =
+      productType === "accessory" && parentId
+        ? implantProducts.find((p) => p.id === parentId)
+        : undefined;
+    const finalBrand =
+      productType === "accessory" ? (parentImplant?.brand || "") : brand.trim();
+
     setBusy(true);
     try {
-      const productId = editing?.id ?? crypto.randomUUID();
-
-      const uploadedPaths: string[] = [];
-      for (const file of imageFiles) {
-        try {
-          uploadedPaths.push(await uploadProductImage(productId, file));
-        } catch {
+      if (productType === "accessory") {
+        if (!parentId || !parentImplant) {
           setBusy(false);
+          setFormError(ar ? "الرجاء اختيار الزرعة الأساسية" : "Please select the main implant");
           return;
         }
+        let imageUrl = "";
+        for (const file of imageFiles) {
+          try {
+            imageUrl = await uploadProductImage(parentId, file);
+          } catch {
+            setBusy(false);
+            return;
+          }
+        }
+        const newAccessory: ProductAccessory = {
+          type: ACCESSORY_CATEGORIES.find((c) => c.id === accessoryCategory)?.en ?? accessoryCategory,
+          name: name.trim(),
+          specs: "",
+          price: 0,
+          imageUrl,
+          currency: "USD",
+        };
+        await updateDoc(doc(db, "products", parentId), {
+          accessories: [...(parentImplant.accessories ?? []), newAccessory],
+        });
+        queryClient.invalidateQueries({ queryKey: productsQueryKey });
+      } else {
+        const productId = editing?.id ?? crypto.randomUUID();
+
+        const uploadedPaths: string[] = [];
+        for (const file of imageFiles) {
+          try {
+            uploadedPaths.push(await uploadProductImage(productId, file));
+          } catch {
+            setBusy(false);
+            return;
+          }
+        }
+
+        const savedAccessories: ProductAccessory[] = accessoryRows
+          .filter((a) => a.type && a.subType)
+          .map((a) => ({
+            type: ACCESSORY_CATEGORIES.find((c) => c.id === a.type)?.en ?? a.type,
+            name: a.subType,
+            specs: a.specs.trim(),
+            price: Math.max(0, parseFloat(a.price) || 0),
+            imageUrl: a.existingImageUrl || "",
+            currency: a.currency,
+          }));
+
+        const dimensionStocksArr = selectedDiameters
+          .flatMap((d) =>
+            selectedLengths.map((l) => ({
+              diameter: Number(d),
+              length: Number(l),
+              quantity: Math.max(0, parseInt(dimensionStocks[`${d}x${l}`] || "0") || 0),
+            })),
+          )
+          .filter((s) => s.quantity > 0);
+        const dimensionTotal = dimensionStocksArr.reduce((sum, s) => sum + s.quantity, 0);
+        const finalStock = dimensionTotal > 0 ? dimensionTotal : Math.max(0, parseInt(stock) || 0);
+
+        await upsert.mutateAsync({
+          id: productId,
+          branch: "implant",
+          ar: name.trim(),
+          en: name.trim(),
+          brand: finalBrand,
+          price: Math.max(0, parseFloat(price) || 0),
+          currency,
+          stock: finalStock,
+          inStock: finalStock > 0,
+          images: [...(editing?.images ?? []), ...uploadedPaths],
+          category: "implant",
+          country,
+          countryFlag: countryCodeToFlag(country),
+          companyId: auth.currentUser?.uid ?? editing?.companyId ?? "",
+          implantSpec: {
+            country,
+            implantType: implantCategory === "non_immediate" ? "non-immediate" : "immediate",
+            subType: implantCategory === "basal" ? "basal" : undefined,
+            connectionType: line.trim() || undefined,
+            diameters: selectedDiameters.length > 0
+              ? selectedDiameters.map(Number).filter((n) => !isNaN(n) && n > 0)
+              : undefined,
+            lengths: selectedLengths.length > 0
+              ? selectedLengths.map(Number).filter((n) => !isNaN(n) && n > 0)
+              : undefined,
+            dimensionStocks: dimensionStocksArr.length > 0 ? dimensionStocksArr : undefined,
+          },
+          accessories: savedAccessories.length > 0 ? savedAccessories : undefined,
+          productType: "main_implant",
+          parentId: null,
+          description: description.trim() || undefined,
+        });
       }
-
-      const savedAccessories: ProductAccessory[] = accessoryRows
-        .filter((a) => a.type && a.subType)
-        .map((a) => ({
-          type: ACCESSORY_CATEGORIES.find((c) => c.id === a.type)?.en ?? a.type,
-          name: a.subType,
-          specs: a.specs.trim(),
-          price: Math.max(0, parseFloat(a.price) || 0),
-          imageUrl: a.existingImageUrl || "",
-          currency: a.currency,
-        }));
-
-      await upsert.mutateAsync({
-        id: productId,
-        branch: "implant",
-        ar: name.trim(),
-        en: name.trim(),
-        brand: brand.trim(),
-        price: Math.max(0, parseFloat(price) || 0),
-        currency,
-        stock: Math.max(0, parseInt(stock) || 0),
-        inStock: parseInt(stock) > 0,
-        images: [...(editing?.images ?? []), ...uploadedPaths],
-        category: "implant",
-        country: productType === "accessory" ? undefined : country,
-        countryFlag: productType === "accessory" ? undefined : countryCodeToFlag(country),
-        companyId: auth.currentUser?.uid ?? editing?.companyId ?? "",
-        implantSpec:
-          productType === "accessory"
-            ? undefined
-            : {
-                country,
-                implantType: implantCategory === "non_immediate" ? "non-immediate" : "immediate",
-                subType: implantCategory === "basal" ? "basal" : undefined,
-                connectionType: line.trim() || undefined,
-                diameters: selectedDiameters.length > 0
-                  ? selectedDiameters.map(Number).filter((n) => !isNaN(n) && n > 0)
-                  : undefined,
-                lengths: selectedLengths.length > 0
-                  ? selectedLengths.map(Number).filter((n) => !isNaN(n) && n > 0)
-                  : undefined,
-              },
-        accessories: savedAccessories.length > 0 ? savedAccessories : undefined,
-        productType,
-        parentId: productType === "accessory" ? parentId || null : null,
-        description: description.trim() || undefined,
-      });
 
       setShowForm(false);
     } catch (e: any) {
@@ -577,32 +623,16 @@ function ImplantProductsPanel() {
     return null;
   }, [imagePreviews, editing, editUrlMap]);
 
-  const groupedProducts = useMemo(() => {
-    const mainImplants = implantProducts.filter(
-      (p) => !p.productType || p.productType === "main_implant",
-    );
-    const accessories = implantProducts.filter((p) => p.productType === "accessory");
-    const childrenByParent: Record<string, Product[]> = {};
-    for (const acc of accessories) {
-      if (acc.parentId) {
-        if (!childrenByParent[acc.parentId]) childrenByParent[acc.parentId] = [];
-        childrenByParent[acc.parentId].push(acc);
-      }
-    }
-    return mainImplants.map((p) => ({
-      product: p,
-      children: childrenByParent[p.id] || [],
-    }));
-  }, [implantProducts]);
+  const groupedProducts = useMemo(
+    () => implantProducts.filter((p) => !p.productType || p.productType === "main_implant"),
+    [implantProducts],
+  );
 
   if (selectedProduct) {
     return (
       <ImplantDetailView
         product={selectedProduct}
         onBack={() => setSelectedProduct(null)}
-        onSaved={(updated) => {
-          setSelectedProduct(updated);
-        }}
       />
     );
   }
@@ -642,7 +672,7 @@ function ImplantProductsPanel() {
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
               <h2 className="font-display font-bold text-xl text-[#17324A]">
-                {ar ? "إضافة منتج جديد" : "Add New Product"}
+                {ar ? "إضافة زرعة جديدة" : "Add New Implant"}
               </h2>
               <p className="text-sm text-[#7A94A8] mt-0.5">
                 {ar ? "أضف زرعة وإكسسواراتها بسهولة" : "Add implant and its accessories easily"}
@@ -956,7 +986,7 @@ function ImplantProductsPanel() {
                   <div className="md:col-span-2 space-y-4">
                     <div>
                       <label className="text-xs font-semibold text-[#17324A] mb-2 block">
-                        {ar ? "الأقطار (mm):" : "Diameters (mm):"}
+                        {ar ? "الأقطار فقط:" : "Diameters only:"}
                       </label>
                       <TagInput
                         value={selectedDiameters}
@@ -968,12 +998,12 @@ function ImplantProductsPanel() {
 
                     <div>
                       <label className="text-xs font-semibold text-[#17324A] mb-2 block">
-                        {ar ? "الأطوال (mm):" : "Lengths (mm):"}
+                        {ar ? "الأطوال فقط:" : "Lengths only:"}
                       </label>
                       <TagInput
                         value={selectedLengths}
                         onChange={setSelectedLengths}
-                        suffix="mm"
+                        prefix="mm"
                         placeholder="10"
                       />
                     </div>
@@ -997,6 +1027,66 @@ function ImplantProductsPanel() {
                         <span className="text-sm text-[#7A94A8]">
                           {ar ? "أدخل قطرًا وطولًا للزرعة" : "Enter implant diameter and length"}
                         </span>
+                      </div>
+                    )}
+
+                    {selectedDiameters.length > 0 && selectedLengths.length > 0 && (
+                      <div>
+                        <label className="text-xs font-semibold text-[#17324A] mb-2 block">
+                          {ar ? "الكمية المتوفرة لكل مقاس" : "Available Quantity per Size"}
+                        </label>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs border-collapse">
+                            <thead>
+                              <tr>
+                                <th className="border border-[#D3E8F7] bg-[#F5FAFE] px-2 py-2 text-[#17324A] font-bold whitespace-nowrap">
+                                  {ar ? "القطر \\ الطول" : "Ø \\ L"}
+                                </th>
+                                {[...selectedLengths]
+                                  .sort((a, b) => Number(a) - Number(b))
+                                  .map((l) => (
+                                    <th
+                                      key={l}
+                                      className="border border-[#D3E8F7] bg-[#F5FAFE] px-2 py-2 text-[#17324A] font-bold whitespace-nowrap"
+                                    >
+                                      {l}
+                                    </th>
+                                  ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {[...selectedDiameters]
+                                .sort((a, b) => Number(a) - Number(b))
+                                .map((d) => (
+                                  <tr key={d}>
+                                    <td className="border border-[#D3E8F7] bg-[#F5FAFE] px-2 py-2 text-center font-bold text-[#17324A] whitespace-nowrap">
+                                      {d}
+                                    </td>
+                                    {[...selectedLengths]
+                                      .sort((a, b) => Number(a) - Number(b))
+                                      .map((l) => (
+                                        <td key={`${d}-${l}`} className="border border-[#D3E8F7] p-1">
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            dir="ltr"
+                                            placeholder="0"
+                                            value={dimensionStocks[`${d}x${l}`] ?? ""}
+                                            onChange={(e) =>
+                                              setDimensionStocks((prev) => ({
+                                                ...prev,
+                                                [`${d}x${l}`]: e.target.value,
+                                              }))
+                                            }
+                                            className="w-full h-9 rounded-lg bg-white border border-[#D3E8F7] px-2 text-center text-[11px] outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
+                                          />
+                                        </td>
+                                      ))}
+                                  </tr>
+                                ))}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1246,7 +1336,7 @@ function ImplantProductsPanel() {
 
               <div>
                 <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-                  {ar ? "الكمية المتوفرة" : "Available Quantity"}
+                  {ar ? "إجمالي الكمية المتوفرة (اختياري)" : "Total Available Quantity (Optional)"}
                 </label>
                 <input
                   type="number"
@@ -1257,6 +1347,11 @@ function ImplantProductsPanel() {
                   dir="ltr"
                   className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
                 />
+                <p className="text-[10px] text-[#7A94A8] mt-1">
+                  {ar
+                    ? "يُحتسب تلقائياً من كميات المقاسات أعلاه إن وُجدت"
+                    : "Auto-calculated from the per-size quantities above if set"}
+                </p>
               </div>
             </div>
 
@@ -1402,7 +1497,7 @@ function ImplantProductsPanel() {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3">
-            {groupedProducts.map(({ product, children }) => (
+            {groupedProducts.map((product) => (
               <div key={product.id}>
                 <div
                   onClick={() => setSelectedProduct(product)}
@@ -1451,9 +1546,9 @@ function ImplantProductsPanel() {
                             : "Non-Immediate"}
                       </span>
                     )}
-                    {children.length > 0 && (
+                    {(product.accessories?.length ?? 0) > 0 && (
                       <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-md">
-                        {children.length} {ar ? "قطعة تكميلية" : "accessory"}
+                        {product.accessories!.length} {ar ? "قطعة تكميلية" : "accessory"}
                       </span>
                     )}
                   </div>
@@ -1501,64 +1596,6 @@ function ImplantProductsPanel() {
                     </button>
                   </div>
                 </div>
-
-                {children.length > 0 && (
-                  <div className="ml-4 mt-2 space-y-2 border-l-2 border-blue-200 pl-3">
-                    {children.map((child) => (
-                      <div
-                        key={child.id}
-                        className="bg-blue-50/60 border border-blue-200/60 rounded-xl p-3 hover:shadow-sm transition cursor-pointer"
-                        onClick={() => setSelectedProduct(child)}
-                      >
-                        <div className="flex items-center gap-2">
-                          <div className="size-10 rounded-lg bg-white border border-border overflow-hidden shrink-0 flex items-center justify-center">
-                            {child.images.length > 0 && imageUrlMap[child.images[0]] ? (
-                              <img
-                                src={imageUrlMap[child.images[0]]}
-                                alt=""
-                                className="size-full object-cover"
-                              />
-                            ) : (
-                              <Package className="size-4 text-slate-300" />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-bold truncate">{child.ar || child.en}</p>
-                            {child.description && (
-                              <p className="text-[10px] text-muted-foreground line-clamp-1">
-                                {child.description}
-                              </p>
-                            )}
-                          </div>
-                          <span className="text-xs font-display font-bold text-blue-600 shrink-0">
-                            {fmtPrice(child)}
-                          </span>
-                        </div>
-                        <div className="flex gap-1 mt-2 pt-2 border-t border-blue-200/40">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openEdit(child);
-                            }}
-                            className="flex-1 h-7 rounded-lg text-[10px] font-semibold bg-white hover:bg-sky-100 hover:text-sky-600 flex items-center justify-center gap-1 transition"
-                          >
-                            <Pencil className="size-3" />
-                            {ar ? "تعديل" : "Edit"}
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDelete(child);
-                            }}
-                            className="w-7 h-7 rounded-lg text-[10px] font-semibold bg-white hover:bg-rose-100 hover:text-rose-600 flex items-center justify-center transition"
-                          >
-                            <Trash2 className="size-3" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
             ))}
           </div>
@@ -1572,11 +1609,9 @@ function ImplantProductsPanel() {
 function ImplantDetailView({
   product,
   onBack,
-  onSaved,
 }: {
   product: Product;
   onBack: () => void;
-  onSaved: (p: Product) => void;
 }) {
   const { lang } = useI18n();
   const ar = lang === "ar";
@@ -1585,70 +1620,42 @@ function ImplantDetailView({
     [],
   );
 
-  const [accItems, setAccItems] = useState<AccessoryRow[]>(
-    (product.accessories || []).map((a) => ({
-      key: crypto.randomUUID(),
-      imageFile: null,
-      imagePreview: "",
-      existingImageUrl: a.imageUrl || "",
-      type: LEGACY_TYPE_MAP[a.type] ?? a.type ?? "",
-      subType: a.name || "",
-      specs: a.specs || "",
-      price: a.price ? String(a.price) : "",
-      currency: a.currency || "USD",
-    })),
+  const [activeImage, setActiveImage] = useState(0);
+  const [zoomOpen, setZoomOpen] = useState(false);
+
+  const productPaths = useMemo(() => product.images ?? [], [product.images]);
+  const { data: imageUrlMap = {} } = useSignedImageUrls(productPaths);
+  const urls = useMemo(
+    () => (product.images ?? []).map((p) => imageUrlMap[p]).filter(Boolean),
+    [product.images, imageUrlMap],
   );
-  const [accBusy, setAccBusy] = useState(false);
-  const [accError, setAccError] = useState("");
 
-  const allPaths = useMemo(
-    () => accItems.filter((a) => a.existingImageUrl).map((a) => a.existingImageUrl),
-    [accItems],
+  const accessoryPaths = useMemo(
+    () => (product.accessories ?? []).filter((a) => a.imageUrl).map((a) => a.imageUrl),
+    [product.accessories],
   );
-  const { data: accImageUrlMap = {} } = useSignedImageUrls(allPaths);
+  const { data: accImageUrlMap = {} } = useSignedImageUrls(accessoryPaths);
 
-  const saveAccessories = async () => {
-    setAccBusy(true);
-    setAccError("");
-    try {
-      const saved: ProductAccessory[] = [];
-      for (const acc of accItems) {
-        let imageUrl = acc.existingImageUrl;
-        if (acc.imageFile) {
-          try {
-            imageUrl = await uploadProductImage(product.id, acc.imageFile);
-          } catch {
-            setAccBusy(false);
-            return;
-          }
-        }
-        if (acc.type && acc.subType) {
-          saved.push({
-            type: ACCESSORY_CATEGORIES.find((c) => c.id === acc.type)?.en ?? acc.type,
-            name: acc.subType,
-            specs: acc.specs.trim(),
-            price: Math.max(0, parseFloat(acc.price) || 0),
-            imageUrl,
-            currency: acc.currency,
-          });
-        }
-      }
+  const prevImage = () =>
+    setActiveImage((i) => (i - 1 + Math.max(urls.length, 1)) % Math.max(urls.length, 1));
+  const nextImage = () =>
+    setActiveImage((i) => (i + 1) % Math.max(urls.length, 1));
 
-      await updateDoc(doc(db, "products", product.id), {
-        accessories: saved.length > 0 ? saved : [],
-      });
-
-      onSaved({ ...product, accessories: saved.length > 0 ? saved : undefined });
-    } catch (e: any) {
-      setAccError(e?.message || String(e));
-    } finally {
-      setAccBusy(false);
-    }
+  const categoryLabel = (acc: ProductAccessory) => {
+    if (!ar) return acc.type;
+    return ACCESSORY_CATEGORIES.find((c) => c.en === acc.type)?.ar ?? acc.type;
   };
 
-  const addRow = () => {
-    setAccItems((prev) => [...prev, emptyAccessory()]);
-  };
+  const countryCode = product.country || product.implantSpec?.country;
+  const country = countryCode ? countryByCode[countryCode] : null;
+  const spec = product.implantSpec;
+  const typeLabel =
+    spec?.implantType === "non-immediate"
+      ? { ar: "غير فورية", en: "Non-Immediate", tone: "bg-amber-100 text-amber-700" }
+      : spec?.subType === "basal"
+        ? { ar: "فورية (قاعدية)", en: "Immediate (Basal)", tone: "bg-emerald-100 text-emerald-700" }
+        : { ar: "فورية", en: "Immediate", tone: "bg-emerald-100 text-emerald-700" };
+  const accessories = product.accessories ?? [];
 
   const fmtPrice = (p: Product) => {
     const isIQD = p.currency === "IQD";
@@ -1671,274 +1678,164 @@ function ImplantDetailView({
           <h2 className="font-display font-bold text-base truncate">{product.ar || product.en}</h2>
           <p className="text-xs text-muted-foreground truncate">{product.brand}</p>
         </div>
-        <div className="text-right shrink-0">
-          <p className="font-display font-extrabold text-lg text-primary">{fmtPrice(product)}</p>
-          <p className="text-[10px] text-muted-foreground">
+      </div>
+
+      {/* Image carousel */}
+      <div className="relative">
+        {urls.length > 0 ? (
+          <div className="relative aspect-square rounded-3xl overflow-hidden bg-slate-100 shadow-soft">
+            <img
+              src={urls[activeImage]}
+              alt={product.ar || product.en}
+              className="size-full object-cover cursor-zoom-in"
+              onClick={() => setZoomOpen(true)}
+            />
+            {urls.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={prevImage}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 size-9 rounded-full bg-white/85 backdrop-blur flex items-center justify-center text-slate-700 shadow hover:bg-white transition"
+                  aria-label="Previous image"
+                >
+                  <ChevronLeft className="size-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={nextImage}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 size-9 rounded-full bg-white/85 backdrop-blur flex items-center justify-center text-slate-700 shadow hover:bg-white transition"
+                  aria-label="Next image"
+                >
+                  <ChevronRight className="size-5" />
+                </button>
+                <div className="absolute bottom-3 inset-x-0 flex justify-center gap-1.5">
+                  {urls.map((_, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setActiveImage(i)}
+                      className={cn(
+                        "size-2 rounded-full transition",
+                        i === activeImage ? "bg-white" : "bg-white/50",
+                      )}
+                      aria-label={`Image ${i + 1}`}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="aspect-square rounded-3xl bg-slate-100 flex items-center justify-center">
+            <Package className="size-16 text-slate-300" />
+          </div>
+        )}
+      </div>
+
+      {/* Metadata */}
+      <div className="bg-card border border-border rounded-3xl p-5 shadow-card">
+        <h1 className="font-display font-extrabold text-xl leading-tight">
+          {product.ar || product.en}
+        </h1>
+        {product.brand && (
+          <p className="text-sm text-muted-foreground mt-1">{product.brand}</p>
+        )}
+        <div className="flex items-end justify-between mt-3">
+          <p className="font-display font-extrabold text-2xl text-primary">{fmtPrice(product)}</p>
+          <p className="text-xs text-muted-foreground">
             {ar ? "المخزون" : "Stock"}: {product.stock}
           </p>
         </div>
+        <div className="flex flex-wrap gap-2 mt-3">
+          {country && (
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold bg-slate-100 text-slate-700 px-2.5 py-1 rounded-full border border-slate-200">
+              <span className="text-sm leading-none">{countryCodeToFlag(country.code)}</span>
+              {ar ? country.ar : country.en} ({country.code})
+            </span>
+          )}
+          {spec?.implantType && (
+            <span className={cn("text-[11px] font-bold px-2.5 py-1 rounded-full", typeLabel.tone)}>
+              {ar ? typeLabel.ar : typeLabel.en}
+            </span>
+          )}
+          <span
+            className={cn(
+              "text-[11px] font-bold px-2.5 py-1 rounded-full",
+              product.inStock ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700",
+            )}
+          >
+            {product.inStock ? (ar ? "متوفر" : "In Stock") : ar ? "غير متوفر" : "Out of Stock"}
+          </span>
+        </div>
       </div>
 
-      <div className="bg-card border border-border rounded-3xl p-5 shadow-card">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-display font-bold text-base text-foreground">
-            {ar ? "الإكسسوارات" : "Accessories"}
-          </h3>
-          <button
-            type="button"
-            onClick={addRow}
-            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold transition"
-          >
-            <Plus className="size-3.5" />
-            {ar ? "إضافة إكسسوار" : "Add Accessory"}
-          </button>
-        </div>
-
-        {accItems.length > 0 ? (
-          <div className="overflow-x-auto -mx-1">
-            <div className="min-w-[580px]">
-              <div className="grid grid-cols-[44px_90px_1fr_1fr_130px_36px] gap-1.5 px-3 py-2 border-b-2 border-border bg-slate-50/50 rounded-t-xl">
-                <span className="text-[10px] font-bold text-muted-foreground">
-                  {ar ? "صورة" : "Img"}
-                </span>
-                <span className="text-[10px] font-bold text-muted-foreground">
-                  {ar ? "النوع" : "Type"}
-                </span>
-                <span className="text-[10px] font-bold text-muted-foreground">
-                  {ar ? "الاسم" : "Name"}
-                </span>
-                <span className="text-[10px] font-bold text-muted-foreground">
-                  {ar ? "المواصفات" : "Specs"}
-                </span>
-                <span className="text-[10px] font-bold text-muted-foreground">
-                  {ar ? "السعر" : "Price"}
-                </span>
-                <span className="text-[10px] font-bold text-muted-foreground">
-                  {ar ? "حذف" : "Del"}
-                </span>
-              </div>
-              <div className="divide-y divide-slate-100">
-                {accItems.map((acc) => (
-                  <div
-                    key={acc.key}
-                    className="grid grid-cols-[44px_90px_1fr_1fr_130px_36px] gap-1.5 px-3 py-2 items-center bg-white hover:bg-slate-50/50 transition"
-                  >
-                    <div>
-                      {acc.imagePreview ? (
-                        <div className="relative size-9 rounded-md overflow-hidden border border-border">
-                          <img src={acc.imagePreview} alt="" className="size-full object-cover" />
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setAccItems((prev) =>
-                                prev.map((a) =>
-                                  a.key === acc.key
-                                    ? { ...a, imageFile: null, imagePreview: "" }
-                                    : a,
-                                ),
-                              )
-                            }
-                            className="absolute inset-0 bg-black/40 flex items-center justify-center"
-                          >
-                            <X className="size-3 text-white" />
-                          </button>
-                        </div>
-                      ) : acc.existingImageUrl ? (
-                        <div className="size-9 rounded-md overflow-hidden border border-border bg-slate-200">
-                          {accImageUrlMap[acc.existingImageUrl] ? (
-                            <img
-                              src={accImageUrlMap[acc.existingImageUrl]}
-                              alt=""
-                              className="size-full object-cover"
-                            />
-                          ) : (
-                            <div className="size-full flex items-center justify-center">
-                              <Package className="size-3 text-slate-400" />
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <label className="flex items-center justify-center size-9 rounded-md border border-dashed border-slate-300 bg-white cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition">
-                          <Upload className="size-3 text-slate-300" />
-                          <input
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp"
-                            className="hidden"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (!file) return;
-                              setAccItems((prev) =>
-                                prev.map((a) =>
-                                  a.key === acc.key
-                                    ? {
-                                        ...a,
-                                        imageFile: file,
-                                        imagePreview: URL.createObjectURL(file),
-                                      }
-                                    : a,
-                                ),
-                              );
-                            }}
-                          />
-                        </label>
-                      )}
-                    </div>
-
-                    <select
-                      value={acc.type}
-                      onChange={(e) =>
-                        setAccItems((prev) =>
-                          prev.map((a) =>
-                            a.key === acc.key ? { ...a, type: e.target.value, subType: "" } : a,
-                          ),
-                        )
-                      }
-                      className="w-full h-9 rounded-lg bg-white border border-border px-1.5 text-[10px] font-semibold outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
-                    >
-                      <option value="">{ar ? "-- اختر الفئة --" : "-- Select category --"}</option>
-                      {ACCESSORY_CATEGORIES.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {ar ? c.ar : c.en}
-                        </option>
-                      ))}
-                    </select>
-
-                    <select
-                      value={acc.subType}
-                      onChange={(e) =>
-                        setAccItems((prev) =>
-                          prev.map((a) => (a.key === acc.key ? { ...a, subType: e.target.value } : a)),
-                        )
-                      }
-                      disabled={!acc.type}
-                      className={cn(
-                        "w-full h-9 rounded-lg border px-2 text-[11px] outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition",
-                        !acc.type
-                          ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed"
-                          : "bg-white border-border",
-                      )}
-                    >
-                      <option value="">{ar ? "-- اختر النوع --" : "-- Select sub-type --"}</option>
-                      {(ACCESSORY_CATEGORIES.find((c) => c.id === acc.type)?.subTypes ?? []).map((st) => (
-                        <option key={st.en} value={ar ? st.ar : st.en}>
-                          {ar ? st.ar : st.en}
-                        </option>
-                      ))}
-                    </select>
-
-                    <input
-                      value={acc.specs}
-                      onChange={(e) =>
-                        setAccItems((prev) =>
-                          prev.map((a) =>
-                            a.key === acc.key ? { ...a, specs: e.target.value } : a,
-                          ),
-                        )
-                      }
-                      placeholder={ar ? "المواصفات" : "Specifications"}
-                      className="w-full h-9 rounded-lg bg-white border border-border px-2 text-[11px] outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
-                    />
-
-                    <div className="flex gap-1">
-                      <div className="relative flex-1">
-                        <input
-                          type="number"
-                          value={acc.price}
-                          onChange={(e) =>
-                            setAccItems((prev) =>
-                              prev.map((a) =>
-                                a.key === acc.key ? { ...a, price: e.target.value } : a,
-                              ),
-                            )
-                          }
-                          placeholder="0"
-                          min="0"
-                          step="0.01"
-                          dir="ltr"
-                          className="w-full h-9 rounded-lg bg-white border border-border px-2 text-[11px] outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
-                        />
-                      </div>
-                      <div className="flex rounded-lg bg-white border border-border overflow-hidden shrink-0">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setAccItems((prev) =>
-                              prev.map((a) => (a.key === acc.key ? { ...a, currency: "USD" } : a)),
-                            )
-                          }
-                          className={cn(
-                            "px-1.5 py-0.5 text-[9px] font-semibold transition",
-                            acc.currency === "USD"
-                              ? "bg-primary text-primary-foreground"
-                              : "text-slate-400 hover:text-slate-600",
-                          )}
-                        >
-                          $
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setAccItems((prev) =>
-                              prev.map((a) => (a.key === acc.key ? { ...a, currency: "IQD" } : a)),
-                            )
-                          }
-                          className={cn(
-                            "px-1.5 py-0.5 text-[9px] font-semibold transition",
-                            acc.currency === "IQD"
-                              ? "bg-primary text-primary-foreground"
-                              : "text-slate-400 hover:text-slate-600",
-                          )}
-                        >
-                          {ar ? "د.ع" : "IQD"}
-                        </button>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setAccItems((prev) => prev.filter((a) => a.key !== acc.key))}
-                      className="size-8 rounded-lg border border-rose-200 text-rose-500 hover:bg-rose-50 flex items-center justify-center transition"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
+      {/* Attached accessories */}
+      <div>
+        <h3 className="font-display font-bold text-base mb-3">
+          {ar ? "الإكسسوارات الملحقة" : "Attached Accessories"}
+        </h3>
+        {accessories.length === 0 ? (
+          <div className="bg-card border border-border rounded-2xl py-10 text-center text-sm text-muted-foreground">
+            {ar ? "لا توجد إكسسوارات ملحقة" : "No attached accessories"}
           </div>
         ) : (
-          <p className="text-xs text-slate-400 text-center py-6">
-            {ar ? "لا توجد إكسسوارات مضافة بعد" : "No accessories added yet"}
-          </p>
+          <div className="grid grid-cols-2 gap-3">
+            {accessories.map((acc, i) => (
+              <div
+                key={`${acc.name}-${i}`}
+                className="bg-card border border-border rounded-2xl p-3 shadow-soft"
+              >
+                <div className="aspect-square rounded-xl bg-slate-100 overflow-hidden mb-2.5 flex items-center justify-center">
+                  {acc.imageUrl && accImageUrlMap[acc.imageUrl] ? (
+                    <img
+                      src={accImageUrlMap[acc.imageUrl]}
+                      alt={acc.name}
+                      className="size-full object-cover"
+                    />
+                  ) : (
+                    <Package className="size-8 text-slate-300" />
+                  )}
+                </div>
+                <p className="text-sm font-bold truncate">{acc.name}</p>
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  <span className="inline-block text-[10px] font-semibold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md">
+                    {categoryLabel(acc)}
+                  </span>
+                  {acc.specs && (
+                    <span className="inline-block text-[10px] font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
+                      {acc.specs}
+                    </span>
+                  )}
+                </div>
+                {acc.price > 0 && (
+                  <p className="mt-2 text-sm font-display font-bold text-primary">
+                    {acc.currency === "IQD"
+                      ? `${acc.price.toLocaleString()} د.ع`
+                      : `$${acc.price.toFixed(2)}`}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
         )}
-
-        {accError && (
-          <p className="text-sm text-rose-600 bg-rose-50 rounded-xl px-4 py-2.5 text-center font-semibold mt-3">
-            {accError}
-          </p>
-        )}
-
-        <button
-          type="button"
-          onClick={saveAccessories}
-          disabled={accBusy}
-          className={cn(
-            "w-full h-12 rounded-2xl font-display font-bold flex items-center justify-center gap-2 transition mt-4 shadow-card",
-            accBusy
-              ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-              : "bg-primary text-primary-foreground hover:opacity-90",
-          )}
-        >
-          {accBusy ? <Loader2 className="size-5 animate-spin" /> : null}
-          {accBusy
-            ? ar
-              ? "جارٍ الحفظ..."
-              : "Saving..."
-            : ar
-              ? "حفظ الإكسسوارات"
-              : "Save Accessories"}
-        </button>
       </div>
+
+      {/* Zoom preview */}
+      {zoomOpen && urls.length > 0 && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setZoomOpen(false)}
+        >
+          <img src={urls[activeImage]} alt="" className="max-h-full max-w-full object-contain" />
+          <button
+            type="button"
+            onClick={() => setZoomOpen(false)}
+            className="absolute top-4 end-4 size-10 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition"
+          >
+            <X className="size-5" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

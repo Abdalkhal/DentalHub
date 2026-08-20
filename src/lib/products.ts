@@ -24,6 +24,7 @@ export type ImplantSpec = {
   surfaceTreatment?: string;
   diameters?: number[];
   lengths?: number[];
+  dimensionStocks?: { diameter: number; length: number; quantity: number }[];
   connectionType?: string;
   recommendedTorque?: string;
   kitType?: "implant" | "surgical_kit";
@@ -108,6 +109,7 @@ const fromDoc = (id: string, data: Record<string, unknown>): Product => {
           surfaceTreatment: (rawSpec.surfaceTreatment as string) ?? undefined,
           diameters: (rawSpec.diameters as number[]) ?? undefined,
           lengths: (rawSpec.lengths as number[]) ?? undefined,
+          dimensionStocks: (rawSpec.dimensionStocks as ImplantSpec["dimensionStocks"]) ?? undefined,
           connectionType: (rawSpec.connectionType as string) ?? undefined,
           recommendedTorque: (rawSpec.recommendedTorque as string) ?? undefined,
           kitType: (rawSpec.kitType as ImplantSpec["kitType"]) ?? undefined,
