@@ -1,5 +1,4 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { RoleGuard } from "@/components/RoleGuard";
@@ -24,13 +23,6 @@ const INVOICE_STATUS: Record<InvoiceStatus, StatusMeta> = {
   rejected: { ar: "ملغاة", en: "Rejected", badge: "bg-rose-100 text-rose-700", dot: "bg-rose-500" },
 };
 
-const FILTERS: { key: "all" | InvoiceStatus; ar: string; en: string }[] = [
-  { key: "all", ar: "الكل", en: "All" },
-  { key: "confirmed", ar: "تم التأكيد", en: "Confirmed" },
-  { key: "shipped", ar: "تم الشحن", en: "Shipped" },
-  { key: "rejected", ar: "ملغاة", en: "Rejected" },
-];
-
 function fmtDate(ts: { toDate?: () => Date } | undefined): string {
   if (!ts || !ts.toDate) return "";
   const d = ts.toDate();
@@ -51,12 +43,10 @@ function DoctorInvoicesListInner() {
   const { role } = useUserRole();
   const officeId = role?.userId;
   const { invoices, loading } = useOfficeInvoices(officeId);
-  const [filter, setFilter] = useState<"all" | InvoiceStatus>("all");
 
   // Only show invoices that have already been confirmed in "My Orders"
   // (pending requests live in the orders collection, not here).
   const visibleInvoices = invoices.filter((i) => i.status !== "pending");
-  const filtered = filter === "all" ? visibleInvoices : visibleInvoices.filter((i) => i.status === filter);
 
   return (
     <MobileShell>
@@ -69,29 +59,11 @@ function DoctorInvoicesListInner() {
           </p>
         </div>
 
-        {/* Filter chips */}
-        <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-          {FILTERS.map((f) => (
-            <button
-              key={f.key}
-              onClick={() => setFilter(f.key)}
-              className={cn(
-                "shrink-0 h-8 px-3.5 rounded-full text-xs font-bold border transition whitespace-nowrap",
-                filter === f.key
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-card text-foreground border-border hover:bg-accent",
-              )}
-            >
-              {ar ? f.ar : f.en}
-            </button>
-          ))}
-        </div>
-
         {loading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="size-6 animate-spin text-muted-foreground" />
           </div>
-        ) : filtered.length === 0 ? (
+        ) : visibleInvoices.length === 0 ? (
           <div className="flex flex-col items-center justify-center text-center py-20 px-6">
             <span className="size-16 rounded-2xl bg-muted flex items-center justify-center text-muted-foreground/30 mb-4">
               <ReceiptText className="size-8" strokeWidth={1.5} />
@@ -102,7 +74,7 @@ function DoctorInvoicesListInner() {
           </div>
         ) : (
           <div className="space-y-3">
-            {filtered.map((inv) => {
+            {visibleInvoices.map((inv) => {
               const meta = INVOICE_STATUS[inv.status];
               const count = invoiceItemCount(inv);
               return (
