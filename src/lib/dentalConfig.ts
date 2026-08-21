@@ -200,3 +200,24 @@ export const RULES: Record<MaterialId, MaterialRules> = {
     manufacturingRules: {},
   },
 };
+
+export type VitaShade = { code: string; hex: string };
+
+export const VITA_SHADES: VitaShade[] = [
+  { code: "A1", hex: "#F5E6D3" },
+  { code: "A2", hex: "#E8D5B7" },
+  { code: "A3", hex: "#D4B896" },
+  { code: "A3.5", hex: "#C4A57A" },
+  { code: "A4", hex: "#B08D62" },
+  { code: "B1", hex: "#F2E9DC" },
+  { code: "B2", hex: "#E1D3B8" },
+  { code: "B3", hex: "#CFB88F" },
+  { code: "B4", hex: "#BBA071" },
+  { code: "C1", hex: "#EBE0D3" },
+  { code: "C2", hex: "#D6C5AD" },
+  { code: "C3", hex: "#C0A98A" },
+  { code: "C4", hex: "#A88D6B" },
+  { code: "D2", hex: "#E0D2BB" },
+  { code: "D3", hex: "#CCB894" },
+  { code: "D4", hex: "#B39A73" },
+];

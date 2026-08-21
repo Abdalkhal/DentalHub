@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, Building2, Calendar, Sparkles, User, Stethoscope } from "lucide-react";
+import { X, Building2, Calendar, Sparkles, User, Stethoscope, Trash2 } from "lucide-react";
 import {
   MATERIALS,
   WORK_TYPES,
@@ -7,9 +7,18 @@ import {
   FRAMEWORK_CREATION,
   RULES,
   IMPLANT_WORK_TYPES,
+  VITA_SHADES,
   type MaterialId,
   type WorkTypeId,
 } from "@/lib/dentalConfig";
+
+export type PricingItem = {
+  id: string;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  currency: "USD" | "IQD";
+};
 
 export type CombinedLabOrder = {
   patientName: string;
@@ -20,12 +29,16 @@ export type CombinedLabOrder = {
   workType?: string;
   manufacturingMethod?: string;
   frameworkCreation?: string;
+  pricingMode: "single" | "mixed";
+  currency: "USD" | "IQD";
+  pricingItems?: PricingItem[];
   unitsCount: number;
   unitPriceIQD: number;
   subtotalIQD: number;
   discountAmountIQD: number;
   finalTotalIQD: number;
   finalTotalUSD: number;
+  shade?: string;
   notes: string;
   implantCompany?: string;
   implantSystem?: string;
@@ -59,8 +72,14 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
   const [selectedManufacturingMethod, setSelectedManufacturingMethod] = useState("monolithic");
   const [frameworkCreation, setFrameworkCreation] = useState("conventional_casting");
 
-  const [singleUnitsCount, setSingleUnitsCount] = useState("1");
-  const [singleUnitPriceIQD, setSingleUnitPriceIQD] = useState("125000");
+  const [pricingMode, setPricingMode] = useState<"single" | "mixed">("single");
+  const [singleQuantity, setSingleQuantity] = useState("1");
+  const [singleUnitPrice, setSingleUnitPrice] = useState("0");
+  const [singleCurrency, setSingleCurrency] = useState<"USD" | "IQD">("IQD");
+  const [shade, setShade] = useState("");
+  const [pricingItems, setPricingItems] = useState<PricingItem[]>([
+    { id: crypto.randomUUID(), name: "", quantity: 1, unitPrice: 0, currency: "IQD" },
+  ]);
 
   // Implant details (dynamic — shown only for implant-related cases)
   const [implantCompany, setImplantCompany] = useState("");
@@ -95,12 +114,52 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
 
   const isImplantCase = isTitaniumBar || IMPLANT_WORK_TYPES.includes(selectedWorkType as WorkTypeId);
 
-  const units = Number(singleUnitsCount) || 0;
-  const unitPrice = Number(singleUnitPriceIQD) || 0;
-  const subtotalIQD = units * unitPrice;
+  const USD_RATE = 1480;
+  const itemTotalIQD = (it: PricingItem) =>
+    (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0) * (it.currency === "IQD" ? 1 : USD_RATE);
+
+  const singleUnits = Number(singleQuantity) || 0;
+  const singlePriceIQD = (Number(singleUnitPrice) || 0) * (singleCurrency === "IQD" ? 1 : USD_RATE);
+
+  const units =
+    pricingMode === "single"
+      ? singleUnits
+      : pricingItems.reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+  const subtotalIQD =
+    pricingMode === "single"
+      ? singleUnits * singlePriceIQD
+      : pricingItems.reduce((s, it) => s + itemTotalIQD(it), 0);
+  const unitPriceIQD = units > 0 ? subtotalIQD / units : 0;
   const discountAmountIQD = 0;
   const finalTotalIQD = subtotalIQD - discountAmountIQD;
-  const finalTotalUSD = finalTotalIQD / 1480;
+  const finalTotalUSD = finalTotalIQD / USD_RATE;
+
+  const fmtNum = (n: number) => n.toLocaleString("en-US");
+  const singleTotalValue =
+    singleCurrency === "USD"
+      ? singleUnits * (Number(singleUnitPrice) || 0)
+      : singleUnits * singlePriceIQD;
+  const singleTotalLabel =
+    singleCurrency === "USD" ? `$ ${fmtNum(singleTotalValue)}` : `IQD ${fmtNum(singleTotalValue)}`;
+  const grandTotalLabel =
+    pricingMode === "single" && singleCurrency === "USD"
+      ? `$ ${fmtNum(finalTotalUSD)}`
+      : `IQD ${fmtNum(finalTotalIQD)}`;
+
+  const updatePricingItem = (id: string, patch: Partial<PricingItem>) => {
+    setPricingItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...patch } : it)));
+  };
+
+  const addPricingItem = () => {
+    setPricingItems((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), name: "", quantity: 1, unitPrice: 0, currency: "IQD" },
+    ]);
+  };
+
+  const removePricingItem = (id: string) => {
+    setPricingItems((prev) => (prev.length > 1 ? prev.filter((it) => it.id !== id) : prev));
+  };
 
   const selectMaterial = (id: MaterialId) => {
     setSelectedMaterialId(id);
@@ -129,12 +188,23 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
       workType: selectedWorkType || undefined,
       manufacturingMethod: selectedManufacturingMethod || undefined,
       frameworkCreation: isPFM ? frameworkCreation : undefined,
+      pricingMode,
+      currency: pricingMode === "single" ? singleCurrency : "IQD",
+      pricingItems:
+        pricingMode === "mixed"
+          ? pricingItems.map((it) => ({
+              ...it,
+              quantity: Number(it.quantity) || 0,
+              unitPrice: Number(it.unitPrice) || 0,
+            }))
+          : undefined,
       unitsCount: units,
-      unitPriceIQD: unitPrice,
+      unitPriceIQD,
       subtotalIQD,
       discountAmountIQD,
       finalTotalIQD,
       finalTotalUSD,
+      shade: shade || undefined,
       notes,
       implantCompany: isImplantCase ? implantCompany : undefined,
       implantSystem: isImplantCase ? implantSystem : undefined,
@@ -492,29 +562,169 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
             )}
           </div>
 
+          {/* Shade selection */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-3">
+            <h3 className="text-sm font-bold text-gray-800 border-b pb-2">درجة اللون (Vita Classical)</h3>
+            <div className="grid grid-cols-8 gap-1.5">
+              {VITA_SHADES.map((s) => (
+                <button
+                  key={s.code}
+                  type="button"
+                  onClick={() => setShade(shade === s.code ? "" : s.code)}
+                  className={`relative aspect-square rounded-xl border-2 transition-all flex flex-col items-center justify-center ${
+                    shade === s.code ? "border-blue-600 scale-110 shadow-md z-10 ring-2 ring-blue-500/20" : "border-slate-200 hover:border-slate-400"
+                  }`}
+                >
+                  <span className="size-5 rounded-full border border-slate-300" style={{ background: s.hex }} />
+                  <span className="text-[9px] font-bold text-slate-600 mt-0.5">{s.code}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Section 3: Pricing */}
           <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4">
             <h3 className="text-sm font-bold text-gray-800 border-b pb-2">3. التسعير والإجمالي</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-4 bg-gray-50 rounded-xl border space-y-2">
-                <p className="text-xs font-bold">عدد الوحدات</p>
-                <input
-                  type="number"
-                  value={singleUnitsCount}
-                  onChange={(e) => setSingleUnitsCount(e.target.value)}
-                  className="w-full text-xs p-2 border rounded-lg bg-white"
-                />
-              </div>
-              <div className="p-4 bg-gray-50 rounded-xl border space-y-2">
-                <p className="text-xs font-bold">سعر الوحدة (IQD)</p>
-                <input
-                  type="number"
-                  value={singleUnitPriceIQD}
-                  onChange={(e) => setSingleUnitPriceIQD(e.target.value)}
-                  className="w-full text-xs p-2 border rounded-lg bg-white"
-                />
-              </div>
+
+            {/* Pricing mode toggle */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setPricingMode("single")}
+                className={`p-3 rounded-xl border-2 text-right transition-all ${
+                  pricingMode === "single" ? "border-blue-600 bg-blue-50/30" : "border-gray-200 bg-white hover:border-blue-200"
+                }`}
+              >
+                <span className="text-xs font-bold text-gray-800 block">تسعير حالة واحدة (وحدة واحدة)</span>
+                <span className="text-[10px] text-gray-400 block" dir="ltr">Single Unit Pricing</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPricingMode("mixed")}
+                className={`p-3 rounded-xl border-2 text-right transition-all ${
+                  pricingMode === "mixed" ? "border-blue-600 bg-blue-50/30" : "border-gray-200 bg-white hover:border-blue-200"
+                }`}
+              >
+                <span className="text-xs font-bold text-gray-800 block">تسعير حالة متعددة (Mixed)</span>
+                <span className="text-[10px] text-gray-400 block" dir="ltr">Multi-Item Matrix</span>
+              </button>
             </div>
+
+            {pricingMode === "single" ? (
+              /* Single unit pricing */
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-gray-600">عدد الوحدات</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={singleQuantity}
+                    onChange={(e) => setSingleQuantity(e.target.value)}
+                    className="w-full text-xs p-2.5 border rounded-lg bg-white"
+                    dir="ltr"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-gray-600">سعر الوحدة</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={singleUnitPrice ? fmtNum(Number(singleUnitPrice)) : ""}
+                    onChange={(e) => setSingleUnitPrice(e.target.value.replace(/[^\d]/g, ""))}
+                    onFocus={(e) => e.target.select()}
+                    className="w-full text-xs p-2.5 border rounded-lg bg-white"
+                    dir="ltr"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-gray-600">العملة</label>
+                  <div className="flex rounded-lg border overflow-hidden">
+                    <button type="button" onClick={() => setSingleCurrency("USD")} className={`flex-1 py-2.5 text-xs font-bold transition ${singleCurrency === "USD" ? "bg-blue-600 text-white" : "bg-white text-gray-500"}`}>$</button>
+                    <button type="button" onClick={() => setSingleCurrency("IQD")} className={`flex-1 py-2.5 text-xs font-bold transition ${singleCurrency === "IQD" ? "bg-blue-600 text-white" : "bg-white text-gray-500"}`}>IQD</button>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-gray-600">الإجمالي</label>
+                  <div className="w-full text-xs p-2.5 rounded-lg bg-gray-100 border text-center font-bold text-blue-700" dir="ltr">
+                    {singleTotalLabel}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* Mixed multi-unit pricing */
+              <div className="space-y-3">
+                <div className="grid grid-cols-[1.4fr_64px_96px_72px_96px_32px] gap-2 px-1 text-[10px] font-bold text-gray-400">
+                  <span>نوع العمل</span>
+                  <span className="text-center">العدد</span>
+                  <span className="text-center">السعر</span>
+                  <span className="text-center">العملة</span>
+                  <span className="text-center">الإجمالي</span>
+                  <span />
+                </div>
+                {pricingItems.map((it) => {
+                  const rowTotal = itemTotalIQD(it);
+                  return (
+                    <div key={it.id} className="grid grid-cols-[1.4fr_64px_96px_72px_96px_32px] gap-2 items-center">
+                      <input
+                        type="text"
+                        value={it.name}
+                        onChange={(e) => updatePricingItem(it.id, { name: e.target.value })}
+                        placeholder="مثال: تاج فوق زرعة"
+                        className="w-full text-xs p-2 border rounded-lg bg-white"
+                      />
+                      <input
+                        type="number"
+                        min="0"
+                        value={it.quantity}
+                        onChange={(e) => updatePricingItem(it.id, { quantity: Number(e.target.value) || 0 })}
+                        className="w-full text-xs p-2 border rounded-lg bg-white text-center"
+                        dir="ltr"
+                      />
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={it.unitPrice ? fmtNum(it.unitPrice) : ""}
+                        onChange={(e) => updatePricingItem(it.id, { unitPrice: Number(e.target.value.replace(/[^\d]/g, "")) || 0 })}
+                        onFocus={(e) => e.target.select()}
+                        className="w-full text-xs p-2 border rounded-lg bg-white text-center"
+                        dir="ltr"
+                      />
+                      <select
+                        value={it.currency}
+                        onChange={(e) => updatePricingItem(it.id, { currency: e.target.value as "USD" | "IQD" })}
+                        className="w-full text-xs p-2 border rounded-lg bg-white"
+                      >
+                        <option value="IQD">IQD</option>
+                        <option value="USD">$</option>
+                      </select>
+                      <span className="text-xs font-bold text-center text-gray-700" dir="ltr">{rowTotal.toLocaleString()}</span>
+                      <button
+                        type="button"
+                        onClick={() => removePricingItem(it.id)}
+                        disabled={pricingItems.length <= 1}
+                        className="size-7 rounded-lg text-rose-500 hover:bg-rose-50 flex items-center justify-center disabled:opacity-30"
+                        aria-label="حذف"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+
+                <button
+                  type="button"
+                  onClick={addPricingItem}
+                  className="w-full h-10 rounded-xl border-2 border-dashed border-blue-200 text-blue-600 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-blue-50/40 transition"
+                >
+                  + إضافة وحدة
+                </button>
+
+                <div className="p-3 rounded-xl bg-gray-50 border flex items-center justify-between flex-wrap gap-2">
+                  <span className="text-xs font-bold text-gray-600">إجمالي الوحدات: <span className="text-blue-600" dir="ltr">{units}</span></span>
+                  <span className="text-xs font-bold text-gray-600">الإجمالي الكلي: <span className="text-blue-600" dir="ltr">{subtotalIQD.toLocaleString()} IQD</span></span>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-1.5 pt-2">
               <label className="text-xs font-bold text-gray-700">ملاحظات إضافية للمختبر (اختياري)</label>
@@ -528,11 +738,8 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
             </div>
 
             <div className="p-4 bg-blue-50/50 rounded-xl border border-blue-100 flex items-center justify-between">
-              <div>
-                <p className="text-xs text-gray-500">الإجمالي النهائي</p>
-                <p className="text-lg font-bold text-blue-600">{finalTotalIQD.toLocaleString()} IQD</p>
-              </div>
-              <p className="text-sm font-semibold text-gray-600">${finalTotalUSD.toFixed(2)} USD</p>
+              <p className="text-xs text-gray-500">الإجمالي النهائي</p>
+              <p className="text-lg font-bold text-blue-600" dir="ltr">{grandTotalLabel}</p>
             </div>
           </div>
         </div>
