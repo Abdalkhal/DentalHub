@@ -170,7 +170,9 @@
   }
 
   #cart-invoice,
-  #cart-invoice * {
+  #cart-invoice *,
+  #invoice-print,
+  #invoice-print * {
     visibility: visible;
   }
 
@@ -180,5 +182,37 @@
     max-width: none;
     margin: 0;
     overflow: visible;
+  }
+
+  #invoice-print {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    max-width: none;
+    width: 100%;
+    margin: 0;
+    padding: 16px;
+    overflow: visible;
+    background: #fff;
+  }
+
+  /* Remove the mobile width cap so the invoice prints full width */
+  .max-w-md {
+    max-width: none !important;
+  }
+
+  /* Preserve background colors (teal header, badges) when printing */
+  #cart-invoice,
+  #cart-invoice *,
+  #invoice-print,
+  #invoice-print * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Expand horizontally-scrollable tables for print */
+  #invoice-print .overflow-x-auto {
+    overflow: visible !important;
   }
 }

@@ -5,6 +5,7 @@ import { RoleGuard } from "@/components/RoleGuard";
 import { createNotification } from "@/components/NotificationBell";
 import { useI18n } from "@/lib/i18n";
 import { useInvoice, updateInvoiceStatus, updateInvoiceItemAvailability } from "@/lib/invoices";
+import { useProducts, useSignedImageUrls } from "@/lib/products";
 import type { InvoiceStatus } from "@/integrations/firebase/types";
 import {
   Loader2,
@@ -20,7 +21,7 @@ import {
   Share2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 
 export const Route = createFileRoute("/doctor-invoices/$invoiceId")({
   component: InvoiceDetail,
@@ -64,6 +65,25 @@ function InvoiceDetailInner() {
   const ar = lang === "ar";
   const { invoice: inv, loading } = useInvoice(invoiceId);
   const [busyIdx, setBusyIdx] = useState<number | null>(null);
+
+  const { data: products = [] } = useProducts();
+  const productById = useMemo(() => {
+    const map: Record<string, (typeof products)[number]> = {};
+    for (const p of products) map[p.id] = p;
+    return map;
+  }, [products]);
+  const imagePaths = useMemo(
+    () =>
+      (inv?.items ?? [])
+        .map((it) => productById[it.productId]?.images?.[0])
+        .filter((x): x is string => !!x),
+    [inv?.items, productById],
+  );
+  const { data: imageUrlMap = {} } = useSignedImageUrls(imagePaths);
+  const imageOf = (productId: string) => {
+    const path = productById[productId]?.images?.[0];
+    return path ? imageUrlMap[path] : undefined;
+  };
 
   if (loading) {
     return (
@@ -178,7 +198,7 @@ function InvoiceDetailInner() {
       <TopBar title={ar ? "تفاصيل الفاتورة" : "Invoice Details"} showBack />
       <div className="px-4 py-4 space-y-4 pb-10">
         {/* Print / Share actions */}
-        <div className="flex gap-2">
+        <div className="flex gap-2 no-print">
           <button
             onClick={handlePrint}
             className="flex-1 h-11 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition"
@@ -196,7 +216,8 @@ function InvoiceDetailInner() {
           </button>
         </div>
 
-        {/* Invoice header */}
+        <div id="invoice-print" className="space-y-4">
+          {/* Invoice header */}
         <div
           className="rounded-3xl p-5 text-white shadow-lg relative overflow-hidden"
           style={{ background: `linear-gradient(135deg, ${TEAL}, #0B5952)` }}
@@ -263,9 +284,17 @@ function InvoiceDetailInner() {
                     className="grid grid-cols-[minmax(180px,1.5fr)_48px_88px_88px_96px_176px] items-center gap-2 px-4 py-3 border-b border-slate-50 last:border-0"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <span className="size-11 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
-                        <Package className="size-5 text-slate-400" />
-                      </span>
+                      {imageOf(item.productId) ? (
+                        <img
+                          src={imageOf(item.productId)}
+                          alt=""
+                          className="size-11 rounded-lg object-cover bg-slate-100 shrink-0"
+                        />
+                      ) : (
+                        <span className="size-11 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                          <Package className="size-5 text-slate-400" />
+                        </span>
+                      )}
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-slate-800 truncate">{item.name}</p>
                       </div>
@@ -344,6 +373,7 @@ function InvoiceDetailInner() {
               </div>
             )}
           </div>
+        </div>
         </div>
 
         {/* Status actions */}
