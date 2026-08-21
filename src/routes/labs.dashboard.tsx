@@ -170,30 +170,27 @@ function StatCard({
     <Comp
       onClick={onClick}
       className={cn(
-        "bg-white rounded-2xl border border-slate-100 p-5 shadow-sm hover:shadow-md transition-shadow duration-300",
+        "rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow duration-300 text-white",
+        color,
         onClick && "cursor-pointer active:scale-[0.98]",
       )}
     >
       <div className="flex items-start justify-between mb-3">
-        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+        <span className="text-xs font-semibold text-white/80 uppercase tracking-wide">
           {label}
         </span>
-        <span className={cn("size-10 rounded-xl flex items-center justify-center", color)}>
+        <span className="size-10 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center">
           <Icon className="size-5" />
         </span>
       </div>
-      <p className="text-3xl font-extrabold text-slate-900 tracking-tight font-display">{value}</p>
+      <p className="text-3xl font-extrabold text-white tracking-tight font-display drop-shadow-sm">{value}</p>
       <div className="flex items-center gap-1 mt-2">
         {trendUp ? (
-          <TrendingUp className="size-3.5 text-emerald-500" />
+          <TrendingUp className="size-3.5 text-white/80" />
         ) : (
-          <TrendingDown className="size-3.5 text-rose-500" />
+          <TrendingDown className="size-3.5 text-white/80" />
         )}
-        <span
-          className={cn("text-xs font-semibold", trendUp ? "text-emerald-600" : "text-rose-600")}
-        >
-          {trend}
-        </span>
+        <span className="text-xs font-semibold text-white/80">{trend}</span>
       </div>
     </Comp>
   );
@@ -409,7 +406,7 @@ function LabDashboard() {
   const today = new Date();
 
   return (
-    <div className="min-h-svh bg-slate-50 overflow-x-hidden" dir={ar ? "rtl" : "ltr"}>
+    <div className="min-h-svh bg-[#F0F7FF] overflow-x-hidden" dir={ar ? "rtl" : "ltr"}>
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
@@ -507,7 +504,7 @@ function LabDashboard() {
                   <span
                     className={cn(
                       "size-8 rounded-lg flex items-center justify-center",
-                      active ? "bg-sky-100 text-sky-600" : "text-slate-400",
+                      active ? "bg-sky-500 text-white" : "bg-sky-100 text-sky-600",
                     )}
                   >
                     <Icon className="size-4" />
@@ -620,7 +617,7 @@ function LabDashboard() {
                 trend={ar ? "+15% عن الشهر الماضي" : "+15% vs last month"}
                 trendUp
                 icon={BarChart3}
-                color="bg-sky-50 text-sky-600"
+                color="bg-blue-900"
                 onClick={() => navigate({ to: "/orders", search: { status: "all" } })}
               />
               <StatCard
@@ -629,7 +626,7 @@ function LabDashboard() {
                 trend={ar ? "+8% عن الشهر الماضي" : "+8% vs last month"}
                 trendUp
                 icon={Clock}
-                color="bg-amber-50 text-amber-600"
+                color="bg-amber-400"
                 onClick={() => navigate({ to: "/orders", search: { status: "in_progress" } })}
               />
               <StatCard
@@ -638,7 +635,7 @@ function LabDashboard() {
                 trend={ar ? "+22% عن الشهر الماضي" : "+22% vs last month"}
                 trendUp
                 icon={CheckCircle2}
-                color="bg-emerald-50 text-emerald-600"
+                color="bg-emerald-500"
                 onClick={() => navigate({ to: "/orders", search: { status: "completed" } })}
               />
               <StatCard
@@ -647,7 +644,7 @@ function LabDashboard() {
                 trend={ar ? "-3% عن الشهر الماضي" : "-3% vs last month"}
                 trendUp={false}
                 icon={AlertCircle}
-                color="bg-rose-50 text-rose-600"
+                color="bg-rose-500"
                 onClick={() => navigate({ to: "/orders", search: { status: "delayed" } })}
               />
             </div>
@@ -1005,10 +1002,15 @@ function QuickAccessButton({
       onClick={onClick}
       className={cn(
         "w-full flex items-center gap-3 px-3 h-11 rounded-xl text-sm font-semibold transition-all",
-        color || "text-slate-600 hover:bg-slate-50 hover:text-slate-800",
+        color || "text-slate-600 hover:bg-sky-50 hover:text-slate-800",
       )}
     >
-      <span className="size-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500">
+      <span
+        className={cn(
+          "size-8 rounded-lg flex items-center justify-center",
+          color ? "bg-white/20 text-white" : "bg-sky-100 text-sky-600",
+        )}
+      >
         <Icon className="size-4" />
       </span>
       {label}
