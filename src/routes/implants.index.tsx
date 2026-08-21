@@ -23,11 +23,13 @@ import {
   type Currency,
 } from "@/lib/products";
 import { useOffers, useUpsertOffer, useDeleteOffer, type Offer } from "@/lib/offers";
-import { useOrders } from "@/lib/orders";
+import { useOrders, confirmOrder, markOrderUnavailable } from "@/lib/orders";
+import type { OrderDoc } from "@/integrations/firebase/types";
 import { useUserRole } from "@/lib/useAuth";
 import { auth, db } from "@/integrations/firebase/client";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import { CountryCombobox } from "@/components/CountryCombobox";
 import { ALL_COUNTRIES, countryCodeToFlag } from "@/data/countries";
 import {
@@ -2373,50 +2375,171 @@ function OffersPanel({ companyId }: { companyId: string }) {
 function ImplantOrdersPanel({ companyId }: { companyId: string }) {
   const { lang } = useI18n();
   const ar = lang === "ar";
+  const queryClient = useQueryClient();
   const { data: orders = [], isLoading } = useOrders(companyId);
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "confirmed" | "rejected">("all");
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const statusOptions: { id: "all" | "pending" | "confirmed" | "rejected"; ar: string; en: string }[] = [
+    { id: "all", ar: "الكل", en: "All" },
+    { id: "pending", ar: "قيد الانتظار", en: "Pending" },
+    { id: "confirmed", ar: "تم التأكيد", en: "Confirmed" },
+    { id: "rejected", ar: "غير متوفر", en: "Unavailable" },
+  ];
+
+  const filtered = statusFilter === "all" ? orders : orders.filter((o) => o.status === statusFilter);
+
+  const handleConfirm = async (o: OrderDoc) => {
+    setBusyId(o.id);
+    try {
+      await confirmOrder(o);
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      toast.success(ar ? "تم تأكيد الطلب وتحويله إلى فاتورة" : "Order confirmed and converted to invoice");
+    } catch (e: any) {
+      toast.error(ar ? `فشل التأكيد: ${e?.message || e}` : `Confirm failed: ${e?.message || e}`);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleUnavailable = async (o: OrderDoc) => {
+    setBusyId(o.id);
+    try {
+      await markOrderUnavailable(o.id);
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      toast.success(ar ? "تم تحديد الطلب كغير متوفر" : "Order marked as unavailable");
+    } catch (e: any) {
+      toast.error(ar ? `فشل التحديث: ${e?.message || e}` : `Update failed: ${e?.message || e}`);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const fmtTotal = (o: OrderDoc) => {
+    const usd = o.totalUSD ?? 0;
+    const iqd = o.totalIQD ?? 0;
+    if (iqd > 0 && usd > 0) return ar ? `${iqd.toLocaleString()} د.ع + $${usd.toFixed(2)}` : `${iqd.toLocaleString()} IQD + $${usd.toFixed(2)}`;
+    if (iqd > 0) return `${iqd.toLocaleString()} د.ع`;
+    return `$${(o.total || 0).toFixed(2)}`;
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="size-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (orders.length === 0) {
+    return (
+      <div className="py-20 flex flex-col items-center text-center text-muted-foreground">
+        <ClipboardList className="size-14 mb-4 opacity-20" />
+        <p className="font-display font-bold text-lg text-slate-400">
+          {ar ? "لا توجد طلبات بعد" : "No orders yet"}
+        </p>
+        <p className="text-sm mt-1 max-w-xs text-slate-400">
+          {ar ? "ستظهر الطلبات هنا عند استلامها" : "Orders will appear here when received"}
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <>
-      {isLoading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="size-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-        </div>
-      ) : orders.length === 0 ? (
-        <div className="py-20 flex flex-col items-center text-center text-muted-foreground">
-          <ClipboardList className="size-14 mb-4 opacity-20" />
-          <p className="font-display font-bold text-lg text-slate-400">
-            {ar ? "لا توجد طلبات بعد" : "No orders yet"}
-          </p>
-          <p className="text-sm mt-1 max-w-xs text-slate-400">
-            {ar ? "ستظهر الطلبات هنا عند استلامها" : "Orders will appear here when received"}
-          </p>
+    <div className="space-y-4">
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+        {statusOptions.map((s) => (
+          <button
+            key={s.id}
+            onClick={() => setStatusFilter(s.id)}
+            className={cn(
+              "shrink-0 h-8 px-3.5 rounded-full text-xs font-bold border transition whitespace-nowrap",
+              statusFilter === s.id
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-card text-foreground border-border hover:bg-accent",
+            )}
+          >
+            {ar ? s.ar : s.en}
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="py-16 text-center text-sm text-muted-foreground">
+          {ar ? "لا توجد طلبات مطابقة" : "No matching orders"}
         </div>
       ) : (
         <div className="space-y-3">
-          {orders.map((order) => (
-            <div
-              key={order.id}
-              className="bg-card border border-border rounded-2xl p-3.5 shadow-soft"
-            >
-              <div className="flex gap-3">
-                <div className="flex-1 min-w-0">
-                  <p className="font-display font-bold text-sm">{order.productName}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {ar ? "الكمية:" : "Qty:"} {order.quantity}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {ar ? "الإجمالي:" : "Total:"} {order.total} {order.currency}
-                  </p>
+          {filtered.map((o) => {
+            const itemCount = (o.items || []).reduce((sum, i) => sum + (i.quantity || 1), 0);
+            const firstItem = o.items?.[0]?.name || (ar ? "منتج" : "Product");
+            const isPending = o.status === "pending";
+            return (
+              <div key={o.id} className="bg-card border border-border rounded-2xl p-4 shadow-soft">
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="size-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
+                      <Package className="size-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="font-mono text-xs font-bold text-muted-foreground">
+                        {o.orderNumber || `#${o.id.slice(0, 8).toUpperCase()}`}
+                      </p>
+                      <p className="font-display font-bold text-sm truncate">
+                        {o.dentistName || (ar ? "طبيب" : "Doctor")}
+                        {o.clinicName ? ` · ${o.clinicName}` : ""}
+                      </p>
+                    </div>
+                  </div>
+                  <span
+                    className={cn(
+                      "text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0",
+                      o.status === "confirmed" ? "bg-emerald-100 text-emerald-700" :
+                      o.status === "rejected" ? "bg-rose-100 text-rose-700" :
+                      "bg-amber-100 text-amber-700",
+                    )}
+                  >
+                    {o.status === "pending" ? (ar ? "قيد الانتظار" : "Pending") :
+                     o.status === "confirmed" ? (ar ? "تم التأكيد" : "Confirmed") :
+                     ar ? "غير متوفر" : "Unavailable"}
+                  </span>
                 </div>
-                <span className="text-[11px] font-bold bg-slate-100 text-slate-600 px-2 py-1 rounded-full h-fit">
-                  {order.status}
-                </span>
+
+                <p className="text-xs text-slate-500 mb-2 truncate">
+                  {firstItem}{itemCount > 1 ? ` +${itemCount - 1}` : ""}
+                </p>
+
+                <div className="flex items-center justify-between text-xs text-slate-500 border-t border-dashed border-border pt-2.5">
+                  <span>{itemCount} {ar ? "منتج" : "products"}</span>
+                  <span className="font-display font-extrabold text-sm">{fmtTotal(o)}</span>
+                </div>
+
+                {isPending && (
+                  <div className="flex gap-2 mt-3 pt-3 border-t border-border">
+                    <button
+                      onClick={() => handleConfirm(o)}
+                      disabled={busyId === o.id}
+                      className="flex-1 h-10 rounded-xl bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-90 transition disabled:opacity-60"
+                    >
+                      {busyId === o.id ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
+                      {ar ? "تأكيد الطلب" : "Confirm"}
+                    </button>
+                    <button
+                      onClick={() => handleUnavailable(o)}
+                      disabled={busyId === o.id}
+                      className="flex-1 h-10 rounded-xl bg-card border border-border text-muted-foreground text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-rose-50 hover:text-rose-600 transition disabled:opacity-60"
+                    >
+                      <X className="size-4" />
+                      {ar ? "الطلب غير متوفر" : "Unavailable"}
+                    </button>
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
-    </>
+    </div>
   );
 }
 

@@ -1,10 +1,8 @@
 import { createFileRoute, Link, useSearch } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
-import { db } from "@/integrations/firebase/client";
-import type { InvoiceDoc, InvoiceStatus } from "@/integrations/firebase/types";
+import type { OrderDoc } from "@/integrations/firebase/types";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { EditOrderModal } from "@/components/EditOrderModal";
@@ -22,7 +20,13 @@ import {
   type OrderStatus,
 } from "@/lib/ordersStore";
 import { useCart } from "@/lib/cartStore";
-import { placeCartOrder } from "@/lib/orders";
+import {
+  placeCartOrder,
+  confirmOrder,
+  markOrderUnavailable,
+  useOrders as useSupplierOrders,
+  useDentistOrders,
+} from "@/lib/orders";
 import {
   Search,
   Eye,
@@ -35,6 +39,8 @@ import {
   Package,
   Loader2,
   Plus,
+  Check,
+  X,
 } from "lucide-react";
 
 const ordersSearchSchema = z.object({
@@ -69,14 +75,6 @@ function formatShortDate(v: unknown): string {
   else d = new Date(v as string);
   if (isNaN(d.getTime())) return "-";
   return `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}/${d.getFullYear()}`;
-}
-
-function createdAtMs(v: unknown): number {
-  if (!v) return 0;
-  const o = v as { toMillis?: () => number };
-  if (typeof o.toMillis === "function") return o.toMillis();
-  const d = new Date(v as string);
-  return isNaN(d.getTime()) ? 0 : d.getTime();
 }
 
 /* ── Main Component ─────────────────────────────── */
@@ -316,7 +314,7 @@ function DentistOrders() {
         city: role?.city,
         clinicName: role?.clinicName,
       });
-      await queryClient.invalidateQueries({ queryKey: ["dentist-invoices", user.uid] });
+      await queryClient.invalidateQueries({ queryKey: ["orders", "dentist", user.uid] });
       toast.success(
         ar ? `تم إرسال ${count} طلب بنجاح` : `${count} order(s) placed successfully`,
       );
@@ -327,22 +325,7 @@ function DentistOrders() {
     }
   };
 
-  const { data: myOrders = [], isLoading } = useQuery({
-    queryKey: ["dentist-invoices", user?.uid],
-    queryFn: async (): Promise<InvoiceDoc[]> => {
-      if (!user?.uid) return [];
-      const q = query(
-        collection(db, "invoices"),
-        where("doctorId", "==", user.uid),
-      );
-      const snap = await getDocs(q);
-      return snap.docs
-        .map((d) => ({ id: d.id, ...d.data() } as InvoiceDoc))
-        .sort((a, b) => createdAtMs(b.createdAt) - createdAtMs(a.createdAt));
-    },
-    enabled: !!user?.uid,
-    staleTime: 30_000,
-  });
+  const { data: myOrders = [], isLoading } = useDentistOrders(user?.uid);
 
   if (!user) {
     return (
@@ -429,16 +412,13 @@ function DentistOrders() {
                     </div>
                     <span className={cn(
                       "text-[10px] font-bold px-2 py-0.5 rounded-full",
-                      s === "delivered" || s === "confirmed" ? "bg-emerald-100 text-emerald-700" :
-                      s === "shipped" ? "bg-sky-100 text-sky-700" :
+                      s === "confirmed" ? "bg-emerald-100 text-emerald-700" :
                       s === "rejected" ? "bg-rose-100 text-rose-700" :
                       "bg-amber-100 text-amber-700",
                     )}>
                       {s === "pending" ? (ar ? "قيد الانتظار" : "Pending") :
                        s === "confirmed" ? (ar ? "تم التأكيد" : "Confirmed") :
-                       s === "shipped" ? (ar ? "تم الشحن" : "Shipped") :
-                       s === "delivered" ? (ar ? "تم التسليم" : "Delivered") :
-                       s === "rejected" ? (ar ? "ملغاة" : "Rejected") : s}
+                       s === "rejected" ? (ar ? "غير متوفر" : "Unavailable") : s}
                     </span>
                   </div>
 
@@ -465,51 +445,73 @@ function SupplierOrders() {
   const ar = lang === "ar";
   const { role } = useUserRole();
   const supplierId = role?.userId ?? "";
+  const queryClient = useQueryClient();
 
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | InvoiceStatus>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "confirmed" | "rejected">("all");
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  const { data: supplierOrders = [], isLoading } = useQuery({
-    queryKey: ["supplier-invoices", supplierId],
-    queryFn: async (): Promise<InvoiceDoc[]> => {
-      if (!supplierId) return [];
-      const q = query(
-        collection(db, "invoices"),
-        where("officeId", "==", supplierId),
-      );
-      const snap = await getDocs(q);
-      return snap.docs
-        .map((d) => ({ id: d.id, ...d.data() } as InvoiceDoc))
-        .sort((a, b) => createdAtMs(b.createdAt) - createdAtMs(a.createdAt));
-    },
-    enabled: !!supplierId,
-    staleTime: 30_000,
-  });
+  const { data: supplierOrders = [], isLoading } = useSupplierOrders(supplierId);
 
-  const statusOptions: { id: "all" | InvoiceStatus; ar: string; en: string }[] = [
+  const statusOptions: { id: "all" | "pending" | "confirmed" | "rejected"; ar: string; en: string }[] = [
     { id: "all", ar: "الكل", en: "All" },
     { id: "pending", ar: "قيد الانتظار", en: "Pending" },
     { id: "confirmed", ar: "تم التأكيد", en: "Confirmed" },
-    { id: "shipped", ar: "تم الشحن", en: "Shipped" },
-    { id: "delivered", ar: "تم التسليم", en: "Delivered" },
-    { id: "rejected", ar: "مرفوضة", en: "Rejected" },
+    { id: "rejected", ar: "غير متوفر", en: "Unavailable" },
   ];
 
   const filteredOrders = useMemo(() => {
     return supplierOrders.filter((o) => {
-      const s = (o.status as string) || "pending";
-      if (statusFilter !== "all" && s !== statusFilter) return false;
+      if (statusFilter !== "all" && o.status !== statusFilter) return false;
       if (search.trim()) {
         const q = search.toLowerCase();
         return (
           (o.orderNumber || "").toLowerCase().includes(q) ||
-          (o.doctorName || "").toLowerCase().includes(q) ||
+          (o.dentistName || "").toLowerCase().includes(q) ||
           (o.clinicName || "").toLowerCase().includes(q)
         );
       }
       return true;
     });
   }, [supplierOrders, statusFilter, search]);
+
+  const handleConfirm = async (o: OrderDoc) => {
+    setBusyId(o.id);
+    try {
+      await confirmOrder(o);
+      queryClient.invalidateQueries({ queryKey: ["orders", "supplier", supplierId] });
+      toast.success(
+        ar ? "تم تأكيد الطلب وتحويله إلى فاتورة" : "Order confirmed and converted to invoice",
+      );
+    } catch (e: any) {
+      toast.error(ar ? `فشل التأكيد: ${e?.message || e}` : `Confirm failed: ${e?.message || e}`);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleUnavailable = async (o: OrderDoc) => {
+    setBusyId(o.id);
+    try {
+      await markOrderUnavailable(o.id);
+      queryClient.invalidateQueries({ queryKey: ["orders", "supplier", supplierId] });
+      toast.success(ar ? "تم تحديد الطلب كغير متوفر" : "Order marked as unavailable");
+    } catch (e: any) {
+      toast.error(ar ? `فشل التحديث: ${e?.message || e}` : `Update failed: ${e?.message || e}`);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const fmtTotal = (o: OrderDoc) => {
+    const usd = o.totalUSD ?? 0;
+    const iqd = o.totalIQD ?? 0;
+    if (iqd > 0 && usd > 0) {
+      return ar ? `${iqd.toLocaleString()} د.ع + $${usd.toFixed(2)}` : `${iqd.toLocaleString()} IQD + $${usd.toFixed(2)}`;
+    }
+    if (iqd > 0) return `${iqd.toLocaleString()} د.ع`;
+    return `$${(o.total || 0).toFixed(2)}`;
+  };
 
   return (
     <MobileShell>
@@ -521,7 +523,7 @@ function SupplierOrders() {
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder={ar ? "ابحث عن فاتورة أو طبيب…" : "Search invoice or doctor…"}
+            placeholder={ar ? "ابحث عن طلب أو طبيب…" : "Search order or doctor…"}
             className="w-full h-11 rounded-2xl bg-card border border-border ps-10 pe-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-primary"
           />
         </div>
@@ -544,7 +546,7 @@ function SupplierOrders() {
         </div>
 
         <p className="text-xs text-muted-foreground">
-          {filteredOrders.length} {ar ? "فاتورة" : "invoice"}
+          {filteredOrders.length} {ar ? "طلب" : "order"}
         </p>
 
         <div className="space-y-2">
@@ -556,22 +558,19 @@ function SupplierOrders() {
             <div className="text-center py-16 text-sm text-muted-foreground">
               <Package className="size-10 mx-auto mb-3 text-muted-foreground/40" />
               {supplierOrders.length === 0
-                ? ar ? "لا توجد فواتير حتى الآن" : "No invoices yet"
-                : ar ? "لا توجد نتائج مطابقة" : "No matching invoices"}
+                ? ar ? "لا توجد طلبات حتى الآن" : "No orders yet"
+                : ar ? "لا توجد نتائج مطابقة" : "No matching orders"}
             </div>
           ) : (
             filteredOrders.map((o) => {
-              const s = (o.status as string) || "pending";
+              const s = o.status;
               const itemCount = (o.items || []).reduce((sum, i) => sum + (i.quantity || 1), 0);
+              const firstItem = o.items?.[0]?.name || (ar ? "منتج" : "Product");
+              const isPending = s === "pending";
               return (
-                <Link
-                  key={o.id}
-                  to="/doctor-invoices/$invoiceId"
-                  params={{ invoiceId: o.id }}
-                  className="block bg-card border border-border rounded-2xl p-4 shadow-soft hover:border-primary/40 transition"
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2.5">
+                <div key={o.id} className="bg-card border border-border rounded-2xl p-4 shadow-soft">
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
                       <span className="size-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
                         <Package className="size-4" />
                       </span>
@@ -580,33 +579,57 @@ function SupplierOrders() {
                           {o.orderNumber || `#${o.id.slice(0, 8).toUpperCase()}`}
                         </p>
                         <p className="font-display font-bold text-sm truncate">
-                          {o.doctorName || (ar ? "طبيب" : "Doctor")}
+                          {o.dentistName || (ar ? "طبيب" : "Doctor")}
                           {o.clinicName ? ` · ${o.clinicName}` : ""}
                         </p>
                       </div>
                     </div>
                     <span className={cn(
                       "text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0",
-                      s === "delivered" || s === "confirmed" ? "bg-emerald-100 text-emerald-700" :
-                      s === "shipped" ? "bg-sky-100 text-sky-700" :
+                      s === "confirmed" ? "bg-emerald-100 text-emerald-700" :
                       s === "rejected" ? "bg-rose-100 text-rose-700" :
                       "bg-amber-100 text-amber-700",
                     )}>
                       {s === "pending" ? (ar ? "قيد الانتظار" : "Pending") :
                        s === "confirmed" ? (ar ? "تم التأكيد" : "Confirmed") :
-                       s === "shipped" ? (ar ? "تم الشحن" : "Shipped") :
-                       s === "delivered" ? (ar ? "تم التسليم" : "Delivered") :
-                       s === "rejected" ? (ar ? "مرفوضة" : "Rejected") : s}
+                       s === "rejected" ? (ar ? "غير متوفر" : "Unavailable") : s}
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span>{itemCount} {ar ? "منتجات" : "products"} · {o.createdAt ? formatShortDate(o.createdAt as unknown as string) : "-"}</span>
-                    <span className="font-display font-extrabold text-sm text-emerald-600">
-                      ${(o.total || 0).toFixed(2)}
+                  <p className="text-xs text-slate-500 mb-2 truncate">
+                    {firstItem}{itemCount > 1 ? ` +${itemCount - 1}` : ""}
+                  </p>
+
+                  <div className="flex items-center justify-between text-xs text-slate-500 border-t border-dashed border-border pt-2.5">
+                    <span>
+                      {itemCount} {ar ? "منتج" : "products"} · {o.createdAt ? formatShortDate(o.createdAt) : "-"}
+                    </span>
+                    <span className="font-display font-extrabold text-sm text-foreground">
+                      {fmtTotal(o)}
                     </span>
                   </div>
-                </Link>
+
+                  {isPending && (
+                    <div className="flex gap-2 mt-3 pt-3 border-t border-border">
+                      <button
+                        onClick={() => handleConfirm(o)}
+                        disabled={busyId === o.id}
+                        className="flex-1 h-10 rounded-xl bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-90 transition disabled:opacity-60"
+                      >
+                        {busyId === o.id ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
+                        {ar ? "تأكيد الطلب" : "Confirm"}
+                      </button>
+                      <button
+                        onClick={() => handleUnavailable(o)}
+                        disabled={busyId === o.id}
+                        className="flex-1 h-10 rounded-xl bg-card border border-border text-muted-foreground text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-rose-50 hover:text-rose-600 transition disabled:opacity-60"
+                      >
+                        <X className="size-4" />
+                        {ar ? "الطلب غير متوفر" : "Unavailable"}
+                      </button>
+                    </div>
+                  )}
+                </div>
               );
             })
           )}
