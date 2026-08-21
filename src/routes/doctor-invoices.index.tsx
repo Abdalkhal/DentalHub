@@ -5,11 +5,10 @@ import { TopBar } from "@/components/TopBar";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useI18n } from "@/lib/i18n";
 import { useUserRole } from "@/lib/useAuth";
-import { useOfficeInvoices, updateInvoiceStatus, invoiceItemCount } from "@/lib/invoices";
-import type { InvoiceDoc, InvoiceStatus } from "@/integrations/firebase/types";
-import { Loader2, ReceiptText, User, Building2, Check, X } from "lucide-react";
+import { useOfficeInvoices, invoiceItemCount } from "@/lib/invoices";
+import type { InvoiceStatus } from "@/integrations/firebase/types";
+import { Loader2, ReceiptText, User, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
 
 export const Route = createFileRoute("/doctor-invoices/")({
   component: DoctorInvoicesList,
@@ -27,7 +26,6 @@ const INVOICE_STATUS: Record<InvoiceStatus, StatusMeta> = {
 
 const FILTERS: { key: "all" | InvoiceStatus; ar: string; en: string }[] = [
   { key: "all", ar: "الكل", en: "All" },
-  { key: "pending", ar: "قيد الانتظار", en: "Pending" },
   { key: "confirmed", ar: "تم التأكيد", en: "Confirmed" },
   { key: "shipped", ar: "تم الشحن", en: "Shipped" },
   { key: "rejected", ar: "ملغاة", en: "Rejected" },
@@ -55,21 +53,10 @@ function DoctorInvoicesListInner() {
   const { invoices, loading } = useOfficeInvoices(officeId);
   const [filter, setFilter] = useState<"all" | InvoiceStatus>("all");
 
-  const filtered = filter === "all" ? invoices : invoices.filter((i) => i.status === filter);
-  const pendingCount = invoices.filter((i) => i.status === "pending").length;
-
-  const handleStatus = async (inv: InvoiceDoc, status: InvoiceStatus) => {
-    try {
-      await updateInvoiceStatus(inv.id, status);
-      toast.success(
-        status === "confirmed"
-          ? ar ? "تم تأكيد الطلب" : "Order confirmed"
-          : ar ? "تم رفض الطلب" : "Order rejected",
-      );
-    } catch (e: any) {
-      toast.error(ar ? `فشل التحديث: ${e?.message || e}` : `Update failed: ${e?.message || e}`);
-    }
-  };
+  // Only show invoices that have already been confirmed in "My Orders"
+  // (pending requests live in the orders collection, not here).
+  const visibleInvoices = invoices.filter((i) => i.status !== "pending");
+  const filtered = filter === "all" ? visibleInvoices : visibleInvoices.filter((i) => i.status === filter);
 
   return (
     <MobileShell>
@@ -78,12 +65,7 @@ function DoctorInvoicesListInner() {
         {/* Counter header */}
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            {invoices.length} {ar ? "فواتير" : "invoices"}
-            {pendingCount > 0 && (
-              <span className="text-amber-600 font-semibold">
-                {" "}· {pendingCount} {ar ? "بانتظار ردك" : "awaiting your reply"}
-              </span>
-            )}
+            {visibleInvoices.length} {ar ? "فواتير" : "invoices"}
           </p>
         </div>
 
@@ -163,25 +145,6 @@ function DoctorInvoicesListInner() {
                       </span>
                     </div>
                   </Link>
-
-                  {inv.status === "pending" && (
-                    <div className="flex gap-2 mt-3 pt-3 border-t border-border">
-                      <button
-                        onClick={() => handleStatus(inv, "confirmed")}
-                        className="flex-1 h-10 rounded-xl bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-90 transition"
-                      >
-                        <Check className="size-4" />
-                        {ar ? "تأكيد الطلب" : "Confirm order"}
-                      </button>
-                      <button
-                        onClick={() => handleStatus(inv, "rejected")}
-                        className="flex-1 h-10 rounded-xl bg-card border border-border text-muted-foreground text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-rose-50 hover:text-rose-600 transition"
-                      >
-                        <X className="size-4" />
-                        {ar ? "رفض" : "Reject"}
-                      </button>
-                    </div>
-                  )}
                 </div>
               );
             })}
