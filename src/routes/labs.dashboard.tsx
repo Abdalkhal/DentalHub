@@ -292,10 +292,14 @@ function LabDashboard() {
 
   const handleCreateOrder = (o: CombinedLabOrder) => {
     const materialLabel: Record<string, string> = {
-      zirconia: "زيركون",
-      emax: "إيماكس",
-      pfm: "سيراميك على معدن",
-      build_up: "طبقات",
+      "material.zirconia": "زركونيا",
+      "material.emax": "إيماكس",
+      "material.pfm": "سيراميك على معدن",
+      "material.full_cast_metal": "معدن كامل",
+      "material.pmma": "تركيبات مؤقتة",
+      "material.feldspathic": "سيراميك تجميلي",
+      "material.clear_aligner": "تقويم شفاف",
+      "material.titanium_bar": "تيتانيوم بار",
     };
     const units = o.unitsCount || 0;
     const price = o.unitPriceIQD || 0;
