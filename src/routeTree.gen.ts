@@ -40,6 +40,7 @@ import { Route as BrandsIndexRouteImport } from './routes/brands.index'
 import { Route as ProfileAccountIdRouteImport } from './routes/profile.$accountId'
 import { Route as ProductsProductIdRouteImport } from './routes/products.$productId'
 import { Route as PatientsPatientIdRouteImport } from './routes/patients.$patientId'
+import { Route as LabsStaffRouteImport } from './routes/labs.staff'
 import { Route as LabsExploreRouteImport } from './routes/labs.explore'
 import { Route as LabsDashboardRouteImport } from './routes/labs.dashboard'
 import { Route as LabsCasesRouteImport } from './routes/labs.cases'
@@ -220,6 +221,11 @@ const PatientsPatientIdRoute = PatientsPatientIdRouteImport.update({
   path: '/patients/$patientId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LabsStaffRoute = LabsStaffRouteImport.update({
+  id: '/labs/staff',
+  path: '/labs/staff',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LabsExploreRoute = LabsExploreRouteImport.update({
   id: '/labs/explore',
   path: '/labs/explore',
@@ -381,6 +387,7 @@ export interface FileRoutesByFullPath {
   '/labs/cases': typeof LabsCasesRoute
   '/labs/dashboard': typeof LabsDashboardRoute
   '/labs/explore': typeof LabsExploreRoute
+  '/labs/staff': typeof LabsStaffRoute
   '/patients/$patientId': typeof PatientsPatientIdRoute
   '/products/$productId': typeof ProductsProductIdRoute
   '/profile/$accountId': typeof ProfileAccountIdRoute
@@ -438,6 +445,7 @@ export interface FileRoutesByTo {
   '/labs/cases': typeof LabsCasesRoute
   '/labs/dashboard': typeof LabsDashboardRoute
   '/labs/explore': typeof LabsExploreRoute
+  '/labs/staff': typeof LabsStaffRoute
   '/patients/$patientId': typeof PatientsPatientIdRoute
   '/products/$productId': typeof ProductsProductIdRoute
   '/profile/$accountId': typeof ProfileAccountIdRoute
@@ -496,6 +504,7 @@ export interface FileRoutesById {
   '/labs/cases': typeof LabsCasesRoute
   '/labs/dashboard': typeof LabsDashboardRoute
   '/labs/explore': typeof LabsExploreRoute
+  '/labs/staff': typeof LabsStaffRoute
   '/patients/$patientId': typeof PatientsPatientIdRoute
   '/products/$productId': typeof ProductsProductIdRoute
   '/profile/$accountId': typeof ProfileAccountIdRoute
@@ -555,6 +564,7 @@ export interface FileRouteTypes {
     | '/labs/cases'
     | '/labs/dashboard'
     | '/labs/explore'
+    | '/labs/staff'
     | '/patients/$patientId'
     | '/products/$productId'
     | '/profile/$accountId'
@@ -612,6 +622,7 @@ export interface FileRouteTypes {
     | '/labs/cases'
     | '/labs/dashboard'
     | '/labs/explore'
+    | '/labs/staff'
     | '/patients/$patientId'
     | '/products/$productId'
     | '/profile/$accountId'
@@ -669,6 +680,7 @@ export interface FileRouteTypes {
     | '/labs/cases'
     | '/labs/dashboard'
     | '/labs/explore'
+    | '/labs/staff'
     | '/patients/$patientId'
     | '/products/$productId'
     | '/profile/$accountId'
@@ -723,6 +735,7 @@ export interface RootRouteChildren {
   LabsCasesRoute: typeof LabsCasesRoute
   LabsDashboardRoute: typeof LabsDashboardRoute
   LabsExploreRoute: typeof LabsExploreRoute
+  LabsStaffRoute: typeof LabsStaffRoute
   PatientsPatientIdRoute: typeof PatientsPatientIdRoute
   ProductsProductIdRoute: typeof ProductsProductIdRoute
   ProfileAccountIdRoute: typeof ProfileAccountIdRoute
@@ -958,6 +971,13 @@ declare module '@tanstack/react-router' {
       path: '/patients/$patientId'
       fullPath: '/patients/$patientId'
       preLoaderRoute: typeof PatientsPatientIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/labs/staff': {
+      id: '/labs/staff'
+      path: '/labs/staff'
+      fullPath: '/labs/staff'
+      preLoaderRoute: typeof LabsStaffRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/labs/explore': {
@@ -1206,6 +1226,7 @@ const rootRouteChildren: RootRouteChildren = {
   LabsCasesRoute: LabsCasesRoute,
   LabsDashboardRoute: LabsDashboardRoute,
   LabsExploreRoute: LabsExploreRoute,
+  LabsStaffRoute: LabsStaffRoute,
   PatientsPatientIdRoute: PatientsPatientIdRoute,
   ProductsProductIdRoute: ProductsProductIdRoute,
   ProfileAccountIdRoute: ProfileAccountIdRoute,

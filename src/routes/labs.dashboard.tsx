@@ -104,6 +104,7 @@ const STATUS_META: Record<OrderStatus, { ar: string; en: string; color: string; 
 const NAV_ITEMS = [
   { key: "home", ar: "الرئيسية", en: "Home", icon: BarChart3, path: "/labs/dashboard" },
   { key: "orders", ar: "الطلبات", en: "Orders", icon: List, path: "/orders" },
+  { key: "staff", ar: "كادر المختبر", en: "Lab Staff", icon: Users, path: "/labs/staff" },
   { key: "cases", ar: "حالات العمل", en: "Work Cases", icon: Layers, path: "/production" },
   { key: "patients", ar: "المرضى", en: "Patients", icon: Users, path: "/patients" },
   { key: "doctors", ar: "الأطباء", en: "Doctors", icon: Users, path: "/doctors" },
