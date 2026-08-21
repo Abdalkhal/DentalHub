@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, Building2, Calendar, Sparkles, User, Stethoscope, Trash2 } from "lucide-react";
+import { X, Building2, Calendar, Sparkles, User, Stethoscope, Trash2, PenTool, Palette } from "lucide-react";
 import {
   MATERIALS,
   WORK_TYPES,
@@ -11,6 +11,7 @@ import {
   type MaterialId,
   type WorkTypeId,
 } from "@/lib/dentalConfig";
+import { useStaff } from "@/lib/staffStore";
 
 export type PricingItem = {
   id: string;
@@ -53,6 +54,10 @@ export type CombinedLabOrder = {
   alignerCount?: string;
   alignerWearProtocol?: string;
   titaniumFrameworkType?: string;
+  designerId?: string;
+  designerName?: string;
+  ceramistId?: string;
+  ceramistName?: string;
 };
 
 type Props = {
@@ -100,6 +105,14 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
 
   const [notes, setNotes] = useState("");
 
+  // Technical staff assignment
+  const [designerId, setDesignerId] = useState("");
+  const [ceramistId, setCeramistId] = useState("");
+  const staff = useStaff();
+
+  const designers = staff.filter((m) => m.department === "cad_designer");
+  const ceramists = staff.filter((m) => m.department === "ceramist");
+
   const resetForm = () => {
     setPatientName("");
     setDoctorName("");
@@ -129,6 +142,8 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
     setAlignerWearProtocol("14days");
     setTitaniumFrameworkType("fixed_framework");
     setNotes("");
+    setDesignerId("");
+    setCeramistId("");
   };
 
   useEffect(() => {
@@ -255,6 +270,10 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
       alignerCount: isClearAligner ? alignerCount : undefined,
       alignerWearProtocol: isClearAligner ? alignerWearProtocol : undefined,
       titaniumFrameworkType: isTitaniumBar ? titaniumFrameworkType : undefined,
+      designerId: designerId || undefined,
+      designerName: designers.find((m) => m.id === designerId)?.name,
+      ceramistId: ceramistId || undefined,
+      ceramistName: ceramists.find((m) => m.id === ceramistId)?.name,
     });
     resetForm();
   };
@@ -783,6 +802,53 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
               <p className="text-xs text-gray-500">الإجمالي النهائي</p>
               <p className="text-lg font-bold text-blue-600" dir="ltr">{grandTotalLabel}</p>
             </div>
+          </div>
+
+          {/* Section 4: Technical Staff Assignment */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4">
+            <h3 className="text-sm font-bold text-gray-800 border-b pb-2">4. تخصيص الكادر الفني</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                  <PenTool className="w-4 h-4 text-blue-600" /> الدايزنر (المصمم)
+                </label>
+                <select
+                  value={designerId}
+                  onChange={(e) => setDesignerId(e.target.value)}
+                  className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">اختر المصمم...</option>
+                  {designers.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                  <Palette className="w-4 h-4 text-pink-600" /> السراميست
+                </label>
+                <select
+                  value={ceramistId}
+                  onChange={(e) => setCeramistId(e.target.value)}
+                  className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">اختر السراميست...</option>
+                  {ceramists.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            {(designers.length === 0 || ceramists.length === 0) && (
+              <p className="text-[11px] text-gray-400">
+                يمكن إضافة أعضاء الكادر من صفحة كادر المختبر لتظهر في هذه القوائم.
+              </p>
+            )}
           </div>
         </div>
 

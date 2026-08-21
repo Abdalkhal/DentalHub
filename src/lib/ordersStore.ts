@@ -61,6 +61,10 @@ export type Order = {
   alignerCount?: string;
   alignerWearProtocol?: string;
   titaniumFrameworkType?: string;
+  designerId?: string;
+  designerName?: string;
+  ceramistId?: string;
+  ceramistName?: string;
 };
 
 const STORAGE_KEY = "dental_hub_orders";

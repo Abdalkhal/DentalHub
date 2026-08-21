@@ -372,6 +372,10 @@ function LabDashboard() {
       alignerCount: o.alignerCount,
       alignerWearProtocol: o.alignerWearProtocol,
       titaniumFrameworkType: o.titaniumFrameworkType,
+      designerId: o.designerId,
+      designerName: o.designerName,
+      ceramistId: o.ceramistId,
+      ceramistName: o.ceramistName,
       status: "delayed",
       agent: "",
     });
