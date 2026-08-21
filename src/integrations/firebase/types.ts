@@ -71,6 +71,8 @@ export type InvoiceDoc = {
   note?: string;
 };
 
+export type OrderStatus = "pending" | "confirmed" | "rejected";
+
 export type OrderDoc = {
   id: string;
   supplierId: string;
@@ -78,14 +80,16 @@ export type OrderDoc = {
   dentistName: string;
   dentistPhone?: string;
   dentistAddress?: string;
-  productId: string;
-  productName: string;
-  productImage?: string;
-  quantity: number;
-  unitPrice: number;
+  clinicName?: string;
+  orderNumber?: string;
+  items: InvoiceItem[];
   total: number;
-  currency: string;
-  status: "pending" | "confirmed" | "delivered";
+  totalUSD?: number;
+  totalIQD?: number;
+  status: OrderStatus;
+  note?: string;
+  discount?: { code?: string; discountUSD?: number; discountIQD?: number } | null;
+  invoiceId?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 };
