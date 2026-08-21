@@ -7,10 +7,6 @@ import {
   Printer,
   Share2,
   ReceiptText,
-  Building2,
-  User,
-  Stethoscope,
-  Calendar,
   Hash,
   Paintbrush,
   Layers,
@@ -18,8 +14,11 @@ import {
   Syringe,
   Smile,
   Ruler,
+  MapPin,
+  Phone,
+  type LucideIcon,
 } from "lucide-react";
-import type { Order, OrderStatus, PricingItem } from "@/lib/ordersStore";
+import type { Order, PricingItem } from "@/lib/ordersStore";
 import {
   MATERIALS,
   WORK_TYPES,
@@ -31,10 +30,20 @@ import {
 type Props = {
   order: Order;
   labName?: string;
+  labAddress?: string;
+  labPhone?: string;
   onClose: () => void;
 };
 
-const USD_RATE = 1480;
+/** Deep blue + light blue + gold palette */
+const C = {
+  deepBlue: "#14539E",
+  deepBlueDark: "#0F3D77",
+  lightBlue: "#DCEAFB",
+  lightBlueSoft: "#EEF6FD",
+  lightBlueText: "#5B82B5",
+  gold: "#C9A227",
+};
 
 const MATERIAL_LABEL: Record<string, { ar: string; en: string }> = Object.fromEntries(
   MATERIALS.map((m) => [m.id, { ar: m.ar, en: m.en }]),
@@ -48,24 +57,6 @@ const MANUFACTURING_LABEL: Record<string, { ar: string; en: string }> = Object.f
 const FRAMEWORK_LABEL: Record<string, { ar: string; en: string }> = Object.fromEntries(
   FRAMEWORK_CREATION.map((f) => [f.id, { ar: f.ar, en: f.en }]),
 );
-
-const STATUS_META: Record<OrderStatus, { ar: string; en: string; cls: string }> = {
-  in_progress: {
-    ar: "قيد التنفيذ",
-    en: "In Progress",
-    cls: "bg-amber-100 text-amber-700 border-amber-200",
-  },
-  completed: {
-    ar: "مكتملة",
-    en: "Completed",
-    cls: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  },
-  delayed: {
-    ar: "متأخرة",
-    en: "Delayed",
-    cls: "bg-rose-100 text-rose-700 border-rose-200",
-  },
-};
 
 const IMPLANT_CONNECTION: Record<string, { ar: string; en: string }> = {
   internal_hex: { ar: "سداسي داخلي", en: "Internal Hex" },
@@ -133,11 +124,16 @@ function formatInvoiceDate(dateStr: string, lang: "ar" | "en"): string {
   });
 }
 
-function InfoRow({ label, value }: { label: string; value: ReactNode }) {
+function CaseBox({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{label}</span>
-      <span className="text-sm font-semibold text-slate-800">{value || "-"}</span>
+    <div
+      className="flex flex-col gap-0.5 rounded-xl px-3 py-2.5"
+      style={{ border: `1px solid ${C.lightBlue}`, background: "#FFFFFF" }}
+    >
+      <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: C.lightBlueText }}>
+        {label}
+      </span>
+      <span className="text-sm font-semibold text-slate-800 truncate">{value || "-"}</span>
     </div>
   );
 }
@@ -145,26 +141,52 @@ function InfoRow({ label, value }: { label: string; value: ReactNode }) {
 function DetailChip({ label, value }: { label: string; value: ReactNode }) {
   if (!value) return null;
   return (
-    <div className="rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2.5">
-      <p className="text-[10px] font-bold text-slate-400 mb-0.5">{label}</p>
+    <div
+      className="rounded-xl px-3 py-2.5"
+      style={{ border: `1px solid ${C.lightBlue}`, background: C.lightBlueSoft }}
+    >
+      <p className="text-[10px] font-bold mb-0.5" style={{ color: C.lightBlueText }}>
+        {label}
+      </p>
       <p className="text-xs font-semibold text-slate-800">{value}</p>
     </div>
   );
 }
 
-export function OrderInvoiceModal({ order, labName, onClose }: Props) {
+function SectionCard({ title, icon: Icon, children }: { title: string; icon: LucideIcon; children: ReactNode }) {
+  return (
+    <div className="rounded-2xl overflow-hidden" style={{ border: `1px solid ${C.lightBlue}` }}>
+      <div
+        className="flex items-center gap-1.5 px-4 py-2.5"
+        style={{ background: C.lightBlueSoft, borderBottom: `1px solid ${C.lightBlue}` }}
+      >
+        <Icon className="size-3.5" style={{ color: C.deepBlue }} />
+        <span
+          className="text-[11px] font-bold uppercase tracking-wide"
+          style={{ color: C.lightBlueText }}
+        >
+          {title}
+        </span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+export function OrderInvoiceModal({ order, labName, labAddress, labPhone, onClose }: Props) {
   const { lang } = useI18n();
   const ar = lang === "ar";
 
-  const sm = STATUS_META[order.status] ?? STATUS_META.in_progress;
   const materialMeta = order.material ? MATERIAL_LABEL[order.material] : null;
   const workTypeMeta = order.workTypeId ? WORK_TYPE_LABEL[order.workTypeId] : null;
   const methodMeta = order.manufacturingMethod ? MANUFACTURING_LABEL[order.manufacturingMethod] : null;
   const frameworkMeta = order.frameworkCreation ? FRAMEWORK_LABEL[order.frameworkCreation] : null;
   const titaniumMeta = order.titaniumFrameworkType ? TITANIUM_TYPE[order.titaniumFrameworkType] : null;
-  const shadeMeta = order.shade ? VITA_SHADES.find((s) => s.code === order.shade) ?? null : null;
+  const selectedShade = order.shade ? order.shade.trim() : "";
 
   const labTitle = labName || (ar ? "مختبر دنتال هب" : "Dental Hub Lab");
+  const address = labAddress?.trim() || "";
+  const phone = labPhone?.trim() || "";
 
   const items = useMemo(
     () => (order.pricingItems ?? []).filter((i) => i.name && String(i.name).trim() !== ""),
@@ -176,17 +198,6 @@ export function OrderInvoiceModal({ order, labName, onClose }: Props) {
     ? items.reduce((s, i) => s + (Number(i.quantity) || 0), 0)
     : order.unitsCount || 0;
 
-  const iqdTotal = hasTable
-    ? items.reduce(
-        (s, i) =>
-          s +
-          (Number(i.quantity) || 0) *
-            (Number(i.unitPrice) || 0) *
-            (i.currency === "IQD" ? 1 : USD_RATE),
-        0,
-      )
-    : order.price || 0;
-
   const usdTotal = hasTable
     ? items
         .filter((i) => i.currency !== "IQD")
@@ -195,9 +206,8 @@ export function OrderInvoiceModal({ order, labName, onClose }: Props) {
       ? order.price || 0
       : 0;
 
-  const grandTotalLabel = hasTable
-    ? `${fmtNum(Math.round(iqdTotal))} د.ع`
-    : fmtAmount(order.price ?? 0, order.currency);
+  const grandTotalLabel = fmtAmount(order.price ?? 0, order.currency);
+  const showUsdSecondary = order.currency !== "USD" && usdTotal > 0;
 
   const handlePrint = () => {
     window.print();
@@ -253,7 +263,8 @@ export function OrderInvoiceModal({ order, labName, onClose }: Props) {
           <div className="flex items-center gap-2 mb-3 no-print">
             <button
               onClick={handlePrint}
-              className="flex-1 h-11 rounded-xl bg-sky-600 text-white font-bold text-sm flex items-center justify-center gap-2 hover:bg-sky-700 transition shadow-sm"
+              className="flex-1 h-11 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-2 transition shadow-sm hover:opacity-90"
+              style={{ background: C.deepBlue }}
             >
               <Printer className="size-4" />
               {ar ? "طباعة الفاتورة" : "Print Invoice"}
@@ -279,130 +290,124 @@ export function OrderInvoiceModal({ order, labName, onClose }: Props) {
           <div
             id="order-invoice"
             dir={ar ? "rtl" : "ltr"}
-            className="bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden"
+            className="bg-white rounded-2xl shadow-2xl overflow-hidden"
+            style={{ border: `1px solid ${C.lightBlue}` }}
           >
-            {/* Invoice header */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-sky-700 to-indigo-800 text-white px-6 sm:px-8 py-6">
+            {/* ===== Deep blue header ===== */}
+            <div className="relative overflow-hidden text-white px-6 sm:px-8 py-6" style={{ background: C.deepBlue }}>
               <div className="absolute -top-14 -end-14 size-44 rounded-full bg-white/10 blur-2xl" />
               <div className="absolute -bottom-16 -start-10 size-40 rounded-full bg-white/5 blur-2xl" />
+
+              {/* Top row: lab identity (address/phone stacked) + reference number */}
               <div className="relative flex flex-wrap items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2.5 mb-1.5">
+                  <div className="flex items-center gap-2.5 mb-2">
                     <span className="size-10 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center shrink-0">
                       <ReceiptText className="size-5" />
                     </span>
                     <div>
-                      <p className="font-display font-extrabold text-lg leading-tight">
+                      <p className="font-display font-extrabold text-lg leading-tight">{labTitle}</p>
+                      <p className="text-xs text-white/80">
                         {ar ? "فاتورة طلب معملي" : "Lab Order Invoice"}
                       </p>
-                      <p className="text-xs text-white/80 truncate">{labTitle}</p>
                     </div>
                   </div>
-                  <p className="font-mono text-xs text-white/75 mt-2">
-                    {order.orderNumber} · {ar ? "حالة" : "Case"} #{order.caseId}
+                  {/* Contact info stacked: address line 1, phone line 2 */}
+                  <div className="space-y-1 text-xs text-white/85">
+                    {address && (
+                      <p className="flex items-start gap-1.5">
+                        <MapPin className="size-3.5 shrink-0 mt-0.5 text-white/60" />
+                        <span className="leading-snug">{address}</span>
+                      </p>
+                    )}
+                    {phone && (
+                      <p className="flex items-center gap-1.5" dir="ltr">
+                        <Phone className="size-3.5 shrink-0 text-white/60" />
+                        <span>{phone}</span>
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Reference number (replaces the removed status badge) */}
+                <div className="shrink-0 text-end">
+                  <p className="text-[10px] font-bold text-white/60 uppercase tracking-wide">
+                    {ar ? "رقم الطلب / الحالة" : "Order / Case"}
+                  </p>
+                  <p className="font-mono font-bold text-lg leading-tight" dir="ltr">
+                    {order.orderNumber}
+                  </p>
+                  <p className="font-mono text-xs text-white/80" dir="ltr">
+                    {ar ? `حالة #${order.caseId}` : `Case #${order.caseId}`}
                   </p>
                 </div>
-                <span
-                  className={cn(
-                    "shrink-0 text-[11px] font-bold px-3 py-1.5 rounded-full border bg-white/15 backdrop-blur",
-                  )}
-                >
-                  {ar ? sm.ar : sm.en}
-                </span>
-              </div>
-
-              <div className="relative mt-5 pt-4 border-t border-white/15 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                <span className="flex items-center gap-1.5 text-white/85">
-                  <Stethoscope className="size-3.5 shrink-0 text-white/70" />
-                  <span className="min-w-0">
-                    <span className="block text-[10px] text-white/60">
-                      {ar ? "الطبيب" : "Doctor"}
-                    </span>
-                    <span className="block font-semibold truncate">{order.doctor}</span>
-                  </span>
-                </span>
-                <span className="flex items-center gap-1.5 text-white/85">
-                  <User className="size-3.5 shrink-0 text-white/70" />
-                  <span className="min-w-0">
-                    <span className="block text-[10px] text-white/60">
-                      {ar ? "المريض" : "Patient"}
-                    </span>
-                    <span className="block font-semibold truncate">{order.patient}</span>
-                  </span>
-                </span>
-                <span className="flex items-center gap-1.5 text-white/85">
-                  <Building2 className="size-3.5 shrink-0 text-white/70" />
-                  <span className="min-w-0">
-                    <span className="block text-[10px] text-white/60">
-                      {ar ? "العيادة" : "Clinic"}
-                    </span>
-                    <span className="block font-semibold truncate">{order.clinic || "-"}</span>
-                  </span>
-                </span>
-                <span className="flex items-center gap-1.5 text-white/85">
-                  <Calendar className="size-3.5 shrink-0 text-white/70" />
-                  <span className="min-w-0">
-                    <span className="block text-[10px] text-white/60">
-                      {ar ? "تاريخ الإخراج المتوقع" : "Expected Delivery"}
-                    </span>
-                    <span className="block font-semibold truncate">
-                      {formatInvoiceDate(order.dueDate || order.receivedDate, lang)}
-                    </span>
-                  </span>
-                </span>
               </div>
             </div>
 
-            {/* Body */}
+            {/* ===== Body ===== */}
             <div className="px-6 sm:px-8 py-6 space-y-6">
-              {/* Order header grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4">
-                <InfoRow label={ar ? "رقم الحالة" : "Case ID"} value={`#${order.caseId}`} />
-                <InfoRow label={ar ? "رقم الطلب" : "Order No."} value={order.orderNumber} />
-                <InfoRow
-                  label={ar ? "تاريخ الاستلام" : "Received Date"}
-                  value={formatInvoiceDate(order.receivedDate, lang)}
-                />
-                <InfoRow label={ar ? "الطبيب" : "Doctor"} value={order.doctor} />
-                <InfoRow label={ar ? "المريض" : "Patient"} value={order.patient} />
-                <InfoRow label={ar ? "العيادة" : "Clinic"} value={order.clinic || "-"} />
-              </div>
-
-              {/* Shade */}
-              <div className="rounded-2xl border border-slate-100 overflow-hidden">
-                <div className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-50/80 border-b border-slate-100">
-                  <Paintbrush className="size-3.5 text-slate-400" />
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
-                    {ar ? "درجة اللون (Vita Classical)" : "Shade (Vita Classical)"}
-                  </span>
+              {/* Case metadata */}
+              <SectionCard icon={ReceiptText} title={ar ? "بيانات الحالة" : "Case Details"}>
+                <div className="px-4 py-4 grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  <CaseBox label={ar ? "رقم الحالة" : "Case ID"} value={`#${order.caseId}`} />
+                  <CaseBox label={ar ? "رقم الطلب" : "Order No."} value={order.orderNumber} />
+                  <CaseBox
+                    label={ar ? "تاريخ الاستلام" : "Received Date"}
+                    value={formatInvoiceDate(order.receivedDate, lang)}
+                  />
+                  <CaseBox
+                    label={ar ? "تاريخ الإخراج المتوقع" : "Expected Delivery"}
+                    value={formatInvoiceDate(order.dueDate, lang)}
+                  />
+                  <CaseBox label={ar ? "الطبيب" : "Doctor"} value={order.doctor} />
+                  <CaseBox label={ar ? "المريض" : "Patient"} value={order.patient} />
+                  <CaseBox label={ar ? "العيادة" : "Clinic"} value={order.clinic || "-"} />
                 </div>
-                <div className="px-4 py-3 flex items-center gap-3">
-                  {shadeMeta ? (
-                    <>
-                      <span
-                        className="size-10 rounded-full border-2 border-slate-200 shadow-inner"
-                        style={{ background: shadeMeta.hex }}
-                      />
-                      <span className="font-display font-extrabold text-lg text-slate-800">
-                        {order.shade}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-sm text-slate-400">
-                      {ar ? "غير محددة" : "Not specified"}
-                    </span>
+              </SectionCard>
+
+              {/* Shade (Vita Classical) strip */}
+              <SectionCard icon={Paintbrush} title={ar ? "درجة اللون (Vita Classical)" : "Shade (Vita Classical)"}>
+                <div className="px-4 py-4">
+                  <div className="grid grid-cols-8 gap-1.5">
+                    {VITA_SHADES.map((s) => {
+                      const active = selectedShade === s.code;
+                      return (
+                        <div
+                          key={s.code}
+                          className={cn(
+                            "relative aspect-square rounded-xl border-2 transition-all flex flex-col items-center justify-center",
+                            active
+                              ? "border-blue-600 scale-110 shadow-md z-10 ring-2 ring-blue-500/20"
+                              : "border-slate-200",
+                          )}
+                        >
+                          <span
+                            className="size-5 rounded-full border border-slate-300"
+                            style={{ background: s.hex }}
+                          />
+                          <span className="text-[9px] font-bold text-slate-600 mt-0.5">
+                            {s.code}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {!selectedShade && (
+                    <p
+                      className="mt-3 text-xs font-medium rounded-lg px-3 py-2"
+                      style={{ background: C.lightBlueSoft, color: C.lightBlueText }}
+                    >
+                      {ar
+                        ? "لم تُحدَّد درجة لون لهذا الطلب - الشريط أعلاه يُبرز الدرجة تلقائياً عند اختيارها من صفحة الحالة."
+                        : "No shade has been set for this order — the strip above highlights the shade automatically once selected from the case page."}
+                    </p>
                   )}
                 </div>
-              </div>
+              </SectionCard>
 
               {/* Material & Work details */}
-              <div className="rounded-2xl border border-slate-100 overflow-hidden">
-                <div className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-50/80 border-b border-slate-100">
-                  <Layers className="size-3.5 text-slate-400" />
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
-                    {ar ? "المادة وتفاصيل العمل" : "Material & Work Details"}
-                  </span>
-                </div>
+              <SectionCard icon={Layers} title={ar ? "المادة وتفاصيل العمل" : "Material & Work Details"}>
                 <div className="px-4 py-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
                   <DetailChip
                     label={ar ? "المادة الأساسية" : "Material"}
@@ -443,15 +448,12 @@ export function OrderInvoiceModal({ order, labName, onClose }: Props) {
                   order.implantPlatform ||
                   order.implantLevel) && (
                   <div className="px-4 pb-3 space-y-2">
-                    <p className="text-[10px] font-bold text-emerald-600 flex items-center gap-1">
+                    <p className="text-[10px] font-bold flex items-center gap-1" style={{ color: C.deepBlue }}>
                       <Syringe className="size-3" />
                       {ar ? "تفاصيل الزرعة" : "Implant Details"}
                     </p>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      <DetailChip
-                        label={ar ? "شركة الزرعة" : "Company"}
-                        value={order.implantCompany}
-                      />
+                      <DetailChip label={ar ? "شركة الزرعة" : "Company"} value={order.implantCompany} />
                       <DetailChip label={ar ? "النظام" : "System"} value={order.implantSystem} />
                       <DetailChip
                         label={ar ? "الربط" : "Connection"}
@@ -463,10 +465,7 @@ export function OrderInvoiceModal({ order, labName, onClose }: Props) {
                             : undefined
                         }
                       />
-                      <DetailChip
-                        label={ar ? "المنصة" : "Platform"}
-                        value={order.implantPlatform}
-                      />
+                      <DetailChip label={ar ? "المنصة" : "Platform"} value={order.implantPlatform} />
                       <DetailChip
                         label={ar ? "المستوى" : "Level"}
                         value={
@@ -477,10 +476,7 @@ export function OrderInvoiceModal({ order, labName, onClose }: Props) {
                             : undefined
                         }
                       />
-                      <DetailChip
-                        label={ar ? "Scan Body" : "Scan Body"}
-                        value={order.implantScanBody}
-                      />
+                      <DetailChip label={ar ? "Scan Body" : "Scan Body"} value={order.implantScanBody} />
                     </div>
                   </div>
                 )}
@@ -491,7 +487,7 @@ export function OrderInvoiceModal({ order, labName, onClose }: Props) {
                   order.alignerScans ||
                   order.alignerCount) && (
                   <div className="px-4 pb-3 space-y-2">
-                    <p className="text-[10px] font-bold text-sky-600 flex items-center gap-1">
+                    <p className="text-[10px] font-bold flex items-center gap-1" style={{ color: C.deepBlue }}>
                       <Smile className="size-3" />
                       {ar ? "تفاصيل التقويم الشفاف" : "Clear Aligner Details"}
                     </p>
@@ -529,36 +525,35 @@ export function OrderInvoiceModal({ order, labName, onClose }: Props) {
                     </div>
                   </div>
                 )}
-              </div>
+              </SectionCard>
 
               {/* Pricing table */}
-              <div className="rounded-2xl border border-slate-100 overflow-hidden">
-                <div className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-50/80 border-b border-slate-100">
-                  <Hash className="size-3.5 text-slate-400" />
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
-                    {ar
-                      ? order.pricingMode === "mixed"
-                        ? "جدول تسعير الوحدات المتعددة"
-                        : "جدول التسعير"
-                      : order.pricingMode === "mixed"
-                        ? "Mixed Units Pricing"
-                        : "Pricing"}
-                  </span>
-                </div>
+              <SectionCard
+                icon={Hash}
+                title={
+                  ar
+                    ? order.pricingMode === "mixed"
+                      ? "جدول تسعير الوحدات المتعددة"
+                      : "جدول التسعير"
+                    : order.pricingMode === "mixed"
+                      ? "Mixed Units Pricing"
+                      : "Pricing"
+                }
+              >
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-slate-100 bg-slate-50/50 text-right">
-                        <th className="px-4 py-2.5 text-[10px] font-bold text-slate-400 whitespace-nowrap">
+                      <tr className="text-right" style={{ borderBottom: `1px solid ${C.lightBlue}`, background: C.lightBlueSoft }}>
+                        <th className="px-4 py-2.5 text-[10px] font-bold whitespace-nowrap" style={{ color: C.lightBlueText }}>
                           {ar ? "اسم العنصر / نوع العمل" : "Item / Work Type"}
                         </th>
-                        <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 text-center whitespace-nowrap">
+                        <th className="px-3 py-2.5 text-[10px] font-bold text-center whitespace-nowrap" style={{ color: C.lightBlueText }}>
                           {ar ? "عدد الوحدات" : "Units"}
                         </th>
-                        <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 text-center whitespace-nowrap">
+                        <th className="px-3 py-2.5 text-[10px] font-bold text-center whitespace-nowrap" style={{ color: C.lightBlueText }}>
                           {ar ? "سعر الوحدة" : "Price / Unit"}
                         </th>
-                        <th className="px-4 py-2.5 text-[10px] font-bold text-slate-400 text-center whitespace-nowrap">
+                        <th className="px-4 py-2.5 text-[10px] font-bold text-center whitespace-nowrap" style={{ color: C.lightBlueText }}>
                           {ar ? "إجمالي الصف" : "Row Total"}
                         </th>
                       </tr>
@@ -566,33 +561,29 @@ export function OrderInvoiceModal({ order, labName, onClose }: Props) {
                     <tbody>
                       {hasTable ? (
                         items.map((it) => (
-                          <tr key={it.id} className="border-b border-slate-50 last:border-0">
-                            <td className="px-4 py-3 text-sm font-semibold text-slate-800">
-                              {it.name}
-                            </td>
+                          <tr key={it.id} style={{ borderBottom: `1px solid ${C.lightBlue}` }}>
+                            <td className="px-4 py-3 text-sm font-semibold text-slate-800">{it.name}</td>
                             <td className="px-3 py-3 text-center font-mono text-sm font-bold text-slate-700">
                               {it.quantity}
                             </td>
                             <td className="px-3 py-3 text-center text-xs text-slate-500 whitespace-nowrap">
                               {fmtAmount(it.unitPrice, it.currency)}
                             </td>
-                            <td className="px-4 py-3 text-center font-display font-extrabold text-slate-800 whitespace-nowrap">
+                            <td className="px-4 py-3 text-center font-display font-extrabold whitespace-nowrap" style={{ color: C.deepBlue }}>
                               {fmtRowTotal(it)}
                             </td>
                           </tr>
                         ))
                       ) : (
-                        <tr className="border-b border-slate-50 last:border-0">
-                          <td className="px-4 py-3 text-sm font-semibold text-slate-800">
-                            {order.workType}
-                          </td>
+                        <tr style={{ borderBottom: `1px solid ${C.lightBlue}` }}>
+                          <td className="px-4 py-3 text-sm font-semibold text-slate-800">{order.workType}</td>
                           <td className="px-3 py-3 text-center font-mono text-sm font-bold text-slate-700">
                             {order.unitsCount ?? "-"}
                           </td>
                           <td className="px-3 py-3 text-center text-xs text-slate-500 whitespace-nowrap">
                             {fmtAmount(order.unitPrice, order.currency)}
                           </td>
-                          <td className="px-4 py-3 text-center font-display font-extrabold text-slate-800 whitespace-nowrap">
+                          <td className="px-4 py-3 text-center font-display font-extrabold whitespace-nowrap" style={{ color: C.deepBlue }}>
                             {fmtAmount(order.price ?? 0, order.currency)}
                           </td>
                         </tr>
@@ -602,48 +593,52 @@ export function OrderInvoiceModal({ order, labName, onClose }: Props) {
                 </div>
 
                 {/* Summary bar */}
-                <div className="px-4 py-3.5 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-3">
+                <div
+                  className="px-4 py-4 flex flex-wrap items-center justify-between gap-3"
+                  style={{ background: C.lightBlueSoft, borderTop: `1px solid ${C.lightBlue}` }}
+                >
                   <div>
-                    <p className="text-[10px] font-bold text-white/60 uppercase tracking-wide">
+                    <p
+                      className="text-[10px] font-bold uppercase tracking-wide"
+                      style={{ color: C.gold }}
+                    >
                       {ar ? "إجمالي عدد الوحدات" : "Total Units"}
                     </p>
-                    <p className="font-display font-extrabold text-lg" dir="ltr">
+                    <p className="font-display font-extrabold text-lg" dir="ltr" style={{ color: C.deepBlue }}>
                       {fmtNum(totalUnits)}
                     </p>
                   </div>
                   <div className="text-end">
-                    <p className="text-[10px] font-bold text-white/60 uppercase tracking-wide">
+                    <p
+                      className="text-[10px] font-bold uppercase tracking-wide"
+                      style={{ color: C.gold }}
+                    >
                       {ar ? "الإجمالي الكلي" : "Grand Total"}
                     </p>
-                    <p className="font-display font-extrabold text-lg text-sky-300" dir="ltr">
+                    <p className="font-display font-extrabold text-xl" dir="ltr" style={{ color: C.gold }}>
                       {grandTotalLabel}
                     </p>
-                    {usdTotal > 0 && (
-                      <p className="text-xs text-white/70 font-semibold" dir="ltr">
+                    {showUsdSecondary && (
+                      <p className="text-xs font-semibold" style={{ color: C.lightBlueText }} dir="ltr">
                         ≈ ${usdTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                     )}
                   </div>
                 </div>
-              </div>
+              </SectionCard>
 
               {/* Notes */}
               {order.notes && (
-                <div className="rounded-2xl border border-slate-100 overflow-hidden">
-                  <div className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-50/80 border-b border-slate-100">
-                    <FileText className="size-3.5 text-slate-400" />
-                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
-                      {ar ? "ملاحظات" : "Notes"}
-                    </span>
-                  </div>
-                  <p className="px-4 py-3 text-sm text-slate-700 whitespace-pre-wrap">
-                    {order.notes}
-                  </p>
-                </div>
+                <SectionCard icon={FileText} title={ar ? "ملاحظات" : "Notes"}>
+                  <p className="px-4 py-3 text-sm text-slate-700 whitespace-pre-wrap">{order.notes}</p>
+                </SectionCard>
               )}
 
               {/* Footer */}
-              <div className="pt-4 border-t border-dashed border-slate-200 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
+              <div
+                className="pt-4 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400"
+                style={{ borderTop: `1px dashed ${C.lightBlue}` }}
+              >
                 <span className="flex items-center gap-1.5">
                   <Ruler className="size-3.5" />
                   {ar ? "وثيقة فاتورة رسمية — معدة للطباعة" : "Official invoice document — ready to print"}

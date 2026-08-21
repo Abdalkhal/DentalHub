@@ -254,6 +254,8 @@ function LabDashboard() {
   }, [user]);
 
   const labName = profile?.name || (ar ? "مختبر دنتال هب" : "Dental Hub Lab");
+  const labAddress = profile?.city ? [profile.city, profile.address].filter(Boolean).join("، ") : profile?.address || "";
+  const labPhone = profile?.phone || "";
 
   const stats = useMemo(() => {
     const total = orders.length;
@@ -899,6 +901,8 @@ function LabDashboard() {
         <OrderInvoiceModal
           order={viewOrder}
           labName={labName}
+          labAddress={labAddress}
+          labPhone={labPhone}
           onClose={() => setViewOrder(null)}
         />
       )}
