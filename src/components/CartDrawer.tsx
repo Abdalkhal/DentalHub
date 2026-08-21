@@ -187,7 +187,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
             : undefined,
         },
       );
-      await queryClient.invalidateQueries({ queryKey: ["dentist-invoices", user.uid] });
+      await queryClient.invalidateQueries({ queryKey: ["orders", "dentist", user.uid] });
       toast.success(ar ? "تم إرسال الطلب بنجاح" : "Order placed successfully");
       onClose();
       navigate({ to: "/orders" });

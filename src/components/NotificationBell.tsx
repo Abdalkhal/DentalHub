@@ -72,6 +72,11 @@ export function NotificationBell({ userId }: { userId: string }) {
     if (n.invoiceId) {
       setOpen(false);
       navigate({ to: "/doctor-invoices/$invoiceId", params: { invoiceId: n.invoiceId } });
+      return;
+    }
+    if (n.orderId || n.type === "order_new") {
+      setOpen(false);
+      navigate({ to: "/orders" });
     }
   };
 
