@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X, Building2, Calendar, Sparkles, User, Stethoscope, Trash2 } from "lucide-react";
 import {
   MATERIALS,
@@ -99,6 +99,42 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
   const [titaniumFrameworkType, setTitaniumFrameworkType] = useState("fixed_framework");
 
   const [notes, setNotes] = useState("");
+
+  const resetForm = () => {
+    setPatientName("");
+    setDoctorName("");
+    setClinicName("");
+    setDeliveryDate("");
+    setSelectedMaterialId("material.zirconia");
+    setSelectedWorkType("crown");
+    setSelectedManufacturingMethod("monolithic");
+    setFrameworkCreation("conventional_casting");
+    setPricingMode("single");
+    setSingleQuantity("1");
+    setSingleUnitPrice("0");
+    setSingleCurrency("IQD");
+    setPricingItems([{ id: crypto.randomUUID(), name: "", quantity: 1, unitPrice: 0, currency: "IQD" }]);
+    setShade("");
+    setImplantCompany("");
+    setImplantSystem("");
+    setImplantConnection("");
+    setImplantPlatform("");
+    setImplantScanBody("");
+    setImplantLevel("implant");
+    setImplantRetention("screw");
+    setAlignerTreatmentType("comprehensive");
+    setAlignerArch("both");
+    setAlignerScans("");
+    setAlignerCount("10");
+    setAlignerWearProtocol("14days");
+    setTitaniumFrameworkType("fixed_framework");
+    setNotes("");
+  };
+
+  useEffect(() => {
+    if (open) resetForm();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   if (!open) return null;
 
@@ -220,6 +256,12 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
       alignerWearProtocol: isClearAligner ? alignerWearProtocol : undefined,
       titaniumFrameworkType: isTitaniumBar ? titaniumFrameworkType : undefined,
     });
+    resetForm();
+  };
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
   };
 
   const workTypeChip = (wt: (typeof WORK_TYPES)[number], active: boolean, onClick: () => void) => (
@@ -264,7 +306,7 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
               <p className="text-xs text-gray-500">قم بتسعير حالتك واختيار تفاصيل المواد والتصنيع بدقة عالية</p>
             </div>
           </div>
-          <button onClick={onClose} className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600">
+          <button onClick={handleClose} className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -746,7 +788,7 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
 
         {/* Footer Actions */}
         <div className="px-8 py-4 border-t border-gray-100 bg-white flex items-center justify-end gap-3 sticky bottom-0">
-          <button onClick={onClose} className="px-5 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50">
+          <button onClick={handleClose} className="px-5 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50">
             إلغاء
           </button>
           <button onClick={handleSubmit} className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20">
