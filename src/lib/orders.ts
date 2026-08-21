@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { db } from "@/integrations/firebase/client";
 import {
-  collection, getDocs, query, where, orderBy, Timestamp,
+  collection, getDocs, query, where, Timestamp,
   doc, setDoc, updateDoc, serverTimestamp,
 } from "firebase/firestore";
 import type { OrderDoc, OrderStatus, InvoiceItem } from "@/integrations/firebase/types";
@@ -199,13 +199,13 @@ export function useOrders(supplierId?: string) {
     queryKey: [...ordersQueryKey, "supplier", supplierId],
     enabled: !!supplierId,
     queryFn: async (): Promise<OrderDoc[]> => {
-      const q = query(
-        collection(db, "orders"),
-        where("supplierId", "==", supplierId!),
-        orderBy("createdAt", "desc"),
-      );
+      // Single equality filter only (no orderBy) so this works with the
+      // automatic single-field index; we sort client-side.
+      const q = query(collection(db, "orders"), where("supplierId", "==", supplierId!));
       const snap = await getDocs(q);
-      return snap.docs.map((d) => fromDoc(d.id, d.data()));
+      return snap.docs
+        .map((d) => fromDoc(d.id, d.data()))
+        .sort((a, b) => createdAtMs(b.createdAt) - createdAtMs(a.createdAt));
     },
     staleTime: 30_000,
   });
