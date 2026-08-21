@@ -4,7 +4,9 @@ import {
   MATERIALS,
   WORK_TYPES,
   MANUFACTURING_METHODS,
+  FRAMEWORK_CREATION,
   RULES,
+  IMPLANT_WORK_TYPES,
   type MaterialId,
   type WorkTypeId,
 } from "@/lib/dentalConfig";
@@ -17,17 +19,21 @@ export type CombinedLabOrder = {
   material: string;
   workType?: string;
   manufacturingMethod?: string;
+  frameworkCreation?: string;
   unitsCount: number;
   unitPriceIQD: number;
   subtotalIQD: number;
   discountAmountIQD: number;
   finalTotalIQD: number;
   finalTotalUSD: number;
-  isImplant: boolean;
-  scanBody: string;
-  abutmentType: string;
-  digitalAnalog: string;
   notes: string;
+  implantCompany?: string;
+  implantSystem?: string;
+  implantConnection?: string;
+  implantPlatform?: string;
+  implantScanBody?: string;
+  implantLevel?: string;
+  implantRetention?: string;
   alignerTreatmentType?: string;
   alignerArch?: string;
   alignerScans?: string;
@@ -50,16 +56,22 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
 
   const [selectedMaterialId, setSelectedMaterialId] = useState<MaterialId>("material.zirconia");
   const [selectedWorkType, setSelectedWorkType] = useState<WorkTypeId | "">("crown");
-  const [selectedManufacturingMethod, setSelectedManufacturingMethod] = useState("cad_cam_milling");
+  const [selectedManufacturingMethod, setSelectedManufacturingMethod] = useState("monolithic");
+  const [frameworkCreation, setFrameworkCreation] = useState("conventional_casting");
 
   const [singleUnitsCount, setSingleUnitsCount] = useState("1");
   const [singleUnitPriceIQD, setSingleUnitPriceIQD] = useState("125000");
 
-  const [isImplant, setIsImplant] = useState(false);
-  const [scanBody, setScanBody] = useState("");
-  const [abutmentType, setAbutmentType] = useState("");
-  const [digitalAnalog, setDigitalAnalog] = useState("");
+  // Implant details (dynamic — shown only for implant-related cases)
+  const [implantCompany, setImplantCompany] = useState("");
+  const [implantSystem, setImplantSystem] = useState("");
+  const [implantConnection, setImplantConnection] = useState("");
+  const [implantPlatform, setImplantPlatform] = useState("");
+  const [implantScanBody, setImplantScanBody] = useState("");
+  const [implantLevel, setImplantLevel] = useState("implant");
+  const [implantRetention, setImplantRetention] = useState("screw");
 
+  // Clear aligner
   const [alignerTreatmentType, setAlignerTreatmentType] = useState("comprehensive");
   const [alignerArch, setAlignerArch] = useState("both");
   const [alignerScans, setAlignerScans] = useState("");
@@ -73,11 +85,15 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
 
   const isClearAligner = selectedMaterialId === "material.clear_aligner";
   const isTitaniumBar = selectedMaterialId === "material.titanium_bar";
+  const isPFM = selectedMaterialId === "material.pfm";
+  const isZirconia = selectedMaterialId === "material.zirconia";
 
   const allowedWorkTypes = RULES[selectedMaterialId]?.allowedWorkTypes ?? [];
   const workTypes = WORK_TYPES.filter((wt) => allowedWorkTypes.includes(wt.id));
   const allowedMethods = RULES[selectedMaterialId]?.manufacturingRules[selectedWorkType as WorkTypeId] ?? [];
   const manufacturingMethods = MANUFACTURING_METHODS.filter((mm) => allowedMethods.includes(mm.id));
+
+  const isImplantCase = isTitaniumBar || IMPLANT_WORK_TYPES.includes(selectedWorkType as WorkTypeId);
 
   const units = Number(singleUnitsCount) || 0;
   const unitPrice = Number(singleUnitPriceIQD) || 0;
@@ -112,17 +128,21 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
       material: selectedMaterialId,
       workType: selectedWorkType || undefined,
       manufacturingMethod: selectedManufacturingMethod || undefined,
+      frameworkCreation: isPFM ? frameworkCreation : undefined,
       unitsCount: units,
       unitPriceIQD: unitPrice,
       subtotalIQD,
       discountAmountIQD,
       finalTotalIQD,
       finalTotalUSD,
-      isImplant,
-      scanBody,
-      abutmentType,
-      digitalAnalog,
       notes,
+      implantCompany: isImplantCase ? implantCompany : undefined,
+      implantSystem: isImplantCase ? implantSystem : undefined,
+      implantConnection: isImplantCase ? implantConnection : undefined,
+      implantPlatform: isImplantCase ? implantPlatform : undefined,
+      implantScanBody: isImplantCase ? implantScanBody : undefined,
+      implantLevel: isImplantCase ? implantLevel : undefined,
+      implantRetention: isImplantCase ? implantRetention : undefined,
       alignerTreatmentType: isClearAligner ? alignerTreatmentType : undefined,
       alignerArch: isClearAligner ? alignerArch : undefined,
       alignerScans: isClearAligner ? alignerScans : undefined,
@@ -131,6 +151,34 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
       titaniumFrameworkType: isTitaniumBar ? titaniumFrameworkType : undefined,
     });
   };
+
+  const workTypeChip = (wt: (typeof WORK_TYPES)[number], active: boolean, onClick: () => void) => (
+    <button
+      key={wt.id}
+      type="button"
+      onClick={onClick}
+      className={`px-3.5 py-2 rounded-xl border-2 text-right transition-all flex flex-col gap-0.5 ${
+        active ? "border-blue-600 bg-blue-50/30" : "border-gray-200 bg-white hover:border-blue-200"
+      }`}
+    >
+      <span className={`text-xs font-bold ${active ? "text-blue-900" : "text-gray-700"}`}>{wt.ar}</span>
+      <span className="text-[10px] text-gray-400" dir="ltr">{wt.en}</span>
+    </button>
+  );
+
+  const methodChip = (mm: (typeof MANUFACTURING_METHODS)[number], active: boolean, onClick: () => void) => (
+    <button
+      key={mm.id}
+      type="button"
+      onClick={onClick}
+      className={`px-3.5 py-2 rounded-xl border-2 text-right transition-all flex flex-col gap-0.5 ${
+        active ? "border-emerald-600 bg-emerald-50/40" : "border-gray-200 bg-white hover:border-emerald-200"
+      }`}
+    >
+      <span className={`text-xs font-bold ${active ? "text-emerald-900" : "text-gray-700"}`}>{mm.ar}</span>
+      <span className="text-[10px] text-gray-400" dir="ltr">{mm.en}</span>
+    </button>
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 text-right" dir="rtl">
@@ -232,9 +280,9 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
                     >
                       <div className="flex items-center gap-2 mb-1.5">
                         <Icon className={`w-5 h-5 shrink-0 ${active ? "text-blue-600" : "text-gray-400"}`} />
-                        <p className={`text-xs font-bold ${active ? "text-blue-900" : "text-gray-700"}`}>{m.ar}</p>
+                        <span className={`text-xs font-bold ${active ? "text-blue-900" : "text-gray-700"}`}>{m.ar}</span>
                       </div>
-                      <p className="text-[10px] text-gray-400">{m.en}</p>
+                      <span className="text-[10px] text-gray-400 block" dir="ltr">{m.en}</span>
                     </button>
                   );
                 })}
@@ -293,7 +341,7 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
                     }`}
                   >
                     <p className="text-xs font-bold text-gray-800">طقم قابل للإزالة</p>
-                    <p className="text-[10px] text-gray-400">Removable Overdenture</p>
+                    <p className="text-[10px] text-gray-400" dir="ltr">Removable Overdenture</p>
                   </button>
                   <button
                     type="button"
@@ -303,7 +351,7 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
                     }`}
                   >
                     <p className="text-xs font-bold text-gray-800">هيكل ثابت</p>
-                    <p className="text-[10px] text-gray-400">Fixed Framework</p>
+                    <p className="text-[10px] text-gray-400" dir="ltr">Fixed Framework</p>
                   </button>
                 </div>
               </div>
@@ -312,81 +360,135 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
                 {/* Step 2: Work type */}
                 <div className="space-y-3">
                   <p className="text-xs font-bold text-gray-600">نوع العمل</p>
-                  <div className="flex flex-wrap gap-2">
-                    {workTypes.map((wt) => {
-                      const active = selectedWorkType === wt.id;
-                      return (
-                        <button
-                          key={wt.id}
-                          type="button"
-                          onClick={() => selectWorkType(wt.id)}
-                          className={`px-4 py-2 rounded-full text-xs font-bold border transition ${
-                            active
-                              ? "bg-blue-600 text-white border-blue-600"
-                              : "bg-white text-gray-600 border-gray-200 hover:border-blue-300"
-                          }`}
-                        >
-                          {wt.ar} <span className="text-[10px] opacity-70">({wt.en})</span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                  {isZirconia ? (
+                    <div className="space-y-3">
+                      <div className="space-y-2">
+                        <p className="text-[10px] font-semibold text-gray-400">أنواع العمل الأساسية</p>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                          {workTypes.filter((wt) => wt.category === "core").map((wt) => workTypeChip(wt, selectedWorkType === wt.id, () => selectWorkType(wt.id)))}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-[10px] font-semibold text-gray-400">أنواع العمل المتقدمة</p>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                          {workTypes.filter((wt) => wt.category === "advanced").map((wt) => workTypeChip(wt, selectedWorkType === wt.id, () => selectWorkType(wt.id)))}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                      {workTypes.map((wt) => workTypeChip(wt, selectedWorkType === wt.id, () => selectWorkType(wt.id)))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Step 3: Manufacturing method */}
                 <div className="space-y-3">
                   <p className="text-xs font-bold text-gray-600">طريقة التصنيع</p>
-                  <div className="flex flex-wrap gap-2">
-                    {manufacturingMethods.map((mm) => {
-                      const active = selectedManufacturingMethod === mm.id;
-                      return (
-                        <button
-                          key={mm.id}
-                          type="button"
-                          onClick={() => setSelectedManufacturingMethod(mm.id)}
-                          className={`px-4 py-2 rounded-full text-xs font-bold border transition ${
-                            active
-                              ? "bg-emerald-600 text-white border-emerald-600"
-                              : "bg-white text-gray-600 border-gray-200 hover:border-emerald-300"
-                          }`}
-                        >
-                          {mm.ar} <span className="text-[10px] opacity-70">({mm.en})</span>
-                        </button>
-                      );
-                    })}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {manufacturingMethods.map((mm) => methodChip(mm, selectedManufacturingMethod === mm.id, () => setSelectedManufacturingMethod(mm.id)))}
                   </div>
                 </div>
 
-                {/* Implant Support Toggle */}
-                <div className="p-4 rounded-xl border border-blue-100 bg-blue-50/20 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-gray-800">عمل على زرعة (Implant Case)?</span>
-                    <input
-                      type="checkbox"
-                      checked={isImplant}
-                      onChange={(e) => setIsImplant(e.target.checked)}
-                      className="w-4 h-4 accent-blue-600 cursor-pointer"
-                    />
-                  </div>
-
-                  {isImplant && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
-                      <select value={scanBody} onChange={(e) => setScanBody(e.target.value)} className="text-xs bg-white border rounded-xl p-2.5">
-                        <option value="">اختر Scan Body</option>
-                        <option value="dess">DESS System</option>
-                      </select>
-                      <select value={abutmentType} onChange={(e) => setAbutmentType(e.target.value)} className="text-xs bg-white border rounded-xl p-2.5">
-                        <option value="">اختر الأبونتمت</option>
-                        <option value="ti_base">Ti-Base Abutment</option>
-                      </select>
-                      <select value={digitalAnalog} onChange={(e) => setDigitalAnalog(e.target.value)} className="text-xs bg-white border rounded-xl p-2.5">
-                        <option value="">اختر الأنالوج</option>
-                        <option value="printed">3D Printed Model Analog</option>
-                      </select>
+                {/* PFM framework creation */}
+                {isPFM && (
+                  <div className="space-y-3">
+                    <p className="text-xs font-bold text-gray-600">طريقة إنشاء الهيكل المعدني</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {FRAMEWORK_CREATION.map((fc) => {
+                        const active = frameworkCreation === fc.id;
+                        return (
+                          <button
+                            key={fc.id}
+                            type="button"
+                            onClick={() => setFrameworkCreation(fc.id)}
+                            className={`px-3.5 py-2 rounded-xl border-2 text-right transition-all flex flex-col gap-0.5 ${
+                              active ? "border-amber-600 bg-amber-50/40" : "border-gray-200 bg-white hover:border-amber-200"
+                            }`}
+                          >
+                            <span className={`text-xs font-bold ${active ? "text-amber-900" : "text-gray-700"}`}>{fc.ar}</span>
+                            <span className="text-[10px] text-gray-400" dir="ltr">{fc.en}</span>
+                          </button>
+                        );
+                      })}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </>
+            )}
+
+            {/* Dynamic Implant Details (auto-triggered) */}
+            {isImplantCase && (
+              <div className="p-4 rounded-xl border border-blue-100 bg-blue-50/20 space-y-4">
+                <p className="text-xs font-bold text-gray-800">تفاصيل الزرعة</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-gray-600">شركة الزرعة</label>
+                    <input type="text" value={implantCompany} onChange={(e) => setImplantCompany(e.target.value)} placeholder="Straumann, Nobel, ..." className="w-full text-xs bg-white border rounded-xl p-2.5" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-gray-600">نظام الزرعة</label>
+                    <input type="text" value={implantSystem} onChange={(e) => setImplantSystem(e.target.value)} placeholder="نظام الزرعة" className="w-full text-xs bg-white border rounded-xl p-2.5" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-gray-600">الربط (Connection)</label>
+                    <select value={implantConnection} onChange={(e) => setImplantConnection(e.target.value)} className="w-full text-xs bg-white border rounded-xl p-2.5">
+                      <option value="">اختر نوع الربط</option>
+                      <option value="internal_hex">سداسي داخلي (Internal Hex)</option>
+                      <option value="external_hex">سداسي خارجي (External Hex)</option>
+                      <option value="conical">مخروطي (Conical)</option>
+                      <option value="morse_taper">Morse Taper</option>
+                      <option value="internal_octagon">ثماني داخلي (Internal Octagon)</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-gray-600">المنصة (Platform)</label>
+                    <input type="text" value={implantPlatform} onChange={(e) => setImplantPlatform(e.target.value)} placeholder="3.5 / 4.3" className="w-full text-xs bg-white border rounded-xl p-2.5" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-gray-600">Scan Body (اختياري)</label>
+                    <select value={implantScanBody} onChange={(e) => setImplantScanBody(e.target.value)} className="w-full text-xs bg-white border rounded-xl p-2.5">
+                      <option value="">بدون</option>
+                      <option value="dess">DESS</option>
+                      <option value="straumann">Straumann</option>
+                      <option value="nobel">Nobel Biocare</option>
+                      <option value="medentika">Medentika</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-gray-600">المستوى</label>
+                    <select value={implantLevel} onChange={(e) => setImplantLevel(e.target.value)} className="w-full text-xs bg-white border rounded-xl p-2.5">
+                      <option value="implant">مستوى الزرعة (Implant Level)</option>
+                      <option value="multi_unit">مستوى مالتي يونيت (Multi-Unit)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Retention toggle */}
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold text-gray-600">طريقة التثبيت</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setImplantRetention("screw")}
+                      className={`px-3 py-2 rounded-xl border-2 text-xs font-bold transition ${
+                        implantRetention === "screw" ? "border-blue-600 bg-white text-blue-800" : "border-gray-200 bg-white/60 text-gray-500"
+                      }`}
+                    >
+                      تثبيت بالبرغي <span className="block text-[10px] font-normal text-gray-400" dir="ltr">Screw-Retained</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setImplantRetention("cement")}
+                      className={`px-3 py-2 rounded-xl border-2 text-xs font-bold transition ${
+                        implantRetention === "cement" ? "border-blue-600 bg-white text-blue-800" : "border-gray-200 bg-white/60 text-gray-500"
+                      }`}
+                    >
+                      تثبيت بالإسمنت <span className="block text-[10px] font-normal text-gray-400" dir="ltr">Cement-Retained</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
 
@@ -414,7 +516,6 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
               </div>
             </div>
 
-            {/* Notes Section */}
             <div className="space-y-1.5 pt-2">
               <label className="text-xs font-bold text-gray-700">ملاحظات إضافية للمختبر (اختياري)</label>
               <textarea
