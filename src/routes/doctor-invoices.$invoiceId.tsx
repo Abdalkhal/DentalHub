@@ -16,6 +16,8 @@ import {
   X,
   Package,
   StickyNote,
+  Printer,
+  Share2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -137,10 +139,63 @@ function InvoiceDetailInner() {
     }
   };
 
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleShare = async () => {
+    const lines = inv.items.map(
+      (i) =>
+        `• ${i.name} ×${i.quantity} — ${
+          i.currency === "IQD" ? fmtIqd(i.price * i.quantity) : fmtUsd(i.price * i.quantity)
+        }`,
+    );
+    const text = [
+      ar ? "فاتورة" : "Invoice",
+      inv.orderNumber,
+      inv.doctorName,
+      ...lines,
+      ar ? `الإجمالي بالدينار: ${fmtIqd(iqdTotal)}` : `IQD total: ${fmtIqd(iqdTotal)}`,
+      ar ? `الإجمالي بالدولار: ${fmtUsd(usdTotal)}` : `USD total: ${fmtUsd(usdTotal)}`,
+    ].join("\n");
+
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({ title: ar ? "فاتورة" : "Invoice", text });
+      } catch {}
+    } else {
+      try {
+        await navigator.clipboard?.writeText(text);
+        toast.success(ar ? "تم نسخ ملخص الفاتورة" : "Invoice summary copied");
+      } catch {
+        toast.error(ar ? "تعذرت المشاركة" : "Share failed");
+      }
+    }
+  };
+
   return (
     <MobileShell>
       <TopBar title={ar ? "تفاصيل الفاتورة" : "Invoice Details"} showBack />
       <div className="px-4 py-4 space-y-4 pb-10">
+        {/* Print / Share actions */}
+        <div className="flex gap-2">
+          <button
+            onClick={handlePrint}
+            className="flex-1 h-11 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition"
+            style={{ backgroundColor: TEAL }}
+          >
+            <Printer className="size-4" />
+            {ar ? "طباعة" : "Print"}
+          </button>
+          <button
+            onClick={handleShare}
+            className="flex-1 h-11 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold text-sm flex items-center justify-center gap-2 hover:bg-slate-50 transition"
+          >
+            <Share2 className="size-4" />
+            {ar ? "مشاركة" : "Share"}
+          </button>
+        </div>
+
         {/* Invoice header */}
         <div
           className="rounded-3xl p-5 text-white shadow-lg relative overflow-hidden"
