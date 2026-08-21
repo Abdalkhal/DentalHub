@@ -8,7 +8,9 @@ import { useSession } from "@/lib/useAuth";
 import { cn } from "@/lib/utils";
 import { CombinedLabOrderModal, type CombinedLabOrder } from "@/components/CombinedLabOrderModal";
 import { EditOrderModal } from "@/components/EditOrderModal";
+import { OrderInvoiceModal } from "@/components/OrderInvoiceModal";
 import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
+import { WORK_TYPES as DENTAL_WORK_TYPES } from "@/lib/dentalConfig";
 import { toast } from "sonner";
 import { NotificationBell } from "@/components/NotificationBell";
 import {
@@ -236,6 +238,7 @@ function LabDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeNav, setActiveNav] = useState("home");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [viewOrder, setViewOrder] = useState<Order | null>(null);
   const [showAllOrders, setShowAllOrders] = useState(false);
   const [showPromoModal, setShowPromoModal] = useState(false);
   const [showNewOrder, setShowNewOrder] = useState(false);
@@ -303,9 +306,30 @@ function LabDashboard() {
       "material.titanium_bar": "تيتانيوم بار",
     };
     const units = o.unitsCount || 0;
-    const price = o.unitPriceIQD || 0;
-    const disc = o.discountAmountIQD || 0;
-    const total = Math.max(0, o.finalTotalIQD);
+    const USD_RATE = 1480;
+    const workTypeLabel = DENTAL_WORK_TYPES.find((w) => w.id === o.workType)?.ar ?? o.workType ?? "";
+    const pricingItems =
+      o.pricingMode === "mixed" && o.pricingItems?.length
+        ? o.pricingItems.map((it) => ({
+            id: it.id,
+            name: it.name,
+            quantity: Number(it.quantity) || 0,
+            unitPrice: Number(it.unitPrice) || 0,
+            currency: it.currency,
+          }))
+        : [
+            {
+              id: crypto.randomUUID(),
+              name: workTypeLabel,
+              quantity: units,
+              unitPrice: o.currency === "USD" ? (o.unitPriceIQD || 0) / USD_RATE : o.unitPriceIQD || 0,
+              currency: o.currency,
+            },
+          ];
+    const price =
+      o.pricingMode === "single" && o.currency === "USD"
+        ? o.finalTotalUSD
+        : Math.max(0, o.finalTotalIQD);
     addOrder({
       id: crypto.randomUUID(),
       orderNumber: getNextOrderNumber(),
@@ -315,16 +339,38 @@ function LabDashboard() {
       patient: o.patientName,
       doctor: o.doctorName,
       workType: materialLabel[o.material] ?? o.material,
-      status: "delayed",
-      agent: "",
-      unitsCount: units,
-      unitPrice: price,
-      currency: "IQD",
+      material: o.material,
+      workTypeId: o.workType,
+      manufacturingMethod: o.manufacturingMethod,
+      frameworkCreation: o.frameworkCreation,
+      shade: o.shade,
       pricingMode: o.pricingMode,
-      discount: disc,
-      price: total,
+      currency: o.currency,
+      pricingItems,
+      unitsCount: units,
+      unitPrice: o.unitPriceIQD || 0,
+      discount: o.discountAmountIQD || 0,
+      price,
+      subtotalIQD: o.subtotalIQD,
+      discountAmountIQD: o.discountAmountIQD,
+      finalTotalUSD: o.finalTotalUSD,
       notes: o.notes,
       clinic: o.clinicName,
+      implantCompany: o.implantCompany,
+      implantSystem: o.implantSystem,
+      implantConnection: o.implantConnection,
+      implantPlatform: o.implantPlatform,
+      implantScanBody: o.implantScanBody,
+      implantLevel: o.implantLevel,
+      implantRetention: o.implantRetention,
+      alignerTreatmentType: o.alignerTreatmentType,
+      alignerArch: o.alignerArch,
+      alignerScans: o.alignerScans,
+      alignerCount: o.alignerCount,
+      alignerWearProtocol: o.alignerWearProtocol,
+      titaniumFrameworkType: o.titaniumFrameworkType,
+      status: "delayed",
+      agent: "",
     });
   };
 
@@ -672,7 +718,7 @@ function LabDashboard() {
                           <td className="px-3 py-3">
                             <div className="flex items-center gap-1">
                               <button
-                                onClick={() => setSelectedOrder(c)}
+                                onClick={() => setViewOrder(c)}
                                 className="h-7 px-2 rounded-lg text-[11px] font-bold text-sky-600 hover:bg-sky-50 flex items-center gap-1 whitespace-nowrap"
                               >
                                 <Eye className="size-3" />
@@ -845,6 +891,15 @@ function LabDashboard() {
           order={selectedOrder}
           onClose={() => setSelectedOrder(null)}
           onSave={updateOrder}
+        />
+      )}
+
+      {/* Order invoice viewer */}
+      {viewOrder && (
+        <OrderInvoiceModal
+          order={viewOrder}
+          labName={labName}
+          onClose={() => setViewOrder(null)}
         />
       )}
 

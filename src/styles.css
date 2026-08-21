@@ -172,7 +172,9 @@
   #cart-invoice,
   #cart-invoice *,
   #invoice-print,
-  #invoice-print * {
+  #invoice-print *,
+  #order-invoice,
+  #order-invoice * {
     visibility: visible;
   }
 
@@ -197,6 +199,21 @@
     background: #fff;
   }
 
+  #order-invoice {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+    background: #fff;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
   /* Remove the mobile width cap so the invoice prints full width */
   .max-w-md {
     max-width: none !important;
@@ -206,13 +223,21 @@
   #cart-invoice,
   #cart-invoice *,
   #invoice-print,
-  #invoice-print * {
+  #invoice-print *,
+  #order-invoice,
+  #order-invoice * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
   /* Expand horizontally-scrollable tables for print */
-  #invoice-print .overflow-x-auto {
+  #invoice-print .overflow-x-auto,
+  #order-invoice .overflow-x-auto {
     overflow: visible !important;
+  }
+
+  /* Hide modal chrome when printing the order invoice */
+  .no-print {
+    display: none !important;
   }
 }

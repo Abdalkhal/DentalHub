@@ -9,6 +9,14 @@ export type OrderStatus = "in_progress" | "completed" | "delayed";
 
 export type ProdStageId = "impression" | "design" | "printing" | "ceramic" | "qc" | "dispatch";
 
+export type PricingItem = {
+  id: string;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  currency: "USD" | "IQD";
+};
+
 export type Order = {
   id: string;
   orderNumber: string;
@@ -30,6 +38,29 @@ export type Order = {
   rating?: number;
   notes: string;
   clinic: string;
+  // Rich detail fields (used by the read-only invoice viewer)
+  material?: string;
+  workTypeId?: string;
+  manufacturingMethod?: string;
+  frameworkCreation?: string;
+  shade?: string;
+  pricingItems?: PricingItem[];
+  subtotalIQD?: number;
+  discountAmountIQD?: number;
+  finalTotalUSD?: number;
+  implantCompany?: string;
+  implantSystem?: string;
+  implantConnection?: string;
+  implantPlatform?: string;
+  implantScanBody?: string;
+  implantLevel?: string;
+  implantRetention?: string;
+  alignerTreatmentType?: string;
+  alignerArch?: string;
+  alignerScans?: string;
+  alignerCount?: string;
+  alignerWearProtocol?: string;
+  titaniumFrameworkType?: string;
 };
 
 const STORAGE_KEY = "dental_hub_orders";
