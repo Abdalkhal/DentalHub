@@ -24,6 +24,7 @@ export type Order = {
   unitsCount: number;
   unitPrice: number;
   currency?: "USD" | "IQD";
+  pricingMode?: "single" | "mixed";
   discount: number;
   price: number;
   rating?: number;

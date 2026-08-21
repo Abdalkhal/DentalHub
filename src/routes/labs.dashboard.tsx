@@ -240,6 +240,7 @@ function LabDashboard() {
   const [showPromoModal, setShowPromoModal] = useState(false);
   const [showNewOrder, setShowNewOrder] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Order | null>(null);
+  const [statusMenuId, setStatusMenuId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -319,6 +320,7 @@ function LabDashboard() {
       unitsCount: units,
       unitPrice: price,
       currency: "IQD",
+      pricingMode: o.pricingMode,
       discount: disc,
       price: total,
       notes: o.notes,
@@ -605,10 +607,8 @@ function LabDashboard() {
                         ar ? "اسم المريض" : "Patient Name",
                         ar ? "نوع العمل" : "Work Type",
                         ar ? "عدد الوحدات" : "Units Count",
-                        ar ? "السعر" : "Unit Price",
+                        ar ? "نوع التسعير" : "Pricing Type",
                         ar ? "الإجمالي" : "Total Price",
-                        ar ? "خصم" : "Discount",
-                        ar ? "السبب" : "Reason",
                         "",
                       ].map((h, i) => (
                         <th
@@ -623,7 +623,7 @@ function LabDashboard() {
                   <tbody>
                     {displayedCases.length === 0 ? (
                       <tr>
-                        <td colSpan={12} className="text-center py-12 text-sm text-slate-400">
+                        <td colSpan={10} className="text-center py-12 text-sm text-slate-400">
                           {ar ? "لا توجد طلبات مطابقة" : "No matching orders"}
                         </td>
                       </tr>
@@ -654,17 +654,20 @@ function LabDashboard() {
                           <td className="px-3 py-3 text-xs text-slate-700 whitespace-nowrap text-center">
                             {c.unitsCount ?? "-"}
                           </td>
-                          <td className="px-3 py-3 text-xs text-slate-700 whitespace-nowrap">
-                            {fmtCurrency(c.unitPrice ?? 0, c.currency)}
+                          <td className="px-3 py-3">
+                            {c.pricingMode === "mixed" ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-violet-100 text-violet-700 whitespace-nowrap">
+                                <Layers className="size-3" />
+                                {ar ? "وحدات متعددة" : "Mixed Units"}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-sky-100 text-sky-700 whitespace-nowrap">
+                                {ar ? "وحدة واحدة" : "Single Unit"}
+                              </span>
+                            )}
                           </td>
                           <td className="px-3 py-3 text-xs font-bold text-emerald-600 whitespace-nowrap">
                             {fmtCurrency(c.price ?? 0, c.currency)}
-                          </td>
-                          <td className="px-3 py-3 text-xs text-rose-500 whitespace-nowrap">
-                            {c.discount ? fmtCurrency(c.discount, c.currency) : "-"}
-                          </td>
-                          <td className="px-3 py-3 text-xs text-slate-500 max-w-[120px] truncate whitespace-nowrap">
-                            {c.notes || "-"}
                           </td>
                           <td className="px-3 py-3">
                             <div className="flex items-center gap-1">
@@ -675,15 +678,39 @@ function LabDashboard() {
                                 <Eye className="size-3" />
                                 {ar ? "عرض" : "View"}
                               </button>
-                              <select
-                                value={c.status}
-                                onChange={(e) => handleStatusChange(c.id, e.target.value as OrderStatus)}
-                                className="h-7 px-1.5 rounded-lg text-[10px] font-bold bg-slate-50 border border-slate-200 text-slate-600 outline-none cursor-pointer appearance-none text-center"
-                              >
-                                <option value="delayed">{ar ? "متأخرة" : "Delayed"}</option>
-                                <option value="in_progress">{ar ? "قيد التنفيذ" : "In Progress"}</option>
-                                <option value="completed">{ar ? "مكتملة" : "Completed"}</option>
-                              </select>
+                              <div className="relative">
+                                <button
+                                  onClick={() => setStatusMenuId(statusMenuId === c.id ? null : c.id)}
+                                  className={cn(
+                                    "inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-bold border whitespace-nowrap cursor-pointer transition",
+                                    STATUS_META[c.status].color,
+                                  )}
+                                >
+                                  <span className={cn("size-1.5 rounded-full", STATUS_META[c.status].dot)} />
+                                  {ar ? STATUS_META[c.status].ar : STATUS_META[c.status].en}
+                                  <ChevronDown className="size-3" />
+                                </button>
+                                {statusMenuId === c.id && (
+                                  <div className="absolute z-30 top-full mt-1 end-0 w-40 bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden">
+                                    {(["in_progress", "completed", "delayed"] as OrderStatus[]).map((s) => (
+                                      <button
+                                        key={s}
+                                        onClick={() => {
+                                          handleStatusChange(c.id, s);
+                                          setStatusMenuId(null);
+                                        }}
+                                        className={cn(
+                                          "w-full text-right px-3 py-2 text-xs font-bold hover:bg-slate-50 flex items-center gap-2 transition",
+                                          c.status === s && "bg-slate-50",
+                                        )}
+                                      >
+                                        <span className={cn("size-1.5 rounded-full", STATUS_META[s].dot)} />
+                                        {ar ? STATUS_META[s].ar : STATUS_META[s].en}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
                               <button
                                 onClick={() => setDeleteTarget(c)}
                                 className="h-7 w-7 rounded-lg text-[11px] font-bold text-rose-500 hover:bg-rose-50 flex items-center justify-center"
