@@ -4,6 +4,12 @@ import { cn } from "@/lib/utils";
 import type { Order, OrderStatus } from "@/lib/ordersStore";
 
 const STATUS_META: Record<OrderStatus, { ar: string; en: string; badge: string; dot: string }> = {
+  new: {
+    ar: "جديد",
+    en: "New",
+    badge: "bg-sky-100 text-sky-700 border-sky-200",
+    dot: "bg-sky-500",
+  },
   in_progress: {
     ar: "قيد التنفيذ",
     en: "In Progress",
@@ -45,11 +51,13 @@ export function OrderDetailsModal({ order, onClose, onStatusChange }: Props) {
   const wt = WORK_TYPE_LABELS[order.workType] ?? { ar: order.workType, en: order.workType };
 
   const nextStatus: OrderStatus | null =
-    order.status === "delayed"
+    order.status === "new"
       ? "in_progress"
-      : order.status === "in_progress"
-        ? "completed"
-        : null;
+      : order.status === "delayed"
+        ? "in_progress"
+        : order.status === "in_progress"
+          ? "completed"
+          : null;
 
   const nextLabel = nextStatus
     ? ar

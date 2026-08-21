@@ -21,6 +21,8 @@ import {
   useOrders,
   getNextOrderNumber,
   getNextCaseId,
+  connectLabOrders,
+  disconnectLabOrders,
   type Order,
   type OrderStatus,
 } from "@/lib/ordersStore";
@@ -81,6 +83,12 @@ const WORK_TYPES: Record<
 };
 
 const STATUS_META: Record<OrderStatus, { ar: string; en: string; color: string; dot: string }> = {
+  new: {
+    ar: "جديد",
+    en: "New",
+    color: "bg-sky-100 text-sky-700 border-sky-200",
+    dot: "bg-sky-500",
+  },
   in_progress: {
     ar: "قيد التنفيذ",
     en: "In Progress",
@@ -252,6 +260,12 @@ function LabDashboard() {
       if (snap.exists()) setProfile(snap.data() as UserRoleDoc);
     });
     return unsub;
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    connectLabOrders(user.uid);
+    return () => disconnectLabOrders();
   }, [user]);
 
   const labName = profile?.name || (ar ? "مختبر دنتال هب" : "Dental Hub Lab");
@@ -745,7 +759,7 @@ function LabDashboard() {
                                 </button>
                                 {statusMenuId === c.id && (
                                   <div className="absolute z-30 top-full mt-1 end-0 w-40 bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden">
-                                    {(["in_progress", "completed", "delayed"] as OrderStatus[]).map((s) => (
+                                    {(["new", "in_progress", "completed", "delayed"] as OrderStatus[]).map((s) => (
                                       <button
                                         key={s}
                                         onClick={() => {

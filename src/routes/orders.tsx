@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useSearch } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import type { OrderDoc } from "@/integrations/firebase/types";
@@ -16,6 +16,8 @@ import {
   updateOrder,
   deleteOrder,
   useOrders,
+  connectLabOrders,
+  disconnectLabOrders,
   type Order,
   type OrderStatus,
 } from "@/lib/ordersStore";
@@ -44,7 +46,7 @@ import {
 } from "lucide-react";
 
 const ordersSearchSchema = z.object({
-  status: z.enum(["all", "in_progress", "completed", "delayed"]).catch("all"),
+  status: z.enum(["all", "new", "in_progress", "completed", "delayed"]).catch("all"),
 });
 
 export const Route = createFileRoute("/orders")({
@@ -52,7 +54,7 @@ export const Route = createFileRoute("/orders")({
   component: Orders,
 });
 
-type FilterStatus = "all" | "in_progress" | "completed" | "delayed";
+type FilterStatus = "all" | "new" | "in_progress" | "completed" | "delayed";
 type WorkType = "zircon" | "inlay_onlay" | "night_guard" | "ceramic" | "implant" | "lumineer" | "e_max" | "veneer";
 
 const WORK_TYPES: Record<WorkType, { ar: string; en: string; icon: typeof Crown; color: string }> = {
@@ -105,6 +107,7 @@ function Orders() {
 function LabOrders() {
   const { lang, t } = useI18n();
   const ar = lang === "ar";
+  const { user } = useSession();
 
   const { status: initialStatus } = useSearch({ from: "/orders" });
   const [search, setSearch] = useState("");
@@ -112,6 +115,12 @@ function LabOrders() {
   const orders = useOrders();
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Order | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    connectLabOrders(user.uid);
+    return () => disconnectLabOrders();
+  }, [user]);
 
   const selectedOrder = useMemo(
     () => (selectedOrderId ? (orders.find((o) => o.id === selectedOrderId) ?? null) : null),
@@ -126,6 +135,7 @@ function LabOrders() {
 
   const statusOptions: { id: FilterStatus; ar: string; en: string }[] = [
     { id: "all", ar: t("filter_all"), en: "All" },
+    { id: "new", ar: "جديد", en: "New" },
     { id: "in_progress", ar: t("filter_in_production"), en: "In Progress" },
     { id: "completed", ar: t("filter_completed"), en: "Completed" },
     { id: "delayed", ar: t("filter_late"), en: "Late" },
@@ -238,8 +248,8 @@ function LabOrders() {
                       <p className="text-muted-foreground font-medium">{t("status")}</p>
                       <span className="font-semibold text-foreground">
                         {ar
-                          ? o.status === "in_progress" ? "قيد التنفيذ" : o.status === "completed" ? "مكتملة" : "متأخرة"
-                          : o.status === "in_progress" ? "In Progress" : o.status === "completed" ? "Completed" : "Delayed"}
+                          ? o.status === "new" ? "جديد" : o.status === "in_progress" ? "قيد التنفيذ" : o.status === "completed" ? "مكتملة" : "متأخرة"
+                          : o.status === "new" ? "New" : o.status === "in_progress" ? "In Progress" : o.status === "completed" ? "Completed" : "Delayed"}
                       </span>
                     </div>
                   </div>

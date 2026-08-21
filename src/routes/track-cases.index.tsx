@@ -42,6 +42,14 @@ const STATUS: Record<"all", StatusStyle> & Record<OrderStatus, StatusStyle> = {
     dot: "bg-rose-500",
     light: "bg-rose-50/30",
   },
+  new: {
+    bg: "bg-sky-50",
+    border: "border-sky-200",
+    text: "text-sky-700",
+    accent: "border-l-sky-400",
+    dot: "bg-sky-500",
+    light: "bg-sky-50/30",
+  },
   in_progress: {
     bg: "bg-amber-50",
     border: "border-amber-200",
@@ -61,6 +69,7 @@ const STATUS: Record<"all", StatusStyle> & Record<OrderStatus, StatusStyle> = {
 };
 
 const STATUS_LABELS: Record<OrderStatus, { ar: string; en: string }> = {
+  new: { ar: "جديد", en: "New" },
   delayed: { ar: "متأخرة", en: "Delayed" },
   in_progress: { ar: "قيد التنفيذ", en: "In Progress" },
   completed: { ar: "مكتملة", en: "Completed" },
@@ -91,6 +100,7 @@ function TrackCases() {
 
   const statuses = [
     { id: "all", ar: "الكل", en: "All" },
+    { id: "new", ar: "جديد", en: "New" },
     { id: "delayed", ar: "متأخرة", en: "Delayed" },
     { id: "in_progress", ar: "قيد التنفيذ", en: "In Progress" },
     { id: "completed", ar: "مكتملة", en: "Completed" },
@@ -118,7 +128,7 @@ function TrackCases() {
             )}
           </div>
         </div>
-        <div className="grid grid-cols-4 gap-2 mb-5">
+        <div className="grid grid-cols-5 gap-2 mb-5">
           {statuses.map((s) => {
             const st = STATUS[s.id as keyof typeof STATUS];
             const active = filter === s.id;

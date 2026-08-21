@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { X, Send, Loader2, Upload } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useSession } from "@/lib/useAuth";
-import { submitDentistCase } from "@/lib/ordersStore";
+import { submitDentistCase, type OrderAttachment } from "@/lib/ordersStore";
 import { createNotification } from "@/components/NotificationBell";
 import { cn } from "@/lib/utils";
 import { storage } from "@/integrations/firebase/client";
@@ -102,19 +102,19 @@ export function SendCaseModal({ labId, labName, open, onClose }: SendCaseModalPr
     setFilePreviewUrls((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  const uploadFiles = async (caseId: string): Promise<string[]> => {
+  const uploadFiles = async (caseId: string): Promise<OrderAttachment[]> => {
     if (files.length === 0) return [];
-    const urls: string[] = [];
+    const attachments: OrderAttachment[] = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      const ext = file.name.split(".").pop() ?? "jpg";
+      const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
       const path = `case_scans/${labId}/${caseId}/scan_${i + 1}.${ext}`;
       const fileRef = ref(storage, path);
       const snap = await uploadBytes(fileRef, file);
       const url = await getDownloadURL(snap.ref);
-      urls.push(url);
+      attachments.push({ name: file.name, url, type: ext });
     }
-    return urls;
+    return attachments;
   };
 
   const handleSubmit = async () => {
@@ -141,19 +141,18 @@ export function SendCaseModal({ labId, labName, open, onClose }: SendCaseModalPr
         clinic: clinic.trim() || (ar ? "غير محدد" : "Unspecified"),
         dentistId: user?.uid ?? "unknown",
         dentistName: user?.displayName ?? user?.email ?? (ar ? "طبيب" : "Dentist"),
+        shade: shade || undefined,
+        material,
       });
 
-      const scanUrls = await uploadFiles(order.id);
+      const attachments = await uploadFiles(order.id);
 
-      if (scanUrls.length > 0) {
+      if (attachments.length > 0) {
         const { doc, setDoc } = await import("firebase/firestore");
         const { db } = await import("@/integrations/firebase/client");
         await setDoc(doc(db, "lab_orders", labId, "cases", order.id), {
           ...order,
-          shade,
-          material,
-          scanUrls,
-          dentistId: user?.uid ?? "unknown",
+          attachments,
           updatedAt: new Date().toISOString(),
         }, { merge: true });
       }
@@ -161,10 +160,10 @@ export function SendCaseModal({ labId, labName, open, onClose }: SendCaseModalPr
       try {
         await createNotification({
           userId: labId,
-          title: ar ? "حالة جديدة" : "New Case",
+          title: ar ? "طلب حالة جديدة" : "New Case Request",
           body: ar
-            ? `حالة جديدة: ${order.patient} — ${WORK_TYPE_LABELS[workType]?.["ar"] ?? workType} (${shade || "—"})`
-            : `New case: ${order.patient} — ${WORK_TYPE_LABELS[workType]?.en ?? workType} (${shade || "—"})`,
+            ? `قام د. ${order.doctor} بطلب حالة جديدة للمريض ${order.patient}.`
+            : `Dr. ${order.doctor} requested a new case for patient ${order.patient}.`,
           type: "order_new",
           orderId: order.id,
         });

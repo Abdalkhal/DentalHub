@@ -22,6 +22,7 @@ const WORK_TYPES = [
 ];
 
 const STATUS_OPTIONS: { value: OrderStatus; ar: string; en: string }[] = [
+  { value: "new", ar: "جديد", en: "New" },
   { value: "in_progress", ar: "قيد التنفيذ", en: "In Progress" },
   { value: "completed", ar: "مكتملة", en: "Completed" },
   { value: "delayed", ar: "متأخرة", en: "Delayed" },

@@ -16,9 +16,11 @@ import {
   Ruler,
   MapPin,
   Phone,
+  Paperclip,
+  Download,
   type LucideIcon,
 } from "lucide-react";
-import type { Order, PricingItem } from "@/lib/ordersStore";
+import type { Order, PricingItem, OrderAttachment } from "@/lib/ordersStore";
 import {
   MATERIALS,
   WORK_TYPES,
@@ -122,6 +124,12 @@ function formatInvoiceDate(dateStr: string, lang: "ar" | "en"): string {
     month: "long",
     day: "numeric",
   });
+}
+
+function isStlAttachment(att: OrderAttachment): boolean {
+  const t = (att.type || "").toLowerCase();
+  const n = (att.name || "").toLowerCase();
+  return t === "stl" || n.endsWith(".stl");
 }
 
 function CaseBox({ label, value }: { label: string; value: ReactNode }) {
@@ -631,6 +639,48 @@ export function OrderInvoiceModal({ order, labName, labAddress, labPhone, onClos
               {order.notes && (
                 <SectionCard icon={FileText} title={ar ? "ملاحظات" : "Notes"}>
                   <p className="px-4 py-3 text-sm text-slate-700 whitespace-pre-wrap">{order.notes}</p>
+                </SectionCard>
+              )}
+
+              {/* Attachments */}
+              {order.attachments && order.attachments.length > 0 && (
+                <SectionCard icon={Paperclip} title={ar ? "المرفقات والملفات" : "Attachments & Files"}>
+                  <ul className="divide-y" style={{ borderColor: C.lightBlue }}>
+                    {order.attachments.map((att, i) => {
+                      const stl = isStlAttachment(att);
+                      return (
+                        <li key={`${att.name}-${i}`} className="flex items-center gap-3 px-4 py-3">
+                          <span
+                            className="size-9 rounded-lg flex items-center justify-center shrink-0"
+                            style={{ background: C.lightBlueSoft, color: C.deepBlue }}
+                          >
+                            {stl ? <Layers className="size-4" /> : <FileText className="size-4" />}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-slate-800 truncate" dir="ltr">
+                              {att.name}
+                            </p>
+                            <p className="text-[11px] text-slate-400 uppercase" dir="ltr">
+                              {att.type || "file"}
+                            </p>
+                          </div>
+                          <a
+                            href={att.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download={att.name}
+                            className="shrink-0 h-9 px-3 rounded-lg text-white font-bold text-xs flex items-center gap-1.5 transition hover:opacity-90"
+                            style={{ background: stl ? C.deepBlue : "#64748B" }}
+                          >
+                            <Download className="size-3.5" />
+                            {stl
+                              ? ar ? "تحميل ملف المسح الضوئي STL / 3D" : "Download STL / 3D Scan"
+                              : ar ? "تحميل" : "Download"}
+                          </a>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </SectionCard>
               )}
 

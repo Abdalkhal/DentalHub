@@ -32,6 +32,12 @@ import {
 } from "@/lib/ordersStore";
 
 const STATUS_META: Record<OrderStatus, { ar: string; en: string; badge: string; dot: string }> = {
+  new: {
+    ar: "جديد",
+    en: "New",
+    badge: "bg-sky-100 text-sky-700 border-sky-200",
+    dot: "bg-sky-500",
+  },
   in_progress: {
     ar: "قيد التنفيذ",
     en: "In Progress",

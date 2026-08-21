@@ -5,9 +5,15 @@ import {
 } from "firebase/firestore";
 import { db } from "@/integrations/firebase/client";
 
-export type OrderStatus = "in_progress" | "completed" | "delayed";
+export type OrderStatus = "new" | "in_progress" | "completed" | "delayed";
 
 export type ProdStageId = "impression" | "design" | "printing" | "ceramic" | "qc" | "dispatch";
+
+export type OrderAttachment = {
+  name: string;
+  url: string;
+  type: string;
+};
 
 export type PricingItem = {
   id: string;
@@ -65,6 +71,9 @@ export type Order = {
   designerName?: string;
   ceramistId?: string;
   ceramistName?: string;
+  targetLabId?: string;
+  dentistId?: string;
+  attachments?: OrderAttachment[];
 };
 
 const STORAGE_KEY = "dental_hub_orders";
@@ -329,6 +338,9 @@ export async function submitDentistCase(
     clinic: string;
     dentistId: string;
     dentistName: string;
+    shade?: string;
+    material?: string;
+    attachments?: OrderAttachment[];
   },
 ) {
   const id = `case_${Date.now().toString(36)}`;
@@ -342,7 +354,7 @@ export async function submitDentistCase(
     workType: data.workType,
     receivedDate: new Date().toISOString().split("T")[0],
     dueDate: data.dueDate,
-    status: "delayed",
+    status: "new",
     currentStage: "impression",
     agent: data.dentistName,
     unitsCount: data.unitsCount,
@@ -352,6 +364,11 @@ export async function submitDentistCase(
     price: 0,
     notes: data.notes,
     clinic: data.clinic,
+    targetLabId: labId,
+    dentistId: data.dentistId,
+    shade: data.shade,
+    material: data.material,
+    attachments: data.attachments,
   };
 
   await setDoc(caseDocRef(labId, id), order);
