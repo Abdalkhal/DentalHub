@@ -341,6 +341,12 @@ function AuthPage() {
         setError(
           ar ? "طلبات كثيرة جداً. حاول مرة أخرى لاحقاً." : "Too many attempts. Try again later.",
         );
+      } else if (msg.includes("network-request-failed")) {
+        setError(
+          ar
+            ? "تعذر الاتصال بخوادم المصادقة. تحقق من اتصال الإنترنت، وأوقف مانع الإعلانات (مثل uBlock أو Brave Shield) مؤقتاً، وحاول في وضع التصفح المتخفي."
+            : "Could not reach the authentication servers. Check your internet connection, temporarily disable any ad blocker (e.g. uBlock / Brave Shield), and try in an incognito window.",
+        );
       } else {
         setError(msg || (ar ? "حدث خطأ. حاول مرة أخرى." : "An error occurred."));
       }

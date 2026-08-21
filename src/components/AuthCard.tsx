@@ -60,6 +60,12 @@ export function AuthCard({ defaultMode }: AuthCardProps) {
         setError(
           ar ? "طلبات كثيرة جداً. حاول مرة أخرى لاحقاً." : "Too many attempts. Try again later.",
         );
+      } else if (msg.includes("network-request-failed")) {
+        setError(
+          ar
+            ? "تعذر الاتصال بخوادم المصادقة. تحقق من اتصال الإنترنت، وأوقف مانع الإعلانات مؤقتاً، وجرّب وضع التصفح المتخفي."
+            : "Could not reach the authentication servers. Check your internet, disable any ad blocker, and try an incognito window.",
+        );
       } else {
         setError(msg || (ar ? "حدث خطأ. حاول مرة أخرى." : "An error occurred."));
       }
@@ -103,6 +109,12 @@ export function AuthCard({ defaultMode }: AuthCardProps) {
           ar
             ? "كلمة المرور ضعيفة جداً. استخدم 6 أحرف على الأقل."
             : "Password too weak. Use at least 6 characters.",
+        );
+      } else if (msg.includes("network-request-failed")) {
+        setError(
+          ar
+            ? "تعذر الاتصال بخوادم المصادقة. تحقق من اتصال الإنترنت، وأوقف مانع الإعلانات مؤقتاً، وجرّب وضع التصفح المتخفي."
+            : "Could not reach the authentication servers. Check your internet, disable any ad blocker, and try an incognito window.",
         );
       } else {
         setError(msg || (ar ? "حدث خطأ. حاول مرة أخرى." : "An error occurred."));
