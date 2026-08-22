@@ -170,27 +170,27 @@ function StatCard({
     <Comp
       onClick={onClick}
       className={cn(
-        "rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow duration-300 text-white",
+        "rounded-2xl p-5 border border-slate-200/60 shadow-sm hover:shadow-md transition-shadow duration-300",
         color,
         onClick && "cursor-pointer active:scale-[0.98]",
       )}
     >
       <div className="flex items-start justify-between mb-3">
-        <span className="text-xs font-semibold text-white/80 uppercase tracking-wide">
+        <span className="text-xs font-bold uppercase tracking-wide opacity-80">
           {label}
         </span>
-        <span className="size-10 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center">
+        <span className="size-10 rounded-xl bg-white/70 flex items-center justify-center">
           <Icon className="size-5" />
         </span>
       </div>
-      <p className="text-3xl font-extrabold text-white tracking-tight font-display drop-shadow-sm">{value}</p>
-      <div className="flex items-center gap-1 mt-2">
+      <p className="text-3xl font-extrabold tracking-tight font-display">{value}</p>
+      <div className="flex items-center gap-1 mt-2 opacity-70">
         {trendUp ? (
-          <TrendingUp className="size-3.5 text-white/80" />
+          <TrendingUp className="size-3.5" />
         ) : (
-          <TrendingDown className="size-3.5 text-white/80" />
+          <TrendingDown className="size-3.5" />
         )}
-        <span className="text-xs font-semibold text-white/80">{trend}</span>
+        <span className="text-xs font-semibold">{trend}</span>
       </div>
     </Comp>
   );
@@ -413,7 +413,7 @@ function LabDashboard() {
   const today = new Date();
 
   return (
-    <div className="min-h-svh bg-[#F0F7FF] overflow-x-hidden" dir={ar ? "rtl" : "ltr"}>
+    <div className="min-h-svh bg-[#F8FAFC] overflow-x-hidden" dir={ar ? "rtl" : "ltr"}>
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
@@ -426,37 +426,38 @@ function LabDashboard() {
         {/* ===== LEFT SIDEBAR ===== */}
         <aside
           className={cn(
-            "fixed lg:sticky top-0 z-50 h-svh w-64 bg-white border-l border-slate-200 flex flex-col transition-transform duration-300 lg:translate-x-0",
+            "fixed lg:sticky top-0 z-50 h-svh w-64 bg-slate-900 border-slate-800 flex flex-col transition-transform duration-300 lg:translate-x-0",
             ar ? "right-0 border-l" : "left-0 border-r",
             sidebarOpen ? "translate-x-0" : ar ? "translate-x-full" : "-translate-x-full",
             "lg:block",
           )}
         >
           {/* Logo */}
-          <div className="flex items-center gap-2.5 px-5 h-16 border-b border-slate-100 shrink-0">
-            <div className="size-8 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 text-white flex items-center justify-center shadow-md">
+          <div className="flex items-center gap-2.5 px-5 h-16 border-b border-slate-800 shrink-0">
+            <div className="size-8 rounded-xl bg-gradient-to-br from-sky-400 to-blue-500 text-white flex items-center justify-center shadow-md">
               <span className="font-extrabold text-sm">DH</span>
             </div>
             <span className="font-display font-extrabold text-lg">
-              <span className="text-sky-500">Dental</span>
-              <span className="text-slate-800">Hub</span>
+              <span className="text-sky-400">Dental</span>
+              <span className="text-white">Hub</span>
             </span>
           </div>
 
           {/* Quick Access */}
-          <div className="p-4 space-y-1.5 border-b border-slate-100">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-3 mb-2">
+          <div className="p-4 space-y-2 border-b border-slate-800">
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-3 mb-2">
               {ar ? "الوصول السريع" : "Quick Access"}
             </p>
             <QuickAccessButton
               icon={Plus}
               label={ar ? "طلب جديد" : "New Order"}
-              color="bg-sky-500 text-white hover:bg-sky-600"
+              color="bg-sky-600 text-white hover:bg-sky-500"
               onClick={() => setShowNewOrder(true)}
             />
             <QuickAccessButton
               icon={List}
               label={ar ? "عرض الطلبات" : "View Orders"}
+              color="bg-sky-600 text-white hover:bg-sky-500"
               onClick={() => navigate({ to: "/orders" })}
             />
             <QuickAccessButton
@@ -473,7 +474,7 @@ function LabDashboard() {
             {/* Promo card */}
             <button
               onClick={() => setShowPromoModal(true)}
-              className="relative mt-4 w-full rounded-2xl overflow-hidden bg-gradient-to-br from-sky-500 to-indigo-600 p-4 text-white text-right shadow-lg group"
+              className="relative mt-4 w-full rounded-2xl overflow-hidden bg-gradient-to-br from-sky-600 to-indigo-600 p-4 text-white text-right shadow-lg group"
             >
               <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_30%_50%,white_0%,transparent_60%)]" />
               <p className="font-display font-bold text-sm leading-tight relative line-clamp-2">
@@ -487,8 +488,8 @@ function LabDashboard() {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 overflow-y-auto p-3 space-y-0.5">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-3 mb-2">
+          <nav className="flex-1 overflow-y-auto p-3 space-y-1">
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-3 mb-2">
               {ar ? "القائمة" : "Menu"}
             </p>
             {NAV_ITEMS.map((item) => {
@@ -504,14 +505,14 @@ function LabDashboard() {
                   className={cn(
                     "w-full flex items-center gap-3 px-3 h-11 rounded-xl text-sm font-semibold transition-all",
                     active
-                      ? "bg-sky-50 text-sky-700 shadow-sm"
-                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-800",
+                      ? "bg-teal-700 text-white shadow-sm"
+                      : "text-slate-400 hover:bg-slate-800 hover:text-white",
                   )}
                 >
                   <span
                     className={cn(
                       "size-8 rounded-lg flex items-center justify-center",
-                      active ? "bg-sky-500 text-white" : "bg-sky-100 text-sky-600",
+                      active ? "bg-white/20 text-white" : "bg-slate-800 text-slate-400",
                     )}
                   >
                     <Icon className="size-4" />
@@ -523,18 +524,18 @@ function LabDashboard() {
           </nav>
 
           {/* Profile widget */}
-          <div className="p-4 border-t border-slate-100 shrink-0">
+          <div className="p-4 border-t border-slate-800 shrink-0">
             <div className="flex items-center gap-3">
-              <span className="size-10 rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 text-white flex items-center justify-center font-display font-bold shadow-md shrink-0">
+              <span className="size-10 rounded-xl bg-gradient-to-br from-sky-400 to-blue-500 text-white flex items-center justify-center font-display font-bold shadow-md shrink-0">
                 {labName.charAt(0)}
               </span>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-slate-900 truncate">{labName}</p>
-                <p className="text-[11px] text-slate-500">{ar ? "مدير النظام" : "Administrator"}</p>
+                <p className="text-sm font-bold text-white truncate">{labName}</p>
+                <p className="text-[11px] text-slate-400">{ar ? "مدير النظام" : "Administrator"}</p>
               </div>
               <button
                 onClick={handleLogout}
-                className="size-8 rounded-lg hover:bg-rose-50 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors"
+                className="size-8 rounded-lg hover:bg-slate-800 flex items-center justify-center text-slate-500 hover:text-rose-400 transition-colors"
                 title={ar ? "تسجيل الخروج" : "Logout"}
               >
                 <LogOut className="size-4" />
@@ -624,7 +625,7 @@ function LabDashboard() {
                 trend={ar ? "+15% عن الشهر الماضي" : "+15% vs last month"}
                 trendUp
                 icon={BarChart3}
-                color="bg-blue-900"
+                color="bg-[#E0F2FE] text-[#0369A1]"
                 onClick={() => setStatusFilter("all")}
               />
               <StatCard
@@ -633,7 +634,7 @@ function LabDashboard() {
                 trend={ar ? "+8% عن الشهر الماضي" : "+8% vs last month"}
                 trendUp
                 icon={Clock}
-                color="bg-amber-400"
+                color="bg-[#FEF3C7] text-[#B45309]"
                 onClick={() => setStatusFilter("in_progress")}
               />
               <StatCard
@@ -642,7 +643,7 @@ function LabDashboard() {
                 trend={ar ? "+22% عن الشهر الماضي" : "+22% vs last month"}
                 trendUp
                 icon={CheckCircle2}
-                color="bg-emerald-500"
+                color="bg-[#D1FAE5] text-[#047857]"
                 onClick={() => setStatusFilter("completed")}
               />
               <StatCard
@@ -651,7 +652,7 @@ function LabDashboard() {
                 trend={ar ? "-3% عن الشهر الماضي" : "-3% vs last month"}
                 trendUp={false}
                 icon={AlertCircle}
-                color="bg-rose-500"
+                color="bg-[#FEE2E2] text-[#B91C1C]"
                 onClick={() => setStatusFilter("delayed")}
               />
             </div>
@@ -1010,14 +1011,14 @@ function QuickAccessButton({
     <button
       onClick={onClick}
       className={cn(
-        "w-full flex items-center gap-3 px-3 h-11 rounded-xl text-sm font-semibold transition-all",
-        color || "text-slate-600 hover:bg-sky-50 hover:text-slate-800",
+        "w-full flex items-center gap-3 px-4 h-11 rounded-full text-sm font-semibold transition-all",
+        color || "text-slate-400 hover:bg-slate-800 hover:text-white",
       )}
     >
       <span
         className={cn(
-          "size-8 rounded-lg flex items-center justify-center",
-          color ? "bg-white/20 text-white" : "bg-sky-100 text-sky-600",
+          "size-8 rounded-full flex items-center justify-center",
+          color ? "bg-white/20 text-white" : "bg-slate-800 text-slate-400",
         )}
       >
         <Icon className="size-4" />
