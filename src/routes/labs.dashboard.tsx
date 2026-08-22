@@ -413,7 +413,7 @@ function LabDashboard() {
   const today = new Date();
 
   return (
-    <div className="min-h-svh bg-[#F8FAFC] overflow-x-hidden" dir={ar ? "rtl" : "ltr"}>
+    <div className="min-h-screen bg-[#F8FAFC] overflow-x-hidden" dir={ar ? "rtl" : "ltr"}>
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
@@ -426,7 +426,7 @@ function LabDashboard() {
         {/* ===== LEFT SIDEBAR ===== */}
         <aside
           className={cn(
-            "fixed lg:sticky top-0 z-50 h-svh w-64 bg-slate-900 border-slate-800 flex flex-col transition-transform duration-300 lg:translate-x-0",
+            "fixed lg:sticky top-0 z-50 h-screen min-h-screen w-64 bg-slate-900 border-slate-800 flex flex-col transition-transform duration-300 lg:translate-x-0",
             ar ? "right-0 border-l" : "left-0 border-r",
             sidebarOpen ? "translate-x-0" : ar ? "translate-x-full" : "-translate-x-full",
             "lg:block",
