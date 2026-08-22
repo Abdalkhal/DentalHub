@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { useImplantOffers } from "@/lib/implantOffers";
 import {
   Plus, X, Phone, MapPin, User, Briefcase, Upload, Megaphone,
+  ChevronRight, ChevronLeft, Send, MessageCircle,
 } from "lucide-react";
 
 export const Route = createFileRoute("/offers")({
@@ -23,6 +24,7 @@ type Classified = {
   price: number;
   currency: "USD" | "IQD";
   images: string[];
+  description?: string;
 };
 
 const CLASSIFIED_CATS = [
@@ -51,6 +53,7 @@ function OffersPage() {
   const [cat, setCat] = useState("all");
   const [classifieds, setClassifieds] = useState<Classified[]>(loadClassifieds);
   const [showForm, setShowForm] = useState(false);
+  const [selectedAd, setSelectedAd] = useState<Classified | null>(null);
   const { offers: realOffers = [], isLoading } = useImplantOffers();
 
   const filtered = useMemo(() => {
@@ -108,18 +111,41 @@ function OffersPage() {
             ) : (
               <div className="grid grid-cols-1 gap-3">
                 {filtered.map((ad) => (
-                  <div key={ad.id} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-                    <p className="font-bold text-sm">{ad.title}</p>
-                    <div className="flex items-center gap-3 mt-1.5 text-[11px] text-slate-500">
-                      <span className="flex items-center gap-1"><MapPin className="size-3" />{ad.location}</span>
-                      <span className="flex items-center gap-1"><User className="size-3" />{ad.publisher}</span>
+                  <button
+                    key={ad.id}
+                    onClick={() => setSelectedAd(ad)}
+                    className="w-full bg-white border border-slate-200 rounded-2xl p-3 shadow-sm text-start hover:shadow-md hover:border-slate-300 transition-all flex gap-3 items-stretch"
+                  >
+                    {/* Thumbnail */}
+                    <div className="relative shrink-0 w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden bg-slate-100">
+                      {ad.images[0] ? (
+                        <img src={ad.images[0]} alt="" className="size-full object-cover" />
+                      ) : (
+                        <div className="size-full flex items-center justify-center text-slate-300">
+                          <Megaphone className="size-6" />
+                        </div>
+                      )}
+                      {ad.images.length > 1 && (
+                        <span className="absolute top-1.5 start-1.5 px-1.5 py-0.5 rounded-md bg-black/60 text-white text-[10px] font-bold">
+                          1/{ad.images.length}
+                        </span>
+                      )}
                     </div>
-                    <p className="font-extrabold text-sm text-primary mt-1.5">{fmtPrice(ad.price, ad.currency)}</p>
-                    <div className="flex gap-2 mt-3">
-                      <a href={`https://wa.me/${ad.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="flex-1 h-9 rounded-xl bg-emerald-50 text-emerald-700 text-[11px] font-bold flex items-center justify-center gap-1 hover:bg-emerald-100"><Phone className="size-3" />{ar ? "واتساب" : "WhatsApp"}</a>
-                      <a href={`tel:${ad.phone}`} className="flex-1 h-9 rounded-xl bg-sky-50 text-sky-700 text-[11px] font-bold flex items-center justify-center gap-1 hover:bg-sky-100"><Phone className="size-3" />{ar ? "اتصال" : "Call"}</a>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0 flex flex-col">
+                      <p className="font-bold text-sm text-slate-800 line-clamp-2">{ad.title}</p>
+                      <div className="flex items-center gap-3 mt-1 text-[11px] text-slate-500 flex-wrap">
+                        <span className="flex items-center gap-1"><MapPin className="size-3" />{ad.location}</span>
+                        <span className="flex items-center gap-1"><User className="size-3" />{ad.publisher}</span>
+                      </div>
+                      <div className="mt-auto pt-1.5">
+                        <p className="font-extrabold text-sm text-primary">{fmtPrice(ad.price, ad.currency)}</p>
+                      </div>
                     </div>
-                  </div>
+
+                    <ChevronRight className="size-4 self-center text-slate-300 shrink-0" />
+                  </button>
                 ))}
               </div>
             )}
@@ -128,12 +154,134 @@ function OffersPage() {
       </div>
 
       {showForm && <ClassifiedModal ar={ar} onClose={() => setShowForm(false)} onAdd={(ad) => { setClassifieds((prev) => { const updated = [ad, ...prev]; saveClassifieds(updated); return updated; }); setShowForm(false); toast.success(ar ? "تم نشر الإعلان" : "Ad published"); }} />}
+
+      {selectedAd && <AdDetailsModal ar={ar} ad={selectedAd} onClose={() => setSelectedAd(null)} />}
     </MobileShell>
   );
 }
 
+function AdDetailsModal({ ar, ad, onClose }: { ar: boolean; ad: Classified; onClose: () => void }) {
+  const [idx, setIdx] = useState(0);
+  const images = ad.images.length > 0 ? ad.images : [];
+  const current = images[idx] ?? null;
+
+  const prev = () => setIdx((i) => (i - 1 + images.length) % images.length);
+  const next = () => setIdx((i) => (i + 1) % images.length);
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4" onClick={onClose}>
+      <div className="w-full sm:max-w-4xl max-h-[92svh] bg-white rounded-t-3xl sm:rounded-3xl overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 shrink-0">
+          <h3 className="font-bold text-base text-slate-800 truncate">
+            {ar ? "تفاصيل الإعلان" : "Ad Details"}: {ad.title}
+          </h3>
+          <button onClick={onClose} className="size-9 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 shrink-0">
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2">
+            {/* Left: gallery carousel */}
+            <div className="bg-slate-900 md:h-full flex flex-col">
+              <div className="relative aspect-square bg-slate-900 flex items-center justify-center">
+                {current ? (
+                  <img src={current} alt="" className="size-full object-contain" />
+                ) : (
+                  <div className="flex flex-col items-center text-slate-500">
+                    <Megaphone className="size-12 mb-2 opacity-40" />
+                    <span className="text-xs">{ar ? "لا توجد صور" : "No images"}</span>
+                  </div>
+                )}
+
+                {images.length > 1 && (
+                  <>
+                    <button onClick={prev} className="absolute start-2 top-1/2 -translate-y-1/2 size-9 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition">
+                      <ChevronLeft className="size-5" />
+                    </button>
+                    <button onClick={next} className="absolute end-2 top-1/2 -translate-y-1/2 size-9 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition">
+                      <ChevronRight className="size-5" />
+                    </button>
+                    <span className="absolute bottom-2 end-2 px-2 py-0.5 rounded-md bg-black/60 text-white text-[11px] font-bold">
+                      {idx + 1}/{images.length}
+                    </span>
+                  </>
+                )}
+              </div>
+
+              {/* Thumbnails */}
+              {images.length > 1 && (
+                <div className="flex gap-2 p-3 overflow-x-auto">
+                  {images.map((img, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setIdx(i)}
+                      className={`relative shrink-0 size-14 rounded-lg overflow-hidden border-2 transition ${i === idx ? "border-sky-400" : "border-transparent opacity-60 hover:opacity-100"}`}
+                    >
+                      <img src={img} alt="" className="size-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Right: info */}
+            <div className="p-5 space-y-4 flex flex-col">
+              <div>
+                <h4 className="font-bold text-lg text-slate-900 leading-snug">{ad.title}</h4>
+                <div className="flex items-center gap-3 mt-2 text-xs text-slate-500 flex-wrap">
+                  <span className="flex items-center gap-1"><MapPin className="size-3.5" />{ad.location || "-"}</span>
+                  <span className="flex items-center gap-1"><User className="size-3.5" />{ad.publisher}</span>
+                </div>
+              </div>
+
+              <span className="inline-flex w-fit px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-sm font-extrabold">
+                {fmtPrice(ad.price, ad.currency)}
+              </span>
+
+              {ad.description && (
+                <div>
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">{ar ? "وصف تفصيلي" : "Detailed Description"}</p>
+                  <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">{ad.description}</p>
+                </div>
+              )}
+
+              <div>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">{ar ? "الفئة" : "Category"}</p>
+                <span className="inline-flex px-2.5 py-1 rounded-full bg-sky-50 text-sky-700 text-[11px] font-bold">
+                  {CLASSIFIED_CATS.find((c) => c.id === ad.category)?.ar ?? ad.category}
+                </span>
+              </div>
+
+              {/* Actions */}
+              <div className="mt-auto pt-3 border-t border-slate-100 grid grid-cols-3 gap-2">
+                <button
+                  onClick={() => toast.success(ar ? "تم إرسال طلب الاستفسار" : "Inquiry request sent")}
+                  className="h-11 rounded-xl bg-primary text-primary-foreground text-[11px] font-bold flex items-center justify-center gap-1"
+                >
+                  <Send className="size-3.5" />
+                  {ar ? "إرسال طلب استفسار" : "Send Inquiry"}
+                </button>
+                <a href={`tel:${ad.phone}`} className="h-11 rounded-xl bg-sky-50 text-sky-700 text-[11px] font-bold flex items-center justify-center gap-1 hover:bg-sky-100">
+                  <Phone className="size-3.5" />
+                  {ar ? "اتصال" : "Call"}
+                </a>
+                <a href={`https://wa.me/${ad.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="h-11 rounded-xl bg-emerald-500 text-white text-[11px] font-bold flex items-center justify-center gap-1 hover:bg-emerald-600">
+                  <MessageCircle className="size-3.5" />
+                  {ar ? "واتساب" : "WhatsApp"}
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ClassifiedModal({ ar, onClose, onAdd }: { ar: boolean; onClose: () => void; onAdd: (ad: Classified) => void }) {
-  const [f, setF] = useState({ title: "", location: "", publisher: "", phone: "", price: "", currency: "USD" as "USD" | "IQD", category: "clinic", images: [] as string[] });
+  const [f, setF] = useState({ title: "", location: "", publisher: "", phone: "", price: "", currency: "USD" as "USD" | "IQD", category: "clinic", images: [] as string[], description: "" });
   const [previews, setPreviews] = useState<string[]>([]);
   const inp = "w-full h-11 rounded-xl bg-slate-50 border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary";
 
@@ -148,7 +296,7 @@ function ClassifiedModal({ ar, onClose, onAdd }: { ar: boolean; onClose: () => v
 
   const submit = () => {
     if (!f.title.trim() || !f.publisher.trim()) { toast.error(ar ? "املأ الحقول المطلوبة" : "Fill required fields"); return; }
-    onAdd({ id: crypto.randomUUID(), title: f.title.trim(), location: f.location.trim(), publisher: f.publisher.trim(), phone: f.phone.trim(), price: Number(f.price) || 0, currency: f.currency, category: f.category, images: f.images });
+    onAdd({ id: crypto.randomUUID(), title: f.title.trim(), location: f.location.trim(), publisher: f.publisher.trim(), phone: f.phone.trim(), price: Number(f.price) || 0, currency: f.currency, category: f.category, images: f.images, description: f.description.trim() });
   };
 
   return (
@@ -170,13 +318,17 @@ function ClassifiedModal({ ar, onClose, onAdd }: { ar: boolean; onClose: () => v
         </div>
 
         <label className="block"><span className="text-xs font-bold text-slate-500">{ar ? "السعر" : "Price"}</span>
-          <div className="flex gap-2 mt-1">
+            <div className="flex gap-2 mt-1">
             <input type="number" min="0" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} placeholder="0" className={`${inp} flex-1 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`} dir="ltr" />
             <div className="flex rounded-xl bg-slate-50 border overflow-hidden shrink-0">
               <button onClick={() => setF({ ...f, currency: "USD" })} className={cn("px-3 text-xs font-bold transition", f.currency === "USD" ? "bg-primary text-primary-foreground" : "text-slate-500")}>$</button>
               <button onClick={() => setF({ ...f, currency: "IQD" })} className={cn("px-3 text-xs font-bold transition", f.currency === "IQD" ? "bg-primary text-primary-foreground" : "text-slate-500")}>{ar ? "د.ع" : "IQD"}</button>
             </div>
           </div>
+        </label>
+
+        <label className="block"><span className="text-xs font-bold text-slate-500">{ar ? "الوصف التفصيلي" : "Detailed Description"}</span>
+          <textarea value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} rows={3} placeholder={ar ? "تفاصيل إضافية، مواصفات، مساحة، معدات..." : "Extra details, specs, area, equipment..."} className="w-full mt-1 rounded-xl bg-slate-50 border px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none" />
         </label>
 
         <div>
