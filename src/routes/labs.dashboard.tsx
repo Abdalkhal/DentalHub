@@ -444,7 +444,7 @@ function LabDashboard() {
           </div>
 
           {/* Quick Access */}
-          <div className="p-4 space-y-2 border-b border-slate-800">
+          <div className="p-4 space-y-2 border-b border-slate-800 shrink-0">
             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-3 mb-2">
               {ar ? "الوصول السريع" : "Quick Access"}
             </p>
@@ -488,7 +488,7 @@ function LabDashboard() {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 overflow-y-auto p-3 space-y-1">
+          <nav className="flex-1 overflow-y-auto p-3 space-y-1 min-h-0">
             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-3 mb-2">
               {ar ? "القائمة" : "Menu"}
             </p>
