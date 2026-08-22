@@ -241,6 +241,7 @@ function LabDashboard() {
   const [profile, setProfile] = useState<UserRoleDoc | null>(null);
   const orders = useOrders();
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | OrderStatus>("all");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeNav, setActiveNav] = useState("home");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -289,17 +290,23 @@ function LabDashboard() {
   }, [orders]);
 
   const filteredCases = useMemo(() => {
-    if (!searchQuery.trim()) return orders;
-    const q = searchQuery.toLowerCase();
-    return orders.filter(
-      (c) =>
-        c.orderNumber.toLowerCase().includes(q) ||
-        String(c.caseId).includes(q) ||
-        c.patient.toLowerCase().includes(q) ||
-        c.doctor.toLowerCase().includes(q) ||
-        c.agent.toLowerCase().includes(q),
-    );
-  }, [orders, searchQuery]);
+    let list = orders;
+    if (statusFilter !== "all") {
+      list = list.filter((c) => c.status === statusFilter);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(
+        (c) =>
+          c.orderNumber.toLowerCase().includes(q) ||
+          String(c.caseId).includes(q) ||
+          c.patient.toLowerCase().includes(q) ||
+          c.doctor.toLowerCase().includes(q) ||
+          c.agent.toLowerCase().includes(q),
+      );
+    }
+    return list;
+  }, [orders, searchQuery, statusFilter]);
 
   const displayedCases = showAllOrders ? filteredCases : filteredCases.slice(0, 5);
 
@@ -618,7 +625,7 @@ function LabDashboard() {
                 trendUp
                 icon={BarChart3}
                 color="bg-blue-900"
-                onClick={() => navigate({ to: "/orders", search: { status: "all" } })}
+                onClick={() => setStatusFilter("all")}
               />
               <StatCard
                 label={ar ? "قيد التنفيذ" : "In Production"}
@@ -627,7 +634,7 @@ function LabDashboard() {
                 trendUp
                 icon={Clock}
                 color="bg-amber-400"
-                onClick={() => navigate({ to: "/orders", search: { status: "in_progress" } })}
+                onClick={() => setStatusFilter("in_progress")}
               />
               <StatCard
                 label={ar ? "مكتملة" : "Completed"}
@@ -636,7 +643,7 @@ function LabDashboard() {
                 trendUp
                 icon={CheckCircle2}
                 color="bg-emerald-500"
-                onClick={() => navigate({ to: "/orders", search: { status: "completed" } })}
+                onClick={() => setStatusFilter("completed")}
               />
               <StatCard
                 label={ar ? "متأخرة" : "Delayed"}
@@ -645,7 +652,7 @@ function LabDashboard() {
                 trendUp={false}
                 icon={AlertCircle}
                 color="bg-rose-500"
-                onClick={() => navigate({ to: "/orders", search: { status: "delayed" } })}
+                onClick={() => setStatusFilter("delayed")}
               />
             </div>
 
@@ -653,7 +660,9 @@ function LabDashboard() {
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
               <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
                 <h2 className="font-display font-extrabold text-lg text-slate-800">
-                  {ar ? "الطلبات الأخيرة" : "Recent Orders"}
+                  {statusFilter === "all"
+                    ? ar ? "الطلبات الأخيرة" : "Recent Orders"
+                    : STATUS_META[statusFilter][ar ? "ar" : "en"]}
                 </h2>
                 <span className="text-xs text-slate-400 bg-slate-50 px-2.5 py-1 rounded-full font-semibold">
                   {filteredCases.length} {ar ? "طلب" : "orders"}
