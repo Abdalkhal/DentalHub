@@ -20,14 +20,14 @@ export const TOOTH_META: Record<string, { ar: string; en: string; dot: string }>
   unerupted: { ar: "غير بازغ", en: "Unerupted", dot: "bg-gray-300" },
 };
 
-const UPPER_POS: Record<number, [number, number]> = {
+export const UPPER_POS: Record<number, [number, number]> = {
   18: [12.5, 82], 17: [13.5, 67], 16: [15.5, 54], 15: [18.5, 42.5], 14: [21, 34],
   13: [25, 25], 12: [32.5, 15.5], 11: [42.5, 11],
   21: [55.5, 11], 22: [65.5, 15.5], 23: [73, 25], 24: [77.5, 34],
   25: [80.5, 42.5], 26: [83.5, 54], 27: [85.5, 67], 28: [86.5, 82],
 };
 
-const LOWER_POS: Record<number, [number, number]> = {
+export const LOWER_POS: Record<number, [number, number]> = {
   48: [14, 14], 47: [15.5, 27], 46: [17, 41], 45: [20, 54], 44: [24, 63.5],
   43: [28.5, 72], 42: [36, 79], 41: [44, 83],
   31: [54, 83], 32: [62, 79], 33: [69.5, 72], 34: [74, 63.5],

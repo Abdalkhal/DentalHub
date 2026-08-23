@@ -74,6 +74,14 @@ export type Order = {
   targetLabId?: string;
   dentistId?: string;
   attachments?: OrderAttachment[];
+  // Rich RX form fields
+  patientAge?: string;
+  patientGender?: string;
+  patientPhone?: string;
+  doctorSignature?: string;
+  rxTeeth?: Record<string, string>;
+  rxItems?: string[];
+  rxData?: Record<string, unknown>;
 };
 
 const STORAGE_KEY = "dental_hub_orders";
@@ -332,7 +340,7 @@ export async function submitDentistCase(
     patient: string;
     doctor: string;
     workType: string;
-    dueDate: string;
+    dueDate?: string;
     unitsCount: number;
     notes: string;
     clinic: string;
@@ -341,6 +349,13 @@ export async function submitDentistCase(
     shade?: string;
     material?: string;
     attachments?: OrderAttachment[];
+    patientAge?: string;
+    patientGender?: string;
+    patientPhone?: string;
+    doctorSignature?: string;
+    rxTeeth?: Record<string, string>;
+    rxItems?: string[];
+    rxData?: Record<string, unknown>;
   },
 ) {
   const id = `case_${Date.now().toString(36)}`;
@@ -353,7 +368,7 @@ export async function submitDentistCase(
     doctor: data.doctor,
     workType: data.workType,
     receivedDate: new Date().toISOString().split("T")[0],
-    dueDate: data.dueDate,
+    dueDate: data.dueDate ?? "",
     status: "new",
     currentStage: "impression",
     agent: data.dentistName,
@@ -369,6 +384,13 @@ export async function submitDentistCase(
     shade: data.shade,
     material: data.material,
     attachments: data.attachments,
+    patientAge: data.patientAge,
+    patientGender: data.patientGender,
+    patientPhone: data.patientPhone,
+    doctorSignature: data.doctorSignature,
+    rxTeeth: data.rxTeeth,
+    rxItems: data.rxItems,
+    rxData: data.rxData,
   };
 
   await setDoc(caseDocRef(labId, id), order);

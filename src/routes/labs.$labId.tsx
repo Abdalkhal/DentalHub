@@ -5,7 +5,7 @@ import { db } from "@/integrations/firebase/client";
 import type { UserRoleDoc } from "@/integrations/firebase/types";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
-import { SendCaseModal } from "@/components/SendCaseModal";
+import { LabRxFormModal } from "@/components/LabRxFormModal";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -153,9 +153,12 @@ function LabPage() {
         )}
       </div>
 
-      <SendCaseModal
+      <LabRxFormModal
         labId={labId}
         labName={labName}
+        labPhone={phone}
+        labAddress={address}
+        labInstagram={(profile as any).instagram || ""}
         open={showSendCase}
         onClose={() => setShowSendCase(false)}
       />
