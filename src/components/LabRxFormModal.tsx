@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { X, Send, Loader2, Phone, Instagram, MapPin, Plus, Eraser } from "lucide-react";
+import { X, Send, Loader2, Phone, Instagram, MapPin, Eraser } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useSession, useUserRole } from "@/lib/useAuth";
 import { submitDentistCase } from "@/lib/ordersStore";
@@ -65,8 +65,8 @@ const CATEGORIES: CategoryDef[] = [
     en: "E-MAX",
     color: "bg-sky-500",
     items: [
-      { ar: "تاج", en: "Crown" },
-      { ar: "فينير", en: "Veneer" },
+      { ar: "فينير إيماكس", en: "Veneer E-max" },
+      { ar: "تاج إيماكس", en: "Crown E-max" },
       { ar: "حشوة داخلية/خارجية", en: "Inlay/Onlay" },
     ],
   },
@@ -76,8 +76,9 @@ const CATEGORIES: CategoryDef[] = [
     en: "ZIRCONIUM",
     color: "bg-violet-500",
     items: [
-      { ar: "تاج", en: "Crown" },
-      { ar: "جسر", en: "Bridge" },
+      { ar: "زيركون 5D", en: "Zircon 5D" },
+      { ar: "تاج زيركون", en: "Zircon Crown" },
+      { ar: "جسر زيركون", en: "Zircon Bridge" },
     ],
   },
   {
@@ -86,9 +87,9 @@ const CATEGORIES: CategoryDef[] = [
     en: "CERAMIC",
     color: "bg-rose-500",
     items: [
-      { ar: "تاج", en: "Crown" },
-      { ar: "فينير", en: "Veneer" },
-      { ar: "جسر", en: "Bridge" },
+      { ar: "تاج سيراميك", en: "Ceramic Crown" },
+      { ar: "فينير سيراميك", en: "Ceramic Veneer" },
+      { ar: "جسر سيراميك", en: "Ceramic Bridge" },
     ],
   },
   {
@@ -97,8 +98,8 @@ const CATEGORIES: CategoryDef[] = [
     en: "DENTURE",
     color: "bg-amber-500",
     items: [
-      { ar: "جزئي", en: "Partial" },
-      { ar: "كامل", en: "Complete" },
+      { ar: "طقم جزئي", en: "Partial Denture" },
+      { ar: "طقم كامل", en: "Complete Denture" },
     ],
   },
 ];
@@ -168,6 +169,8 @@ const VITA_BLEACH: Shade[] = [
 
 type VitaTab = "classical" | "3d" | "bleach" | "others";
 
+const cardCls = "bg-white rounded-2xl border border-slate-200 shadow-[0_2px_8px_rgba(0,0,0,0.06)]";
+
 export function LabRxFormModal({
   labId,
   labName,
@@ -189,16 +192,13 @@ export function LabRxFormModal({
   const [receivedDate, setReceivedDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [deliveryDate, setDeliveryDate] = useState("");
 
-  const [selected, setSelected] = useState<Record<string, string[]>>({});
-  const [extraItems, setExtraItems] = useState<Record<string, string[]>>({});
-  const [addingCat, setAddingCat] = useState<string | null>(null);
-  const [customInput, setCustomInput] = useState("");
+  const [activeWorkType, setActiveWorkType] = useState<WorkTypeKey | null>(null);
+  const [teeth, setTeeth] = useState<Record<number, WorkTypeKey>>({});
+  const [activeTooth, setActiveTooth] = useState<number | null>(null);
+  const [toothItems, setToothItems] = useState<Record<number, string[]>>({});
 
   const [lowerSelected, setLowerSelected] = useState<string[]>([]);
   const [lowerSubSelected, setLowerSubSelected] = useState<string[]>([]);
-
-  const [activeWorkType, setActiveWorkType] = useState<WorkTypeKey | null>(null);
-  const [teeth, setTeeth] = useState<Record<number, WorkTypeKey>>({});
 
   const [vitaTab, setVitaTab] = useState<VitaTab>("classical");
   const [shade, setShade] = useState("");
@@ -246,34 +246,33 @@ export function LabRxFormModal({
 
   const displayName = (item: { ar: string; en: string }) => (ar ? item.ar : item.en);
 
-  const toggleItem = (catId: string, itemLabel: string) => {
-    setSelected((prev) => {
-      const cur = prev[catId] || [];
+  const selectTooth = (n: number) => {
+    setActiveTooth(n);
+    if (activeWorkType) {
+      setTeeth((prev) => {
+        const next = { ...prev };
+        if (next[n] === activeWorkType) delete next[n];
+        else next[n] = activeWorkType;
+        return next;
+      });
+    }
+  };
+
+  const toggleItem = (itemLabel: string) => {
+    if (activeTooth == null) return;
+    setToothItems((prev) => {
+      const cur = prev[activeTooth] || [];
       const next = cur.includes(itemLabel)
         ? cur.filter((x) => x !== itemLabel)
         : [...cur, itemLabel];
-      return { ...prev, [catId]: next };
+      return { ...prev, [activeTooth]: next };
     });
   };
 
-  const confirmCustom = (catId: string) => {
-    const label = customInput.trim();
-    if (!label) return;
-    setExtraItems((prev) => ({ ...prev, [catId]: [...(prev[catId] || []), label] }));
-    setSelected((prev) => ({ ...prev, [catId]: [...(prev[catId] || []), label] }));
-    setCustomInput("");
-    setAddingCat(null);
-  };
-
-  const toggleTooth = (n: number) => {
-    if (!activeWorkType) return;
-    setTeeth((prev) => {
-      const next = { ...prev };
-      if (next[n] === activeWorkType) delete next[n];
-      else next[n] = activeWorkType;
-      return next;
-    });
-  };
+  const getItemTeeth = (itemLabel: string): number[] =>
+    Object.entries(toothItems)
+      .filter(([, items]) => items.includes(itemLabel))
+      .map(([n]) => Number(n));
 
   const wordCount = notes.trim() ? notes.trim().split(/\s+/).length : 0;
   const onNotesChange = (v: string) => {
@@ -331,9 +330,9 @@ export function LabRxFormModal({
     }
 
     const allItems: string[] = [];
-    CATEGORIES.forEach((c) =>
-      (selected[c.id] || []).forEach((it) => allItems.push(`${c.en}: ${it}`)),
-    );
+    Object.entries(toothItems).forEach(([n, items]) => {
+      items.forEach((it) => allItems.push(`${it} #${n}`));
+    });
     lowerSelected.forEach((id) => {
       const o = LOWER_OPTIONS.find((x) => x.id === id);
       if (o) allItems.push(o.en);
@@ -370,8 +369,8 @@ export function LabRxFormModal({
         rxTeeth: Object.fromEntries(Object.entries(teeth).map(([n, t]) => [n, t])),
         rxItems: allItems,
         rxData: {
-          selected,
-          extraItems,
+          toothItems,
+          teeth,
           lowerSelected,
           lowerSubSelected,
           receivedDate,
@@ -407,7 +406,7 @@ export function LabRxFormModal({
     return (
       <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-        <div className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl p-6 pb-8 shadow-2xl animate-in slide-in-from-bottom">
+        <div className="relative w-full max-w-md bg-[#EBF3FA] rounded-t-3xl sm:rounded-3xl p-6 pb-8 shadow-2xl animate-in slide-in-from-bottom">
           <div className="text-center space-y-3">
             <div className="size-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto">
               <Send className="size-8 text-emerald-600" />
@@ -435,9 +434,9 @@ export function LabRxFormModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl animate-in slide-in-from-bottom max-h-[92vh] overflow-y-auto">
+      <div className="relative w-full max-w-md bg-[#EBF3FA] rounded-t-3xl sm:rounded-3xl shadow-2xl animate-in slide-in-from-bottom max-h-[92vh] overflow-y-auto overflow-x-hidden">
         {/* Header */}
-        <div className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-slate-100 px-5 py-3 flex items-center justify-between gap-3">
+        <div className="sticky top-0 z-10 bg-[#EBF3FA]/95 backdrop-blur border-b border-slate-200 px-5 py-3 flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="font-extrabold text-base text-slate-800 truncate leading-tight">
               {ar ? `مختبر ${labName} لطب الأسنان` : `${labName} Dental Lab`}
@@ -465,7 +464,7 @@ export function LabRxFormModal({
           </button>
         </div>
 
-        <div className="px-5 py-4 space-y-5">
+        <div className="px-4 py-4 space-y-4">
           {error && (
             <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-sm text-rose-700">
               {error}
@@ -550,79 +549,132 @@ export function LabRxFormModal({
             </div>
           </section>
 
+          {/* Odontogram */}
+          <section className="space-y-2">
+            <SectionTitle>{ar ? "مخطط الأسنان (Odontogram)" : "Odontogram"}</SectionTitle>
+            <div className={cn(cardCls, "p-3")}>
+              <div className="grid grid-cols-[1fr_auto] gap-3 items-start">
+                <div className="space-y-1">
+                  <OdontogramArch
+                    jaw="upper"
+                    teeth={teeth}
+                    activeTooth={activeTooth}
+                    onTooth={selectTooth}
+                  />
+                  <OdontogramArch
+                    jaw="lower"
+                    teeth={teeth}
+                    activeTooth={activeTooth}
+                    onTooth={selectTooth}
+                  />
+                </div>
+                <div className="space-y-1.5 pt-1">
+                  {WORK_TYPE_ORDER.map((k) => {
+                    const wt = WORK_TYPES[k];
+                    const active = activeWorkType === k;
+                    return (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => setActiveWorkType(active ? null : k)}
+                        className={cn(
+                          "flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold transition w-full text-start",
+                          active
+                            ? cn("border-2", wt.soft)
+                            : "border-slate-200 text-slate-600 hover:border-slate-300",
+                        )}
+                      >
+                        <span className={cn("size-2.5 rounded-full shrink-0", wt.dot)} />
+                        <span className="truncate">{ar ? wt.ar : wt.en}</span>
+                      </button>
+                    );
+                  })}
+                  <div className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[10px] font-bold text-slate-400">
+                    <span className="size-2.5 rounded-full bg-slate-300 shrink-0" />
+                    <span className="truncate">{ar ? "غير محدد" : "Not selected"}</span>
+                  </div>
+                </div>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-2">
+                {ar
+                  ? "اختر نوع العمل (اللون) ثم اضغط على السن، ثم اربط الأعمال أدناه بالسن المحدد"
+                  : "Pick a work type (color), tap a tooth, then link work items to that tooth below"}
+              </p>
+            </div>
+          </section>
+
           {/* Categories */}
           <section className="space-y-3">
-            <SectionTitle>{ar ? "نوع العمل" : "Work type"}</SectionTitle>
-            {CATEGORIES.map((c) => {
-              const items = [...c.items.map((it) => displayName(it)), ...(extraItems[c.id] || [])];
-              const sel = selected[c.id] || [];
-              return (
-                <div key={c.id} className="rounded-2xl border border-slate-200 overflow-hidden">
-                  <div
+            <div className="flex items-center justify-between gap-2">
+              <SectionTitle>{ar ? "نوع العمل" : "Work type"}</SectionTitle>
+              {activeTooth != null ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-white border border-slate-200 px-2.5 py-1 text-[10px] font-bold text-slate-600">
+                  <span
                     className={cn(
-                      "flex items-center justify-between px-3 py-2",
-                      ar ? "flex-row" : "flex-row",
+                      "size-2.5 rounded-full",
+                      teeth[activeTooth] ? WORK_TYPES[teeth[activeTooth]].dot : "bg-slate-400",
                     )}
-                  >
-                    <span className="inline-flex items-center gap-2">
-                      <span className={cn("size-2.5 rounded-full", c.color)} />
-                      <span className="font-extrabold text-sm text-slate-700">
-                        {ar ? c.ar : c.en}
-                      </span>
+                  />
+                  <span dir="ltr">#{activeTooth}</span>
+                  {teeth[activeTooth] && <span>{WORK_TYPES[teeth[activeTooth]].ar}</span>}
+                </span>
+              ) : (
+                <span className="text-[10px] font-semibold text-slate-400">
+                  {ar ? "اختر سنًا أولاً من المخطط" : "Select a tooth first"}
+                </span>
+              )}
+            </div>
+
+            {CATEGORIES.map((c) => {
+              const items = c.items.map((it) => displayName(it));
+              return (
+                <div key={c.id} className={cn(cardCls, "overflow-hidden")}>
+                  <div className="flex items-center gap-2 px-3 py-2.5 border-b border-slate-100">
+                    <span className={cn("size-2.5 rounded-full", c.color)} />
+                    <span className="font-extrabold text-sm text-slate-700">
+                      {ar ? c.ar : c.en}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAddingCat(addingCat === c.id ? null : c.id);
-                        setCustomInput("");
-                      }}
-                      className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline"
-                    >
-                      <Plus className="size-3.5" />
-                      {ar ? "إضافة عمل جديد" : "Add new work"}
-                    </button>
                   </div>
-                  <div className="px-3 pb-3 flex flex-wrap gap-1.5">
+                  <div className="px-3 py-3 flex flex-wrap gap-2">
                     {items.map((it) => {
-                      const active = sel.includes(it);
+                      const itemTeeth = getItemTeeth(it);
+                      const selected = itemTeeth.length > 0;
+                      const colors = itemTeeth
+                        .map((n) => teeth[n])
+                        .filter((t): t is WorkTypeKey => Boolean(t));
+                      const primary = colors[0];
                       return (
                         <button
                           key={it}
                           type="button"
-                          onClick={() => toggleItem(c.id, it)}
+                          onClick={() => toggleItem(it)}
                           className={cn(
-                            "h-8 px-3 rounded-full text-[11px] font-semibold border transition",
-                            active
-                              ? "bg-primary text-primary-foreground border-primary"
+                            "h-9 px-3 rounded-xl border text-[11px] font-semibold inline-flex items-center gap-1.5 transition",
+                            selected
+                              ? primary
+                                ? cn("border", WORK_TYPES[primary].soft)
+                                : "border-slate-400 bg-slate-100 text-slate-700"
                               : "bg-white text-slate-600 border-slate-200 hover:border-slate-300",
                           )}
                         >
-                          {it}
+                          {selected && (
+                            <span
+                              className={cn(
+                                "size-2.5 rounded-full shrink-0",
+                                primary ? WORK_TYPES[primary].dot : "bg-slate-400",
+                              )}
+                            />
+                          )}
+                          <span>{it}</span>
+                          {selected && (
+                            <span className="text-[9px] opacity-70" dir="ltr">
+                              #{itemTeeth.join(",")}
+                            </span>
+                          )}
                         </button>
                       );
                     })}
                   </div>
-                  {addingCat === c.id && (
-                    <div className="px-3 pb-3 flex gap-2">
-                      <input
-                        autoFocus
-                        value={customInput}
-                        onChange={(e) => setCustomInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") confirmCustom(c.id);
-                        }}
-                        placeholder={ar ? "اسم العمل الجديد..." : "New work name..."}
-                        className="flex-1 h-9 px-3 rounded-lg border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => confirmCustom(c.id)}
-                        className="h-9 px-3 rounded-lg bg-primary text-primary-foreground text-xs font-bold"
-                      >
-                        {ar ? "إضافة" : "Add"}
-                      </button>
-                    </div>
-                  )}
                 </div>
               );
             })}
@@ -642,7 +694,7 @@ export function LabRxFormModal({
                       setLowerSelected((p) => (active ? p.filter((x) => x !== o.id) : [...p, o.id]))
                     }
                     className={cn(
-                      "h-8 px-3 rounded-full text-[11px] font-semibold border transition",
+                      "h-9 px-3 rounded-xl border text-[11px] font-semibold transition",
                       active
                         ? "bg-slate-800 text-white border-slate-800"
                         : "bg-white text-slate-600 border-slate-200 hover:border-slate-300",
@@ -666,7 +718,7 @@ export function LabRxFormModal({
                       )
                     }
                     className={cn(
-                      "h-7 px-3 rounded-full text-[10px] font-semibold border transition",
+                      "h-8 px-3 rounded-xl border text-[10px] font-semibold transition",
                       active
                         ? "bg-amber-500 text-white border-amber-500"
                         : "bg-white text-slate-500 border-slate-200 hover:border-slate-300",
@@ -677,48 +729,6 @@ export function LabRxFormModal({
                 );
               })}
             </div>
-          </section>
-
-          {/* Odontogram */}
-          <section className="space-y-2">
-            <SectionTitle>{ar ? "مخطط الأسنان (Odontogram)" : "Odontogram"}</SectionTitle>
-            <div className="grid grid-cols-[1fr_auto] gap-3 items-start">
-              <div className="space-y-1">
-                <OdontogramArch jaw="upper" teeth={teeth} onTooth={toggleTooth} />
-                <OdontogramArch jaw="lower" teeth={teeth} onTooth={toggleTooth} />
-              </div>
-              <div className="space-y-1.5 pt-1">
-                {WORK_TYPE_ORDER.map((k) => {
-                  const wt = WORK_TYPES[k];
-                  const active = activeWorkType === k;
-                  return (
-                    <button
-                      key={k}
-                      type="button"
-                      onClick={() => setActiveWorkType(active ? null : k)}
-                      className={cn(
-                        "flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold transition w-full text-start",
-                        active
-                          ? cn("border-2", wt.soft)
-                          : "border-slate-200 text-slate-600 hover:border-slate-300",
-                      )}
-                    >
-                      <span className={cn("size-2.5 rounded-full shrink-0", wt.dot)} />
-                      <span className="truncate">{ar ? wt.ar : wt.en}</span>
-                    </button>
-                  );
-                })}
-                <div className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[10px] font-bold text-slate-400">
-                  <span className="size-2.5 rounded-full bg-slate-300 shrink-0" />
-                  <span className="truncate">{ar ? "غير محدد" : "Not selected"}</span>
-                </div>
-              </div>
-            </div>
-            {!activeWorkType && (
-              <p className="text-[11px] text-slate-400">
-                {ar ? "اختر نوع العمل ثم اضغط على السن" : "Select a work type then tap a tooth"}
-              </p>
-            )}
           </section>
 
           {/* Shade & units */}
@@ -784,34 +794,36 @@ export function LabRxFormModal({
                 className={inputCls}
               />
             ) : (
-              <div className="grid grid-cols-8 gap-1.5">
-                {(vitaTab === "classical"
-                  ? VITA_CLASSICAL
-                  : vitaTab === "3d"
-                    ? VITA_3D
-                    : VITA_BLEACH
-                ).map((s) => {
-                  const active = shade === s.code;
-                  return (
-                    <button
-                      key={s.code}
-                      type="button"
-                      onClick={() => pickShade(s.code)}
-                      className={cn(
-                        "relative aspect-square rounded-xl border-2 transition flex flex-col items-center justify-center",
-                        active
-                          ? "border-primary scale-110 shadow-md z-10 ring-2 ring-primary/20"
-                          : "border-slate-200 hover:border-slate-400",
-                      )}
-                    >
-                      <span
-                        className="size-5 rounded-full border border-slate-300"
-                        style={{ background: s.hex }}
-                      />
-                      <span className="text-[8px] font-bold text-slate-600 mt-0.5">{s.code}</span>
-                    </button>
-                  );
-                })}
+              <div className={cn(cardCls, "p-3")}>
+                <div className="grid grid-cols-8 gap-1.5">
+                  {(vitaTab === "classical"
+                    ? VITA_CLASSICAL
+                    : vitaTab === "3d"
+                      ? VITA_3D
+                      : VITA_BLEACH
+                  ).map((s) => {
+                    const active = shade === s.code;
+                    return (
+                      <button
+                        key={s.code}
+                        type="button"
+                        onClick={() => pickShade(s.code)}
+                        className={cn(
+                          "relative aspect-square rounded-xl border-2 transition flex flex-col items-center justify-center",
+                          active
+                            ? "border-primary scale-110 shadow-md z-10 ring-2 ring-primary/20"
+                            : "border-slate-200 hover:border-slate-400",
+                        )}
+                      >
+                        <span
+                          className="size-5 rounded-full border border-slate-300"
+                          style={{ background: s.hex }}
+                        />
+                        <span className="text-[8px] font-bold text-slate-600 mt-0.5">{s.code}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </section>
@@ -826,7 +838,7 @@ export function LabRxFormModal({
               placeholder={
                 ar ? "تعليمات سريرية، ملاحظات خاصة..." : "Clinical instructions, special notes..."
               }
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
             />
             <p
               className={cn(
@@ -842,7 +854,7 @@ export function LabRxFormModal({
           <section className="space-y-2">
             <SectionTitle>{ar ? "توقيع الطبيب" : "Doctor signature"}</SectionTitle>
             <div
-              className="rounded-2xl border-2 border-dashed border-slate-300 relative h-28 overflow-hidden bg-slate-50"
+              className="rounded-2xl border-2 border-dashed border-slate-300 relative h-28 overflow-hidden bg-white"
               style={{ touchAction: "none" }}
             >
               <canvas
@@ -863,7 +875,7 @@ export function LabRxFormModal({
               <button
                 type="button"
                 onClick={clearSignature}
-                className="h-8 px-3 rounded-lg bg-slate-100 text-slate-600 text-xs font-bold inline-flex items-center gap-1 hover:bg-slate-200"
+                className="h-8 px-3 rounded-lg bg-white border border-slate-200 text-slate-600 text-xs font-bold inline-flex items-center gap-1 hover:bg-slate-100"
               >
                 <Eraser className="size-3.5" />
                 {ar ? "مسح" : "Clear"}
@@ -894,7 +906,7 @@ export function LabRxFormModal({
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-slate-50 border-t border-slate-100 px-5 py-3 flex items-center justify-between gap-3 text-[11px] text-slate-500">
+        <div className="sticky bottom-0 bg-[#E2EDF8] border-t border-slate-200 px-5 py-3 flex items-center justify-between gap-3 text-[11px] text-slate-500">
           <span className="inline-flex items-center gap-1 truncate" dir="ltr">
             <Phone className="size-3 shrink-0" />
             {labPhone?.replace(/\D/g, "").replace(/^964/, "+964 ") || "—"}
@@ -910,7 +922,7 @@ export function LabRxFormModal({
 }
 
 const inputCls =
-  "w-full h-11 px-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary";
+  "w-full h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary";
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return <p className="text-[13px] font-extrabold text-slate-800">{children}</p>;
@@ -953,10 +965,12 @@ function GenderChip({
 function OdontogramArch({
   jaw,
   teeth,
+  activeTooth,
   onTooth,
 }: {
   jaw: "upper" | "lower";
   teeth: Record<number, WorkTypeKey>;
+  activeTooth: number | null;
   onTooth: (n: number) => void;
 }) {
   const fdiList = jaw === "upper" ? FDI_UPPER : FDI_LOWER;
@@ -977,6 +991,7 @@ function OdontogramArch({
         const lx = 50 + (pos[0] - 50) * 1.22;
         const ly = 50 + (pos[1] - 50) * 1.18;
         const wt = teeth[n];
+        const isActive = activeTooth === n;
         return (
           <button
             key={n}
@@ -987,6 +1002,7 @@ function OdontogramArch({
               wt
                 ? cn("text-white border-white shadow", WORK_TYPES[wt].dot)
                 : "bg-slate-200 text-slate-500 border-white",
+              isActive && "ring-2 ring-slate-900 ring-offset-1",
             )}
             style={{ top: `${ly}%`, left: `${lx}%` }}
           >
