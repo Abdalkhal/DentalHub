@@ -11,20 +11,26 @@ import {
   UserPlus,
   UserCheck,
   Phone,
+  Mail,
   X,
   Edit3,
   Trash2,
   Building2,
+  Loader2,
+  ShieldCheck,
 } from "lucide-react";
 import {
-  useStaff,
-  addStaffMember,
-  updateStaffMember,
-  removeStaffMember,
-  type StaffDepartment,
-  type StaffMember,
-} from "@/lib/staffStore";
+  useLabMembers,
+  inviteLabMember,
+  updateLabMember,
+  removeLabMember,
+  roleForDepartment,
+  type LabMember,
+  type LabRole,
+} from "@/lib/labMembersStore";
+import { useSession } from "@/lib/useAuth";
 import { DEPARTMENTS, getDepartment } from "@/data/staffDepartments";
+import type { StaffDepartment } from "@/lib/staffStore";
 
 export const Route = createFileRoute("/labs/staff")({
   component: StaffPage,
@@ -33,59 +39,81 @@ export const Route = createFileRoute("/labs/staff")({
 const inputClass =
   "w-full h-11 rounded-xl bg-slate-50 border border-slate-200 px-4 text-sm font-medium placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 transition";
 
+const ROLE_LABELS: Record<LabRole, { ar: string; en: string; color: string }> = {
+  DESIGNER: { ar: "مصمم CAD", en: "Designer", color: "bg-sky-100 text-sky-700" },
+  TECHNICIAN: { ar: "فني", en: "Technician", color: "bg-violet-100 text-violet-700" },
+  ADMIN: { ar: "إدارة", en: "Admin", color: "bg-amber-100 text-amber-700" },
+};
+
+const ROLE_ORDER: LabRole[] = ["DESIGNER", "TECHNICIAN", "ADMIN"];
+
 function StaffPage() {
   const { lang, dir } = useI18n();
   const ar = lang === "ar";
   const navigate = useNavigate();
-  const staff = useStaff();
+  const { user } = useSession();
+  const labId = user?.uid || "";
+  const { members, loading } = useLabMembers(labId);
 
   const [search, setSearch] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
-  const [editingMember, setEditingMember] = useState<StaffMember | null>(null);
+  const [editingMember, setEditingMember] = useState<LabMember | null>(null);
   const [viewDeptId, setViewDeptId] = useState<StaffDepartment | null>(null);
 
   const BackIcon = dir === "rtl" ? ArrowRight : ArrowLeft;
 
-  const totalMembers = staff.length;
+  const totalMembers = members.length;
 
   const filteredDepartments = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return DEPARTMENTS;
     return DEPARTMENTS.filter((d) => {
       const nameMatch = (ar ? d.ar : d.en).toLowerCase().includes(q);
-      const memberMatch = staff.some(
+      const memberMatch = members.some(
         (m) =>
           m.department === d.id &&
-          (m.name.toLowerCase().includes(q) || (m.phone || "").includes(q)),
+          (m.name.toLowerCase().includes(q) ||
+            (m.phone || "").includes(q) ||
+            (m.email || "").toLowerCase().includes(q)),
       );
       return nameMatch || memberMatch;
     });
-  }, [search, ar, staff]);
+  }, [search, ar, members]);
 
   const countFor = (deptId: StaffDepartment) =>
-    staff.filter((m) => m.department === deptId).length;
+    members.filter((m) => m.department === deptId).length;
 
-  const membersOf = (deptId: StaffDepartment) =>
-    staff.filter((m) => m.department === deptId);
+  const membersOf = (deptId: StaffDepartment) => members.filter((m) => m.department === deptId);
 
-  const handleSaveMember = (data: { name: string; phone: string; department: StaffDepartment }) => {
+  const handleSaveMember = async (data: {
+    name: string;
+    email: string;
+    phone: string;
+    role: LabRole;
+    department: StaffDepartment;
+  }) => {
     if (editingMember) {
-      updateStaffMember(editingMember.id, data);
+      await updateLabMember(labId, editingMember.id, {
+        name: data.name,
+        phone: data.phone,
+        role: data.role,
+        department: data.department,
+      });
       toast.success(ar ? "تم تحديث بيانات العضو بنجاح" : "Member updated successfully");
     } else {
-      addStaffMember(data);
-      toast.success(ar ? "تمت إضافة العضو بنجاح" : "Member added successfully");
+      await inviteLabMember(labId, { ...data });
+      toast.success(ar ? "تم إرسال دعوة العضو بنجاح" : "Member invitation sent successfully");
     }
     setShowAddModal(false);
     setEditingMember(null);
   };
 
-  const handleRemove = (member: StaffMember) => {
-    removeStaffMember(member.id);
+  const handleRemove = async (member: LabMember) => {
+    await removeLabMember(member.id);
     toast.success(ar ? "تم حذف العضو" : "Member removed");
   };
 
-  const handleOpenEdit = (member: StaffMember) => {
+  const handleOpenEdit = (member: LabMember) => {
     setEditingMember(member);
     setShowAddModal(true);
   };
@@ -111,7 +139,9 @@ function StaffPage() {
                 {ar ? "كادر المختبر" : "Lab Staff"}
               </h1>
               <p className="text-xs text-slate-500 truncate">
-                {ar ? "إدارة جميع أعضاء كادر المختبر والمهام والصلاحيات" : "Manage all lab staff members, roles and permissions"}
+                {ar
+                  ? "حسابات حقيقية وأدوار وصلاحيات (مصمم / فني / إدارة)"
+                  : "Real accounts, roles & permissions (Designer / Technician / Admin)"}
               </p>
             </div>
           </div>
@@ -124,7 +154,7 @@ function StaffPage() {
             className="h-11 px-4 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-sm font-bold flex items-center gap-2 shadow-sm transition shrink-0"
           >
             <UserPlus className="size-4" />
-            {ar ? "إضافة عضو جديد" : "Add New Member"}
+            {ar ? "دعوة عضو جديد" : "Invite New Member"}
           </button>
         </div>
       </header>
@@ -134,7 +164,7 @@ function StaffPage() {
         <div className="grid grid-cols-1 gap-4">
           <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm flex items-center gap-4">
             <span className="size-12 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
-              <Users className="size-6" />
+              {loading ? <Loader2 className="size-6 animate-spin" /> : <Users className="size-6" />}
             </span>
             <div>
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
@@ -168,7 +198,12 @@ function StaffPage() {
                 className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col"
               >
                 <div className="flex items-center gap-3 mb-3">
-                  <span className={cn("size-11 rounded-xl flex items-center justify-center shrink-0", d.color)}>
+                  <span
+                    className={cn(
+                      "size-11 rounded-xl flex items-center justify-center shrink-0",
+                      d.color,
+                    )}
+                  >
                     <Icon className="size-5" />
                   </span>
                   <div className="min-w-0">
@@ -237,26 +272,61 @@ function MemberFormModal({
   onSave,
 }: {
   ar: boolean;
-  editing: StaffMember | null;
+  editing: LabMember | null;
   onClose: () => void;
-  onSave: (data: { name: string; phone: string; department: StaffDepartment }) => void;
+  onSave: (data: {
+    name: string;
+    email: string;
+    phone: string;
+    role: LabRole;
+    department: StaffDepartment;
+  }) => Promise<void> | void;
 }) {
   const [name, setName] = useState(editing?.name ?? "");
+  const [email, setEmail] = useState(editing?.email ?? "");
   const [phone, setPhone] = useState(editing?.phone ?? "");
+  const [role, setRole] = useState<LabRole>(editing?.role ?? "DESIGNER");
   const [department, setDepartment] = useState<StaffDepartment>(
     editing?.department ?? "cad_designer",
   );
+  const [busy, setBusy] = useState(false);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!name.trim()) {
       toast.error(ar ? "اسم العضو مطلوب" : "Member name is required");
       return;
     }
-    onSave({ name: name.trim(), phone: phone.trim(), department });
+    if (!editing && !email.trim()) {
+      toast.error(ar ? "البريد الإلكتروني مطلوب للدعوة" : "Email is required to invite");
+      return;
+    }
+    setBusy(true);
+    try {
+      await onSave({
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        role,
+        department,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      toast.error(msg || (ar ? "فشل حفظ العضو" : "Failed to save member"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const changeDepartment = (d: StaffDepartment) => {
+    setDepartment(d);
+    setRole(roleForDepartment(d));
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+      onClick={onClose}
+    >
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
       <div
         className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[92svh] flex flex-col animate-in slide-in-from-bottom duration-300"
@@ -271,10 +341,10 @@ function MemberFormModal({
               {ar
                 ? editing
                   ? "تعديل عضو"
-                  : "إضافة عضو جديد"
+                  : "دعوة عضو جديد"
                 : editing
                   ? "Edit Member"
-                  : "Add New Member"}
+                  : "Invite New Member"}
             </h2>
           </div>
           <button
@@ -299,6 +369,23 @@ function MemberFormModal({
             />
           </div>
 
+          {!editing && (
+            <div>
+              <label className="text-xs font-bold text-slate-600 mb-1.5 flex items-center gap-1.5">
+                <Mail className="size-3.5" />
+                {ar ? "البريد الإلكتروني" : "Email Address"}
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="member@lab.com"
+                dir="ltr"
+                className={inputClass}
+              />
+            </div>
+          )}
+
           <div>
             <label className="text-xs font-bold text-slate-600 mb-1.5 flex items-center gap-1.5">
               <Phone className="size-3.5" />
@@ -316,12 +403,36 @@ function MemberFormModal({
 
           <div>
             <label className="text-xs font-bold text-slate-600 mb-1.5 flex items-center gap-1.5">
+              <ShieldCheck className="size-3.5" />
+              {ar ? "الدور (الصلاحية)" : "Role"}
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {ROLE_ORDER.map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setRole(r)}
+                  className={cn(
+                    "h-10 rounded-xl border text-xs font-bold transition",
+                    role === r
+                      ? "bg-sky-600 text-white border-sky-600"
+                      : "bg-white text-slate-600 border-slate-200 hover:border-slate-300",
+                  )}
+                >
+                  {ar ? ROLE_LABELS[r].ar : ROLE_LABELS[r].en}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-600 mb-1.5 flex items-center gap-1.5">
               <Building2 className="size-3.5" />
               {ar ? "القسم" : "Department"}
             </label>
             <select
               value={department}
-              onChange={(e) => setDepartment(e.target.value as StaffDepartment)}
+              onChange={(e) => changeDepartment(e.target.value as StaffDepartment)}
               className={cn(inputClass, "appearance-none")}
             >
               {DEPARTMENTS.map((d) => (
@@ -342,9 +453,17 @@ function MemberFormModal({
           </button>
           <button
             onClick={handleSubmit}
-            className="flex-1 h-11 rounded-xl bg-sky-600 text-white font-bold text-sm flex items-center justify-center gap-2 hover:bg-sky-700 transition"
+            disabled={busy}
+            className="flex-1 h-11 rounded-xl bg-sky-600 text-white font-bold text-sm flex items-center justify-center gap-2 hover:bg-sky-700 transition disabled:opacity-50"
           >
-            {editing ? (ar ? "حفظ التعديلات" : "Save Changes") : ar ? "إضافة العضو" : "Add Member"}
+            {busy && <Loader2 className="size-4 animate-spin" />}
+            {editing
+              ? ar
+                ? "حفظ التعديلات"
+                : "Save Changes"
+              : ar
+                ? "إرسال الدعوة"
+                : "Send Invite"}
           </button>
         </div>
       </div>
@@ -362,14 +481,17 @@ function ViewMembersModal({
 }: {
   ar: boolean;
   dept: NonNullable<ReturnType<typeof getDepartment>>;
-  members: StaffMember[];
+  members: LabMember[];
   onClose: () => void;
-  onEdit: (m: StaffMember) => void;
-  onRemove: (m: StaffMember) => void;
+  onEdit: (m: LabMember) => void;
+  onRemove: (m: LabMember) => void;
 }) {
   const Icon = dept.icon;
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+      onClick={onClose}
+    >
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
       <div
         className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[92svh] flex flex-col animate-in slide-in-from-bottom duration-300"
@@ -381,9 +503,7 @@ function ViewMembersModal({
               <Icon className="size-4" />
             </span>
             <div>
-              <h2 className="font-display font-extrabold text-base">
-                {ar ? dept.ar : dept.en}
-              </h2>
+              <h2 className="font-display font-extrabold text-base">{ar ? dept.ar : dept.en}</h2>
               <p className="text-[11px] text-slate-400 font-semibold">
                 {members.length} {ar ? "أعضاء" : "members"}
               </p>
@@ -418,7 +538,26 @@ function ViewMembersModal({
                     {m.name.charAt(0)}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-slate-800 truncate">{m.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold text-slate-800 truncate">{m.name}</p>
+                      <span
+                        className={cn(
+                          "text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0",
+                          ROLE_LABELS[m.role]?.color ?? "bg-slate-100 text-slate-500",
+                        )}
+                      >
+                        {ar ? ROLE_LABELS[m.role]?.ar : ROLE_LABELS[m.role]?.en}
+                      </span>
+                    </div>
+                    {m.email && (
+                      <p
+                        className="text-xs text-slate-400 flex items-center gap-1 truncate"
+                        dir="ltr"
+                      >
+                        <Mail className="size-3" />
+                        {m.email}
+                      </p>
+                    )}
                     {m.phone && (
                       <p className="text-xs text-slate-400 flex items-center gap-1" dir="ltr">
                         <Phone className="size-3" />

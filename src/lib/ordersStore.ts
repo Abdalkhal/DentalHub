@@ -1,9 +1,14 @@
 import { useSyncExternalStore } from "react";
 import {
   doc, setDoc, getDoc, onSnapshot, deleteDoc,
-  collection, query, orderBy, getDocs,
+  collection, query, orderBy, getDocs, collectionGroup, where,
 } from "firebase/firestore";
 import { db } from "@/integrations/firebase/client";
+import {
+  writeCaseFinance,
+  stripFinancialFields,
+  type CaseFinance,
+} from "./financeStore";
 
 export type OrderStatus = "new" | "in_progress" | "completed" | "delayed";
 
@@ -74,6 +79,7 @@ export type Order = {
   targetLabId?: string;
   dentistId?: string;
   attachments?: OrderAttachment[];
+  designs?: OrderAttachment[];
   // Rich RX form fields
   patientAge?: string;
   patientGender?: string;
@@ -113,6 +119,9 @@ function saveOrders(data: Order[]) {
 let orders: Order[] = loadOrders();
 let _labId: string | null = null;
 let _unsubFirestore: (() => void) | null = null;
+let _unsubFinance: (() => void) | null = null;
+let _firestoreCases: Order[] = [];
+let _financeByCase: Record<string, CaseFinance> = {};
 const listeners = new Set<() => void>();
 
 function emit() {
@@ -220,8 +229,9 @@ async function migrateLocalToFirestore(labId: string) {
     try {
       const snap = await getDoc(caseDocRef(labId, o.id));
       if (!snap.exists()) {
-        await setDoc(caseDocRef(labId, o.id), o);
+        await setDoc(caseDocRef(labId, o.id), stripFinancialFields(o));
       }
+      await writeCaseFinance(labId, o.id, o);
     } catch (err) {
       console.warn("Failed to migrate order:", o.id, err);
     }
@@ -234,21 +244,53 @@ export function connectLabOrders(labId: string) {
   disconnectLabOrders();
 
   _labId = labId;
+  _firestoreCases = [];
+  _financeByCase = {};
+
+  const rebuildFromFirestore = () => {
+    orders = _firestoreCases.map((c) => {
+      const fin = _financeByCase[c.id];
+      if (!fin) return c;
+      return {
+        ...c,
+        price: fin.price ?? 0,
+        currency: fin.currency ?? c.currency,
+        unitPrice: fin.unitPrice ?? 0,
+        discount: fin.discount ?? 0,
+        pricingMode: fin.pricingMode ?? c.pricingMode,
+        pricingItems: fin.pricingItems ?? c.pricingItems,
+        subtotalIQD: fin.subtotalIQD ?? c.subtotalIQD,
+        discountAmountIQD: fin.discountAmountIQD ?? c.discountAmountIQD,
+        finalTotalUSD: fin.finalTotalUSD ?? c.finalTotalUSD,
+      } as Order;
+    });
+    if (orders.length > 0) {
+      _counter = orders.reduce((m, o) => Math.max(m, o.caseId), 0);
+      saveCounter(_counter);
+    }
+    saveOrders(orders);
+    listeners.forEach((l) => l());
+  };
 
   migrateLocalToFirestore(labId).then(() => {
     const q = query(collection(db, "lab_orders", labId, "cases"), orderBy("caseId", "desc"));
     _unsubFirestore = onSnapshot(q, (snap) => {
-      const firestoreOrders = snap.docs.map((d) => d.data() as Order);
-      if (firestoreOrders.length > 0) {
-        orders = firestoreOrders;
-        const maxId = orders.reduce((m, o) => Math.max(m, o.caseId), 0);
-        _counter = maxId;
-        saveCounter(maxId);
-      }
-      saveOrders(orders);
-      listeners.forEach((l) => l());
+      _firestoreCases = snap.docs.map((d) => d.data() as Order);
+      rebuildFromFirestore();
     }, (err) => {
       console.warn("Firestore lab orders listener error:", err);
+    });
+
+    const fq = query(collectionGroup(db, "private"), where("labId", "==", labId));
+    _unsubFinance = onSnapshot(fq, (snap) => {
+      _financeByCase = {};
+      snap.docs.forEach((d) => {
+        const fin = d.data() as CaseFinance;
+        _financeByCase[fin.caseId] = fin;
+      });
+      rebuildFromFirestore();
+    }, (err) => {
+      console.warn("Firestore lab finance listener error:", err);
     });
   }).catch((err) => {
     console.warn("Failed to migrate local orders:", err);
@@ -260,13 +302,20 @@ export function disconnectLabOrders() {
     _unsubFirestore();
     _unsubFirestore = null;
   }
+  if (_unsubFinance) {
+    _unsubFinance();
+    _unsubFinance = null;
+  }
   _labId = null;
+  _firestoreCases = [];
+  _financeByCase = {};
 }
 
 async function syncToFirestore(order: Order) {
   if (!_labId || !db) return;
   try {
-    await setDoc(caseDocRef(_labId, order.id), order);
+    await setDoc(caseDocRef(_labId, order.id), stripFinancialFields(order));
+    await writeCaseFinance(_labId, order.id, order);
   } catch (err) {
     console.warn("Failed to sync order to Firestore:", order.id, err);
   }
@@ -393,6 +442,7 @@ export async function submitDentistCase(
     rxData: data.rxData,
   };
 
-  await setDoc(caseDocRef(labId, id), order);
+  await setDoc(caseDocRef(labId, id), stripFinancialFields(order));
+  await writeCaseFinance(labId, id, order);
   return order;
 }

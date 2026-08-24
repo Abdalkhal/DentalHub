@@ -27,6 +27,7 @@ import {
   type OrderStatus,
 } from "@/lib/ordersStore";
 import type { UserRoleDoc } from "@/integrations/firebase/types";
+import { useLabFinance, sumFinanceRevenue } from "@/lib/financeStore";
 import {
   Search,
   Bell,
@@ -278,10 +279,8 @@ function LabDashboard() {
     return { total, inProgress, completed, delayed };
   }, [orders]);
 
-  const totalRevenue = useMemo(
-    () => orders.reduce((sum, c) => sum + (c.price || 0), 0),
-    [orders],
-  );
+  const { finance: labFinance } = useLabFinance(user?.uid || "");
+  const totalRevenue = useMemo(() => sumFinanceRevenue(labFinance), [labFinance]);
 
   const avgRating = useMemo(() => {
     const rated = orders.filter((c) => c.rating != null && c.rating > 0);

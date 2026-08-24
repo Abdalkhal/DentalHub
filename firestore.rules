@@ -2,8 +2,22 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // ============================================================
+    // Shared helpers
+    // ============================================================
     function isAuthenticated() {
       return request.auth != null;
+    }
+
+    // Custom claim set by the invite Cloud Function (inviteLabMember).
+    // Values: 'ADMIN' | 'DESIGNER' | 'TECHNICIAN' (may be null/absent).
+    function staffRole() {
+      return request.auth.token.role;
+    }
+
+    function claimLabId() {
+      return request.auth.token.labId;
     }
 
     function isAdmin() {
@@ -11,6 +25,48 @@ service cloud.firestore {
         get(/databases/$(database)/documents/user_roles/$(request.auth.uid)).data.role == 'admin';
     }
 
+    // The lab owner is the account whose uid equals the lab document id.
+    function isLabOwner(labId) {
+      return isAuthenticated() && request.auth.uid == labId;
+    }
+
+    // Any member of a lab via custom claims (ADMIN, DESIGNER or TECHNICIAN).
+    function isLabMember(labId) {
+      return isAuthenticated()
+        && claimLabId() == labId
+        && staffRole() in ['ADMIN', 'DESIGNER', 'TECHNICIAN'];
+    }
+
+    function isDesigner(labId) {
+      return isLabMember(labId) && staffRole() == 'DESIGNER';
+    }
+
+    function isTechnician(labId) {
+      return isLabMember(labId) && staffRole() == 'TECHNICIAN';
+    }
+
+    function isLabAdmin(labId) {
+      return isLabOwner(labId) || (isLabMember(labId) && staffRole() == 'ADMIN');
+    }
+
+    // Financial fields must never be modified by non-owner staff. This also
+    // guards the transition period before financial data is fully migrated to
+    // the private/finance subcollection.
+    function isUnchanged(field) {
+      return request.resource.data[field] == resource.data[field];
+    }
+
+    function noFinanceChanges() {
+      return isUnchanged('price') && isUnchanged('currency')
+        && isUnchanged('unitPrice') && isUnchanged('discount')
+        && isUnchanged('pricingMode') && isUnchanged('pricingItems')
+        && isUnchanged('subtotalIQD') && isUnchanged('discountAmountIQD')
+        && isUnchanged('finalTotalUSD');
+    }
+
+    // ============================================================
+    // Existing collections
+    // ============================================================
     match /user_roles/{userId} {
       allow read: if isAuthenticated();
       allow create, update, delete: if isAuthenticated() && request.auth.uid == userId;
@@ -18,7 +74,7 @@ service cloud.firestore {
 
     match /products/{productId} {
       allow read: if true;
-      allow create, update, delete: if isAdmin() || 
+      allow create, update, delete: if isAdmin() ||
         (isAuthenticated() && resource != null && resource.data.companyId == request.auth.uid);
     }
 
@@ -76,22 +132,101 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && request.auth.uid == labId;
     }
 
-    match /lab_orders/{labId} {
-      match /cases/{caseId} {
-        allow read: if isAuthenticated() &&
-          (request.auth.uid == labId || resource.data.dentistId == request.auth.uid);
-        allow create: if isAuthenticated();
-        allow update: if isAuthenticated() &&
-          (request.auth.uid == labId || resource.data.dentistId == request.auth.uid);
-        allow delete: if isAuthenticated() && request.auth.uid == labId;
-      }
-    }
-
     match /admin_config/{config} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
+    // ============================================================
+    // PHASE 5: storage_hashes (SHA-256 dedup bookkeeping)
+    // ============================================================
+    match /storage_hashes/{hashId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.labId
+        || isLabMember(resource.data.labId)
+        || resource.data.dentistId == request.auth.uid
+      );
+      allow create, update: if isAuthenticated() && (
+        request.auth.uid == request.resource.data.labId
+        || isLabMember(request.resource.data.labId)
+        || request.resource.data.dentistId == request.auth.uid
+      );
+      allow delete: if isAuthenticated() && (
+        request.auth.uid == resource.data.labId
+        || isLabMember(resource.data.labId)
+        || resource.data.dentistId == request.auth.uid
+      );
+    }
+
+    // ============================================================
+    // PHASE 2: lab_members (real Firebase accounts)
+    // ============================================================
+    match /lab_members/{memberId} {
+      allow read: if isAuthenticated() && (
+        resource.data.uid == request.auth.uid
+        || resource.data.labId == request.auth.uid
+        || isLabAdmin(resource.data.labId)
+      );
+      allow create, update: if isAuthenticated() && (
+        request.resource.data.labId == request.auth.uid
+        || isLabAdmin(request.resource.data.labId)
+      );
+      allow delete: if isAuthenticated() && (
+        resource.data.labId == request.auth.uid
+        || isLabAdmin(resource.data.labId)
+      );
+    }
+
+    // ============================================================
+    // PHASE 0 + 3: lab cases
+    // ============================================================
+    match /lab_orders/{labId} {
+      match /cases/{caseId} {
+        // Designers/technicians may only read cases assigned to them.
+        // Unassigned cases (designerId empty/missing) are invisible to staff.
+        allow read: if isAuthenticated() && (
+          isLabAdmin(labId)
+          || resource.data.dentistId == request.auth.uid
+          || (isLabMember(labId) && resource.data.designerId == request.auth.uid)
+        );
+
+        // PHASE 0: only the referring dentist or the lab owner may create a case.
+        allow create: if isAuthenticated() && (
+          request.resource.data.dentistId == request.auth.uid
+          || isLabOwner(labId)
+        );
+
+        // Staff cannot modify designerId (or any financial field); the owner and
+        // the referring dentist keep full update rights.
+        allow update: if isAuthenticated() && (
+          isLabOwner(labId)
+          || (resource.data.dentistId == request.auth.uid && noFinanceChanges())
+          || (
+            isLabMember(labId)
+            && resource.data.designerId == request.auth.uid
+            && request.resource.data.designerId == resource.data.designerId
+            && request.resource.data.dentistId == resource.data.dentistId
+            && request.resource.data.caseId == resource.data.caseId
+            && noFinanceChanges()
+          )
+        );
+
+        allow delete: if isLabOwner(labId);
+
+        // ============================================================
+        // PHASE 1 + 3: private finance subcollection
+        // Only the lab owner (or lab ADMIN) can read/write financial metrics.
+        // DESIGNER / TECHNICIAN roles are explicitly denied.
+        // ============================================================
+        match /private/finance {
+          allow read, write: if isLabAdmin(labId);
+        }
+      }
+    }
+
+    // ============================================================
+    // Deny-by-default for everything else
+    // ============================================================
     match /{document=**} {
       allow read, write: if false;
     }

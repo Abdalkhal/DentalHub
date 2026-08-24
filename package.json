@@ -12,6 +12,7 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:rules": "firebase emulators:exec --only firestore \"node --test scripts/firestore.rules.test.js\"",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -75,6 +76,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.0",
     "@eslint/js": "^9.32.0",
     "@lovable.dev/vite-tanstack-config": "2.7.1",
     "@testing-library/jest-dom": "^7.0.0",

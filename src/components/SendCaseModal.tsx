@@ -5,8 +5,7 @@ import { useSession } from "@/lib/useAuth";
 import { submitDentistCase, type OrderAttachment } from "@/lib/ordersStore";
 import { createNotification } from "@/components/NotificationBell";
 import { cn } from "@/lib/utils";
-import { storage } from "@/integrations/firebase/client";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { uploadCaseFile } from "@/lib/storagePipeline";
 
 type SendCaseModalProps = {
   labId: string;
@@ -105,14 +104,20 @@ export function SendCaseModal({ labId, labName, open, onClose }: SendCaseModalPr
   const uploadFiles = async (caseId: string): Promise<OrderAttachment[]> => {
     if (files.length === 0) return [];
     const attachments: OrderAttachment[] = [];
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
-      const path = `case_scans/${labId}/${caseId}/scan_${i + 1}.${ext}`;
-      const fileRef = ref(storage, path);
-      const snap = await uploadBytes(fileRef, file);
-      const url = await getDownloadURL(snap.ref);
-      attachments.push({ name: file.name, url, type: ext });
+    for (const file of files) {
+      const res = await uploadCaseFile({
+        labId,
+        caseId,
+        file,
+        fileName: file.name,
+        dentistId: user?.uid ?? "unknown",
+        kind: "scan",
+      });
+      attachments.push({
+        name: file.name,
+        url: res.url,
+        type: file.name.split(".").pop()?.toLowerCase() ?? "stl",
+      });
     }
     return attachments;
   };
