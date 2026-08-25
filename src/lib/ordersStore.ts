@@ -3,7 +3,8 @@ import {
   doc, setDoc, getDoc, onSnapshot, deleteDoc, updateDoc,
   collection, query, orderBy, getDocs, collectionGroup, where,
 } from "firebase/firestore";
-import { db } from "@/integrations/firebase/client";
+import { deleteObject, ref as storageRef } from "firebase/storage";
+import { db, storage } from "@/integrations/firebase/client";
 import {
   writeCaseFinance,
   stripFinancialFields,
@@ -96,6 +97,10 @@ export type Order = {
   patientGender?: string;
   patientPhone?: string;
   doctorSignature?: string;
+  fileUrl?: string;
+  fileName?: string;
+  filePath?: string;
+  fileStatus?: "uploaded" | "deleted" | null;
   rxTeeth?: Record<string, string>;
   rxItems?: string[];
   rxData?: Record<string, unknown>;
@@ -463,7 +468,51 @@ export function addOrder(order: Order) {
   syncToFirestore(order);
 }
 
+function isCompletedStatusValue(status: string): boolean {
+  const v = String(status ?? "").trim().toLowerCase();
+  return v === "completed" || v === "مكتملة" || v === "مكتمل";
+}
+
+/** Permanently erases the heavy STL/ZIP file once a case is completed. */
+async function cleanupOrderFile(
+  labId: string,
+  orderId: string,
+  filePath: string | null | undefined,
+): Promise<void> {
+  if (filePath) {
+    try {
+      await deleteObject(storageRef(storage, filePath));
+    } catch (err) {
+      console.warn("Failed to delete order file:", filePath, err);
+    }
+  }
+  try {
+    await updateDoc(caseDocRef(labId, orderId), {
+      fileUrl: null,
+      filePath: null,
+      fileStatus: "deleted",
+    });
+  } catch (err) {
+    console.warn("Failed to update order file status:", orderId, err);
+  }
+}
+
+/** Attaches the uploaded scanner file metadata to the order document. */
+export async function attachOrderFile(
+  labId: string,
+  orderId: string,
+  file: { url: string; name: string; path: string },
+): Promise<void> {
+  await updateDoc(caseDocRef(labId, orderId), {
+    fileUrl: file.url,
+    fileName: file.name,
+    filePath: file.path,
+    fileStatus: "uploaded",
+  });
+}
+
 export function updateOrderStatus(id: string, status: OrderStatus) {
+  const target = orders.find((o) => o.id === id);
   orders = orders.map((o) => (o.id === id ? { ...o, status } : o));
   emit();
   // Partial update: only the status field is written, so dentist ownership
@@ -473,6 +522,9 @@ export function updateOrderStatus(id: string, status: OrderStatus) {
     updateDoc(caseDocRef(_labId, id), { status }).catch((err) => {
       console.warn("Failed to update order status:", id, err);
     });
+    if (isCompletedStatusValue(status)) {
+      void cleanupOrderFile(_labId, id, target?.filePath ?? null);
+    }
   }
 }
 

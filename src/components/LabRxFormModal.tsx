@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { X, Send, Loader2, Phone, Instagram, MapPin, Eraser } from "lucide-react";
+import { X, Send, Loader2, Phone, Instagram, MapPin, Upload, File } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useSession, useUserRole } from "@/lib/useAuth";
-import { submitDentistCase } from "@/lib/ordersStore";
+import { submitDentistCase, attachOrderFile } from "@/lib/ordersStore";
+import { uploadOrderFile } from "@/lib/storagePipeline";
 import { createNotification } from "@/components/NotificationBell";
 import { cn } from "@/lib/utils";
 import { FDI_UPPER, FDI_LOWER, UPPER_POS, LOWER_POS } from "@/components/DentalArch";
@@ -237,10 +238,10 @@ export function LabRxFormModal({
 
   const [notes, setNotes] = useState("");
   const [doctorName, setDoctorName] = useState("");
-  const [sigDataUrl, setSigDataUrl] = useState<string | null>(null);
+  const [scanFile, setScanFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const drawing = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
@@ -254,23 +255,6 @@ export function LabRxFormModal({
         : user?.displayName || user?.email || "";
     setDoctorName(docName);
   }, [open, role, user]);
-
-  useEffect(() => {
-    if (!open || !canvasRef.current) return;
-    const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    const ctx = canvas.getContext("2d");
-    if (ctx) {
-      ctx.scale(dpr, dpr);
-      ctx.lineWidth = 2;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.strokeStyle = "#0f172a";
-    }
-  }, [open]);
 
   if (!open) return null;
 
@@ -315,42 +299,24 @@ export function LabRxFormModal({
     setCustomShade("");
   };
 
-  const clearSignature = () => {
-    setSigDataUrl(null);
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext("2d");
-    if (canvas && ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const handleFileSelect = (files: FileList | null) => {
+    const file = files?.[0];
+    if (!file) return;
+    const ext = (file.name.split(".").pop() ?? "").toLowerCase();
+    if (ext !== "stl" && ext !== "zip") {
+      setError(ar ? "يُسمح فقط بملفات STL أو ZIP" : "Only .stl and .zip files are allowed");
+      return;
+    }
+    setError(null);
+    setScanFile(file);
+    setUploadProgress(0);
   };
 
-  const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    drawing.current = true;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    const rect = canvas.getBoundingClientRect();
-    ctx.beginPath();
-    ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+  const clearFile = () => {
+    setScanFile(null);
+    setUploadProgress(0);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
-
-  const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!drawing.current) return;
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext("2d");
-    if (!canvas || !ctx) return;
-    const rect = canvas.getBoundingClientRect();
-    ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
-    ctx.stroke();
-  };
-
-  const onPointerUp = () => {
-    if (!drawing.current) return;
-    drawing.current = false;
-    const canvas = canvasRef.current;
-    if (canvas) setSigDataUrl(canvas.toDataURL("image/png"));
-  };
-
-  const signature = sigDataUrl || doctorName.trim();
 
   const handleSubmit = async () => {
     setError(null);
@@ -418,7 +384,6 @@ export function LabRxFormModal({
         patientAge: patientAge || undefined,
         patientGender: patientGender || undefined,
         patientPhone: patientPhone || undefined,
-        doctorSignature: signature || undefined,
         rxTeeth: Object.fromEntries(Object.entries(teeth).map(([n, t]) => [n, t])),
         rxItems: allItems,
         rxData: {
@@ -433,6 +398,20 @@ export function LabRxFormModal({
           primaryWorkType,
         },
       });
+
+      if (scanFile) {
+        const { url, path } = await uploadOrderFile({
+          orderId: order.id,
+          file: scanFile,
+          fileName: scanFile.name,
+          onProgress: (pct) => setUploadProgress(pct),
+        });
+        await attachOrderFile(labId, order.id, {
+          url,
+          name: scanFile.name,
+          path,
+        });
+      }
 
       try {
         await createNotification({
@@ -907,40 +886,65 @@ export function LabRxFormModal({
             </p>
           </section>
 
-          {/* Signature */}
+          {/* Scanner file (STL/ZIP) */}
           <section className="space-y-2">
-            <SectionTitle>{ar ? "توقيع الطبيب" : "Doctor signature"}</SectionTitle>
-            <div
-              className="rounded-2xl border-2 border-dashed border-slate-300 relative h-28 overflow-hidden bg-white"
-              style={{ touchAction: "none" }}
-            >
-              <canvas
-                ref={canvasRef}
-                className="absolute inset-0 w-full h-full cursor-crosshair"
-                onPointerDown={onPointerDown}
-                onPointerMove={onPointerMove}
-                onPointerUp={onPointerUp}
-                onPointerLeave={onPointerUp}
-              />
-              {!sigDataUrl && (
-                <span className="absolute inset-0 flex items-center justify-center text-slate-300 text-xs pointer-events-none select-none">
-                  {ar ? "وقّع هنا بالسحب" : "Sign here by dragging"}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
+            <SectionTitle>{ar ? "إرفاق ملف الماسح (STL / ZIP)" : "Attach scanner file (STL / ZIP)"}</SectionTitle>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".stl,.zip"
+              className="hidden"
+              onChange={(e) => handleFileSelect(e.target.files)}
+            />
+            {scanFile ? (
+              <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="size-9 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
+                    <File className="size-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold text-slate-700 truncate" dir="ltr">{scanFile.name}</p>
+                    <p className="text-[10px] text-slate-400">
+                      {(scanFile.size / 1024 / 1024).toFixed(2)} MB
+                    </p>
+                  </div>
+                  {!busy && (
+                    <button
+                      type="button"
+                      onClick={clearFile}
+                      className="size-7 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-rose-500 flex items-center justify-center"
+                    >
+                      <X className="size-4" />
+                    </button>
+                  )}
+                </div>
+                {busy && (
+                  <div className="space-y-1">
+                    <div className="w-full h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                      <div
+                        className="h-full bg-sky-500 transition-all"
+                        style={{ width: `${uploadProgress}%` }}
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-400 text-center" dir="ltr">
+                      {uploadProgress}%
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
               <button
                 type="button"
-                onClick={clearSignature}
-                className="h-8 px-3 rounded-lg bg-white border border-slate-200 text-slate-600 text-xs font-bold inline-flex items-center gap-1 hover:bg-slate-100"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full rounded-2xl border-2 border-dashed border-slate-300 hover:border-primary/50 bg-white p-4 flex flex-col items-center justify-center gap-1 text-slate-400 hover:text-primary transition"
               >
-                <Eraser className="size-3.5" />
-                {ar ? "مسح" : "Clear"}
+                <Upload className="size-5" />
+                <span className="text-[11px] font-semibold">
+                  {ar ? "اضغط لإرفاق ملف STL أو ZIP" : "Tap to attach STL or ZIP"}
+                </span>
+                <span className="text-[9px] text-slate-300">.stl · .zip</span>
               </button>
-              <span className="text-[11px] text-slate-400 truncate">
-                {ar ? "أو تأكيد باسم الطبيب:" : "Or confirm with doctor name:"} {doctorName || "—"}
-              </span>
-            </div>
+            )}
           </section>
 
           <button

@@ -654,6 +654,30 @@ export function OrderInvoiceModal({ order, labName, labAddress, labPhone, onClos
                 </SectionCard>
               )}
 
+              {/* Scanner file (STL/ZIP) */}
+              {order.fileUrl && order.fileStatus !== "deleted" && (
+                <SectionCard icon={Layers} title={ar ? "ملف الماسح" : "Scanner File"}>
+                  <div className="px-4 py-3">
+                    <a
+                      href={order.fileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      download={order.fileName || "scan"}
+                      className="inline-flex items-center gap-2 h-10 px-4 rounded-xl text-white font-bold text-sm transition hover:opacity-90"
+                      style={{ background: C.deepBlue }}
+                    >
+                      <Download className="size-4" />
+                      {ar ? "تحميل ملف 3D (.stl / .zip)" : "Download 3D file (.stl / .zip)"}
+                    </a>
+                    {order.fileName && (
+                      <p className="text-xs text-slate-500 mt-2" dir="ltr">
+                        {order.fileName}
+                      </p>
+                    )}
+                  </div>
+                </SectionCard>
+              )}
+
               {/* Attachments */}
               {order.attachments && order.attachments.length > 0 && (
                 <SectionCard icon={Paperclip} title={ar ? "المرفقات والملفات" : "Attachments & Files"}>

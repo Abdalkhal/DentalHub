@@ -1,4 +1,4 @@
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytes, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { storage, db } from "@/integrations/firebase/client";
 
@@ -173,4 +173,46 @@ export async function uploadCaseFile(opts: CaseUploadOptions): Promise<CaseUploa
   });
 
   return { url, previewUrl, hash, deduplicated: false };
+}
+
+/**
+ * Uploads a dentist's raw scanner file (STL/ZIP) to `orders_files/{orderId}/{fileName}`
+ * with a progress callback. Returns the download URL and storage path so the
+ * caller can persist `fileUrl` / `filePath` on the order document.
+ */
+export async function uploadOrderFile(opts: {
+  orderId: string;
+  file: File;
+  fileName: string;
+  onProgress?: (pct: number) => void;
+}): Promise<{ url: string; path: string }> {
+  const { orderId, file, fileName, onProgress } = opts;
+  const path = `orders_files/${orderId}/${fileName}`;
+  const fileRef = ref(storage, path);
+
+  const url = await new Promise<string>((resolve, reject) => {
+    const task = uploadBytesResumable(fileRef, file, {
+      contentType: file.type || "application/octet-stream",
+      cacheControl: "private, max-age=86400",
+    });
+    task.on(
+      "state_changed",
+      (snapshot) => {
+        const pct = snapshot.totalBytes
+          ? Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100)
+          : 0;
+        onProgress?.(pct);
+      },
+      (err) => reject(err),
+      async () => {
+        try {
+          resolve(await getDownloadURL(fileRef));
+        } catch (err) {
+          reject(err);
+        }
+      },
+    );
+  });
+
+  return { url, path };
 }
