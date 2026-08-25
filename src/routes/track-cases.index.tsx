@@ -2,10 +2,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
+import { IncomingOrderRxModal } from "@/components/IncomingOrderRxModal";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { useOrders, type OrderStatus } from "@/lib/ordersStore";
+import { useOrders, type Order, type OrderStatus } from "@/lib/ordersStore";
 import { useDentistCases, getCaseProgress, getStageLabel } from "@/lib/caseTracking";
+import { useCaseUnreadCount } from "@/lib/caseMessages";
 import { useSession, useUserRole } from "@/lib/useAuth";
 import {
   User, Wrench, CalendarDays, Truck, Hash, Building2, ClipboardList,
@@ -75,6 +77,18 @@ const STATUS_LABELS: Record<OrderStatus, { ar: string; en: string }> = {
   completed: { ar: "مكتملة", en: "Completed" },
 };
 
+type TrackedCase = { labId: string; order: Order };
+
+function UnreadBadge({ labId, caseId, userId }: { labId?: string; caseId: string; userId?: string }) {
+  const count = useCaseUnreadCount(labId ?? "", caseId, userId);
+  if (!count) return null;
+  return (
+    <span className="shrink-0 min-w-5 h-5 px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">
+      {count > 9 ? "9+" : count}
+    </span>
+  );
+}
+
 function TrackCases() {
   const { lang } = useI18n();
   const ar = lang === "ar";
@@ -83,16 +97,20 @@ function TrackCases() {
   const dentistName = role?.accountType === "dentist" ? (role.name || "") : "";
   const localOrders = useOrders();
   const { cases: remoteCases, loading } = useDentistCases(user?.uid ?? "");
+  const [selectedCase, setSelectedCase] = useState<TrackedCase | null>(null);
 
-  const allOrders = useMemo(() => {
-    const remote = remoteCases.map((c) => c.order);
-    const remoteIds = new Set(remote.map((r) => r.id));
-    const localOnly = localOrders.filter((o) => !remoteIds.has(o.id));
+  const allCases = useMemo(() => {
+    const remote: TrackedCase[] = remoteCases.map((c) => ({ labId: c.labId, order: c.order }));
+    const remoteIds = new Set(remote.map((r) => r.order.id));
+    const localOnly: TrackedCase[] = localOrders
+      .filter((o) => !remoteIds.has(o.id))
+      .map((o) => ({ labId: "", order: o }));
     const merged = [...remote, ...localOnly];
     if (!dentistName) return merged;
-    return merged.filter((o) =>
-      o.doctor.toLowerCase().includes(dentistName.toLowerCase()) ||
-      (o.clinic || "").toLowerCase().includes(dentistName.toLowerCase())
+    return merged.filter(
+      (c) =>
+        c.order.doctor.toLowerCase().includes(dentistName.toLowerCase()) ||
+        (c.order.clinic || "").toLowerCase().includes(dentistName.toLowerCase()),
     );
   }, [remoteCases, localOrders, dentistName]);
 
@@ -108,10 +126,10 @@ function TrackCases() {
 
   const counts: Record<string, number> = {};
   statuses.forEach((s) => {
-    counts[s.id] = s.id === "all" ? allOrders.length : allOrders.filter((o) => o.status === s.id).length;
+    counts[s.id] = s.id === "all" ? allCases.length : allCases.filter((c) => c.order.status === s.id).length;
   });
 
-  const filtered = filter === "all" ? allOrders : allOrders.filter((o) => o.status === filter);
+  const filtered = filter === "all" ? allCases : allCases.filter((c) => c.order.status === filter);
 
   return (
     <MobileShell>
@@ -169,29 +187,34 @@ function TrackCases() {
           </div>
         ) : (
           <div className="space-y-3">
-            {filtered.map((o) => {
+            {filtered.map((c) => {
+              const o = c.order;
               const st = STATUS[o.status] ?? STATUS.delayed;
               const label = STATUS_LABELS[o.status] ?? STATUS_LABELS.delayed;
               return (
                 <div
                   key={o.id}
+                  onClick={() => setSelectedCase(c)}
                   className={cn(
-                    "bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md transition-all overflow-hidden",
+                    "bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md transition-all overflow-hidden cursor-pointer",
                     "border-s-4",
                     st.accent,
                   )}
                 >
                   <div className={cn("px-4 pt-3 pb-1", st.light)}>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
                         <span className={cn("size-9 rounded-xl flex items-center justify-center font-bold text-sm shrink-0", st.bg, st.text)}>
                           {(o.patient || "?").charAt(0)}
                         </span>
-                        <p className="font-bold text-sm text-slate-800">{o.patient}</p>
+                        <p className="font-bold text-sm text-slate-800 truncate">{o.patient}</p>
                       </div>
-                      <span className={cn("text-[10px] font-bold px-2.5 py-1 rounded-full", st.bg, st.text)}>
-                        {ar ? label.ar : label.en}
-                      </span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <UnreadBadge labId={c.labId} caseId={o.id} userId={user?.uid} />
+                        <span className={cn("text-[10px] font-bold px-2.5 py-1 rounded-full", st.bg, st.text)}>
+                          {ar ? label.ar : label.en}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -230,6 +253,19 @@ function TrackCases() {
           </div>
         )}
       </div>
+
+      {selectedCase && (
+        <IncomingOrderRxModal
+          order={selectedCase.order}
+          onClose={() => setSelectedCase(null)}
+          labId={selectedCase.labId || undefined}
+          currentUserId={user?.uid}
+          senderRole="doctor"
+          senderName={
+            role?.name || user?.displayName || user?.email || (ar ? "الطبيب" : "Doctor")
+          }
+        />
+      )}
     </MobileShell>
   );
 }

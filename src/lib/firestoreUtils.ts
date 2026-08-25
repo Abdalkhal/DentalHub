@@ -21,3 +21,23 @@ export function safeFirestoreGet<T>(
     return fallback;
   });
 }
+
+/**
+ * Recursively removes `undefined` values from a value before it is written to
+ * Firestore (which rejects `undefined`). Undefined properties are replaced
+ * with `null`; nested objects and arrays are traversed as well.
+ */
+export function sanitizeForFirestore<T>(value: T): T {
+  if (value === undefined) return null as T;
+  if (Array.isArray(value)) {
+    return value.map((v) => sanitizeForFirestore(v)) as unknown as T;
+  }
+  if (value !== null && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
+      out[key] = sanitizeForFirestore(v);
+    }
+    return out as T;
+  }
+  return value;
+}

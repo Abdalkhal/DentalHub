@@ -5,22 +5,26 @@ import { z } from "zod";
 import type { OrderDoc } from "@/integrations/firebase/types";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
-import { EditOrderModal } from "@/components/EditOrderModal";
 import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
+import { IncomingOrderRxModal } from "@/components/IncomingOrderRxModal";
+import { CombinedLabOrderModal, type CombinedLabOrder, type OrderPrefill } from "@/components/CombinedLabOrderModal";
 import { useI18n } from "@/lib/i18n";
 import { useUserRole, useSession } from "@/lib/useAuth";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   updateOrderStatus,
-  updateOrder,
   deleteOrder,
   useOrders,
   connectLabOrders,
   disconnectLabOrders,
+  addOrder,
+  buildInternalOrder,
   type Order,
   type OrderStatus,
 } from "@/lib/ordersStore";
+import type { MaterialId, WorkTypeId } from "@/lib/dentalConfig";
+import { useCaseUnreadCount } from "@/lib/caseMessages";
 import { useCart } from "@/lib/cartStore";
 import {
   placeCartOrder,
@@ -32,7 +36,6 @@ import {
 import {
   Search,
   Eye,
-  Edit3,
   Trash2,
   Crown,
   Sparkles,
@@ -79,7 +82,80 @@ function formatShortDate(v: unknown): string {
   return `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}/${d.getFullYear()}`;
 }
 
+function fmtPrice(o: Order, ar: boolean): string {
+  const price = Number(o.price) || 0;
+  if (o.currency === "IQD") return `${price.toLocaleString("en-US")} ${ar ? "د.ع" : "IQD"}`;
+  return `$${price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+/* ── Rx → prefill helpers ────────────────────────── */
+
+function deriveMaterial(order: Order): MaterialId | undefined {
+  const source = [order.workType ?? "", ...(order.rxItems ?? [])].join(" ");
+  if (/زيركون|زركون|zircon/i.test(source)) return "material.zirconia";
+  if (/إيماكس|ايماكس|e-?max/i.test(source)) return "material.emax";
+  if (/سيراميك|ceramic/i.test(source)) return "material.feldspathic";
+  if (/طقم|denture/i.test(source)) return "material.pmma";
+  if (/تيتانيوم|titanium|بار/i.test(source)) return "material.titanium_bar";
+  if (/تقويم|مصفف|aligner/i.test(source)) return "material.clear_aligner";
+  if (/معدن|pfm/i.test(source)) return "material.pfm";
+  return undefined;
+}
+
+function deriveWorkType(order: Order): WorkTypeId | undefined {
+  const teeth = order.rxTeeth ?? {};
+  const counts: Record<string, number> = {};
+  Object.values(teeth).forEach((t) => {
+    counts[t] = (counts[t] ?? 0) + 1;
+  });
+  const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0];
+  if (top === "crown" || top === "bridge" || top === "veneer" || top === "inlay") {
+    return top;
+  }
+  const source = [order.workType ?? "", ...(order.rxItems ?? [])].join(" ");
+  if (/جسر|bridge/i.test(source)) return "bridge";
+  if (/فينير|veneer/i.test(source)) return "veneer";
+  if (/حشوة|inlay|onlay/i.test(source)) return "inlay";
+  if (/تاج|crown/i.test(source)) return "crown";
+  return undefined;
+}
+
+function buildPrefillFromOrder(order: Order): OrderPrefill {
+  const teeth = order.rxTeeth ?? {};
+  const toothLabels: Record<string, string> = {
+    crown: "تاج",
+    bridge: "جسر",
+    veneer: "فينير",
+    inlay: "حشوة داخلية/خارجية",
+  };
+  const toothNotes = Object.entries(teeth)
+    .sort((a, b) => Number(a[0]) - Number(b[0]))
+    .map(([n, t]) => `${n}: ${toothLabels[t] ?? t}`)
+    .join("، ");
+  const itemNotes = (order.rxItems ?? []).join("، ");
+  const notes = [toothNotes, itemNotes].filter(Boolean).join(" | ");
+  return {
+    patientName: order.patient,
+    doctorName: order.doctor,
+    clinicName: order.clinic,
+    material: deriveMaterial(order),
+    workType: deriveWorkType(order),
+    shade: order.shade,
+    notes,
+  };
+}
+
 /* ── Main Component ─────────────────────────────── */
+
+function UnreadBadge({ labId, caseId, userId }: { labId?: string; caseId: string; userId?: string }) {
+  const count = useCaseUnreadCount(labId ?? "", caseId, userId);
+  if (!count) return null;
+  return (
+    <span className="shrink-0 min-w-5 h-5 px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">
+      {count > 9 ? "9+" : count}
+    </span>
+  );
+}
 
 function Orders() {
   const { lang, t } = useI18n();
@@ -108,13 +184,16 @@ function LabOrders() {
   const { lang, t } = useI18n();
   const ar = lang === "ar";
   const { user } = useSession();
+  const { role } = useUserRole();
 
   const { status: initialStatus } = useSearch({ from: "/orders" });
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<FilterStatus>(initialStatus);
   const orders = useOrders();
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [viewOrderId, setViewOrderId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Order | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<Order | null>(null);
+  const [showNewOrder, setShowNewOrder] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -122,15 +201,31 @@ function LabOrders() {
     return () => disconnectLabOrders();
   }, [user]);
 
-  const selectedOrder = useMemo(
-    () => (selectedOrderId ? (orders.find((o) => o.id === selectedOrderId) ?? null) : null),
-    [selectedOrderId, orders],
+  const viewOrder = useMemo(
+    () => (viewOrderId ? (orders.find((o) => o.id === viewOrderId) ?? null) : null),
+    [viewOrderId, orders],
   );
 
   const handleDelete = (target: Order) => {
     deleteOrder(target.id);
     setDeleteTarget(null);
     toast.success(ar ? "تم حذف الطلب بنجاح" : "Order deleted successfully");
+  };
+
+  const handleConfirmSubmit = (o: CombinedLabOrder) => {
+    if (!confirmTarget) return;
+    addOrder({
+      ...buildInternalOrder(o, "in_progress"),
+      rxTeeth: confirmTarget.rxTeeth,
+      rxItems: confirmTarget.rxItems,
+      rxData: confirmTarget.rxData,
+    });
+    updateOrderStatus(confirmTarget.id, "in_progress");
+    setConfirmTarget(null);
+    setShowNewOrder(false);
+    toast.success(
+      ar ? "تم تأكيد الطلب وتحويله إلى قيد التنفيذ" : "Order confirmed and moved to production",
+    );
   };
 
   const statusOptions: { id: FilterStatus; ar: string; en: string }[] = [
@@ -143,6 +238,7 @@ function LabOrders() {
 
   const filteredOrders = useMemo(() => {
     return orders.filter((o) => {
+      if (o.source !== "incoming_doctor_case") return false;
       if (statusFilter !== "all" && o.status !== statusFilter) return false;
       if (search.trim()) {
         const q = search.toLowerCase();
@@ -162,7 +258,7 @@ function LabOrders() {
 
   return (
     <MobileShell>
-      <TopBar title={ar ? "طلباتي" : "My Orders"} showBack />
+      <TopBar title={ar ? "الطلبات الواردة" : "Incoming Orders"} showBack />
       <div className="px-4 pt-4 pb-6 space-y-4">
         <div className="relative">
           <Search className="size-4 absolute top-1/2 -translate-y-1/2 start-3 text-muted-foreground pointer-events-none" />
@@ -198,13 +294,9 @@ function LabOrders() {
         </p>
 
         <div className="space-y-2">
-          {orders.length === 0 ? (
+          {filteredOrders.length === 0 ? (
             <div className="text-center py-16 text-sm text-muted-foreground">
-              {ar ? "لا توجد طلبات حالياً" : "No orders available"}
-            </div>
-          ) : filteredOrders.length === 0 ? (
-            <div className="text-center py-12 text-sm text-muted-foreground">
-              {ar ? "لا توجد طلبات مطابقة" : "No matching orders"}
+              {ar ? "لا توجد حالات واردة من الأطباء" : "No incoming doctor cases"}
             </div>
           ) : (
             filteredOrders.map((o) => {
@@ -218,7 +310,8 @@ function LabOrders() {
               return (
                 <div
                   key={o.id}
-                  className="bg-card border border-border rounded-2xl p-4 shadow-soft hover:shadow-card transition"
+                  onClick={() => setViewOrderId(o.id)}
+                  className="bg-card border border-border rounded-2xl p-4 shadow-soft hover:shadow-card transition cursor-pointer"
                 >
                   <div className="flex items-start justify-between gap-3 mb-3">
                     <div className="flex items-center gap-2.5 min-w-0">
@@ -230,15 +323,12 @@ function LabOrders() {
                         <p className="font-display font-bold text-sm text-foreground truncate">{o.patient}</p>
                       </div>
                     </div>
+                    <UnreadBadge labId={user?.uid} caseId={o.id} userId={user?.uid} />
                   </div>
                   <div className="grid grid-cols-2 gap-3 mb-3 text-xs">
                     <div>
                       <p className="text-muted-foreground font-medium">{t("doctor")}</p>
                       <p className="font-semibold text-foreground truncate">{o.doctor}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground font-medium">{t("work_type")}</p>
-                      <p className="font-semibold text-foreground">{ar ? wt.ar : wt.en}</p>
                     </div>
                     <div>
                       <p className="text-muted-foreground font-medium">{t("received_date")}</p>
@@ -252,24 +342,28 @@ function LabOrders() {
                           : o.status === "new" ? "New" : o.status === "in_progress" ? "In Progress" : o.status === "completed" ? "Completed" : "Delayed"}
                       </span>
                     </div>
+                    <div>
+                      <p className="text-muted-foreground font-medium">{ar ? "السعر الإجمالي" : "Total Price"}</p>
+                      <p className="font-bold text-emerald-600" dir="ltr">{fmtPrice(o, ar)}</p>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 pt-2 border-t border-border">
                     <button
-                      onClick={() => setSelectedOrderId(o.id)}
+                      onClick={(e) => { e.stopPropagation(); setViewOrderId(o.id); }}
                       className="flex-1 h-9 rounded-xl bg-primary/10 text-primary text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-primary/20 transition"
                     >
                       <Eye className="size-3.5" />
                       {t("view")}
                     </button>
                     <button
-                      onClick={() => setSelectedOrderId(o.id)}
-                      className="flex-1 h-9 rounded-xl bg-card border border-border text-muted-foreground text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-accent transition"
+                      onClick={(e) => { e.stopPropagation(); setConfirmTarget(o); setShowNewOrder(true); }}
+                      className="flex-1 h-9 rounded-xl bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-90 transition"
                     >
-                      <Edit3 className="size-3.5" />
-                      {t("edit")}
+                      <Check className="size-3.5" />
+                      {ar ? "تأكيد" : "Confirm"}
                     </button>
                     <button
-                      onClick={() => setDeleteTarget(o)}
+                      onClick={(e) => { e.stopPropagation(); setDeleteTarget(o); }}
                       className="size-9 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center hover:bg-rose-100 transition shrink-0"
                       title={ar ? "حذف" : "Delete"}
                     >
@@ -283,13 +377,26 @@ function LabOrders() {
         </div>
       </div>
 
-      {selectedOrder && (
-        <EditOrderModal
-          order={selectedOrder}
-          onClose={() => setSelectedOrderId(null)}
-          onSave={updateOrder}
+      {viewOrder && (
+        <IncomingOrderRxModal
+          order={viewOrder}
+          onClose={() => setViewOrderId(null)}
+          labId={user?.uid}
+          currentUserId={user?.uid}
+          senderRole="lab"
+          senderName={role?.name || user?.displayName || user?.email || (ar ? "المختبر" : "Lab")}
         />
       )}
+      <CombinedLabOrderModal
+        open={showNewOrder}
+        onClose={() => {
+          setShowNewOrder(false);
+          setConfirmTarget(null);
+        }}
+        onSubmit={handleConfirmSubmit}
+        labId={user?.uid}
+        prefill={confirmTarget ? buildPrefillFromOrder(confirmTarget) : null}
+      />
       {deleteTarget && (
         <DeleteConfirmModal
           orderNumber={deleteTarget.orderNumber}

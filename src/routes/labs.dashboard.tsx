@@ -177,7 +177,7 @@ function StatCard({
       )}
     >
       <div className="flex items-start justify-between mb-3">
-        <span className="text-xs font-bold uppercase tracking-wide opacity-80">
+        <span className="text-xs font-semibold uppercase tracking-wide">
           {label}
         </span>
         <span className="size-10 rounded-xl bg-white/70 flex items-center justify-center">
@@ -185,7 +185,7 @@ function StatCard({
         </span>
       </div>
       <p className="text-3xl font-extrabold tracking-tight font-display">{value}</p>
-      <div className="flex items-center gap-1 mt-2 opacity-70">
+      <div className="flex items-center gap-1 mt-2 opacity-90">
         {trendUp ? (
           <TrendingUp className="size-3.5" />
         ) : (
@@ -271,25 +271,33 @@ function LabDashboard() {
   const labAddress = profile?.city ? [profile.city, profile.address].filter(Boolean).join("، ") : profile?.address || "";
   const labPhone = profile?.phone || "";
 
+  const internalOrders = useMemo(
+    () => orders.filter((o) => o.source !== "incoming_doctor_case"),
+    [orders],
+  );
+
   const stats = useMemo(() => {
-    const total = orders.length;
-    const inProgress = orders.filter((c) => c.status === "in_progress").length;
-    const completed = orders.filter((c) => c.status === "completed").length;
-    const delayed = orders.filter((c) => c.status === "delayed").length;
+    const total = internalOrders.length;
+    const inProgress = internalOrders.filter((c) => c.status === "in_progress").length;
+    const completed = internalOrders.filter((c) => c.status === "completed").length;
+    const delayed = internalOrders.filter((c) => c.status === "delayed").length;
     return { total, inProgress, completed, delayed };
-  }, [orders]);
+  }, [internalOrders]);
 
   const { finance: labFinance } = useLabFinance(user?.uid || "");
-  const totalRevenue = useMemo(() => sumFinanceRevenue(labFinance), [labFinance]);
+  const totalRevenue = useMemo(() => {
+    const internalIds = new Set(internalOrders.map((o) => o.id));
+    return sumFinanceRevenue(labFinance.filter((f) => internalIds.has(f.caseId)));
+  }, [labFinance, internalOrders]);
 
   const avgRating = useMemo(() => {
-    const rated = orders.filter((c) => c.rating != null && c.rating > 0);
+    const rated = internalOrders.filter((c) => c.rating != null && c.rating > 0);
     if (rated.length === 0) return null;
     return rated.reduce((sum, c) => sum + (c.rating ?? 0), 0) / rated.length;
-  }, [orders]);
+  }, [internalOrders]);
 
   const filteredCases = useMemo(() => {
-    let list = orders;
+    let list = internalOrders;
     if (statusFilter !== "all") {
       list = list.filter((c) => c.status === statusFilter);
     }
@@ -305,7 +313,7 @@ function LabDashboard() {
       );
     }
     return list;
-  }, [orders, searchQuery, statusFilter]);
+  }, [internalOrders, searchQuery, statusFilter]);
 
   const displayedCases = showAllOrders ? filteredCases : filteredCases.slice(0, 5);
 
@@ -355,15 +363,15 @@ function LabDashboard() {
       orderNumber: getNextOrderNumber(),
       caseId: getNextCaseId(),
       receivedDate: new Date().toISOString(),
-      dueDate: o.deliveryDate,
-      patient: o.patientName,
-      doctor: o.doctorName,
-      workType: materialLabel[o.material] ?? o.material,
-      material: o.material,
-      workTypeId: o.workType,
-      manufacturingMethod: o.manufacturingMethod,
-      frameworkCreation: o.frameworkCreation,
-      shade: o.shade,
+      dueDate: o.deliveryDate ?? "",
+      patient: o.patientName ?? "",
+      doctor: o.doctorName ?? "",
+      workType: materialLabel[o.material] ?? o.material ?? "",
+      material: o.material ?? "",
+      workTypeId: o.workType ?? "",
+      manufacturingMethod: o.manufacturingMethod ?? "",
+      frameworkCreation: o.frameworkCreation ?? "",
+      shade: o.shade ?? "",
       pricingMode: o.pricingMode,
       currency: o.currency,
       pricingItems,
@@ -374,8 +382,8 @@ function LabDashboard() {
       subtotalIQD: o.subtotalIQD,
       discountAmountIQD: o.discountAmountIQD,
       finalTotalUSD: o.finalTotalUSD,
-      notes: o.notes,
-      clinic: o.clinicName,
+      notes: o.notes ?? "",
+      clinic: o.clinicName ?? "",
       implantCompany: o.implantCompany,
       implantSystem: o.implantSystem,
       implantConnection: o.implantConnection,
@@ -425,10 +433,9 @@ function LabDashboard() {
         {/* ===== LEFT SIDEBAR ===== */}
         <aside
           className={cn(
-            "fixed lg:sticky top-0 z-50 h-screen min-h-screen w-64 bg-slate-900 border-slate-800 flex flex-col transition-transform duration-300 lg:translate-x-0",
+            "fixed lg:sticky top-0 z-50 h-screen min-h-screen w-64 shrink-0 bg-[#0f172a] border-slate-800 flex flex-col transition-transform duration-300 lg:translate-x-0",
             ar ? "right-0 border-l" : "left-0 border-r",
             sidebarOpen ? "translate-x-0" : ar ? "translate-x-full" : "-translate-x-full",
-            "lg:block",
           )}
         >
           {/* Logo */}
@@ -505,13 +512,13 @@ function LabDashboard() {
                     "w-full flex items-center gap-3 px-3 h-11 rounded-xl text-sm font-semibold transition-all",
                     active
                       ? "bg-teal-700 text-white shadow-sm"
-                      : "text-slate-400 hover:bg-slate-800 hover:text-white",
+                      : "text-slate-200 hover:bg-slate-800 hover:text-white",
                   )}
                 >
                   <span
                     className={cn(
                       "size-8 rounded-lg flex items-center justify-center",
-                      active ? "bg-white/20 text-white" : "bg-slate-800 text-slate-400",
+                      active ? "bg-white/20 text-white" : "bg-slate-800 text-slate-300",
                     )}
                   >
                     <Icon className="size-4" />
@@ -664,7 +671,7 @@ function LabDashboard() {
                     ? ar ? "الطلبات الأخيرة" : "Recent Orders"
                     : STATUS_META[statusFilter][ar ? "ar" : "en"]}
                 </h2>
-                <span className="text-xs text-slate-400 bg-slate-50 px-2.5 py-1 rounded-full font-semibold">
+                <span className="text-xs text-slate-600 bg-slate-50 px-2.5 py-1 rounded-full font-semibold">
                   {filteredCases.length} {ar ? "طلب" : "orders"}
                 </span>
               </div>
@@ -686,7 +693,7 @@ function LabDashboard() {
                       ].map((h, i) => (
                         <th
                           key={i}
-                          className="text-right px-3 py-3 text-[11px] font-bold text-slate-500 whitespace-nowrap"
+                          className="text-right px-3 py-3 text-[11px] font-semibold text-slate-600 whitespace-nowrap"
                         >
                           {h}
                         </th>
@@ -696,7 +703,7 @@ function LabDashboard() {
                   <tbody>
                     {displayedCases.length === 0 ? (
                       <tr>
-                        <td colSpan={10} className="text-center py-12 text-sm text-slate-400">
+                        <td colSpan={10} className="text-center py-12 text-sm font-medium text-slate-500">
                           {ar ? "لا توجد طلبات مطابقة" : "No matching orders"}
                         </td>
                       </tr>
@@ -706,25 +713,25 @@ function LabDashboard() {
                           key={c.id}
                           className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors"
                         >
-                          <td className="px-3 py-3 text-xs text-slate-600 whitespace-nowrap">
+                          <td className="px-3 py-3 text-xs text-slate-700 font-medium whitespace-nowrap">
                             {formatShortDate(c.dueDate || c.receivedDate)}
                           </td>
-                          <td className="px-3 py-3 text-xs text-slate-600 whitespace-nowrap font-medium">
+                          <td className="px-3 py-3 text-xs text-slate-800 whitespace-nowrap font-medium">
                             {c.agent || "-"}
                           </td>
-                          <td className="px-3 py-3 font-mono text-xs font-bold text-sky-600 whitespace-nowrap">
+                          <td className="px-3 py-3 font-mono text-xs font-bold text-sky-700 whitespace-nowrap">
                             {c.caseId || c.orderNumber}
                           </td>
-                          <td className="px-3 py-3 text-xs font-semibold text-slate-800 whitespace-nowrap">
+                          <td className="px-3 py-3 text-xs font-bold text-slate-900 whitespace-nowrap">
                             {c.doctor}
                           </td>
-                          <td className="px-3 py-3 text-xs text-slate-700 whitespace-nowrap">
+                          <td className="px-3 py-3 text-xs font-bold text-slate-900 whitespace-nowrap">
                             {c.patient}
                           </td>
                           <td className="px-3 py-3">
                             <WorkTypeBadge type={c.workType as WorkType} />
                           </td>
-                          <td className="px-3 py-3 text-xs text-slate-700 whitespace-nowrap text-center">
+                          <td className="px-3 py-3 text-xs text-slate-800 font-semibold whitespace-nowrap text-center">
                             {c.unitsCount ?? "-"}
                           </td>
                           <td className="px-3 py-3">
@@ -739,7 +746,7 @@ function LabDashboard() {
                               </span>
                             )}
                           </td>
-                          <td className="px-3 py-3 text-xs font-bold text-emerald-600 whitespace-nowrap">
+                          <td className="px-3 py-3 text-xs font-bold text-emerald-700 whitespace-nowrap">
                             {fmtCurrency(c.price ?? 0, c.currency)}
                           </td>
                           <td className="px-3 py-3">
@@ -824,7 +831,7 @@ function LabDashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
-                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                  <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
                     {ar ? "الجودة والدقة" : "Quality & Accuracy"}
                   </span>
                   <Target className="size-4 text-sky-500" />
@@ -871,7 +878,7 @@ function LabDashboard() {
 
               <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
-                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                  <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
                     {ar ? "متوسط مدة الإنجاز" : "Avg. Turnaround"}
                   </span>
                   <Clock className="size-4 text-amber-500" />
@@ -890,7 +897,7 @@ function LabDashboard() {
 
               <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
-                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                  <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
                     {ar ? "إجمالي الإيرادات" : "Total Revenue"}
                   </span>
                   <DollarSign className="size-4 text-emerald-500" />
@@ -945,6 +952,7 @@ function LabDashboard() {
         open={showNewOrder}
         onClose={() => setShowNewOrder(false)}
         onSubmit={handleCreateOrder}
+        labId={user?.uid}
       />
 
       {/* Promo modal */}
@@ -1011,13 +1019,13 @@ function QuickAccessButton({
       onClick={onClick}
       className={cn(
         "w-full flex items-center gap-3 px-4 h-11 rounded-full text-sm font-semibold transition-all",
-        color || "text-slate-400 hover:bg-slate-800 hover:text-white",
+        color || "text-slate-200 hover:bg-slate-800 hover:text-white",
       )}
     >
       <span
         className={cn(
           "size-8 rounded-full flex items-center justify-center",
-          color ? "bg-white/20 text-white" : "bg-slate-800 text-slate-400",
+          color ? "bg-white/20 text-white" : "bg-slate-800 text-slate-300",
         )}
       >
         <Icon className="size-4" />

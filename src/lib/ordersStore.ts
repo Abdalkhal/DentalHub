@@ -9,6 +9,9 @@ import {
   stripFinancialFields,
   type CaseFinance,
 } from "./financeStore";
+import { sanitizeForFirestore } from "./firestoreUtils";
+import { WORK_TYPES } from "./dentalConfig";
+import type { CombinedLabOrder } from "@/components/CombinedLabOrderModal";
 
 export type OrderStatus = "new" | "in_progress" | "completed" | "delayed";
 
@@ -80,6 +83,7 @@ export type Order = {
   dentistId?: string;
   attachments?: OrderAttachment[];
   designs?: OrderAttachment[];
+  source?: "internal" | "incoming_doctor_case";
   // Rich RX form fields
   patientAge?: string;
   patientGender?: string;
@@ -215,6 +219,11 @@ function caseDocRef(labId: string, caseId: string) {
   return doc(db, "lab_orders", labId, "cases", caseId);
 }
 
+/** Strips financial fields and removes any `undefined` before writing to Firestore. */
+function serializeOrder(order: Order): Order {
+  return sanitizeForFirestore(stripFinancialFields(order));
+}
+
 const MIGRATED_KEY = "dh_orders_migrated";
 
 async function migrateLocalToFirestore(labId: string) {
@@ -229,7 +238,7 @@ async function migrateLocalToFirestore(labId: string) {
     try {
       const snap = await getDoc(caseDocRef(labId, o.id));
       if (!snap.exists()) {
-        await setDoc(caseDocRef(labId, o.id), stripFinancialFields(o));
+        await setDoc(caseDocRef(labId, o.id), serializeOrder(o));
       }
       await writeCaseFinance(labId, o.id, o);
     } catch (err) {
@@ -314,7 +323,7 @@ export function disconnectLabOrders() {
 async function syncToFirestore(order: Order) {
   if (!_labId || !db) return;
   try {
-    await setDoc(caseDocRef(_labId, order.id), stripFinancialFields(order));
+    await setDoc(caseDocRef(_labId, order.id), serializeOrder(order));
     await writeCaseFinance(_labId, order.id, order);
   } catch (err) {
     console.warn("Failed to sync order to Firestore:", order.id, err);
@@ -327,12 +336,110 @@ export function getNextOrderNumber(): string {
   return `ORD-${String(_counter).padStart(3, "0")}`;
 }
 
+/** Formats a raw order into a clean `ORD-###` display ID. */
+export function formatOrderId(order: Pick<Order, "orderNumber" | "caseId" | "id">): string {
+  if (order.orderNumber && /^ORD-/.test(order.orderNumber)) return order.orderNumber;
+  if (order.caseId) return `ORD-${String(order.caseId).padStart(3, "0")}`;
+  return order.orderNumber || order.id;
+}
+
 export function getNextCaseId(): number {
   return _counter + 1;
 }
 
+const MATERIAL_LABELS: Record<string, string> = {
+  "material.zirconia": "زركونيا",
+  "material.emax": "إيماكس",
+  "material.pfm": "سيراميك على معدن",
+  "material.full_cast_metal": "معدن كامل",
+  "material.pmma": "تركيبات مؤقتة",
+  "material.feldspathic": "سيراميك تجميلي",
+  "material.clear_aligner": "تقويم شفاف",
+  "material.titanium_bar": "تيتانيوم بار",
+};
+
+/**
+ * Builds a full internal `Order` (with a fresh id / order number / case id) from the
+ * "New Order" modal payload. Used by both the lab dashboard and the incoming-order
+ * confirmation workflow.
+ */
+export function buildInternalOrder(o: CombinedLabOrder, status: OrderStatus): Order {
+  const units = o.unitsCount || 0;
+  const USD_RATE = 1480;
+  const workTypeLabel = WORK_TYPES.find((w) => w.id === o.workType)?.ar ?? o.workType ?? "";
+  const pricingItems =
+    o.pricingMode === "mixed" && o.pricingItems?.length
+      ? o.pricingItems.map((it) => ({
+          id: it.id,
+          name: it.name,
+          quantity: Number(it.quantity) || 0,
+          unitPrice: Number(it.unitPrice) || 0,
+          currency: it.currency,
+        }))
+      : [
+          {
+            id: crypto.randomUUID(),
+            name: workTypeLabel,
+            quantity: units,
+            unitPrice: o.currency === "USD" ? (o.unitPriceIQD || 0) / USD_RATE : o.unitPriceIQD || 0,
+            currency: o.currency,
+          },
+        ];
+  const price =
+    o.pricingMode === "single" && o.currency === "USD"
+      ? o.finalTotalUSD
+      : Math.max(0, o.finalTotalIQD);
+
+  return {
+    id: crypto.randomUUID(),
+    orderNumber: getNextOrderNumber(),
+    caseId: getNextCaseId(),
+    receivedDate: new Date().toISOString(),
+    dueDate: o.deliveryDate ?? "",
+    patient: o.patientName ?? "",
+    doctor: o.doctorName ?? "",
+    workType: MATERIAL_LABELS[o.material] ?? o.material ?? "",
+    material: o.material ?? "",
+    workTypeId: o.workType ?? "",
+    manufacturingMethod: o.manufacturingMethod ?? "",
+    frameworkCreation: o.frameworkCreation ?? "",
+    shade: o.shade ?? "",
+    pricingMode: o.pricingMode,
+    currency: o.currency,
+    pricingItems,
+    unitsCount: units,
+    unitPrice: o.unitPriceIQD || 0,
+    discount: o.discountAmountIQD || 0,
+    price,
+    subtotalIQD: o.subtotalIQD,
+    discountAmountIQD: o.discountAmountIQD,
+    finalTotalUSD: o.finalTotalUSD,
+    notes: o.notes ?? "",
+    clinic: o.clinicName ?? "",
+    implantCompany: o.implantCompany,
+    implantSystem: o.implantSystem,
+    implantConnection: o.implantConnection,
+    implantPlatform: o.implantPlatform,
+    implantScanBody: o.implantScanBody,
+    implantLevel: o.implantLevel,
+    implantRetention: o.implantRetention,
+    alignerTreatmentType: o.alignerTreatmentType,
+    alignerArch: o.alignerArch,
+    alignerScans: o.alignerScans,
+    alignerCount: o.alignerCount,
+    alignerWearProtocol: o.alignerWearProtocol,
+    titaniumFrameworkType: o.titaniumFrameworkType,
+    designerId: o.designerId,
+    designerName: o.designerName,
+    ceramistId: o.ceramistId,
+    ceramistName: o.ceramistName,
+    status,
+    agent: "",
+  };
+}
+
 export function addOrder(order: Order) {
-  orders = [order, ...orders];
+  orders = [{ ...order, source: order.source ?? "internal" }, ...orders];
   emit();
   syncToFirestore(order);
 }
@@ -426,23 +533,24 @@ export async function submitDentistCase(
     currency: "USD",
     discount: 0,
     price: 0,
-    notes: data.notes,
-    clinic: data.clinic,
+    notes: data.notes ?? "",
+    clinic: data.clinic ?? "",
     targetLabId: labId,
     dentistId: data.dentistId,
-    shade: data.shade,
-    material: data.material,
-    attachments: data.attachments,
-    patientAge: data.patientAge,
-    patientGender: data.patientGender,
-    patientPhone: data.patientPhone,
-    doctorSignature: data.doctorSignature,
-    rxTeeth: data.rxTeeth,
-    rxItems: data.rxItems,
-    rxData: data.rxData,
+    source: "incoming_doctor_case",
+    shade: data.shade ?? "",
+    material: data.material ?? "",
+    attachments: data.attachments ?? [],
+    patientAge: data.patientAge ?? "",
+    patientGender: data.patientGender ?? "",
+    patientPhone: data.patientPhone ?? "",
+    doctorSignature: data.doctorSignature ?? "",
+    rxTeeth: data.rxTeeth ?? {},
+    rxItems: data.rxItems ?? [],
+    rxData: data.rxData ?? {},
   };
 
-  await setDoc(caseDocRef(labId, id), stripFinancialFields(order));
+  await setDoc(caseDocRef(labId, id), serializeOrder(order));
   await writeCaseFinance(labId, id, order);
   return order;
 }

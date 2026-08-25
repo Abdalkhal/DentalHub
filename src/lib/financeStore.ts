@@ -10,6 +10,7 @@ import {
   onSnapshot,
 } from "firebase/firestore";
 import { db } from "@/integrations/firebase/client";
+import { sanitizeForFirestore } from "./firestoreUtils";
 
 export type FinancePricingItem = {
   id: string;
@@ -127,7 +128,7 @@ export async function writeCaseFinance(
 ): Promise<CaseFinance | null> {
   const finance = extractFinance(source, labId, caseId);
   if (!finance) return null;
-  await setDoc(financeDocRef(labId, caseId), finance, { merge: true });
+  await setDoc(financeDocRef(labId, caseId), sanitizeForFirestore(finance), { merge: true });
   return finance;
 }
 

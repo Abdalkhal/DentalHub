@@ -138,6 +138,18 @@ service cloud.firestore {
     }
 
     // ============================================================
+    // PHASE (catalog): lab custom_catalog
+    // Anyone (including dentists opening the Rx form) may read; only the lab
+    // owner may write.
+    // ============================================================
+    match /labs/{labId} {
+      match /custom_catalog/{docId} {
+        allow read: if true;
+        allow write: if isAuthenticated() && request.auth.uid == labId;
+      }
+    }
+
+    // ============================================================
     // PHASE 5: storage_hashes (SHA-256 dedup bookkeeping)
     // ============================================================
     match /storage_hashes/{hashId} {
@@ -220,6 +232,25 @@ service cloud.firestore {
         // ============================================================
         match /private/finance {
           allow read, write: if isLabAdmin(labId);
+        }
+
+        // ============================================================
+        // Case chat: per-case messages between the referring doctor and the lab.
+        // ============================================================
+        match /messages/{messageId} {
+          allow read: if isAuthenticated() && (
+            isLabAdmin(labId)
+            || get(/databases/$(database)/documents/lab_orders/$(labId)/cases/$(caseId)).data.dentistId == request.auth.uid
+            || (isLabMember(labId) && get(/databases/$(database)/documents/lab_orders/$(labId)/cases/$(caseId)).data.designerId == request.auth.uid)
+          );
+          allow create: if isAuthenticated()
+            && request.resource.data.senderId == request.auth.uid
+            && (
+              isLabAdmin(labId)
+              || isLabMember(labId)
+              || get(/databases/$(database)/documents/lab_orders/$(labId)/cases/$(caseId)).data.dentistId == request.auth.uid
+            );
+          allow update, delete: if isAdmin();
         }
       }
     }

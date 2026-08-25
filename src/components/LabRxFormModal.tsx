@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils";
 import { FDI_UPPER, FDI_LOWER, UPPER_POS, LOWER_POS } from "@/components/DentalArch";
 import archUpper from "@/assets/arch-upper.png";
 import archLower from "@/assets/arch-lower.png";
+import { useLabCatalog } from "@/lib/catalogStore";
+import type { MaterialId, WorkTypeId } from "@/lib/dentalConfig";
 
 type LabRxFormModalProps = {
   labId: string;
@@ -55,7 +57,8 @@ type CategoryDef = {
   ar: string;
   en: string;
   color: string;
-  items: { ar: string; en: string }[];
+  material: MaterialId;
+  items: { ar: string; en: string; wt?: WorkTypeId }[];
 };
 
 const CATEGORIES: CategoryDef[] = [
@@ -64,10 +67,11 @@ const CATEGORIES: CategoryDef[] = [
     ar: "إيماكس",
     en: "E-MAX",
     color: "bg-sky-500",
+    material: "material.emax",
     items: [
-      { ar: "فينير إيماكس", en: "Veneer E-max" },
-      { ar: "تاج إيماكس", en: "Crown E-max" },
-      { ar: "حشوة داخلية/خارجية", en: "Inlay/Onlay" },
+      { ar: "فينير إيماكس", en: "Veneer E-max", wt: "veneer" },
+      { ar: "تاج إيماكس", en: "Crown E-max", wt: "crown" },
+      { ar: "حشوة داخلية/خارجية", en: "Inlay/Onlay", wt: "inlay" },
     ],
   },
   {
@@ -75,10 +79,11 @@ const CATEGORIES: CategoryDef[] = [
     ar: "زيركون",
     en: "ZIRCONIUM",
     color: "bg-violet-500",
+    material: "material.zirconia",
     items: [
       { ar: "زيركون 5D", en: "Zircon 5D" },
-      { ar: "تاج زيركون", en: "Zircon Crown" },
-      { ar: "جسر زيركون", en: "Zircon Bridge" },
+      { ar: "تاج زيركون", en: "Zircon Crown", wt: "crown" },
+      { ar: "جسر زيركون", en: "Zircon Bridge", wt: "bridge" },
     ],
   },
   {
@@ -86,10 +91,11 @@ const CATEGORIES: CategoryDef[] = [
     ar: "سيراميك",
     en: "CERAMIC",
     color: "bg-rose-500",
+    material: "material.feldspathic",
     items: [
-      { ar: "تاج سيراميك", en: "Ceramic Crown" },
-      { ar: "فينير سيراميك", en: "Ceramic Veneer" },
-      { ar: "جسر سيراميك", en: "Ceramic Bridge" },
+      { ar: "تاج سيراميك", en: "Ceramic Crown", wt: "crown" },
+      { ar: "فينير سيراميك", en: "Ceramic Veneer", wt: "veneer" },
+      { ar: "جسر سيراميك", en: "Ceramic Bridge", wt: "bridge" },
     ],
   },
   {
@@ -97,6 +103,7 @@ const CATEGORIES: CategoryDef[] = [
     ar: "طقم أسنان",
     en: "DENTURE",
     color: "bg-amber-500",
+    material: "material.pmma",
     items: [
       { ar: "طقم جزئي", en: "Partial Denture" },
       { ar: "طقم كامل", en: "Complete Denture" },
@@ -184,6 +191,11 @@ export function LabRxFormModal({
   const ar = lang === "ar";
   const { user } = useSession();
   const { role } = useUserRole();
+  const { catalog } = useLabCatalog(labId);
+
+  const enabledMaterials = new Set(catalog.materials.map((m) => m.id));
+  const enabledWorkTypes = new Set(catalog.workTypes.map((w) => w.id));
+  const visibleCategories = CATEGORIES.filter((c) => enabledMaterials.has(c.material));
 
   const [patient, setPatient] = useState("");
   const [patientAge, setPatientAge] = useState("");
@@ -625,8 +637,10 @@ export function LabRxFormModal({
               )}
             </div>
 
-            {CATEGORIES.map((c) => {
-              const items = c.items.map((it) => displayName(it));
+            {visibleCategories.map((c) => {
+              const items = c.items
+                .filter((it) => !it.wt || enabledWorkTypes.has(it.wt))
+                .map((it) => displayName(it));
               return (
                 <div key={c.id} className={cn(cardCls, "overflow-hidden")}>
                   <div className="flex items-center gap-2 px-3 py-2.5 border-b border-slate-100">

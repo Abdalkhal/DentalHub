@@ -1,17 +1,33 @@
 import { useState, useEffect } from "react";
-import { X, Building2, Calendar, Sparkles, User, Stethoscope, Trash2, PenTool, Palette } from "lucide-react";
+import {
+  X,
+  Building2,
+  Calendar,
+  Sparkles,
+  User,
+  Stethoscope,
+  Trash2,
+  PenTool,
+  Palette,
+  Gem,
+  Pencil,
+  Plus,
+  Check,
+} from "lucide-react";
 import {
   MATERIALS,
-  WORK_TYPES,
-  MANUFACTURING_METHODS,
   FRAMEWORK_CREATION,
   RULES,
   IMPLANT_WORK_TYPES,
   VITA_SHADES,
   type MaterialId,
   type WorkTypeId,
+  type ManufacturingMethodId,
+  type MaterialRules,
 } from "@/lib/dentalConfig";
 import { useStaff } from "@/lib/staffStore";
+import { useLabCatalog, saveLabCatalog, type LabCatalog } from "@/lib/catalogStore";
+import { toast } from "sonner";
 
 export type PricingItem = {
   id: string;
@@ -19,6 +35,16 @@ export type PricingItem = {
   quantity: number;
   unitPrice: number;
   currency: "USD" | "IQD";
+};
+
+export type OrderPrefill = {
+  patientName?: string;
+  doctorName?: string;
+  clinicName?: string;
+  material?: MaterialId;
+  workType?: WorkTypeId;
+  shade?: string;
+  notes?: string;
 };
 
 export type CombinedLabOrder = {
@@ -60,13 +86,18 @@ export type CombinedLabOrder = {
   ceramistName?: string;
 };
 
+type CatalogSection = "materials" | "workTypes" | "manufacturingMethods";
+
 type Props = {
   open: boolean;
   onClose: () => void;
   onSubmit: (order: CombinedLabOrder) => void;
+  labId?: string;
+  prefill?: OrderPrefill | null;
 };
 
-export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
+export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill }: Props) {
+  const { catalog } = useLabCatalog(labId ?? "");
   const [patientName, setPatientName] = useState("");
   const [doctorName, setDoctorName] = useState("");
   const [clinicName, setClinicName] = useState("");
@@ -110,6 +141,13 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
   const [ceramistId, setCeramistId] = useState("");
   const staff = useStaff();
 
+  const [editMode, setEditMode] = useState(false);
+  const [draft, setDraft] = useState<LabCatalog | null>(null);
+  const [savingCatalog, setSavingCatalog] = useState(false);
+  const [addingSection, setAddingSection] = useState<keyof LabCatalog | null>(null);
+  const [newAr, setNewAr] = useState("");
+  const [newEn, setNewEn] = useState("");
+
   const designers = staff.filter((m) => m.department === "cad_designer");
   const ceramists = staff.filter((m) => m.department === "ceramist");
 
@@ -146,8 +184,35 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
     setCeramistId("");
   };
 
+  const applyPrefill = (p: OrderPrefill) => {
+    resetForm();
+    if (p.patientName) setPatientName(p.patientName);
+    if (p.doctorName) setDoctorName(p.doctorName);
+    if (p.clinicName) setClinicName(p.clinicName);
+    if (p.shade) setShade(p.shade);
+    if (p.notes) setNotes(p.notes);
+    if (p.material) {
+      setSelectedMaterialId(p.material);
+      const rule = (RULES as Record<string, MaterialRules | undefined>)[p.material];
+      const wt =
+        p.workType && rule?.allowedWorkTypes.includes(p.workType as WorkTypeId)
+          ? (p.workType as WorkTypeId)
+          : rule?.allowedWorkTypes[0] ?? (catalog.workTypes[0]?.id as WorkTypeId | undefined);
+      if (wt) {
+        setSelectedWorkType(wt);
+        setSelectedManufacturingMethod(rule?.manufacturingRules[wt]?.[0] ?? "");
+      } else {
+        setSelectedWorkType("");
+        setSelectedManufacturingMethod("");
+      }
+    }
+  };
+
   useEffect(() => {
-    if (open) resetForm();
+    if (open) {
+      if (prefill) applyPrefill(prefill);
+      else resetForm();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -158,10 +223,74 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
   const isPFM = selectedMaterialId === "material.pfm";
   const isZirconia = selectedMaterialId === "material.zirconia";
 
-  const allowedWorkTypes = RULES[selectedMaterialId]?.allowedWorkTypes ?? [];
-  const workTypes = WORK_TYPES.filter((wt) => allowedWorkTypes.includes(wt.id));
-  const allowedMethods = RULES[selectedMaterialId]?.manufacturingRules[selectedWorkType as WorkTypeId] ?? [];
-  const manufacturingMethods = MANUFACTURING_METHODS.filter((mm) => allowedMethods.includes(mm.id));
+  const displayCatalog: LabCatalog = editMode && draft ? draft : catalog;
+  const materialIcon = (id: string) => MATERIALS.find((m) => m.id === id)?.icon ?? Gem;
+
+  const enterEditMode = () => {
+    setDraft({
+      materials: catalog.materials.map((m) => ({ ...m })),
+      workTypes: catalog.workTypes.map((w) => ({ ...w })),
+      manufacturingMethods: catalog.manufacturingMethods.map((m) => ({ ...m })),
+    });
+    setAddingSection(null);
+    setEditMode(true);
+  };
+
+  const cancelEditMode = () => {
+    setEditMode(false);
+    setDraft(null);
+    setAddingSection(null);
+    setNewAr("");
+    setNewEn("");
+  };
+
+  const saveEditMode = async () => {
+    if (!labId || !draft) return;
+    setSavingCatalog(true);
+    try {
+      await saveLabCatalog(labId, draft);
+      setEditMode(false);
+      setDraft(null);
+    } finally {
+      setSavingCatalog(false);
+    }
+  };
+
+  const removeCatalogItem = (section: CatalogSection, id: string) => {
+    setDraft((prev) => {
+      if (!prev) return prev;
+      const list = prev[section] as { id: string }[];
+      return { ...prev, [section]: list.filter((x) => x.id !== id) } as LabCatalog;
+    });
+  };
+
+  const confirmAddCatalogItem = () => {
+    if (!addingSection || !newAr.trim()) return;
+    const id = `custom_${Date.now().toString(36)}`;
+    setDraft((prev) => {
+      if (!prev) return prev;
+      const item =
+        addingSection === "workTypes"
+          ? { id, ar: newAr.trim(), en: newEn.trim() || newAr.trim(), category: "advanced" as const }
+          : { id, ar: newAr.trim(), en: newEn.trim() || newAr.trim() };
+      return { ...prev, [addingSection]: [...(prev[addingSection] as { id: string }[]), item] } as LabCatalog;
+    });
+    setNewAr("");
+    setNewEn("");
+    setAddingSection(null);
+  };
+
+  const rulesEntry = (RULES as Record<string, MaterialRules | undefined>)[selectedMaterialId];
+  const allowedWorkTypes = rulesEntry
+    ? rulesEntry.allowedWorkTypes
+    : (displayCatalog.workTypes.map((w) => w.id) as WorkTypeId[]);
+  const workTypes = displayCatalog.workTypes.filter((wt) => allowedWorkTypes.includes(wt.id as WorkTypeId));
+  const allowedMethods = rulesEntry
+    ? (rulesEntry.manufacturingRules[selectedWorkType as WorkTypeId] ?? [])
+    : (displayCatalog.manufacturingMethods.map((m) => m.id) as ManufacturingMethodId[]);
+  const manufacturingMethods = displayCatalog.manufacturingMethods.filter((mm) =>
+    allowedMethods.includes(mm.id as ManufacturingMethodId),
+  );
 
   const isImplantCase = isTitaniumBar || IMPLANT_WORK_TYPES.includes(selectedWorkType as WorkTypeId);
 
@@ -214,10 +343,11 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
 
   const selectMaterial = (id: MaterialId) => {
     setSelectedMaterialId(id);
-    const firstWorkType = RULES[id]?.allowedWorkTypes[0];
+    const rule = (RULES as Record<string, MaterialRules | undefined>)[id];
+    const firstWorkType = rule?.allowedWorkTypes[0] ?? displayCatalog.workTypes[0]?.id;
     if (firstWorkType) {
-      setSelectedWorkType(firstWorkType);
-      setSelectedManufacturingMethod(RULES[id]?.manufacturingRules[firstWorkType]?.[0] ?? "");
+      setSelectedWorkType(firstWorkType as WorkTypeId);
+      setSelectedManufacturingMethod(rule?.manufacturingRules[firstWorkType as WorkTypeId]?.[0] ?? "");
     } else {
       setSelectedWorkType("");
       setSelectedManufacturingMethod("");
@@ -226,18 +356,36 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
 
   const selectWorkType = (wt: WorkTypeId) => {
     setSelectedWorkType(wt);
-    setSelectedManufacturingMethod(RULES[selectedMaterialId]?.manufacturingRules[wt]?.[0] ?? "");
+    const rule = (RULES as Record<string, MaterialRules | undefined>)[selectedMaterialId];
+    setSelectedManufacturingMethod(rule?.manufacturingRules[wt]?.[0] ?? "");
   };
 
   const handleSubmit = () => {
+    if (!patientName.trim()) {
+      toast.error("يرجى إدخال اسم المريض");
+      return;
+    }
+    if (!doctorName.trim()) {
+      toast.error("يرجى إدخال اسم الطبيب");
+      return;
+    }
+    if (!deliveryDate) {
+      toast.error("يرجى تحديد تاريخ الإخراج");
+      return;
+    }
+    if (!selectedMaterialId) {
+      toast.error("يرجى اختيار المادة الأساسية");
+      return;
+    }
+
     onSubmit({
-      patientName,
-      doctorName,
-      clinicName,
-      deliveryDate,
-      material: selectedMaterialId,
-      workType: selectedWorkType || undefined,
-      manufacturingMethod: selectedManufacturingMethod || undefined,
+      patientName: patientName.trim(),
+      doctorName: doctorName.trim(),
+      clinicName: clinicName ?? "",
+      deliveryDate: deliveryDate ?? "",
+      material: selectedMaterialId ?? "",
+      workType: selectedWorkType || "",
+      manufacturingMethod: selectedManufacturingMethod || "",
       frameworkCreation: isPFM ? frameworkCreation : undefined,
       pricingMode,
       currency: pricingMode === "single" ? singleCurrency : "IQD",
@@ -255,8 +403,8 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
       discountAmountIQD,
       finalTotalIQD,
       finalTotalUSD,
-      shade: shade || undefined,
-      notes,
+      shade: shade || "",
+      notes: notes ?? "",
       implantCompany: isImplantCase ? implantCompany : undefined,
       implantSystem: isImplantCase ? implantSystem : undefined,
       implantConnection: isImplantCase ? implantConnection : undefined,
@@ -283,32 +431,62 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
     onClose();
   };
 
-  const workTypeChip = (wt: (typeof WORK_TYPES)[number], active: boolean, onClick: () => void) => (
-    <button
+  const workTypeChip = (
+    wt: { id: string; ar: string; en: string },
+    active: boolean,
+    onClick: () => void,
+    editable = false,
+    onDelete?: () => void,
+  ) => (
+    <div
       key={wt.id}
-      type="button"
-      onClick={onClick}
-      className={`px-3.5 py-2 rounded-xl border-2 text-right transition-all flex flex-col gap-0.5 ${
-        active ? "border-blue-600 bg-blue-50/30" : "border-gray-200 bg-white hover:border-blue-200"
+      className={`flex items-stretch rounded-xl border shadow-sm overflow-hidden transition ${
+        active ? "border-blue-600 bg-blue-50/30" : "border-slate-300 bg-white hover:border-blue-300"
       }`}
     >
-      <span className={`text-xs font-bold ${active ? "text-blue-900" : "text-gray-700"}`}>{wt.ar}</span>
-      <span className="text-[10px] text-gray-400" dir="ltr">{wt.en}</span>
-    </button>
+      <button type="button" onClick={onClick} className="flex-1 min-w-0 px-3.5 py-2 text-right flex flex-col gap-0.5">
+        <span className={`text-xs font-bold ${active ? "text-blue-900" : "text-gray-700"}`}>{wt.ar}</span>
+        <span className="text-[10px] text-gray-500" dir="ltr">{wt.en}</span>
+      </button>
+      {editable && (
+        <button
+          type="button"
+          onClick={onDelete}
+          className="shrink-0 w-9 border-s border-slate-200 text-rose-500 hover:bg-rose-50 flex items-center justify-center"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      )}
+    </div>
   );
 
-  const methodChip = (mm: (typeof MANUFACTURING_METHODS)[number], active: boolean, onClick: () => void) => (
-    <button
+  const methodChip = (
+    mm: { id: string; ar: string; en: string },
+    active: boolean,
+    onClick: () => void,
+    editable = false,
+    onDelete?: () => void,
+  ) => (
+    <div
       key={mm.id}
-      type="button"
-      onClick={onClick}
-      className={`px-3.5 py-2 rounded-xl border-2 text-right transition-all flex flex-col gap-0.5 ${
-        active ? "border-emerald-600 bg-emerald-50/40" : "border-gray-200 bg-white hover:border-emerald-200"
+      className={`flex items-stretch rounded-xl border shadow-sm overflow-hidden transition ${
+        active ? "border-emerald-600 bg-emerald-50/40" : "border-slate-300 bg-white hover:border-emerald-300"
       }`}
     >
-      <span className={`text-xs font-bold ${active ? "text-emerald-900" : "text-gray-700"}`}>{mm.ar}</span>
-      <span className="text-[10px] text-gray-400" dir="ltr">{mm.en}</span>
-    </button>
+      <button type="button" onClick={onClick} className="flex-1 min-w-0 px-3.5 py-2 text-right flex flex-col gap-0.5">
+        <span className={`text-xs font-bold ${active ? "text-emerald-900" : "text-gray-700"}`}>{mm.ar}</span>
+        <span className="text-[10px] text-gray-500" dir="ltr">{mm.en}</span>
+      </button>
+      {editable && (
+        <button
+          type="button"
+          onClick={onDelete}
+          className="shrink-0 w-9 border-s border-slate-200 text-rose-500 hover:bg-rose-50 flex items-center justify-center"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      )}
+    </div>
   );
 
   return (
@@ -325,9 +503,40 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
               <p className="text-xs text-gray-500">قم بتسعير حالتك واختيار تفاصيل المواد والتصنيع بدقة عالية</p>
             </div>
           </div>
-          <button onClick={handleClose} className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600">
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {editMode ? (
+              <>
+                <button
+                  onClick={saveEditMode}
+                  disabled={savingCatalog}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 disabled:opacity-60"
+                >
+                  <Check className="w-4 h-4" />
+                  حفظ القائمة
+                </button>
+                <button
+                  onClick={cancelEditMode}
+                  className="px-4 py-2 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50"
+                >
+                  إلغاء
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={enterEditMode}
+                className="px-4 py-2 rounded-xl border border-blue-200 text-blue-600 text-xs font-bold flex items-center gap-1.5 hover:bg-blue-50"
+              >
+                <Pencil className="w-4 h-4" />
+                تعديل القائمة
+              </button>
+            )}
+            <button
+              onClick={handleClose}
+              className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Body */}
@@ -395,29 +604,64 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
 
             {/* Step 1: Material */}
             <div className="space-y-3">
-              <p className="text-xs font-bold text-gray-600">المادة الأساسية</p>
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold text-gray-600">المادة الأساسية</p>
+                {editMode && (
+                  <button
+                    type="button"
+                    onClick={() => { setAddingSection("materials"); setNewAr(""); setNewEn(""); }}
+                    className="text-[11px] font-bold text-blue-600 flex items-center gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> إضافة مادة
+                  </button>
+                )}
+              </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {MATERIALS.map((m) => {
-                  const Icon = m.icon;
+                {displayCatalog.materials.map((m) => {
+                  const Icon = materialIcon(m.id);
                   const active = selectedMaterialId === m.id;
                   return (
-                    <button
+                    <div
                       key={m.id}
-                      type="button"
-                      onClick={() => selectMaterial(m.id)}
-                      className={`p-3 rounded-xl border-2 text-right transition-all ${
-                        active ? "border-blue-600 bg-blue-50/30" : "border-gray-200 bg-white hover:border-blue-200"
+                      className={`flex items-stretch rounded-xl border shadow-sm overflow-hidden transition ${
+                        active ? "border-blue-600 bg-blue-50/30" : "border-slate-300 bg-white hover:border-blue-300"
                       }`}
                     >
-                      <div className="flex items-center gap-2 mb-1.5">
+                      <button
+                        type="button"
+                        onClick={() => !editMode && selectMaterial(m.id as MaterialId)}
+                        className="flex-1 min-w-0 p-3 text-right flex items-center gap-2"
+                      >
                         <Icon className={`w-5 h-5 shrink-0 ${active ? "text-blue-600" : "text-gray-400"}`} />
-                        <span className={`text-xs font-bold ${active ? "text-blue-900" : "text-gray-700"}`}>{m.ar}</span>
-                      </div>
-                      <span className="text-[10px] text-gray-400 block" dir="ltr">{m.en}</span>
-                    </button>
+                        <div className="min-w-0 flex-1">
+                          <span className={`text-xs font-bold block truncate ${active ? "text-blue-900" : "text-gray-700"}`}>{m.ar}</span>
+                          <span className="text-[10px] text-gray-500 block truncate" dir="ltr">{m.en}</span>
+                        </div>
+                      </button>
+                      {editMode && (
+                        <button
+                          type="button"
+                          onClick={() => removeCatalogItem("materials", m.id)}
+                          className="shrink-0 w-9 border-s border-slate-200 text-rose-500 hover:bg-rose-50 flex items-center justify-center"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   );
                 })}
               </div>
+              {editMode && addingSection === "materials" && (
+                <AddCatalogRow
+                  newAr={newAr}
+                  newEn={newEn}
+                  setNewAr={setNewAr}
+                  setNewEn={setNewEn}
+                  onConfirm={confirmAddCatalogItem}
+                  onCancel={() => setAddingSection(null)}
+                  placeholder="اسم المادة الجديدة"
+                />
+              )}
             </div>
 
             {isClearAligner ? (
@@ -490,35 +734,87 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
               <>
                 {/* Step 2: Work type */}
                 <div className="space-y-3">
-                  <p className="text-xs font-bold text-gray-600">نوع العمل</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold text-gray-600">نوع العمل</p>
+                    {editMode && (
+                      <button
+                        type="button"
+                        onClick={() => { setAddingSection("workTypes"); setNewAr(""); setNewEn(""); }}
+                        className="text-[11px] font-bold text-blue-600 flex items-center gap-1"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> إضافة نوع عمل
+                      </button>
+                    )}
+                  </div>
                   {isZirconia ? (
                     <div className="space-y-3">
                       <div className="space-y-2">
                         <p className="text-[10px] font-semibold text-gray-400">أنواع العمل الأساسية</p>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                          {workTypes.filter((wt) => wt.category === "core").map((wt) => workTypeChip(wt, selectedWorkType === wt.id, () => selectWorkType(wt.id)))}
+                          {workTypes.filter((wt) => wt.category === "core").map((wt) =>
+                            workTypeChip(wt, selectedWorkType === wt.id, () => !editMode && selectWorkType(wt.id as WorkTypeId), editMode, () => removeCatalogItem("workTypes", wt.id)),
+                          )}
                         </div>
                       </div>
                       <div className="space-y-2">
                         <p className="text-[10px] font-semibold text-gray-400">أنواع العمل المتقدمة</p>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                          {workTypes.filter((wt) => wt.category === "advanced").map((wt) => workTypeChip(wt, selectedWorkType === wt.id, () => selectWorkType(wt.id)))}
+                          {workTypes.filter((wt) => wt.category === "advanced").map((wt) =>
+                            workTypeChip(wt, selectedWorkType === wt.id, () => !editMode && selectWorkType(wt.id as WorkTypeId), editMode, () => removeCatalogItem("workTypes", wt.id)),
+                          )}
                         </div>
                       </div>
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                      {workTypes.map((wt) => workTypeChip(wt, selectedWorkType === wt.id, () => selectWorkType(wt.id)))}
+                      {workTypes.map((wt) =>
+                        workTypeChip(wt, selectedWorkType === wt.id, () => !editMode && selectWorkType(wt.id as WorkTypeId), editMode, () => removeCatalogItem("workTypes", wt.id)),
+                      )}
                     </div>
+                  )}
+                  {editMode && addingSection === "workTypes" && (
+                    <AddCatalogRow
+                      newAr={newAr}
+                      newEn={newEn}
+                      setNewAr={setNewAr}
+                      setNewEn={setNewEn}
+                      onConfirm={confirmAddCatalogItem}
+                      onCancel={() => setAddingSection(null)}
+                      placeholder="اسم نوع العمل الجديد"
+                    />
                   )}
                 </div>
 
                 {/* Step 3: Manufacturing method */}
                 <div className="space-y-3">
-                  <p className="text-xs font-bold text-gray-600">طريقة التصنيع</p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {manufacturingMethods.map((mm) => methodChip(mm, selectedManufacturingMethod === mm.id, () => setSelectedManufacturingMethod(mm.id)))}
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold text-gray-600">طريقة التصنيع</p>
+                    {editMode && (
+                      <button
+                        type="button"
+                        onClick={() => { setAddingSection("manufacturingMethods"); setNewAr(""); setNewEn(""); }}
+                        className="text-[11px] font-bold text-blue-600 flex items-center gap-1"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> إضافة طريقة تصنيع
+                      </button>
+                    )}
                   </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {manufacturingMethods.map((mm) =>
+                      methodChip(mm, selectedManufacturingMethod === mm.id, () => !editMode && setSelectedManufacturingMethod(mm.id), editMode, () => removeCatalogItem("manufacturingMethods", mm.id)),
+                    )}
+                  </div>
+                  {editMode && addingSection === "manufacturingMethods" && (
+                    <AddCatalogRow
+                      newAr={newAr}
+                      newEn={newEn}
+                      setNewAr={setNewAr}
+                      setNewEn={setNewEn}
+                      onConfirm={confirmAddCatalogItem}
+                      onCancel={() => setAddingSection(null)}
+                      placeholder="اسم طريقة التصنيع الجديدة"
+                    />
+                  )}
                 </div>
 
                 {/* PFM framework creation */}
@@ -624,7 +920,7 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
           </div>
 
           {/* Shade selection */}
-          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-3">
+          <div className={`bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-3 ${editMode ? "pointer-events-none opacity-40 select-none" : ""}`}>
             <h3 className="text-sm font-bold text-gray-800 border-b pb-2">درجة اللون (Vita Classical)</h3>
             <div className="grid grid-cols-8 gap-1.5">
               {VITA_SHADES.map((s) => (
@@ -644,7 +940,7 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
           </div>
 
           {/* Section 3: Pricing */}
-          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4">
+          <div className={`bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4 ${editMode ? "pointer-events-none opacity-40 select-none" : ""}`}>
             <h3 className="text-sm font-bold text-gray-800 border-b pb-2">3. التسعير والإجمالي</h3>
 
             {/* Pricing mode toggle */}
@@ -854,14 +1150,85 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit }: Props) {
 
         {/* Footer Actions */}
         <div className="px-8 py-4 border-t border-gray-100 bg-white flex items-center justify-end gap-3 sticky bottom-0">
-          <button onClick={handleClose} className="px-5 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50">
-            إلغاء
-          </button>
-          <button onClick={handleSubmit} className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20">
-            حفظ وإضافة الطلب
-          </button>
+          {editMode ? (
+            <>
+              <button onClick={cancelEditMode} className="px-5 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50">
+                إلغاء التعديل
+              </button>
+              <button
+                onClick={saveEditMode}
+                disabled={savingCatalog}
+                className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-500/20 flex items-center gap-1.5 disabled:opacity-60"
+              >
+                {savingCatalog && <Check className="w-4 h-4" />}
+                {savingCatalog ? "جارٍ الحفظ..." : "حفظ القائمة"}
+              </button>
+            </>
+          ) : (
+            <>
+              <button onClick={handleClose} className="px-5 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50">
+                إلغاء
+              </button>
+              <button onClick={handleSubmit} className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20">
+                حفظ وإضافة الطلب
+              </button>
+            </>
+          )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function AddCatalogRow({
+  newAr,
+  newEn,
+  setNewAr,
+  setNewEn,
+  onConfirm,
+  onCancel,
+  placeholder,
+}: {
+  newAr: string;
+  newEn: string;
+  setNewAr: (v: string) => void;
+  setNewEn: (v: string) => void;
+  onConfirm: () => void;
+  onCancel: () => void;
+  placeholder: string;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 p-2 rounded-xl border border-dashed border-blue-200 bg-blue-50/30">
+      <input
+        autoFocus
+        value={newAr}
+        onChange={(e) => setNewAr(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") onConfirm();
+        }}
+        placeholder={placeholder}
+        className="flex-1 min-w-[140px] text-xs bg-white border border-gray-200 rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500"
+      />
+      <input
+        value={newEn}
+        onChange={(e) => setNewEn(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") onConfirm();
+        }}
+        placeholder="English name"
+        dir="ltr"
+        className="flex-1 min-w-[140px] text-xs bg-white border border-gray-200 rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500"
+      />
+      <button
+        type="button"
+        onClick={onConfirm}
+        className="px-3 py-2 rounded-lg bg-blue-600 text-white text-xs font-bold flex items-center gap-1"
+      >
+        <Check className="w-3.5 h-3.5" /> إضافة
+      </button>
+      <button type="button" onClick={onCancel} className="px-2 py-2 rounded-lg text-gray-400 hover:bg-gray-100">
+        <X className="w-4 h-4" />
+      </button>
     </div>
   );
 }
