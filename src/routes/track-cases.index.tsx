@@ -11,6 +11,9 @@ import {
   filterLegacyOrders,
   getCaseProgress,
   getStageLabel,
+  isCompletedStatus,
+  isInProgressStatus,
+  isNewStatus,
 } from "@/lib/caseTracking";
 import { useCaseUnreadCount } from "@/lib/caseMessages";
 import { useSession, useUserRole } from "@/lib/useAuth";
@@ -82,6 +85,14 @@ const STATUS_LABELS: Record<OrderStatus, { ar: string; en: string }> = {
   completed: { ar: "مكتملة", en: "Completed" },
 };
 
+/** Maps any status string (English or Arabic) to its canonical OrderStatus. */
+function canonicalStatus(status: string | undefined): OrderStatus {
+  if (isCompletedStatus(status)) return "completed";
+  if (isInProgressStatus(status)) return "in_progress";
+  if (isNewStatus(status)) return "new";
+  return "delayed";
+}
+
 type TrackedCase = { labId: string; order: Order };
 
 function UnreadBadge({ labId, caseId, userId }: { labId?: string; caseId: string; userId?: string }) {
@@ -133,10 +144,16 @@ function TrackCases() {
 
   const counts: Record<string, number> = {};
   statuses.forEach((s) => {
-    counts[s.id] = s.id === "all" ? allCases.length : allCases.filter((c) => c.order.status === s.id).length;
+    counts[s.id] =
+      s.id === "all"
+        ? allCases.length
+        : allCases.filter((c) => canonicalStatus(c.order.status) === s.id).length;
   });
 
-  const filtered = filter === "all" ? allCases : allCases.filter((c) => c.order.status === filter);
+  const filtered =
+    filter === "all"
+      ? allCases
+      : allCases.filter((c) => canonicalStatus(c.order.status) === filter);
 
   return (
     <MobileShell>
@@ -196,8 +213,8 @@ function TrackCases() {
           <div className="space-y-3">
             {filtered.map((c) => {
               const o = c.order;
-              const st = STATUS[o.status] ?? STATUS.delayed;
-              const label = STATUS_LABELS[o.status] ?? STATUS_LABELS.delayed;
+              const st = STATUS[canonicalStatus(o.status)];
+              const label = STATUS_LABELS[canonicalStatus(o.status)];
               return (
                 <div
                   key={o.id}

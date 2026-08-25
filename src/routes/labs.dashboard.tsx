@@ -341,6 +341,7 @@ function LabDashboard() {
       unitPrice: o.unitPriceIQD || 0,
       discount: o.discountAmountIQD || 0,
       price,
+      totalAmount: Math.round(Math.max(0, o.finalTotalIQD)),
       subtotalIQD: o.subtotalIQD,
       discountAmountIQD: o.discountAmountIQD,
       finalTotalUSD: o.finalTotalUSD,

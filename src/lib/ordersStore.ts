@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import {
-  doc, setDoc, getDoc, onSnapshot, deleteDoc,
+  doc, setDoc, getDoc, onSnapshot, deleteDoc, updateDoc,
   collection, query, orderBy, getDocs, collectionGroup, where,
 } from "firebase/firestore";
 import { db } from "@/integrations/firebase/client";
@@ -49,6 +49,7 @@ export type Order = {
   pricingMode?: "single" | "mixed";
   discount: number;
   price: number;
+  totalAmount?: number;
   rating?: number;
   notes: string;
   clinic: string;
@@ -397,6 +398,9 @@ export function buildInternalOrder(
     o.pricingMode === "single" && o.currency === "USD"
       ? o.finalTotalUSD
       : Math.max(0, o.finalTotalIQD);
+  // IQD total kept on the case document (not stripped) so the referring
+  // dentist can read the invoice amount.
+  const totalAmount = Math.round(Math.max(0, o.finalTotalIQD));
 
   return {
     id: existing?.id ?? crypto.randomUUID(),
@@ -419,6 +423,7 @@ export function buildInternalOrder(
     unitPrice: o.unitPriceIQD || 0,
     discount: o.discountAmountIQD || 0,
     price,
+    totalAmount,
     subtotalIQD: o.subtotalIQD,
     discountAmountIQD: o.discountAmountIQD,
     finalTotalUSD: o.finalTotalUSD,
@@ -455,8 +460,14 @@ export function addOrder(order: Order) {
 export function updateOrderStatus(id: string, status: OrderStatus) {
   orders = orders.map((o) => (o.id === id ? { ...o, status } : o));
   emit();
-  const updated = orders.find((o) => o.id === id);
-  if (updated) syncToFirestore(updated);
+  // Partial update: only the status field is written, so dentist ownership
+  // fields (dentistId, doctor, clinic, orderNumber, totalAmount, …) are never
+  // overwritten or stripped on the Firestore document.
+  if (_labId && db) {
+    updateDoc(caseDocRef(_labId, id), { status }).catch((err) => {
+      console.warn("Failed to update order status:", id, err);
+    });
+  }
 }
 
 export function updateOrder(id: string, updates: Partial<Order>) {

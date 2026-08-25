@@ -5,7 +5,7 @@ import { TopBar } from "@/components/TopBar";
 import { OrderInvoiceModal } from "@/components/OrderInvoiceModal";
 import { useI18n } from "@/lib/i18n";
 import { useSession } from "@/lib/useAuth";
-import { useDentistCases } from "@/lib/caseTracking";
+import { useDentistCases, isCompletedStatus } from "@/lib/caseTracking";
 import { useDentistInvoices } from "@/lib/invoices";
 import { db } from "@/integrations/firebase/client";
 import { doc, getDoc } from "firebase/firestore";
@@ -30,9 +30,11 @@ export const Route = createFileRoute("/invoices/")({
 type Tab = "all" | "supplies" | "implants" | "labs";
 
 function fmtOrderTotal(order: Order): string {
-  const n = Number(order.price) || 0;
-  if (order.currency === "IQD") return `${n.toLocaleString("en-US")} د.ع`;
-  return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const n = Number(order.totalAmount ?? order.price) || 0;
+  if (order.currency === "USD") {
+    return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+  return `${n.toLocaleString("en-US")} د.ع`;
 }
 
 function fmtOfficeTotal(inv: InvoiceDoc): string {
@@ -103,9 +105,9 @@ function Invoices() {
   const { cases: labCases, loading: labLoading } = useDentistCases(user?.uid ?? "");
   const { invoices: officeInvoices, loading: officeLoading } = useDentistInvoices(user?.uid ?? "");
 
-  // Lab invoices = completed lab cases for this doctor.
+  // Lab invoices = completed lab cases for this doctor (English or Arabic).
   const completedLab = useMemo(
-    () => labCases.filter((c) => c.order.status === "completed"),
+    () => labCases.filter((c) => isCompletedStatus(c.order.status)),
     [labCases],
   );
 

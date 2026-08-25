@@ -82,6 +82,28 @@ export function filterLegacyOrders(
   });
 }
 
+function normalizeStatus(status: unknown): string {
+  return String(status ?? "").trim().toLowerCase();
+}
+
+/** Matches "completed" in both English and Arabic representations. */
+export function isCompletedStatus(status: unknown): boolean {
+  const s = normalizeStatus(status);
+  return s === "completed" || s === "مكتملة" || s === "مكتمل";
+}
+
+/** Matches "in_progress" in both English and Arabic representations. */
+export function isInProgressStatus(status: unknown): boolean {
+  const s = normalizeStatus(status);
+  return s === "in_progress" || s === "قيد التنفيذ";
+}
+
+/** Matches "new" in both English and Arabic representations. */
+export function isNewStatus(status: unknown): boolean {
+  const s = normalizeStatus(status);
+  return s === "new" || s === "جديد";
+}
+
 export function useLabCases(labId: string) {
   const [cases, setCases] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
