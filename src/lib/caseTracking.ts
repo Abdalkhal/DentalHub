@@ -22,18 +22,29 @@ export function useDentistCases(dentistId: string) {
       const { query, onSnapshot, collectionGroup, where } = await import("firebase/firestore");
 
       try {
+        // Filter strictly by the doctor's unique id. No orderBy here so the
+        // collectionGroup query only needs the auto-created single-field index
+        // on `dentistId`, avoiding a missing composite-index failure that
+        // previously returned 0 cases.
         const casesQuery = query(
           collectionGroup(db, "cases"),
           where("dentistId", "==", dentistId),
-          orderBy("caseId", "desc"),
         );
 
         const unsub = onSnapshot(casesQuery, (snap) => {
           const results = snap.docs.map((d) => {
             const labId = d.ref.parent.parent?.id ?? "unknown";
-            return { labId, order: d.data() as Order };
+            const order = d.data() as Order;
+            if (!order.id) order.id = d.id;
+            return { labId, order };
           });
-          setCases(results);
+          // Deduplicate by unique order.id (a collectionGroup snapshot can
+          // surface the same case more than once).
+          const deduped = Array.from(
+            new Map(results.map((c) => [c.order.id, c])).values(),
+          );
+          deduped.sort((a, b) => (Number(b.order.caseId) || 0) - (Number(a.order.caseId) || 0));
+          setCases(deduped);
           setLoading(false);
         }, (err) => {
           console.warn("Dentist cases listener error:", err);
@@ -50,6 +61,25 @@ export function useDentistCases(dentistId: string) {
   }, [dentistId]);
 
   return { cases, loading };
+}
+
+/**
+ * Legacy fallback for cases that predate `dentistId` (or were created without
+ * it). Matches by the doctor's name, case-insensitively and trimmed, excluding
+ * any ids already resolved from Firestore.
+ */
+export function filterLegacyOrders(
+  orders: Order[],
+  excludeIds: Set<string>,
+  doctorName: string,
+): Order[] {
+  const target = doctorName.trim().toLowerCase();
+  if (!target) return [];
+  return orders.filter((o) => {
+    if (!o.id || excludeIds.has(o.id)) return false;
+    if (o.dentistId) return false;
+    return (o.doctor ?? "").trim().toLowerCase() === target;
+  });
 }
 
 export function useLabCases(labId: string) {

@@ -221,3 +221,44 @@ export const VITA_SHADES: VitaShade[] = [
   { code: "D3", hex: "#CCB894" },
   { code: "D4", hex: "#B39A73" },
 ];
+
+export const VITA_3D_SHADES: VitaShade[] = [
+  { code: "1M1", hex: "#F7F2EA" },
+  { code: "1M2", hex: "#F2E7D6" },
+  { code: "2M1", hex: "#EFE6D8" },
+  { code: "2M2", hex: "#EAD9C2" },
+  { code: "2L1.5", hex: "#E7DCC8" },
+  { code: "2R1.5", hex: "#EBDDC9" },
+  { code: "3M1", hex: "#E4D5BC" },
+  { code: "3M2", hex: "#DCC5A6" },
+  { code: "3L1.5", hex: "#DDC9A8" },
+  { code: "3L2.5", hex: "#D2B68E" },
+  { code: "3R1.5", hex: "#E0CFB0" },
+  { code: "3R2.5", hex: "#D6BC99" },
+  { code: "4M1", hex: "#D6C3A2" },
+  { code: "4M2", hex: "#CBB08A" },
+  { code: "4L1.5", hex: "#D0B896" },
+  { code: "4L2.5", hex: "#C4A477" },
+  { code: "4R1.5", hex: "#D3BC9B" },
+  { code: "5M1", hex: "#C7AC85" },
+  { code: "5M2", hex: "#BB9C72" },
+  { code: "5M3", hex: "#AD8C60" },
+];
+
+export const VITA_BLEACH_SHADES: VitaShade[] = [
+  { code: "BL1", hex: "#FBF7F1" },
+  { code: "BL2", hex: "#F7F1E6" },
+  { code: "BL3", hex: "#F3EBDB" },
+  { code: "BL4", hex: "#EFE5D1" },
+];
+
+export type ShadeTab = "classical" | "3d" | "bleach" | "others";
+
+/** Maps a shade code to its shade-system tab (falls back to `others`). */
+export function classifyShade(code: string): ShadeTab {
+  if (!code) return "others";
+  if (VITA_SHADES.some((s) => s.code === code)) return "classical";
+  if (VITA_3D_SHADES.some((s) => s.code === code)) return "3d";
+  if (VITA_BLEACH_SHADES.some((s) => s.code === code)) return "bleach";
+  return "others";
+}

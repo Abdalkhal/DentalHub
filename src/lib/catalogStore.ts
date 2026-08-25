@@ -19,12 +19,28 @@ export type LabCatalog = {
   updatedAt?: string;
 };
 
-/** The default full catalog, derived from the static dentalConfig lists. */
+/**
+ * Single shared source of truth for the default lab work-services menu.
+ * Used as the fallback everywhere (dentist order form and lab dashboard)
+ * when a lab has not configured its own custom catalog yet.
+ *
+ * - 8 primary materials (زركون، إيماكس، سيراميك ملتحم بالمعدن، معدن كامل،
+ *   سيراميك تجميلي، تركيبات مؤقتة، تقويم شفاف، تيتانيوم بار).
+ * - All work types (core + advanced).
+ * - All manufacturing methods.
+ */
+export const DEFAULT_LAB_SERVICES: LabCatalog = {
+  materials: MATERIALS.map((m) => ({ id: m.id, ar: m.ar, en: m.en })),
+  workTypes: WORK_TYPES.map((w) => ({ id: w.id, ar: w.ar, en: w.en, category: w.category })),
+  manufacturingMethods: MANUFACTURING_METHODS.map((m) => ({ id: m.id, ar: m.ar, en: m.en })),
+};
+
+/** Returns a fresh clone of the default full catalog. */
 export function defaultCatalog(): LabCatalog {
   return {
-    materials: MATERIALS.map((m) => ({ id: m.id, ar: m.ar, en: m.en })),
-    workTypes: WORK_TYPES.map((w) => ({ id: w.id, ar: w.ar, en: w.en, category: w.category })),
-    manufacturingMethods: MANUFACTURING_METHODS.map((m) => ({ id: m.id, ar: m.ar, en: m.en })),
+    materials: DEFAULT_LAB_SERVICES.materials.map((m) => ({ ...m })),
+    workTypes: DEFAULT_LAB_SERVICES.workTypes.map((w) => ({ ...w })),
+    manufacturingMethods: DEFAULT_LAB_SERVICES.manufacturingMethods.map((m) => ({ ...m })),
   };
 }
 

@@ -17,6 +17,7 @@ import {
   MapPin,
   Phone,
   Check,
+  ReceiptText,
 } from "lucide-react";
 import { auth, db } from "@/integrations/firebase/client";
 import { signOut } from "firebase/auth";
@@ -112,6 +113,16 @@ function Account() {
             label: lang === "ar" ? "فواتير الأطباء" : "Doctor Invoices",
             tone: "bg-[oklch(0.93_0.06_220)] ring-[oklch(0.82_0.1_220)] text-[oklch(0.45_0.18_220)]",
             onClick: () => navigate({ to: "/doctor-invoices" }),
+          },
+        ]
+      : []),
+    ...(role?.accountType === "dentist"
+      ? [
+          {
+            icon: ReceiptText,
+            label: lang === "ar" ? "الفواتير" : "Invoices",
+            tone: "bg-[oklch(0.93_0.06_270)] ring-[oklch(0.82_0.1_270)] text-[oklch(0.45_0.18_270)]",
+            onClick: () => navigate({ to: "/invoices" }),
           },
         ]
       : []),

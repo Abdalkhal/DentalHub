@@ -1,14 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { MobileShell } from "@/components/MobileShell";
 import { useI18n } from "@/lib/i18n";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useSession, useUserRole } from "@/lib/useAuth";
 import { setPatientStoreUser } from "@/lib/patientsStore";
 import { setClinicStoreUser } from "@/lib/clinicStore";
 import { setAppointmentsStoreUser } from "@/lib/appointmentsStore";
 import { NotificationBell } from "@/components/NotificationBell";
-import { getSnapshot } from "@/lib/ordersStore";
+import { useOrders } from "@/lib/ordersStore";
+import { useDentistCases, filterLegacyOrders } from "@/lib/caseTracking";
 import { useQuickOrders } from "@/lib/quickOrders";
 import { useImplantOffers } from "@/lib/implantOffers";
 import dentalImplant from "@/assets/dental-implant.png";
@@ -77,27 +78,23 @@ function Home() {
   const next = () => setIdx((i) => (i + 1) % banners.length);
   const prev = () => setIdx((i) => (i - 1 + banners.length) % banners.length);
 
-  const [caseCount, setCaseCount] = useState(0);
   const [searchQ, setSearchQ] = useState("");
   const { results: searchResults, loading: searchLoading } = useProductSearch(searchQ);
   const { role } = useUserRole();
-  const dentistName = role?.accountType === "dentist" ? (role.name || "") : "";
+  const dentistName =
+    role?.accountType === "dentist"
+      ? [role.name, role.surname].filter(Boolean).join(" ").trim()
+      : "";
+  const localOrders = useOrders();
+  const { cases: dentistCases } = useDentistCases(user?.uid ?? "");
 
-  useEffect(() => {
-    const upd = () => {
-      let filtered = getSnapshot().filter((o) => o.status !== "completed");
-      if (dentistName) {
-        filtered = filtered.filter((o) =>
-          o.doctor.toLowerCase().includes(dentistName.toLowerCase()) ||
-          (o.clinic || "").toLowerCase().includes(dentistName.toLowerCase())
-        );
-      }
-      setCaseCount(filtered.length);
-    };
-    upd();
-    window.addEventListener("storage", upd);
-    return () => window.removeEventListener("storage", upd);
-  }, [dentistName]);
+  const caseCount = useMemo(() => {
+    const remote = dentistCases.map((c) => c.order);
+    const remoteIds = new Set(remote.map((o) => o.id));
+    const legacy = filterLegacyOrders(localOrders, remoteIds, dentistName);
+    const all = Array.from(new Map([...remote, ...legacy].map((o) => [o.id, o])).values());
+    return all.filter((o) => o.status !== "completed").length;
+  }, [dentistCases, localOrders, dentistName]);
 
   const NextIcon = dir === "rtl" ? ChevronLeft : ChevronRight;
   const PrevIcon = dir === "rtl" ? ChevronRight : ChevronLeft;

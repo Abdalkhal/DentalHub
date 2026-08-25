@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { X, Send, Loader2, Phone, Instagram, MapPin, Eraser } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useSession, useUserRole } from "@/lib/useAuth";
@@ -8,8 +8,14 @@ import { cn } from "@/lib/utils";
 import { FDI_UPPER, FDI_LOWER, UPPER_POS, LOWER_POS } from "@/components/DentalArch";
 import archUpper from "@/assets/arch-upper.png";
 import archLower from "@/assets/arch-lower.png";
-import { useLabCatalog } from "@/lib/catalogStore";
-import type { MaterialId, WorkTypeId } from "@/lib/dentalConfig";
+import { useLabCatalog, type LabCatalog } from "@/lib/catalogStore";
+import {
+  WORK_TYPES as DENTAL_WORK_TYPES,
+  RULES,
+  type MaterialId,
+  type WorkTypeId,
+  type MaterialRules,
+} from "@/lib/dentalConfig";
 
 type LabRxFormModalProps = {
   labId: string;
@@ -61,55 +67,47 @@ type CategoryDef = {
   items: { ar: string; en: string; wt?: WorkTypeId }[];
 };
 
-const CATEGORIES: CategoryDef[] = [
-  {
-    id: "emax",
-    ar: "إيماكس",
-    en: "E-MAX",
-    color: "bg-sky-500",
-    material: "material.emax",
-    items: [
-      { ar: "فينير إيماكس", en: "Veneer E-max", wt: "veneer" },
-      { ar: "تاج إيماكس", en: "Crown E-max", wt: "crown" },
-      { ar: "حشوة داخلية/خارجية", en: "Inlay/Onlay", wt: "inlay" },
-    ],
-  },
-  {
-    id: "zirconium",
-    ar: "زيركون",
-    en: "ZIRCONIUM",
-    color: "bg-violet-500",
-    material: "material.zirconia",
-    items: [
-      { ar: "زيركون 5D", en: "Zircon 5D" },
-      { ar: "تاج زيركون", en: "Zircon Crown", wt: "crown" },
-      { ar: "جسر زيركون", en: "Zircon Bridge", wt: "bridge" },
-    ],
-  },
-  {
-    id: "ceramic",
-    ar: "سيراميك",
-    en: "CERAMIC",
-    color: "bg-rose-500",
-    material: "material.feldspathic",
-    items: [
-      { ar: "تاج سيراميك", en: "Ceramic Crown", wt: "crown" },
-      { ar: "فينير سيراميك", en: "Ceramic Veneer", wt: "veneer" },
-      { ar: "جسر سيراميك", en: "Ceramic Bridge", wt: "bridge" },
-    ],
-  },
-  {
-    id: "denture",
-    ar: "طقم أسنان",
-    en: "DENTURE",
-    color: "bg-amber-500",
-    material: "material.pmma",
-    items: [
-      { ar: "طقم جزئي", en: "Partial Denture" },
-      { ar: "طقم كامل", en: "Complete Denture" },
-    ],
-  },
-];
+const MATERIAL_COLORS: Record<string, string> = {
+  "material.emax": "bg-sky-500",
+  "material.zirconia": "bg-violet-500",
+  "material.feldspathic": "bg-rose-500",
+  "material.pmma": "bg-amber-500",
+  "material.pfm": "bg-slate-500",
+  "material.full_cast_metal": "bg-stone-500",
+  "material.clear_aligner": "bg-emerald-500",
+  "material.titanium_bar": "bg-cyan-600",
+};
+
+const DENTAL_WORK_TYPE_BY_ID = Object.fromEntries(
+  DENTAL_WORK_TYPES.map((w) => [w.id, w]),
+) as Record<string, { ar: string; en: string }>;
+
+/**
+ * Builds the dentist-facing categories straight from the lab's catalog
+ * (custom services or `DEFAULT_LAB_SERVICES` fallback), so the doctor sees
+ * the exact materials and work types the lab actually offers.
+ */
+function buildCategories(catalog: LabCatalog): CategoryDef[] {
+  return catalog.materials.map((m) => {
+    const material = m.id as MaterialId;
+    const rule = (RULES as Record<string, MaterialRules | undefined>)[material];
+    const allowed = rule?.allowedWorkTypes ?? [];
+    const color = MATERIAL_COLORS[m.id] ?? "bg-slate-400";
+
+    const items =
+      allowed.length > 0
+        ? allowed
+            .filter((wt) => DENTAL_WORK_TYPE_BY_ID[wt])
+            .map((wt) => ({
+              ar: `${DENTAL_WORK_TYPE_BY_ID[wt].ar} ${m.ar}`,
+              en: `${DENTAL_WORK_TYPE_BY_ID[wt].en} ${m.en}`,
+              wt,
+            }))
+        : [{ ar: m.ar, en: m.en }];
+
+    return { id: m.id, ar: m.ar, en: m.en, color, material, items };
+  });
+}
 
 const LOWER_OPTIONS = [
   { id: "night_guard", ar: "واقي ليلي", en: "Night guard" },
@@ -193,9 +191,29 @@ export function LabRxFormModal({
   const { role } = useUserRole();
   const { catalog } = useLabCatalog(labId);
 
-  const enabledMaterials = new Set(catalog.materials.map((m) => m.id));
   const enabledWorkTypes = new Set(catalog.workTypes.map((w) => w.id));
-  const visibleCategories = CATEGORIES.filter((c) => enabledMaterials.has(c.material));
+  const categories = useMemo(() => buildCategories(catalog), [catalog]);
+
+  // Reverse lookups used to map the doctor's selection back to clean ids.
+  const itemMaterial = useMemo(() => {
+    const map = new Map<string, MaterialId>();
+    categories.forEach((c) => {
+      c.items.forEach((it) => {
+        map.set(ar ? it.ar : it.en, c.material);
+      });
+    });
+    return map;
+  }, [categories, ar]);
+
+  const itemWorkType = useMemo(() => {
+    const map = new Map<string, WorkTypeId>();
+    categories.forEach((c) => {
+      c.items.forEach((it) => {
+        if (it.wt) map.set(ar ? it.ar : it.en, it.wt);
+      });
+    });
+    return map;
+  }, [categories, ar]);
 
   const [patient, setPatient] = useState("");
   const [patientAge, setPatientAge] = useState("");
@@ -361,6 +379,28 @@ export function LabRxFormModal({
     const workType =
       [...allItems, ...toothSummary].join(" · ") || (ar ? "غير محدد" : "Unspecified");
 
+    // Determine the doctor's primary material & work type so the lab can
+    // pre-select them accurately on confirmation.
+    let primaryMaterial: MaterialId | undefined;
+    let primaryWorkType: WorkTypeId | undefined;
+    for (const items of Object.values(toothItems)) {
+      for (const label of items) {
+        if (!primaryMaterial) primaryMaterial = itemMaterial.get(label);
+        if (!primaryWorkType) primaryWorkType = itemWorkType.get(label);
+      }
+      if (primaryMaterial && primaryWorkType) break;
+    }
+    if (!primaryWorkType) {
+      const counts: Record<string, number> = {};
+      Object.values(teeth).forEach((t) => {
+        counts[t] = (counts[t] ?? 0) + 1;
+      });
+      const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] as
+        | WorkTypeId
+        | undefined;
+      if (top) primaryWorkType = top;
+    }
+
     setBusy(true);
     try {
       const order = await submitDentistCase(labId, {
@@ -374,6 +414,7 @@ export function LabRxFormModal({
         dentistId: user?.uid ?? "unknown",
         dentistName: user?.displayName ?? user?.email ?? (ar ? "طبيب" : "Dentist"),
         shade: shade || undefined,
+        material: primaryMaterial,
         patientAge: patientAge || undefined,
         patientGender: patientGender || undefined,
         patientPhone: patientPhone || undefined,
@@ -388,6 +429,8 @@ export function LabRxFormModal({
           receivedDate,
           vitaTab,
           customShade: customShade || undefined,
+          primaryMaterial,
+          primaryWorkType,
         },
       });
 
@@ -637,7 +680,7 @@ export function LabRxFormModal({
               )}
             </div>
 
-            {visibleCategories.map((c) => {
+            {categories.map((c) => {
               const items = c.items
                 .filter((it) => !it.wt || enabledWorkTypes.has(it.wt))
                 .map((it) => displayName(it));

@@ -62,6 +62,8 @@ export type InvoiceDoc = {
   doctorCity?: string;
   items: InvoiceItem[];
   total: number;
+  totalUSD?: number;
+  totalIQD?: number;
   status: InvoiceStatus;
   createdAt: Timestamp;
   confirmedAt?: Timestamp | null;

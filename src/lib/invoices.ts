@@ -35,6 +35,8 @@ const fromDoc = (id: string, data: Record<string, unknown>): InvoiceDoc => ({
   doctorCity: (data.doctorCity as string) ?? undefined,
   items: ((data.items as unknown[]) ?? []).map((it) => mapItem(it as Record<string, unknown>)),
   total: (data.total as number) ?? 0,
+  totalUSD: (data.totalUSD as number) ?? undefined,
+  totalIQD: (data.totalIQD as number) ?? undefined,
   status: (data.status as InvoiceDoc["status"]) ?? "pending",
   createdAt: data.createdAt as InvoiceDoc["createdAt"],
   confirmedAt: (data.confirmedAt as InvoiceDoc["confirmedAt"]) ?? null,
@@ -74,6 +76,37 @@ export function useOfficeInvoices(officeId: string | undefined) {
     );
     return unsub;
   }, [officeId]);
+
+  return { invoices, loading };
+}
+
+/** Real-time stream of a dentist's incoming invoices (sorted newest first). */
+export function useDentistInvoices(dentistId: string | undefined) {
+  const [invoices, setInvoices] = useState<InvoiceDoc[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!dentistId) {
+      setInvoices([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const q = query(collection(db, "invoices"), where("doctorId", "==", dentistId));
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setInvoices(
+          snap.docs
+            .map((d) => fromDoc(d.id, d.data()))
+            .sort((a, b) => createdAtMs(b.createdAt) - createdAtMs(a.createdAt)),
+        );
+        setLoading(false);
+      },
+      () => setLoading(false),
+    );
+    return unsub;
+  }, [dentistId]);
 
   return { invoices, loading };
 }

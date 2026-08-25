@@ -12,6 +12,7 @@ import { OrderInvoiceModal } from "@/components/OrderInvoiceModal";
 import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
 import { WORK_TYPES as DENTAL_WORK_TYPES } from "@/lib/dentalConfig";
 import { toast } from "sonner";
+import { deriveOrderLines } from "@/lib/orderLines";
 import { NotificationBell } from "@/components/NotificationBell";
 import {
   addOrder,
@@ -40,9 +41,7 @@ import {
   Eye,
   Edit3,
   Trash2,
-  Crown,
   Sparkles,
-  Syringe,
   Layers,
   Clock,
   TrendingUp,
@@ -66,22 +65,6 @@ import {
 export const Route = createFileRoute("/labs/dashboard")({
   component: LabDashboard,
 });
-
-type WorkType = "zircon" | "inlay_onlay" | "night_guard" | "ceramic" | "implant" | "lumineer" | "e_max" | "veneer";
-
-const WORK_TYPES: Record<
-  WorkType,
-  { ar: string; en: string; icon: LucideIcon; color: string }
-> = {
-  zircon: { ar: "زيركون", en: "Zircon", icon: Crown, color: "text-amber-500 bg-amber-50" },
-  inlay_onlay: { ar: "إنلاي وأونلاي", en: "Inlay & Onlay", icon: Sparkles, color: "text-orange-500 bg-orange-50" },
-  night_guard: { ar: "واقي ليلي", en: "Night Guard", icon: Layers, color: "text-violet-500 bg-violet-50" },
-  ceramic: { ar: "سيراميك", en: "Ceramic", icon: Sparkles, color: "text-pink-500 bg-pink-50" },
-  implant: { ar: "زرعة", en: "Implant", icon: Syringe, color: "text-emerald-500 bg-emerald-50" },
-  lumineer: { ar: "لومينير", en: "Lumineer", icon: Sparkles, color: "text-sky-500 bg-sky-50" },
-  e_max: { ar: "إيماكس", en: "E-Max", icon: Sparkles, color: "text-rose-500 bg-rose-50" },
-  veneer: { ar: "فينير", en: "Veneer", icon: Sparkles, color: "text-cyan-500 bg-cyan-50" },
-};
 
 const STATUS_META: Record<OrderStatus, { ar: string; en: string; color: string; dot: string }> = {
   new: {
@@ -194,27 +177,6 @@ function StatCard({
         <span className="text-xs font-semibold">{trend}</span>
       </div>
     </Comp>
-  );
-}
-
-function WorkTypeBadge({ type }: { type: WorkType }) {
-  const wt = WORK_TYPES[type] ?? {
-    ar: type,
-    en: type,
-    icon: Crown,
-    color: "text-slate-500 bg-slate-50",
-  };
-  const Icon = wt.icon;
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold",
-        wt.color,
-      )}
-    >
-      <Icon className="size-3.5" />
-      {wt.ar}
-    </span>
   );
 }
 
@@ -729,7 +691,17 @@ function LabDashboard() {
                             {c.patient}
                           </td>
                           <td className="px-3 py-3">
-                            <WorkTypeBadge type={c.workType as WorkType} />
+                            <div className="flex flex-wrap gap-1 max-w-[240px]">
+                              {deriveOrderLines(c).map((l) => (
+                                <span
+                                  key={l.id}
+                                  className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 whitespace-nowrap"
+                                  title={l.name}
+                                >
+                                  {l.name}
+                                </span>
+                              ))}
+                            </div>
                           </td>
                           <td className="px-3 py-3 text-xs text-slate-800 font-semibold whitespace-nowrap text-center">
                             {c.unitsCount ?? "-"}

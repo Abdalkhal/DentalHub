@@ -362,8 +362,16 @@ const MATERIAL_LABELS: Record<string, string> = {
  * Builds a full internal `Order` (with a fresh id / order number / case id) from the
  * "New Order" modal payload. Used by both the lab dashboard and the incoming-order
  * confirmation workflow.
+ *
+ * When `existing` is provided, the existing case's identity (id / order number /
+ * case id / received date) is preserved instead of generating new values, so the
+ * order is updated in place rather than duplicated.
  */
-export function buildInternalOrder(o: CombinedLabOrder, status: OrderStatus): Order {
+export function buildInternalOrder(
+  o: CombinedLabOrder,
+  status: OrderStatus,
+  existing?: Pick<Order, "id" | "orderNumber" | "caseId" | "receivedDate">,
+): Order {
   const units = o.unitsCount || 0;
   const USD_RATE = 1480;
   const workTypeLabel = WORK_TYPES.find((w) => w.id === o.workType)?.ar ?? o.workType ?? "";
@@ -391,10 +399,10 @@ export function buildInternalOrder(o: CombinedLabOrder, status: OrderStatus): Or
       : Math.max(0, o.finalTotalIQD);
 
   return {
-    id: crypto.randomUUID(),
-    orderNumber: getNextOrderNumber(),
-    caseId: getNextCaseId(),
-    receivedDate: new Date().toISOString(),
+    id: existing?.id ?? crypto.randomUUID(),
+    orderNumber: existing?.orderNumber ?? getNextOrderNumber(),
+    caseId: existing?.caseId ?? getNextCaseId(),
+    receivedDate: existing?.receivedDate ?? new Date().toISOString(),
     dueDate: o.deliveryDate ?? "",
     patient: o.patientName ?? "",
     doctor: o.doctorName ?? "",

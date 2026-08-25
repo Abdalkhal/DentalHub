@@ -20,10 +20,14 @@ import {
   RULES,
   IMPLANT_WORK_TYPES,
   VITA_SHADES,
+  VITA_3D_SHADES,
+  VITA_BLEACH_SHADES,
+  classifyShade,
   type MaterialId,
   type WorkTypeId,
   type ManufacturingMethodId,
   type MaterialRules,
+  type ShadeTab,
 } from "@/lib/dentalConfig";
 import { useStaff } from "@/lib/staffStore";
 import { useLabCatalog, saveLabCatalog, type LabCatalog } from "@/lib/catalogStore";
@@ -44,6 +48,8 @@ export type OrderPrefill = {
   material?: MaterialId;
   workType?: WorkTypeId;
   shade?: string;
+  shadeTab?: ShadeTab;
+  customShade?: string;
   notes?: string;
 };
 
@@ -113,6 +119,8 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
   const [singleUnitPrice, setSingleUnitPrice] = useState("0");
   const [singleCurrency, setSingleCurrency] = useState<"USD" | "IQD">("IQD");
   const [shade, setShade] = useState("");
+  const [shadeTab, setShadeTab] = useState<ShadeTab>("classical");
+  const [customShade, setCustomShade] = useState("");
   const [pricingItems, setPricingItems] = useState<PricingItem[]>([
     { id: crypto.randomUUID(), name: "", quantity: 1, unitPrice: 0, currency: "IQD" },
   ]);
@@ -166,6 +174,8 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
     setSingleCurrency("IQD");
     setPricingItems([{ id: crypto.randomUUID(), name: "", quantity: 1, unitPrice: 0, currency: "IQD" }]);
     setShade("");
+    setShadeTab("classical");
+    setCustomShade("");
     setImplantCompany("");
     setImplantSystem("");
     setImplantConnection("");
@@ -189,7 +199,22 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
     if (p.patientName) setPatientName(p.patientName);
     if (p.doctorName) setDoctorName(p.doctorName);
     if (p.clinicName) setClinicName(p.clinicName);
-    if (p.shade) setShade(p.shade);
+    if (p.customShade) {
+      setShadeTab("others");
+      setCustomShade(p.customShade);
+      setShade("");
+    } else if (p.shade) {
+      const tab = p.shadeTab ?? classifyShade(p.shade);
+      if (tab === "others") {
+        setShadeTab("others");
+        setCustomShade(p.shade);
+        setShade("");
+      } else {
+        setShadeTab(tab);
+        setShade(p.shade);
+        setCustomShade("");
+      }
+    }
     if (p.notes) setNotes(p.notes);
     if (p.material) {
       setSelectedMaterialId(p.material);
@@ -403,7 +428,7 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
       discountAmountIQD,
       finalTotalIQD,
       finalTotalUSD,
-      shade: shade || "",
+      shade: shadeTab === "others" ? customShade.trim() : shade || "",
       notes: notes ?? "",
       implantCompany: isImplantCase ? implantCompany : undefined,
       implantSystem: isImplantCase ? implantSystem : undefined,
@@ -423,7 +448,7 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
       ceramistId: ceramistId || undefined,
       ceramistName: ceramists.find((m) => m.id === ceramistId)?.name,
     });
-    resetForm();
+    handleClose();
   };
 
   const handleClose = () => {
@@ -921,22 +946,55 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
 
           {/* Shade selection */}
           <div className={`bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-3 ${editMode ? "pointer-events-none opacity-40 select-none" : ""}`}>
-            <h3 className="text-sm font-bold text-gray-800 border-b pb-2">درجة اللون (Vita Classical)</h3>
-            <div className="grid grid-cols-8 gap-1.5">
-              {VITA_SHADES.map((s) => (
+            <h3 className="text-sm font-bold text-gray-800 border-b pb-2">درجة اللون (Shade)</h3>
+
+            {/* Shade system tabs */}
+            <div className="flex gap-1.5 overflow-x-auto pb-1">
+              {([
+                ["classical", "VITA كلاسيكي"],
+                ["3d", "VITA 3D-Master"],
+                ["bleach", "Bleach"],
+                ["others", "أخرى"],
+              ] as [ShadeTab, string][]).map(([k, label]) => (
                 <button
-                  key={s.code}
+                  key={k}
                   type="button"
-                  onClick={() => setShade(shade === s.code ? "" : s.code)}
-                  className={`relative aspect-square rounded-xl border-2 transition-all flex flex-col items-center justify-center ${
-                    shade === s.code ? "border-blue-600 scale-110 shadow-md z-10 ring-2 ring-blue-500/20" : "border-slate-200 hover:border-slate-400"
+                  onClick={() => setShadeTab(k)}
+                  className={`shrink-0 h-9 px-3.5 rounded-full text-xs font-bold border-2 transition ${
+                    shadeTab === k
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-white text-gray-600 border-gray-200 hover:border-blue-300"
                   }`}
                 >
-                  <span className="size-5 rounded-full border border-slate-300" style={{ background: s.hex }} />
-                  <span className="text-[9px] font-bold text-slate-600 mt-0.5">{s.code}</span>
+                  {label}
                 </button>
               ))}
             </div>
+
+            {shadeTab === "others" ? (
+              <input
+                value={customShade}
+                onChange={(e) => setCustomShade(e.target.value)}
+                placeholder="أدخل درجة لون مخصصة..."
+                className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            ) : (
+              <div className="grid grid-cols-8 gap-1.5">
+                {(shadeTab === "classical" ? VITA_SHADES : shadeTab === "3d" ? VITA_3D_SHADES : VITA_BLEACH_SHADES).map((s) => (
+                  <button
+                    key={s.code}
+                    type="button"
+                    onClick={() => setShade(shade === s.code ? "" : s.code)}
+                    className={`relative aspect-square rounded-xl border-2 transition-all flex flex-col items-center justify-center ${
+                      shade === s.code ? "border-blue-600 scale-110 shadow-md z-10 ring-2 ring-blue-500/20" : "border-slate-200 hover:border-slate-400"
+                    }`}
+                  >
+                    <span className="size-5 rounded-full border border-slate-300" style={{ background: s.hex }} />
+                    <span className="text-[9px] font-bold text-slate-600 mt-0.5">{s.code}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Section 3: Pricing */}

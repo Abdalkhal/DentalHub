@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { FDI_UPPER, FDI_LOWER, UPPER_POS, LOWER_POS } from "@/components/DentalArch";
 import { VITA_SHADES } from "@/lib/dentalConfig";
 import { formatOrderId } from "@/lib/ordersStore";
+import { cleanDoctorNotes } from "@/lib/orderLines";
 import { translateWorkItem } from "@/lib/rxTranslations";
 import { CaseChat } from "@/components/CaseChat";
 import { markCaseRead, type CaseMessageSenderRole } from "@/lib/caseMessages";
@@ -316,7 +317,7 @@ export function IncomingOrderRxModal({
                 </span>
               </div>
               <p className="text-sm text-slate-700 whitespace-pre-wrap">
-                {order.notes || (ar ? "لا توجد ملاحظات" : "No notes")}
+                {cleanDoctorNotes(order.notes) || (ar ? "لا توجد ملاحظات" : "No notes")}
               </p>
             </div>
           </div>

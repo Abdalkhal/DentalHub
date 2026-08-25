@@ -1,6 +1,5 @@
 import { useMemo, type ReactNode } from "react";
 import { useI18n } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   X,
@@ -27,7 +26,11 @@ import {
   MANUFACTURING_METHODS,
   FRAMEWORK_CREATION,
   VITA_SHADES,
+  VITA_3D_SHADES,
+  VITA_BLEACH_SHADES,
+  classifyShade,
 } from "@/lib/dentalConfig";
+import { deriveOrderLines, cleanDoctorNotes } from "@/lib/orderLines";
 
 type Props = {
   order: Order;
@@ -58,6 +61,17 @@ const MANUFACTURING_LABEL: Record<string, { ar: string; en: string }> = Object.f
 );
 const FRAMEWORK_LABEL: Record<string, { ar: string; en: string }> = Object.fromEntries(
   FRAMEWORK_CREATION.map((f) => [f.id, { ar: f.ar, en: f.en }]),
+);
+
+const SHADE_SYSTEMS: Record<string, { ar: string; en: string }> = {
+  classical: { ar: "VITA Classical", en: "VITA Classical" },
+  "3d": { ar: "VITA 3D-Master", en: "VITA 3D-Master" },
+  bleach: { ar: "Bleach", en: "Bleach" },
+  others: { ar: "أخرى", en: "Other" },
+};
+
+const SHADE_HEX: Record<string, string> = Object.fromEntries(
+  [...VITA_SHADES, ...VITA_3D_SHADES, ...VITA_BLEACH_SHADES].map((s) => [s.code, s.hex]),
 );
 
 const IMPLANT_CONNECTION: Record<string, { ar: string; en: string }> = {
@@ -191,28 +205,26 @@ export function OrderInvoiceModal({ order, labName, labAddress, labPhone, onClos
   const frameworkMeta = order.frameworkCreation ? FRAMEWORK_LABEL[order.frameworkCreation] : null;
   const titaniumMeta = order.titaniumFrameworkType ? TITANIUM_TYPE[order.titaniumFrameworkType] : null;
   const selectedShade = order.shade ? order.shade.trim() : "";
+  const shadeTab = selectedShade ? classifyShade(selectedShade) : null;
+  const shadeHex = selectedShade ? SHADE_HEX[selectedShade] : undefined;
+  const shadeSystemLabel =
+    shadeTab && shadeTab !== "others"
+      ? ar
+        ? SHADE_SYSTEMS[shadeTab].ar
+        : SHADE_SYSTEMS[shadeTab].en
+      : null;
 
   const labTitle = labName || (ar ? "مختبر دنتال هب" : "Dental Hub Lab");
   const address = labAddress?.trim() || "";
   const phone = labPhone?.trim() || "";
 
-  const items = useMemo(
-    () => (order.pricingItems ?? []).filter((i) => i.name && String(i.name).trim() !== ""),
-    [order.pricingItems],
-  );
-  const hasTable = items.length > 0;
+  const items = useMemo(() => deriveOrderLines(order), [order]);
 
-  const totalUnits = hasTable
-    ? items.reduce((s, i) => s + (Number(i.quantity) || 0), 0)
-    : order.unitsCount || 0;
+  const totalUnits = items.reduce((s, i) => s + (Number(i.quantity) || 0), 0);
 
-  const usdTotal = hasTable
-    ? items
-        .filter((i) => i.currency !== "IQD")
-        .reduce((s, i) => s + (Number(i.quantity) || 0) * (Number(i.unitPrice) || 0), 0)
-    : order.currency === "USD"
-      ? order.price || 0
-      : 0;
+  const usdTotal = items
+    .filter((i) => i.currency !== "IQD")
+    .reduce((s, i) => s + (Number(i.quantity) || 0) * (Number(i.unitPrice) || 0), 0);
 
   const grandTotalLabel = fmtAmount(order.price ?? 0, order.currency);
   const showUsdSecondary = order.currency !== "USD" && usdTotal > 0;
@@ -222,13 +234,12 @@ export function OrderInvoiceModal({ order, labName, labAddress, labPhone, onClos
   };
 
   const handleShare = async () => {
-    const lines = hasTable
-      ? items.map((i) => `• ${i.name} ×${i.quantity} — ${fmtRowTotal(i)}`)
-      : [`• ${order.workType} ×${totalUnits} — ${grandTotalLabel}`];
+    const lines = items.map((i) => `• ${i.name} ×${i.quantity} — ${fmtRowTotal(i)}`);
 
     const extra: string[] = [];
     if (order.shade) extra.push(ar ? `درجة اللون: ${order.shade}` : `Shade: ${order.shade}`);
-    if (order.notes) extra.push(ar ? `ملاحظات: ${order.notes}` : `Notes: ${order.notes}`);
+    const cleanNotes = cleanDoctorNotes(order.notes);
+    if (cleanNotes) extra.push(ar ? `ملاحظات: ${cleanNotes}` : `Notes: ${cleanNotes}`);
 
     const text = [
       ar ? "فاتورة" : "Invoice",
@@ -374,41 +385,37 @@ export function OrderInvoiceModal({ order, labName, labAddress, labPhone, onClos
               </SectionCard>
 
               {/* Shade (Vita Classical) strip */}
-              <SectionCard icon={Paintbrush} title={ar ? "درجة اللون (Vita Classical)" : "Shade (Vita Classical)"}>
+              <SectionCard icon={Paintbrush} title={ar ? "درجة اللون" : "Shade"}>
                 <div className="px-4 py-4">
-                  <div className="grid grid-cols-8 gap-1.5">
-                    {VITA_SHADES.map((s) => {
-                      const active = selectedShade === s.code;
-                      return (
-                        <div
-                          key={s.code}
-                          className={cn(
-                            "relative aspect-square rounded-xl border-2 transition-all flex flex-col items-center justify-center",
-                            active
-                              ? "border-blue-600 scale-110 shadow-md z-10 ring-2 ring-blue-500/20"
-                              : "border-slate-200",
-                          )}
-                        >
-                          <span
-                            className="size-5 rounded-full border border-slate-300"
-                            style={{ background: s.hex }}
-                          />
-                          <span className="text-[9px] font-bold text-slate-600 mt-0.5">
-                            {s.code}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {!selectedShade && (
+                  {selectedShade ? (
+                    <span
+                      className="inline-flex items-center gap-2.5 rounded-full px-4 py-2.5"
+                      style={{
+                        background: C.lightBlueSoft,
+                        border: `1px solid ${C.lightBlue}`,
+                      }}
+                    >
+                      <span
+                        className="size-6 rounded-full border border-slate-300 shadow-inner shrink-0"
+                        style={{ background: shadeHex ?? "#E8D5B7" }}
+                      />
+                      <span className="text-sm font-extrabold text-slate-800" dir="auto">
+                        {selectedShade}
+                      </span>
+                      {shadeSystemLabel && (
+                        <span className="text-[11px] font-semibold" style={{ color: C.lightBlueText }}>
+                          {shadeSystemLabel}
+                        </span>
+                      )}
+                    </span>
+                  ) : (
                     <p
-                      className="mt-3 text-xs font-medium rounded-lg px-3 py-2"
+                      className="text-xs font-medium rounded-lg px-3 py-2"
                       style={{ background: C.lightBlueSoft, color: C.lightBlueText }}
                     >
                       {ar
-                        ? "لم تُحدَّد درجة لون لهذا الطلب - الشريط أعلاه يُبرز الدرجة تلقائياً عند اختيارها من صفحة الحالة."
-                        : "No shade has been set for this order — the strip above highlights the shade automatically once selected from the case page."}
+                        ? "لم تُحدَّد درجة لون لهذا الطلب."
+                        : "No shade has been set for this order."}
                     </p>
                   )}
                 </div>
@@ -567,35 +574,20 @@ export function OrderInvoiceModal({ order, labName, labAddress, labPhone, onClos
                       </tr>
                     </thead>
                     <tbody>
-                      {hasTable ? (
-                        items.map((it) => (
-                          <tr key={it.id} style={{ borderBottom: `1px solid ${C.lightBlue}` }}>
-                            <td className="px-4 py-3 text-sm font-semibold text-slate-800">{it.name}</td>
-                            <td className="px-3 py-3 text-center font-mono text-sm font-bold text-slate-700">
-                              {it.quantity}
-                            </td>
-                            <td className="px-3 py-3 text-center text-xs text-slate-500 whitespace-nowrap">
-                              {fmtAmount(it.unitPrice, it.currency)}
-                            </td>
-                            <td className="px-4 py-3 text-center font-display font-extrabold whitespace-nowrap" style={{ color: C.deepBlue }}>
-                              {fmtRowTotal(it)}
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr style={{ borderBottom: `1px solid ${C.lightBlue}` }}>
-                          <td className="px-4 py-3 text-sm font-semibold text-slate-800">{order.workType}</td>
+                      {items.map((it) => (
+                        <tr key={it.id} style={{ borderBottom: `1px solid ${C.lightBlue}` }}>
+                          <td className="px-4 py-3 text-sm font-semibold text-slate-800">{it.name}</td>
                           <td className="px-3 py-3 text-center font-mono text-sm font-bold text-slate-700">
-                            {order.unitsCount ?? "-"}
+                            {it.quantity}
                           </td>
                           <td className="px-3 py-3 text-center text-xs text-slate-500 whitespace-nowrap">
-                            {fmtAmount(order.unitPrice, order.currency)}
+                            {fmtAmount(it.unitPrice, it.currency)}
                           </td>
                           <td className="px-4 py-3 text-center font-display font-extrabold whitespace-nowrap" style={{ color: C.deepBlue }}>
-                            {fmtAmount(order.price ?? 0, order.currency)}
+                            {fmtRowTotal(it)}
                           </td>
                         </tr>
-                      )}
+                      ))}
                     </tbody>
                   </table>
                 </div>
@@ -636,9 +628,11 @@ export function OrderInvoiceModal({ order, labName, labAddress, labPhone, onClos
               </SectionCard>
 
               {/* Notes */}
-              {order.notes && (
+              {cleanDoctorNotes(order.notes) && (
                 <SectionCard icon={FileText} title={ar ? "ملاحظات" : "Notes"}>
-                  <p className="px-4 py-3 text-sm text-slate-700 whitespace-pre-wrap">{order.notes}</p>
+                  <p className="px-4 py-3 text-sm text-slate-700 whitespace-pre-wrap">
+                    {cleanDoctorNotes(order.notes)}
+                  </p>
                 </SectionCard>
               )}
 

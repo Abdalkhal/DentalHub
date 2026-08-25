@@ -6,7 +6,12 @@ import { IncomingOrderRxModal } from "@/components/IncomingOrderRxModal";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { useOrders, type Order, type OrderStatus } from "@/lib/ordersStore";
-import { useDentistCases, getCaseProgress, getStageLabel } from "@/lib/caseTracking";
+import {
+  useDentistCases,
+  filterLegacyOrders,
+  getCaseProgress,
+  getStageLabel,
+} from "@/lib/caseTracking";
 import { useCaseUnreadCount } from "@/lib/caseMessages";
 import { useSession, useUserRole } from "@/lib/useAuth";
 import {
@@ -94,25 +99,27 @@ function TrackCases() {
   const ar = lang === "ar";
   const { user } = useSession();
   const { role } = useUserRole();
-  const dentistName = role?.accountType === "dentist" ? (role.name || "") : "";
   const localOrders = useOrders();
+  const doctorName =
+    role?.accountType === "dentist"
+      ? [role.name, role.surname].filter(Boolean).join(" ").trim()
+      : "";
   const { cases: remoteCases, loading } = useDentistCases(user?.uid ?? "");
   const [selectedCase, setSelectedCase] = useState<TrackedCase | null>(null);
 
-  const allCases = useMemo(() => {
+  // Filter strictly by the doctor's unique id (Firestore), with a legacy
+  // fallback: cases that lack `dentistId` are matched by doctor name
+  // (case-insensitive + trimmed). Everything is deduplicated by order.id.
+  const allCases = useMemo<TrackedCase[]>(() => {
     const remote: TrackedCase[] = remoteCases.map((c) => ({ labId: c.labId, order: c.order }));
     const remoteIds = new Set(remote.map((r) => r.order.id));
-    const localOnly: TrackedCase[] = localOrders
-      .filter((o) => !remoteIds.has(o.id))
-      .map((o) => ({ labId: "", order: o }));
-    const merged = [...remote, ...localOnly];
-    if (!dentistName) return merged;
-    return merged.filter(
-      (c) =>
-        c.order.doctor.toLowerCase().includes(dentistName.toLowerCase()) ||
-        (c.order.clinic || "").toLowerCase().includes(dentistName.toLowerCase()),
+    const legacy: TrackedCase[] = filterLegacyOrders(localOrders, remoteIds, doctorName).map(
+      (o) => ({ labId: "", order: o }),
     );
-  }, [remoteCases, localOrders, dentistName]);
+    return Array.from(
+      new Map([...remote, ...legacy].map((c) => [c.order.id, c])).values(),
+    );
+  }, [remoteCases, localOrders, doctorName]);
 
   const [filter, setFilter] = useState<string>("all");
 

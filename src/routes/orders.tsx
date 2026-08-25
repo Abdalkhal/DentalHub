@@ -18,12 +18,19 @@ import {
   useOrders,
   connectLabOrders,
   disconnectLabOrders,
-  addOrder,
+  updateOrder,
   buildInternalOrder,
   type Order,
   type OrderStatus,
 } from "@/lib/ordersStore";
-import type { MaterialId, WorkTypeId } from "@/lib/dentalConfig";
+import {
+  MATERIALS,
+  WORK_TYPES as DENTAL_WORK_TYPES,
+  classifyShade,
+  type MaterialId,
+  type WorkTypeId,
+  type ShadeTab,
+} from "@/lib/dentalConfig";
 import { useCaseUnreadCount } from "@/lib/caseMessages";
 import { useCart } from "@/lib/cartStore";
 import {
@@ -90,6 +97,9 @@ function fmtPrice(o: Order, ar: boolean): string {
 
 /* ── Rx → prefill helpers ────────────────────────── */
 
+const VALID_MATERIAL_IDS = new Set<string>(MATERIALS.map((m) => m.id));
+const VALID_WORK_TYPE_IDS = new Set<string>(DENTAL_WORK_TYPES.map((w) => w.id));
+
 function deriveMaterial(order: Order): MaterialId | undefined {
   const source = [order.workType ?? "", ...(order.rxItems ?? [])].join(" ");
   if (/زيركون|زركون|zircon/i.test(source)) return "material.zirconia";
@@ -109,9 +119,7 @@ function deriveWorkType(order: Order): WorkTypeId | undefined {
     counts[t] = (counts[t] ?? 0) + 1;
   });
   const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0];
-  if (top === "crown" || top === "bridge" || top === "veneer" || top === "inlay") {
-    return top;
-  }
+  if (top && VALID_WORK_TYPE_IDS.has(top)) return top as WorkTypeId;
   const source = [order.workType ?? "", ...(order.rxItems ?? [])].join(" ");
   if (/جسر|bridge/i.test(source)) return "bridge";
   if (/فينير|veneer/i.test(source)) return "veneer";
@@ -121,27 +129,38 @@ function deriveWorkType(order: Order): WorkTypeId | undefined {
 }
 
 function buildPrefillFromOrder(order: Order): OrderPrefill {
-  const teeth = order.rxTeeth ?? {};
-  const toothLabels: Record<string, string> = {
-    crown: "تاج",
-    bridge: "جسر",
-    veneer: "فينير",
-    inlay: "حشوة داخلية/خارجية",
-  };
-  const toothNotes = Object.entries(teeth)
-    .sort((a, b) => Number(a[0]) - Number(b[0]))
-    .map(([n, t]) => `${n}: ${toothLabels[t] ?? t}`)
-    .join("، ");
-  const itemNotes = (order.rxItems ?? []).join("، ");
-  const notes = [toothNotes, itemNotes].filter(Boolean).join(" | ");
+  const customShade = (order.rxData?.customShade as string | undefined) || undefined;
+  const shade = order.shade || undefined;
+  const shadeTab: ShadeTab | undefined = customShade
+    ? "others"
+    : shade
+      ? classifyShade(shade)
+      : undefined;
+
+  // Prefer the doctor's explicit material / work type (sent cleanly in the
+  // Rx payload) over the fuzzy fallback, so confirmation selects them exactly.
+  const rawMaterial = (order.rxData?.primaryMaterial as string | undefined) ?? order.material;
+  const material =
+    rawMaterial && VALID_MATERIAL_IDS.has(rawMaterial)
+      ? (rawMaterial as MaterialId)
+      : deriveMaterial(order);
+
+  const rawWorkType = order.rxData?.primaryWorkType as string | undefined;
+  const workType =
+    rawWorkType && VALID_WORK_TYPE_IDS.has(rawWorkType)
+      ? (rawWorkType as WorkTypeId)
+      : deriveWorkType(order);
+
   return {
     patientName: order.patient,
     doctorName: order.doctor,
     clinicName: order.clinic,
-    material: deriveMaterial(order),
-    workType: deriveWorkType(order),
-    shade: order.shade,
-    notes,
+    material,
+    workType,
+    shade,
+    shadeTab,
+    customShade,
+    notes: order.notes || "",
   };
 }
 
@@ -214,13 +233,15 @@ function LabOrders() {
 
   const handleConfirmSubmit = (o: CombinedLabOrder) => {
     if (!confirmTarget) return;
-    addOrder({
-      ...buildInternalOrder(o, "in_progress"),
+    // Update the existing incoming case in place instead of creating a
+    // duplicate order document, so the doctor's tracking shows one case.
+    updateOrder(confirmTarget.id, {
+      ...buildInternalOrder(o, "in_progress", confirmTarget),
+      source: "internal",
       rxTeeth: confirmTarget.rxTeeth,
       rxItems: confirmTarget.rxItems,
       rxData: confirmTarget.rxData,
     });
-    updateOrderStatus(confirmTarget.id, "in_progress");
     setConfirmTarget(null);
     setShowNewOrder(false);
     toast.success(
@@ -355,13 +376,15 @@ function LabOrders() {
                       <Eye className="size-3.5" />
                       {t("view")}
                     </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setConfirmTarget(o); setShowNewOrder(true); }}
-                      className="flex-1 h-9 rounded-xl bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-90 transition"
-                    >
-                      <Check className="size-3.5" />
-                      {ar ? "تأكيد" : "Confirm"}
-                    </button>
+                    {(o.status === "new" || (o.status as string) === "pending") && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setConfirmTarget(o); setShowNewOrder(true); }}
+                        className="flex-1 h-9 rounded-xl bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-90 transition"
+                      >
+                        <Check className="size-3.5" />
+                        {ar ? "تأكيد" : "Confirm"}
+                      </button>
+                    )}
                     <button
                       onClick={(e) => { e.stopPropagation(); setDeleteTarget(o); }}
                       className="size-9 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center hover:bg-rose-100 transition shrink-0"
