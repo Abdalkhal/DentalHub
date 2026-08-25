@@ -7,6 +7,9 @@ export type OrderLine = {
   quantity: number;
   unitPrice: number;
   currency: "USD" | "IQD";
+  price?: number;
+  totalPrice?: number;
+  total?: number;
 };
 
 const WORK_TYPE_BY_ID: Record<string, string> = Object.fromEntries(
@@ -15,12 +18,31 @@ const WORK_TYPE_BY_ID: Record<string, string> = Object.fromEntries(
 
 const USD_RATE = 1480;
 
+/**
+ * Resolves the final invoice amount, checking every possible price field.
+ * The referring dentist reads the (financial-stripped) case document, so the
+ * total can live under any of these keys depending on when the order was written.
+ */
+export function resolveOrderTotal(order: Order): number {
+  const firstItemPrice =
+    order.items && order.items.length ? Number(order.items[0]?.price) || 0 : 0;
+  return (
+    Number(order.totalAmount) ||
+    Number(order.totalPrice) ||
+    Number(order.price) ||
+    Number(order.total) ||
+    firstItemPrice ||
+    0
+  );
+}
+
 function fallbackUnitPrice(order: Order): number {
   if (Number(order.unitPrice) > 0) {
     return order.currency === "USD" ? Number(order.unitPrice) / USD_RATE : Number(order.unitPrice);
   }
-  if (order.price && order.unitsCount) {
-    return Number(order.price) / (Number(order.unitsCount) || 1);
+  const total = resolveOrderTotal(order);
+  if (total && order.unitsCount) {
+    return total / (Number(order.unitsCount) || 1);
   }
   return 0;
 }
@@ -31,8 +53,15 @@ function toLine(
   quantity: number,
   unitPrice: number,
   currency: "USD" | "IQD",
+  price?: number,
+  totalPrice?: number,
+  total?: number,
 ): OrderLine {
-  return { id, name, quantity, unitPrice, currency };
+  const line: OrderLine = { id, name, quantity, unitPrice, currency };
+  if (price !== undefined) line.price = price;
+  if (totalPrice !== undefined) line.totalPrice = totalPrice;
+  if (total !== undefined) line.total = total;
+  return line;
 }
 
 /**
@@ -47,7 +76,16 @@ export function deriveOrderLines(order: Order): OrderLine[] {
   const priced = (order.pricingItems ?? []).filter((i) => i.name && String(i.name).trim() !== "");
   if (priced.length > 1) {
     return priced.map((i) =>
-      toLine(i.id, String(i.name), Number(i.quantity) || 0, Number(i.unitPrice) || 0, i.currency),
+      toLine(
+        i.id,
+        String(i.name),
+        Number(i.quantity) || 0,
+        Number(i.unitPrice) || 0,
+        i.currency,
+        Number(i.price) || undefined,
+        Number(i.totalPrice) || undefined,
+        Number(i.total) || undefined,
+      ),
     );
   }
 
@@ -83,7 +121,16 @@ export function deriveOrderLines(order: Order): OrderLine[] {
   if (priced.length === 1) {
     const i = priced[0];
     return [
-      toLine(i.id, String(i.name), Number(i.quantity) || 0, Number(i.unitPrice) || 0, i.currency),
+      toLine(
+        i.id,
+        String(i.name),
+        Number(i.quantity) || 0,
+        Number(i.unitPrice) || 0,
+        i.currency,
+        Number(i.price) || undefined,
+        Number(i.totalPrice) || undefined,
+        Number(i.total) || undefined,
+      ),
     ];
   }
 

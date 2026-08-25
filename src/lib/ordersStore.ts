@@ -29,6 +29,9 @@ export type PricingItem = {
   quantity: number;
   unitPrice: number;
   currency: "USD" | "IQD";
+  price?: number;
+  totalPrice?: number;
+  total?: number;
 };
 
 export type Order = {
@@ -50,6 +53,9 @@ export type Order = {
   discount: number;
   price: number;
   totalAmount?: number;
+  totalPrice?: number;
+  total?: number;
+  items?: Array<{ price?: number }>;
   rating?: number;
   notes: string;
   clinic: string;

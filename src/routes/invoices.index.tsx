@@ -7,6 +7,7 @@ import { useI18n } from "@/lib/i18n";
 import { useSession } from "@/lib/useAuth";
 import { useDentistCases, isCompletedStatus } from "@/lib/caseTracking";
 import { useDentistInvoices } from "@/lib/invoices";
+import { resolveOrderTotal } from "@/lib/orderLines";
 import { db } from "@/integrations/firebase/client";
 import { doc, getDoc } from "firebase/firestore";
 import type { UserRoleDoc, InvoiceDoc, InvoiceItem } from "@/integrations/firebase/types";
@@ -30,7 +31,7 @@ export const Route = createFileRoute("/invoices/")({
 type Tab = "all" | "supplies" | "implants" | "labs";
 
 function fmtOrderTotal(order: Order): string {
-  const n = Number(order.totalAmount ?? order.price) || 0;
+  const n = resolveOrderTotal(order);
   if (order.currency === "USD") {
     return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }

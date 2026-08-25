@@ -30,7 +30,7 @@ import {
   VITA_BLEACH_SHADES,
   classifyShade,
 } from "@/lib/dentalConfig";
-import { deriveOrderLines, cleanDoctorNotes } from "@/lib/orderLines";
+import { deriveOrderLines, cleanDoctorNotes, resolveOrderTotal } from "@/lib/orderLines";
 
 type Props = {
   order: Order;
@@ -120,13 +120,28 @@ function fmtNum(n: number): string {
 }
 
 function fmtAmount(n: number, cur?: "USD" | "IQD"): string {
-  if (cur === "IQD") return `${fmtNum(Math.round(n || 0))} د.ع`;
-  return `$${(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const value = Number(n) || 0;
+  if (cur === "USD") {
+    return `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+  return `${fmtNum(Math.round(value))} د.ع`;
 }
 
-function fmtRowTotal(it: PricingItem): string {
-  const total = (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0);
-  return it.currency === "IQD" ? `${fmtNum(Math.round(total))} د.ع` : `$${total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function itemUnitPrice(it: PricingItem, fallbackTotal: number): number {
+  return Number(it.unitPrice) || Number(it.price) || fallbackTotal || 0;
+}
+
+function itemRowTotal(it: PricingItem, fallbackTotal: number): number {
+  const unitPrice = itemUnitPrice(it, fallbackTotal);
+  return Number(it.totalPrice) || Number(it.total) || unitPrice * (Number(it.quantity) || 1);
+}
+
+function fmtRowTotal(it: PricingItem, fallbackTotal: number): string {
+  const total = itemRowTotal(it, fallbackTotal);
+  if (it.currency === "USD") {
+    return `$${total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+  return `${fmtNum(Math.round(total))} د.ع`;
 }
 
 function formatInvoiceDate(dateStr: string, lang: "ar" | "en"): string {
@@ -220,21 +235,24 @@ export function OrderInvoiceModal({ order, labName, labAddress, labPhone, onClos
 
   const items = useMemo(() => deriveOrderLines(order), [order]);
 
+  const finalAmount = resolveOrderTotal(order);
+  const orderCurrency: "USD" | "IQD" = order.currency === "USD" ? "USD" : "IQD";
+
   const totalUnits = items.reduce((s, i) => s + (Number(i.quantity) || 0), 0);
 
   const usdTotal = items
     .filter((i) => i.currency !== "IQD")
-    .reduce((s, i) => s + (Number(i.quantity) || 0) * (Number(i.unitPrice) || 0), 0);
+    .reduce((s, i) => s + itemRowTotal(i, finalAmount), 0);
 
-  const grandTotalLabel = fmtAmount(order.price ?? 0, order.currency);
-  const showUsdSecondary = order.currency !== "USD" && usdTotal > 0;
+  const grandTotalLabel = fmtAmount(finalAmount, orderCurrency);
+  const showUsdSecondary = orderCurrency !== "USD" && usdTotal > 0;
 
   const handlePrint = () => {
     window.print();
   };
 
   const handleShare = async () => {
-    const lines = items.map((i) => `• ${i.name} ×${i.quantity} — ${fmtRowTotal(i)}`);
+    const lines = items.map((i) => `• ${i.name} ×${i.quantity} — ${fmtRowTotal(i, finalAmount)}`);
 
     const extra: string[] = [];
     if (order.shade) extra.push(ar ? `درجة اللون: ${order.shade}` : `Shade: ${order.shade}`);
@@ -581,10 +599,10 @@ export function OrderInvoiceModal({ order, labName, labAddress, labPhone, onClos
                             {it.quantity}
                           </td>
                           <td className="px-3 py-3 text-center text-xs text-slate-500 whitespace-nowrap">
-                            {fmtAmount(it.unitPrice, it.currency)}
+                            {fmtAmount(itemUnitPrice(it, finalAmount), it.currency)}
                           </td>
                           <td className="px-4 py-3 text-center font-display font-extrabold whitespace-nowrap" style={{ color: C.deepBlue }}>
-                            {fmtRowTotal(it)}
+                            {fmtRowTotal(it, finalAmount)}
                           </td>
                         </tr>
                       ))}
