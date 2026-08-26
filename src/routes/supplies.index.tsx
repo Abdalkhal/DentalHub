@@ -10,6 +10,7 @@ import { RoleGuard } from "@/components/RoleGuard";
 import { BoneGraftModal } from "@/components/BoneGraftModal";
 import { TagInput } from "@/components/TagInput";
 import { NotificationBell } from "@/components/NotificationBell";
+import { BrandAutocomplete } from "@/components/BrandAutocomplete";
 import { CountryCombobox } from "@/components/CountryCombobox";
 import { BarcodeScannerModal } from "@/components/BarcodeScannerModal";
 import {
@@ -21,7 +22,6 @@ import {
 } from "@/components/ui/dialog";
 import { CITIES } from "@/data/offices";
 import { subcategoriesOf } from "@/data/subcategories";
-import { BRANDS } from "@/data/brands";
 import { ALL_COUNTRIES, countryCodeToFlag } from "@/data/countries";
 import {
   SPEC_FIELDS,
@@ -158,6 +158,14 @@ function formatPriceInput(raw: string): string {
 
 function parsePriceInput(raw: string): number {
   return Number(raw.replace(/,/g, "")) || 0;
+}
+
+function formatQtyInput(raw: string): string {
+  const cleaned = raw.replace(/[^\d]/g, "");
+  if (!cleaned) return "";
+  let int = cleaned.replace(/^0+(?=\d)/, "");
+  if (!int) int = "0";
+  return int.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
 type TierRow = {
@@ -354,7 +362,7 @@ function ProductsPanel() {
   }, [allProducts, branchFilter, subFilter]);
 
   const branchOptions = [
-    { value: "general", ar: "مواد عامة", en: "General" },
+    { value: "general", ar: "مواد عامة واستهلاكية", en: "General & Consumables" },
     { value: "operative", ar: "معالجة الأسنان", en: "Operative" },
     { value: "endodontic", ar: "علاج الجذور", en: "Endodontics" },
     { value: "prosthodontic", ar: "التركيبات", en: "Prosthodontics" },
@@ -381,7 +389,6 @@ function ProductsPanel() {
   const [editing, setEditing] = useState<Product | null>(null);
   const [nameEn, setNameEn] = useState("");
   const [brand, setBrand] = useState("");
-  const [brandMode, setBrandMode] = useState<"list" | "custom">("list");
   const [price, setPrice] = useState("");
   const [purchasePrice, setPurchasePrice] = useState("");
   const [currency, setCurrency] = useState<Currency>("USD");
@@ -391,7 +398,7 @@ function ProductsPanel() {
   const [origin, setOrigin] = useState("");
   const [barcode, setBarcode] = useState("");
   const [showScanner, setShowScanner] = useState(false);
-  const [volume, setVolume] = useState("");
+  const [expiryDate, setExpiryDate] = useState("");
   const [specs, setSpecs] = useState<ProductSpecs>({});
   const [techSpecs, setTechSpecs] = useState<ProductSpecs>({});
   const [tiers, setTiers] = useState<TierRow[]>([]);
@@ -406,15 +413,6 @@ function ProductsPanel() {
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
-
-  const brandOptions = useMemo(() => {
-    const set = new Set<string>();
-    BRANDS.forEach((b) => {
-      if (b.name) set.add(b.name);
-      if (b.ar && b.ar.trim() && b.ar !== b.name) set.add(b.ar.trim());
-    });
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, []);
 
   const subCategoryAr = subcategoriesOf(branch).find((s) => s.en === subCategory)?.ar ?? "";
   const isTechBranch =
@@ -653,7 +651,6 @@ function ProductsPanel() {
     setEditing(null);
     setNameEn("");
     setBrand("");
-    setBrandMode("list");
     setPrice("");
     setPurchasePrice("");
     setCurrency("USD");
@@ -662,7 +659,7 @@ function ProductsPanel() {
     setSubCategory("");
     setOrigin("");
     setBarcode("");
-    setVolume("");
+    setExpiryDate("");
     setSpecs({});
     setTechSpecs({});
     setTiers([]);
@@ -677,7 +674,6 @@ function ProductsPanel() {
     setEditing(p);
     setNameEn(p.en || p.ar);
     setBrand(p.brand);
-    setBrandMode(brandOptions.includes(p.brand) ? "list" : "custom");
     setPrice(formatPriceInput(String(p.price ?? "")));
     setPurchasePrice(p.purchasePrice ? formatPriceInput(String(p.purchasePrice)) : "");
     setCurrency(p.currency || "USD");
@@ -686,7 +682,7 @@ function ProductsPanel() {
     setSubCategory(p.subCategory ?? "");
     setOrigin(p.country || "");
     setBarcode(p.barcode || "");
-    setVolume(p.volume || "");
+    setExpiryDate(p.expiryDate || "");
     setSpecs(p.specs ? { ...p.specs } : {});
     setTechSpecs(p.technicalSpecifications ? { ...p.technicalSpecifications } : {});
     setTiers(
@@ -808,10 +804,10 @@ function ProductsPanel() {
       const cleanTiers = tiers
         .filter((t) => t.fromQty.trim())
         .map((t) => ({
-          fromQty: Math.max(1, parseInt(t.fromQty) || 0),
-          toQty: Math.max(0, parseInt(t.toQty) || 0),
-          price: Math.max(0, parseFloat(t.price) || 0),
-          discountPct: Math.max(0, Math.min(100, parseFloat(t.discountPct) || 0)),
+          fromQty: Math.max(1, parseInt(t.fromQty.replace(/,/g, "")) || 0),
+          toQty: Math.max(0, parseInt(t.toQty.replace(/,/g, "")) || 0),
+          price: Math.max(0, parseFloat(t.price.replace(/,/g, "")) || 0),
+          discountPct: Math.max(0, Math.min(100, parseFloat(t.discountPct.replace(/,/g, "")) || 0)),
         }));
 
       const originCountry = ALL_COUNTRIES.find((c) => c.code === origin);
@@ -847,14 +843,14 @@ function ProductsPanel() {
         price: parsePriceInput(price),
         purchasePrice: parsePriceInput(purchasePrice) || undefined,
         currency,
-        stock: Number(stock) || 0,
-        inStock: Number(stock) > 0,
+        stock: Number(stock.replace(/,/g, "")) || 0,
+        inStock: Number(stock.replace(/,/g, "")) > 0,
         images: allImages,
         companyId: editing?.companyId || auth.currentUser?.uid || "",
         country: origin || undefined,
         countryOrigin,
         barcode: barcode.trim() || undefined,
-        volume: volume.trim() || undefined,
+        expiryDate: expiryDate || undefined,
         specs: Object.keys(cleanSpecs).length > 0 ? cleanSpecs : undefined,
         technicalSpecifications:
           Object.keys(cleanTech).length > 0 ? cleanTech : undefined,
@@ -986,38 +982,76 @@ function ProductsPanel() {
                 </div>
                 <div>
                   <label className={labelCls}>{ar ? "الماركة" : "Brand"}</label>
-                  <div className="relative">
-                    <select
-                      value={brandMode === "list" && brandOptions.includes(brand) ? brand : "custom"}
-                      onChange={(e) => {
-                        if (e.target.value === "custom") {
-                          setBrandMode("custom");
-                        } else {
-                          setBrand(e.target.value);
-                          setBrandMode("list");
-                        }
-                      }}
-                      className={cn(inputCls, "appearance-none pe-9")}
+                  <BrandAutocomplete
+                    value={brand}
+                    onChange={setBrand}
+                    placeholder={ar ? "اكتب لاقتراح الماركات..." : "Type to suggest brands..."}
+                    className={inputCls}
+                  />
+                </div>
+              </section>
+
+              {/* Product Images */}
+              <section className={cardCls}>
+                <p className={sectionTitleCls}>
+                  <span className="size-1.5 rounded-full bg-emerald-500" />
+                  {ar ? "صور المنتج" : "Product Images"}
+                </p>
+                <div className="flex gap-2.5 overflow-x-auto pb-1 -mx-1 px-1">
+                  {editing &&
+                    editing.images.map((path) => (
+                      <div
+                        key={path}
+                        className="relative size-20 shrink-0 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden"
+                      >
+                        {editUrlMap[path] ? (
+                          <img src={editUrlMap[path]} alt="" className="size-full object-cover" />
+                        ) : (
+                          <div className="size-full flex items-center justify-center">
+                            <Package className="size-5 text-slate-300" />
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => removeExistingImage(path)}
+                          className="absolute top-1 end-1 size-5 rounded-full bg-black/60 text-white flex items-center justify-center"
+                        >
+                          <Trash2 className="size-3" />
+                        </button>
+                      </div>
+                    ))}
+                  {imagePreviews.map((url, i) => (
+                    <div
+                      key={url}
+                      className="relative size-20 shrink-0 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden"
                     >
-                      <option value="">{ar ? "-- اختر الماركة --" : "-- Select brand --"}</option>
-                      {brandOptions.map((b) => (
-                        <option key={b} value={b}>
-                          {b}
-                        </option>
-                      ))}
-                      <option value="custom">{ar ? "أخرى (إدخال يدوي)" : "Other (manual entry)"}</option>
-                    </select>
-                    <ChevronDown className="absolute end-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400 pointer-events-none" />
-                  </div>
-                  {brandMode === "custom" && (
-                    <input
-                      value={brand}
-                      onChange={(e) => setBrand(e.target.value)}
-                      placeholder={ar ? "اكتب اسم الماركة" : "Type brand name"}
-                      className={cn(inputCls, "mt-2")}
-                    />
+                      <img src={url} alt="" className="size-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => removePreview(i)}
+                        className="absolute top-1 end-1 size-5 rounded-full bg-black/60 text-white flex items-center justify-center"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </div>
+                  ))}
+                  {imageFiles.length + (editing?.images.length ?? 0) < MAX_PRODUCT_IMAGES && (
+                    <label className="shrink-0 size-20 rounded-2xl border-2 border-dashed border-slate-300 bg-white/70 flex flex-col items-center justify-center gap-0.5 cursor-pointer hover:border-emerald-400 hover:text-emerald-500 transition text-slate-400">
+                      <Plus className="size-5" />
+                      <span className="text-[9px] font-bold">{ar ? "إضافة" : "Add"}</span>
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        multiple
+                        className="hidden"
+                        onChange={(e) => handleFiles(e.target.files)}
+                      />
+                    </label>
                   )}
                 </div>
+                <p className="text-[10px] text-slate-400">
+                  {imageFiles.length}/{MAX_PRODUCT_IMAGES} · JPG, PNG
+                </p>
               </section>
 
               {/* Category */}
@@ -1140,69 +1174,6 @@ function ProductsPanel() {
                 </div>
               </section>
 
-              {/* Product Images */}
-              <section className={cardCls}>
-                <p className={sectionTitleCls}>
-                  <span className="size-1.5 rounded-full bg-emerald-500" />
-                  {ar ? "صور المنتج" : "Product Images"}
-                </p>
-                <div className="flex gap-2.5 overflow-x-auto pb-1 -mx-1 px-1">
-                  {editing &&
-                    editing.images.map((path) => (
-                      <div
-                        key={path}
-                        className="relative size-20 shrink-0 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden"
-                      >
-                        {editUrlMap[path] ? (
-                          <img src={editUrlMap[path]} alt="" className="size-full object-cover" />
-                        ) : (
-                          <div className="size-full flex items-center justify-center">
-                            <Package className="size-5 text-slate-300" />
-                          </div>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => removeExistingImage(path)}
-                          className="absolute top-1 end-1 size-5 rounded-full bg-black/60 text-white flex items-center justify-center"
-                        >
-                          <Trash2 className="size-3" />
-                        </button>
-                      </div>
-                    ))}
-                  {imagePreviews.map((url, i) => (
-                    <div
-                      key={url}
-                      className="relative size-20 shrink-0 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden"
-                    >
-                      <img src={url} alt="" className="size-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => removePreview(i)}
-                        className="absolute top-1 end-1 size-5 rounded-full bg-black/60 text-white flex items-center justify-center"
-                      >
-                        <X className="size-3" />
-                      </button>
-                    </div>
-                  ))}
-                  {imageFiles.length + (editing?.images.length ?? 0) < MAX_PRODUCT_IMAGES && (
-                    <label className="shrink-0 size-20 rounded-2xl border-2 border-dashed border-slate-300 bg-white/70 flex flex-col items-center justify-center gap-0.5 cursor-pointer hover:border-emerald-400 hover:text-emerald-500 transition text-slate-400">
-                      <Plus className="size-5" />
-                      <span className="text-[9px] font-bold">{ar ? "إضافة" : "Add"}</span>
-                      <input
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp"
-                        multiple
-                        className="hidden"
-                        onChange={(e) => handleFiles(e.target.files)}
-                      />
-                    </label>
-                  )}
-                </div>
-                <p className="text-[10px] text-slate-400">
-                  {imageFiles.length}/{MAX_PRODUCT_IMAGES} · JPG, PNG
-                </p>
-              </section>
-
               {/* Dynamic Technical Specs */}
               {isStrictBranch ? (
                 visibleStrictIds.length > 0 && (
@@ -1307,13 +1278,16 @@ function ProductsPanel() {
                   </div>
                 </div>
                 <div>
-                  <label className={labelCls}>{ar ? "الحجم / المقاس" : "Size / Volume"}</label>
-                  <input
-                    value={volume}
-                    onChange={(e) => setVolume(e.target.value)}
-                    placeholder={ar ? "مثال: 5 مل / 4 غم" : "e.g. 5ml / 4g"}
-                    className={inputCls}
-                  />
+                  <label className={labelCls}>{ar ? "تاريخ انتهاء الصلاحية" : "Expiry Date"}</label>
+                  <div className="relative">
+                    <Calendar className="absolute start-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400 pointer-events-none" />
+                    <input
+                      type="date"
+                      value={expiryDate}
+                      onChange={(e) => setExpiryDate(e.target.value)}
+                      className={cn(inputCls, "ps-10")}
+                    />
+                  </div>
                 </div>
                 <div>
                   <label className={labelCls}>{ar ? "المخزون الحالي" : "Current stock"}</label>
@@ -1326,13 +1300,14 @@ function ProductsPanel() {
                       <Minus className="size-4" />
                     </button>
                     <input
-                      type="number"
-                      value={stock}
-                      onChange={(e) => setStock(e.target.value)}
+                      type="text"
+                      inputMode="numeric"
+                      value={formatQtyInput(stock)}
+                      onChange={(e) => setStock(e.target.value.replace(/,/g, ""))}
                       onFocus={(e) => e.target.select()}
                       placeholder="0"
                       dir="ltr"
-                      className="w-full bg-transparent text-center font-display font-extrabold text-xl text-slate-900 outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                      className="w-full bg-transparent text-center font-display font-extrabold text-xl text-slate-900 outline-none"
                     />
                     <button
                       type="button"
@@ -1397,16 +1372,16 @@ function ProductsPanel() {
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                           <input
-                            value={t.fromQty}
-                            onChange={(e) => updateTier(t.key, "fromQty", e.target.value)}
+                            value={formatQtyInput(t.fromQty)}
+                            onChange={(e) => updateTier(t.key, "fromQty", e.target.value.replace(/,/g, ""))}
                             inputMode="numeric"
                             placeholder={ar ? "من كمية" : "From qty"}
                             dir="ltr"
                             className={cn(inputCls, "h-10 text-xs")}
                           />
                           <input
-                            value={t.toQty}
-                            onChange={(e) => updateTier(t.key, "toQty", e.target.value)}
+                            value={formatQtyInput(t.toQty)}
+                            onChange={(e) => updateTier(t.key, "toQty", e.target.value.replace(/,/g, ""))}
                             inputMode="numeric"
                             placeholder={ar ? "إلى كمية" : "To qty"}
                             dir="ltr"
@@ -1415,8 +1390,8 @@ function ProductsPanel() {
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                           <input
-                            value={t.price}
-                            onChange={(e) => updateTier(t.key, "price", e.target.value)}
+                            value={formatPriceInput(t.price)}
+                            onChange={(e) => updateTier(t.key, "price", e.target.value.replace(/,/g, ""))}
                             inputMode="decimal"
                             placeholder={ar ? "سعر الدرجة" : "Tier price"}
                             dir="ltr"

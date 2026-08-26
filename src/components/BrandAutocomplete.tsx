@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { Check } from "lucide-react";
 import { BRANDS } from "@/data/brands";
+import { cn } from "@/lib/utils";
 
 const BRAND_SUGGESTIONS = [
   ...new Set(BRANDS.flatMap((b) => [b.name, b.ar].filter((x) => x && x.trim()))),
@@ -10,9 +11,10 @@ type Props = {
   value: string;
   onChange: (brand: string) => void;
   placeholder?: string;
+  className?: string;
 };
 
-export function BrandAutocomplete({ value, onChange, placeholder }: Props) {
+export function BrandAutocomplete({ value, onChange, placeholder, className }: Props) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -48,7 +50,10 @@ export function BrandAutocomplete({ value, onChange, placeholder }: Props) {
         onFocus={() => setOpen(true)}
         placeholder={placeholder ?? "e.g. 3M"}
         autoComplete="off"
-        className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
+        className={cn(
+          "w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition",
+          className,
+        )}
       />
       {open && filtered.length > 0 && (
         <ul className="absolute z-30 top-full start-0 end-0 mt-1 max-h-60 overflow-y-auto bg-white rounded-xl border border-slate-200 shadow-xl py-1">

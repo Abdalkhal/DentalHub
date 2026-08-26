@@ -105,6 +105,7 @@ export type Product = {
   specs?: ProductSpecs;
   technicalSpecifications?: ProductSpecs;
   sku?: string;
+  expiryDate?: string;
 };
 
 const fromDoc = (id: string, data: Record<string, unknown>): Product => {
@@ -159,6 +160,7 @@ const fromDoc = (id: string, data: Record<string, unknown>): Product => {
     specs: (data.specs as ProductSpecs | null) ?? undefined,
     technicalSpecifications: (data.technicalSpecifications as ProductSpecs | null) ?? undefined,
     sku: (data.sku as string) ?? undefined,
+    expiryDate: (data.expiryDate as string) ?? undefined,
   };
 };
 
@@ -245,6 +247,7 @@ export function useUpsertProduct() {
           specs: cleanSpecs,
           technicalSpecifications: cleanTechnicalSpecs,
           sku: p.sku ?? null,
+          expiryDate: p.expiryDate ?? null,
         },
         { merge: true },
       );
