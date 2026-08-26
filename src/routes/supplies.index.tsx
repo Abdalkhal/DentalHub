@@ -399,6 +399,7 @@ function ProductsPanel() {
   const [barcode, setBarcode] = useState("");
   const [showScanner, setShowScanner] = useState(false);
   const [expiryDate, setExpiryDate] = useState("");
+  const [description, setDescription] = useState("");
   const [specs, setSpecs] = useState<ProductSpecs>({});
   const [techSpecs, setTechSpecs] = useState<ProductSpecs>({});
   const [tiers, setTiers] = useState<TierRow[]>([]);
@@ -506,6 +507,15 @@ function ProductsPanel() {
     setSpecs({});
     setTechSpecs({});
   };
+
+  const MAX_DESC_WORDS = 200;
+  const handleDescription = (value: string) => {
+    const words = value.trim() ? value.trim().split(/\s+/) : [];
+    setDescription(
+      words.length > MAX_DESC_WORDS ? words.slice(0, MAX_DESC_WORDS).join(" ") : value,
+    );
+  };
+  const descWords = description.trim() ? description.trim().split(/\s+/).length : 0;
 
   const visibleSpecIds = (ids: SpecFieldId[], bag: ProductSpecs): SpecFieldId[] =>
     ids.filter((fid) => {
@@ -660,6 +670,7 @@ function ProductsPanel() {
     setOrigin("");
     setBarcode("");
     setExpiryDate("");
+    setDescription("");
     setSpecs({});
     setTechSpecs({});
     setTiers([]);
@@ -683,6 +694,7 @@ function ProductsPanel() {
     setOrigin(p.country || "");
     setBarcode(p.barcode || "");
     setExpiryDate(p.expiryDate || "");
+    setDescription(p.description || "");
     setSpecs(p.specs ? { ...p.specs } : {});
     setTechSpecs(p.technicalSpecifications ? { ...p.technicalSpecifications } : {});
     setTiers(
@@ -851,6 +863,7 @@ function ProductsPanel() {
         countryOrigin,
         barcode: barcode.trim() || undefined,
         expiryDate: expiryDate || undefined,
+        description: description.trim() || undefined,
         specs: Object.keys(cleanSpecs).length > 0 ? cleanSpecs : undefined,
         technicalSpecifications:
           Object.keys(cleanTech).length > 0 ? cleanTech : undefined,
@@ -1051,6 +1064,28 @@ function ProductsPanel() {
                 </div>
                 <p className="text-[10px] text-slate-400">
                   {imageFiles.length}/{MAX_PRODUCT_IMAGES} · JPG, PNG
+                </p>
+              </section>
+
+              {/* Product Description */}
+              <section className={cardCls}>
+                <p className={sectionTitleCls}>
+                  <span className="size-1.5 rounded-full bg-emerald-500" />
+                  {ar ? "وصف المنتج" : "Product Description"}
+                </p>
+                <textarea
+                  value={description}
+                  onChange={(e) => handleDescription(e.target.value)}
+                  rows={4}
+                  placeholder={
+                    ar
+                      ? "اكتب وصفاً للمنتج (200 كلمة كحد أقصى)..."
+                      : "Describe the product (200 words max)..."
+                  }
+                  className={cn(inputCls, "h-auto py-3 resize-none")}
+                />
+                <p className="text-[10px] font-semibold text-slate-400 text-end">
+                  {ar ? `${descWords}/200 كلمة` : `${descWords}/200 words`}
                 </p>
               </section>
 
