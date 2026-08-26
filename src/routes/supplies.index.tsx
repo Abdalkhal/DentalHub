@@ -13,6 +13,7 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { BrandAutocomplete } from "@/components/BrandAutocomplete";
 import { CountryCombobox } from "@/components/CountryCombobox";
 import { BarcodeScannerModal } from "@/components/BarcodeScannerModal";
+import { ProductDetailsModal } from "@/components/ProductDetailsModal";
 import {
   Dialog,
   DialogContent,
@@ -386,6 +387,7 @@ function ProductsPanel() {
 
   const [showForm, setShowForm] = useState(false);
   const [showBoneGraft, setShowBoneGraft] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [editing, setEditing] = useState<Product | null>(null);
   const [nameEn, setNameEn] = useState("");
   const [brand, setBrand] = useState("");
@@ -890,31 +892,6 @@ function ProductsPanel() {
     const val = isIQD ? Number(p.price).toLocaleString() : p.price.toFixed(2);
     const sym = isIQD ? "د.ع" : "$";
     return isIQD ? `${val} ${sym}` : `${sym}${val}`;
-  };
-
-  const originLabel = (p: Product): string | null => {
-    if (p.countryOrigin) return p.countryOrigin;
-    if (p.country) {
-      const c = ALL_COUNTRIES.find((x) => x.code === p.country);
-      if (c) return `${countryCodeToFlag(c.code)} ${c.ar}`;
-    }
-    return null;
-  };
-
-  const specChips = (p: Product): string[] => {
-    const out: string[] = [];
-    const bags = [p.specs ?? {}, p.technicalSpecifications ?? {}];
-    bags.forEach((bag) => {
-      (Object.entries(bag) as [SpecFieldId, string | string[]][]).forEach(([id, v]) => {
-        if (Array.isArray(v)) {
-          if (v.length > 0) out.push(v.join(" · "));
-        } else if (typeof v === "string" && v) {
-          const opt = SPEC_FIELDS[id]?.options?.find((o) => o.value === v);
-          out.push(opt?.ar ?? v);
-        }
-      });
-    });
-    return out.slice(0, 2);
   };
 
   const allImagePaths = myProducts.flatMap((p) => p.images);
@@ -1622,7 +1599,8 @@ function ProductsPanel() {
             return (
               <div
                 key={p.id}
-                className="bg-card border border-border rounded-2xl p-3 shadow-soft hover:shadow-card transition relative overflow-hidden group"
+                onClick={() => setSelectedProduct(p)}
+                className="bg-card border border-border rounded-2xl p-3 shadow-soft hover:shadow-card transition relative overflow-hidden group cursor-pointer"
               >
                 {/* Out badge */}
                 {isOut && (
@@ -1633,54 +1611,19 @@ function ProductsPanel() {
 
                 {/* Image or icon */}
                 {p.images.length > 0 && imageUrlMap[p.images[0]] ? (
-                  <div className="w-full h-36 rounded-xl bg-slate-100 overflow-hidden mb-2.5">
-                    <img src={imageUrlMap[p.images[0]]} alt="" className="size-full object-contain" />
+                  <div className="w-full h-32 rounded-xl bg-slate-100 overflow-hidden mb-2.5">
+                    <img src={imageUrlMap[p.images[0]]} alt="" className="size-full object-cover" />
                   </div>
                 ) : (
-                  <div className="w-full h-36 rounded-xl bg-slate-100 flex items-center justify-center mb-2.5">
-                    <Package className="size-10 text-slate-300" />
+                  <div className="w-full h-32 rounded-xl bg-slate-100 flex items-center justify-center mb-2.5">
+                    <Package className="size-9 text-slate-300" />
                   </div>
                 )}
 
                 {/* Product name */}
-                <p className="font-display font-bold text-sm leading-snug line-clamp-2">
+                <p className="font-display font-bold text-sm leading-snug line-clamp-2 min-h-[2.25rem]">
                   {ar ? p.ar || p.en : p.en || p.ar}
                 </p>
-
-                {/* Brand */}
-                {p.brand && (
-                  <p className="text-[11px] text-muted-foreground mt-1 truncate">{p.brand}</p>
-                )}
-
-                {/* Country of origin */}
-                {originLabel(p) && (
-                  <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded-full px-2 py-0.5">
-                    {originLabel(p)}
-                  </span>
-                )}
-
-                {/* Spec chips */}
-                {specChips(p).length > 0 && (
-                  <span className="block mt-1.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-full px-2 py-0.5 truncate">
-                    {specChips(p).join(" · ")}
-                  </span>
-                )}
-
-                {/* SKU */}
-                {p.sku && (
-                  <p className="mt-1.5 text-[9px] font-mono font-semibold text-slate-400 truncate" dir="ltr">
-                    {p.sku}
-                  </p>
-                )}
-
-                {/* Sub-category */}
-                {p.subCategory && (
-                  <span className="inline-block mt-1.5 text-[10px] font-bold bg-sky-50 text-sky-700 rounded-full px-2 py-0.5">
-                    {ar
-                      ? subcategoriesOf(p.branch).find((s) => s.en === p.subCategory)?.ar ?? p.subCategory
-                      : p.subCategory}
-                  </span>
-                )}
 
                 {/* Price */}
                 <p className="mt-1.5 font-display font-extrabold text-base text-primary">
@@ -1688,7 +1631,7 @@ function ProductsPanel() {
                 </p>
 
                 {/* Stock */}
-                <div className="flex items-center gap-1.5 mt-1.5">
+                <div className="flex items-center gap-1.5 mt-1">
                   <Layers className="size-3 text-slate-400" />
                   <span className={cn("text-[11px] font-semibold", isOut ? "text-rose-500" : "text-emerald-600")}>
                     {ar ? "المخزون:" : "Stock:"} {p.stock ?? 0}
@@ -1696,7 +1639,10 @@ function ProductsPanel() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-1.5 mt-2.5 pt-2.5 border-t border-border">
+                <div
+                  className="flex gap-1.5 mt-2.5 pt-2.5 border-t border-border"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <button
                     onClick={() => openEdit(p)}
                     className="flex-1 h-8 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-sky-100 hover:text-sky-600 flex items-center justify-center gap-1 transition"
@@ -1764,6 +1710,12 @@ function ProductsPanel() {
         </div>
       )}
       {showBoneGraft && <BoneGraftModal onClose={() => setShowBoneGraft(false)} />}
+      {selectedProduct && (
+        <ProductDetailsModal
+          product={selectedProduct}
+          onClose={() => setSelectedProduct(null)}
+        />
+      )}
       {showScanner && (
         <BarcodeScannerModal
           onScan={(code) => {
