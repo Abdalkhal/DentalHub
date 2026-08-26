@@ -10,7 +10,8 @@ import { RoleGuard } from "@/components/RoleGuard";
 import { BoneGraftModal } from "@/components/BoneGraftModal";
 import { TagInput } from "@/components/TagInput";
 import { NotificationBell } from "@/components/NotificationBell";
-import { BrandAutocomplete } from "@/components/BrandAutocomplete";
+import { CountryCombobox } from "@/components/CountryCombobox";
+import { BarcodeScannerModal } from "@/components/BarcodeScannerModal";
 import {
   Dialog,
   DialogContent,
@@ -20,6 +21,9 @@ import {
 } from "@/components/ui/dialog";
 import { CITIES } from "@/data/offices";
 import { subcategoriesOf } from "@/data/subcategories";
+import { BRANDS } from "@/data/brands";
+import { ALL_COUNTRIES, countryCodeToFlag } from "@/data/countries";
+import { VITA_SHADES, VITA_3D_SHADES, VITA_BLEACH_SHADES, type ShadeTab } from "@/lib/dentalConfig";
 import { useAdminStore } from "@/lib/adminStore";
 import {
   useProducts,
@@ -77,6 +81,10 @@ import {
   Shirt,
   Settings,
   FlaskConical,
+  Minus,
+  Percent,
+  ScanBarcode,
+  Tag,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Currency } from "@/lib/products";
@@ -141,6 +149,18 @@ function formatPriceInput(raw: string): string {
 
 function parsePriceInput(raw: string): number {
   return Number(raw.replace(/,/g, "")) || 0;
+}
+
+type TierRow = {
+  key: string;
+  fromQty: string;
+  toQty: string;
+  price: string;
+  discountPct: string;
+};
+
+function emptyTier(): TierRow {
+  return { key: crypto.randomUUID(), fromQty: "", toQty: "", price: "", discountPct: "" };
 }
 
 export const Route = createFileRoute("/supplies/")({
@@ -352,11 +372,20 @@ function ProductsPanel() {
   const [editing, setEditing] = useState<Product | null>(null);
   const [nameEn, setNameEn] = useState("");
   const [brand, setBrand] = useState("");
+  const [brandMode, setBrandMode] = useState<"list" | "custom">("list");
   const [price, setPrice] = useState("");
+  const [purchasePrice, setPurchasePrice] = useState("");
   const [currency, setCurrency] = useState<Currency>("USD");
   const [stock, setStock] = useState("");
   const [branch, setBranch] = useState("general");
   const [subCategory, setSubCategory] = useState("");
+  const [origin, setOrigin] = useState("");
+  const [barcode, setBarcode] = useState("");
+  const [showScanner, setShowScanner] = useState(false);
+  const [volume, setVolume] = useState("");
+  const [shadeTab, setShadeTab] = useState<ShadeTab>("classical");
+  const [shades, setShades] = useState<string[]>([]);
+  const [tiers, setTiers] = useState<TierRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState("");
   const [imageFiles, setImageFiles] = useState<File[]>([]);
@@ -368,6 +397,23 @@ function ProductsPanel() {
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
+
+  const brandOptions = useMemo(() => {
+    const set = new Set<string>();
+    BRANDS.forEach((b) => {
+      if (b.name) set.add(b.name);
+      if (b.ar && b.ar.trim() && b.ar !== b.name) set.add(b.ar.trim());
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, []);
+
+  const showShades = branch === "operative" && subCategory === "Composites";
+
+  const inputCls =
+    "w-full h-12 rounded-2xl bg-white border border-slate-200 px-4 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/40 transition";
+  const labelCls = "text-[11px] font-bold text-slate-500 mb-1.5 block";
+  const cardCls = "rounded-2xl bg-white border border-slate-200/80 shadow-sm p-4 space-y-3";
+  const sectionTitleCls = "text-sm font-bold text-slate-800 flex items-center gap-1.5";
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -383,11 +429,19 @@ function ProductsPanel() {
     setEditing(null);
     setNameEn("");
     setBrand("");
+    setBrandMode("list");
     setPrice("");
+    setPurchasePrice("");
     setCurrency("USD");
     setStock("");
     setBranch(branchFilter !== "all" ? branchFilter : "general");
     setSubCategory("");
+    setOrigin("");
+    setBarcode("");
+    setVolume("");
+    setShadeTab("classical");
+    setShades([]);
+    setTiers([]);
     setImageFiles([]);
     setImagePreviews([]);
     setCatDropdownOpen(false);
@@ -399,15 +453,39 @@ function ProductsPanel() {
     setEditing(p);
     setNameEn(p.en || p.ar);
     setBrand(p.brand);
+    setBrandMode(brandOptions.includes(p.brand) ? "list" : "custom");
     setPrice(formatPriceInput(String(p.price ?? "")));
+    setPurchasePrice(p.purchasePrice ? formatPriceInput(String(p.purchasePrice)) : "");
     setCurrency(p.currency || "USD");
     setStock(String(p.stock ?? 0));
     setBranch(p.branch);
     setSubCategory(p.subCategory ?? "");
+    setOrigin(p.country || "");
+    setBarcode(p.barcode || "");
+    setVolume(p.volume || "");
+    setShadeTab((p.shadeSystem as ShadeTab) || "classical");
+    setShades(p.shades || []);
+    setTiers(
+      (p.discountTiers || []).map((t) => ({
+        key: crypto.randomUUID(),
+        fromQty: String(t.fromQty ?? ""),
+        toQty: String(t.toQty ?? ""),
+        price: String(t.price ?? ""),
+        discountPct: String(t.discountPct ?? ""),
+      })),
+    );
     setImageFiles([]);
     setImagePreviews([]);
     setFormError("");
     setShowForm(true);
+  };
+
+  const updateTier = (key: string, field: keyof Omit<TierRow, "key">, value: string) => {
+    setTiers((prev) => prev.map((t) => (t.key === key ? { ...t, [field]: value } : t)));
+  };
+
+  const toggleShade = (code: string) => {
+    setShades((prev) => (prev.includes(code) ? prev.filter((s) => s !== code) : [...prev, code]));
   };
 
   const handleFiles = (files: FileList | null) => {
@@ -507,6 +585,20 @@ function ProductsPanel() {
 
       const allImages = [...(editing?.images ?? []), ...uploadedPaths];
 
+      const cleanTiers = tiers
+        .filter((t) => t.fromQty.trim())
+        .map((t) => ({
+          fromQty: Math.max(1, parseInt(t.fromQty) || 0),
+          toQty: Math.max(0, parseInt(t.toQty) || 0),
+          price: Math.max(0, parseFloat(t.price) || 0),
+          discountPct: Math.max(0, Math.min(100, parseFloat(t.discountPct) || 0)),
+        }));
+
+      const originCountry = ALL_COUNTRIES.find((c) => c.code === origin);
+      const countryOrigin = originCountry
+        ? `${countryCodeToFlag(originCountry.code)} ${originCountry.ar}`
+        : undefined;
+
       await upsert.mutateAsync({
         id: productId,
         branch,
@@ -515,11 +607,19 @@ function ProductsPanel() {
         en: nameEn.trim(),
         brand: brand.trim(),
         price: parsePriceInput(price),
+        purchasePrice: parsePriceInput(purchasePrice) || undefined,
         currency,
         stock: Number(stock) || 0,
         inStock: Number(stock) > 0,
         images: allImages,
         companyId: editing?.companyId || auth.currentUser?.uid || "",
+        country: origin || undefined,
+        countryOrigin,
+        barcode: barcode.trim() || undefined,
+        volume: volume.trim() || undefined,
+        shadeSystem: showShades ? shadeTab : undefined,
+        shades: showShades && shades.length > 0 ? shades : undefined,
+        discountTiers: cleanTiers.length > 0 ? cleanTiers : undefined,
       });
 
       setShowForm(false);
@@ -541,6 +641,15 @@ function ProductsPanel() {
     const val = isIQD ? Number(p.price).toLocaleString() : p.price.toFixed(2);
     const sym = isIQD ? "د.ع" : "$";
     return isIQD ? `${val} ${sym}` : `${sym}${val}`;
+  };
+
+  const originLabel = (p: Product): string | null => {
+    if (p.countryOrigin) return p.countryOrigin;
+    if (p.country) {
+      const c = ALL_COUNTRIES.find((x) => x.code === p.country);
+      if (c) return `${countryCodeToFlag(c.code)} ${c.ar}`;
+    }
+    return null;
   };
 
   const allImagePaths = myProducts.flatMap((p) => p.images);
@@ -572,291 +681,562 @@ function ProductsPanel() {
         </div>
       )}
 
-      {/* Product form card */}
+      {/* ── Add / Edit Product Modal (Mobile Sheet) ── */}
       {showForm && (
-        <div className="bg-white border border-[#D3E8F7] rounded-3xl p-5 shadow-card space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-display font-bold text-lg text-[#1C6FB5] flex items-center gap-1.5">
-              <span className="size-1.5 rounded-full bg-[#1C6FB5]" />
-              {editing ? (ar ? "تعديل منتج" : "Edit product") : ar ? "منتج جديد" : "New product"}
-            </h3>
-            <button
-              onClick={() => setShowForm(false)}
-              className="size-9 rounded-xl bg-[#E7F4FE] hover:bg-[#DCEEFB] text-[#1C6FB5] flex items-center justify-center transition"
-            >
-              <X className="size-4" />
-            </button>
-          </div>
-
-          {/* Category */}
-          <div>
-            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-              {ar ? "الفئة" : "Category"}
-            </label>
-            <div ref={catRef} className="relative">
+        <div className="fixed inset-0 z-[70]">
+          <div
+            className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
+            onClick={() => setShowForm(false)}
+          />
+          <div
+            className="absolute inset-x-0 bottom-0 top-6 mx-auto w-full max-w-md flex flex-col rounded-t-3xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom"
+            style={{ background: "linear-gradient(to bottom, #F7FCFF, #DCEEFB, #BFE1F7)" }}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 pt-4 pb-3 shrink-0 border-b border-white/70">
+              <div>
+                <h3 className="font-display font-extrabold text-base text-[#17324A]">
+                  {editing ? (ar ? "تعديل منتج" : "Edit Product") : ar ? "منتج جديد" : "New Product"}
+                </h3>
+                <p className="text-[11px] text-[#7A94A8] mt-0.5">
+                  {ar ? "أدخل تفاصيل المنتج للحفظ" : "Enter product details to save"}
+                </p>
+              </div>
               <button
                 type="button"
-                onClick={() => setCatDropdownOpen(!catDropdownOpen)}
-                className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition flex items-center justify-between"
+                onClick={() => setShowForm(false)}
+                className="size-9 rounded-xl bg-white/70 border border-white/80 text-slate-500 flex items-center justify-center hover:bg-white transition"
               >
-                <span className={branch ? "" : "text-muted-foreground/60"}>
-                  {branch
-                    ? (ar
-                        ? branchOptions.find((b) => b.value === branch)?.ar
-                        : branchOptions.find((b) => b.value === branch)?.en)
-                    : ar
-                      ? "اختر الفئة"
-                      : "Select category"}
-                </span>
-                <ChevronDown
-                  className={`size-4 text-slate-400 transition-transform ${catDropdownOpen ? "rotate-180" : ""}`}
-                />
+                <X className="size-4" />
               </button>
-              {catDropdownOpen && (
-                <div className="absolute start-0 end-0 top-full mt-1 bg-white rounded-xl shadow-xl border border-gray-100 max-h-60 overflow-y-auto py-2 z-50">
-                  {branchOptions.map((b) => (
-                    <button
-                      key={b.value}
-                      type="button"
-                      onClick={() => {
-                        setBranch(b.value);
-                        setSubCategory("");
-                        setCatDropdownOpen(false);
-                      }}
-                      className={`w-full px-4 py-2.5 text-sm transition-colors flex items-center justify-between hover:bg-blue-50 hover:text-blue-600 ${
-                        branch === b.value
-                          ? "bg-blue-100 text-blue-700 font-medium"
-                          : "text-gray-700"
-                      }`}
-                    >
-                      {ar ? b.ar : b.en}
-                    </button>
-                  ))}
+            </div>
+
+            {/* Scrollable body */}
+            <div className="flex-1 overflow-y-auto px-4 pt-4 pb-36 space-y-4">
+              {/* Basic Info */}
+              <section className={cardCls}>
+                <p className={sectionTitleCls}>
+                  <span className="size-1.5 rounded-full bg-emerald-500" />
+                  {ar ? "معلومات أساسية" : "Basic Info"}
+                </p>
+                <div>
+                  <label className={labelCls}>{ar ? "اسم المنتج" : "Product name"}</label>
+                  <input
+                    value={nameEn}
+                    onChange={(e) => setNameEn(e.target.value)}
+                    placeholder={ar ? "مثال: كومبوزيت ضوئي" : "e.g. Light-cured composite"}
+                    className={inputCls}
+                  />
                 </div>
-              )}
-            </div>
-          </div>
-
-          {/* Sub-category */}
-          {subcategoriesOf(branch).length > 0 && (
-            <div>
-              <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-                {ar ? "التصنيف الفرعي (اختياري)" : "Sub-category (Optional)"}
-              </label>
-              <select
-                value={subCategory}
-                onChange={(e) => setSubCategory(e.target.value)}
-                className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition appearance-none"
-              >
-                <option value="">{ar ? "-- اختر التصنيف الفرعي --" : "-- Select sub-category --"}</option>
-                {subcategoriesOf(branch).map((s) => (
-                  <option key={s.en} value={s.en}>
-                    {ar ? s.ar : s.en}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Name */}
-          <div>
-            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-              {ar ? "اسم المنتج" : "Product name"}
-            </label>
-            <input
-              value={nameEn}
-              onChange={(e) => setNameEn(e.target.value)}
-              placeholder={ar ? "مثال: كومبوزيت ضوئي" : "e.g. Light-cured composite"}
-              className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
-            />
-          </div>
-
-          {/* Brand */}
-          <div>
-            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-              {ar ? "الماركة" : "Brand"}
-            </label>
-            <BrandAutocomplete
-              value={brand}
-              onChange={setBrand}
-              placeholder={ar ? "مثال: 3M" : "e.g. 3M"}
-            />
-          </div>
-
-          {/* Price + Currency row */}
-          <div>
-            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-              {ar ? "السعر" : "Price"}
-            </label>
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={price}
-                  onChange={(e) => setPrice(formatPriceInput(e.target.value))}
-                  onFocus={(e) => e.target.select()}
-                  placeholder="0"
-                  dir="ltr"
-                  className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
-                />
-              </div>
-              <div className="flex rounded-xl bg-[#F5FAFE] border-[#D3E8F7] overflow-hidden shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setCurrency("USD")}
-                  className={cn(
-                    "px-3.5 text-sm font-semibold transition",
-                    currency === "USD"
-                      ? "bg-primary text-primary-foreground"
-                      : "text-slate-500 hover:text-slate-700",
+                <div>
+                  <label className={labelCls}>{ar ? "الماركة" : "Brand"}</label>
+                  <div className="relative">
+                    <select
+                      value={brandMode === "list" && brandOptions.includes(brand) ? brand : "custom"}
+                      onChange={(e) => {
+                        if (e.target.value === "custom") {
+                          setBrandMode("custom");
+                        } else {
+                          setBrand(e.target.value);
+                          setBrandMode("list");
+                        }
+                      }}
+                      className={cn(inputCls, "appearance-none pe-9")}
+                    >
+                      <option value="">{ar ? "-- اختر الماركة --" : "-- Select brand --"}</option>
+                      {brandOptions.map((b) => (
+                        <option key={b} value={b}>
+                          {b}
+                        </option>
+                      ))}
+                      <option value="custom">{ar ? "أخرى (إدخال يدوي)" : "Other (manual entry)"}</option>
+                    </select>
+                    <ChevronDown className="absolute end-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400 pointer-events-none" />
+                  </div>
+                  {brandMode === "custom" && (
+                    <input
+                      value={brand}
+                      onChange={(e) => setBrand(e.target.value)}
+                      placeholder={ar ? "اكتب اسم الماركة" : "Type brand name"}
+                      className={cn(inputCls, "mt-2")}
+                    />
                   )}
-                >
-                  $
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCurrency("IQD")}
-                  className={cn(
-                    "px-3.5 text-sm font-semibold transition",
-                    currency === "IQD"
-                      ? "bg-primary text-primary-foreground"
-                      : "text-slate-500 hover:text-slate-700",
-                  )}
-                >
-                  {ar ? "د.ع" : "IQD"}
-                </button>
-              </div>
-            </div>
-          </div>
+                </div>
+              </section>
 
-          {/* Stock */}
-          <div>
-            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-              {ar ? "الكمية المتوفرة" : "Available quantity"}
-            </label>
-            <div className="relative">
-              <input
-                type="number"
-                value={stock}
-                onChange={(e) => setStock(e.target.value)}
-                onFocus={(e) => e.target.select()}
-                placeholder="0"
-                dir="ltr"
-                className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] ps-12 pe-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-              />
-              <Layers className="absolute start-4 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
-            </div>
-          </div>
-
-          {/* Product images */}
-          <div>
-            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-              {ar ? "صور المنتج" : "Product images"}
-            </label>
-
-            {/* Existing images (editing) */}
-            {editing && editing.images.length > 0 && (
-              <div className="flex gap-2 flex-wrap mb-3">
-                {editing.images.map((path, idx) => (
-                  <div
-                    key={path}
-                    className="relative size-16 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] overflow-hidden group"
-                  >
-                    {editUrlMap[path] ? (
-                      <img src={editUrlMap[path]} alt="" className="size-full object-cover" />
-                    ) : (
-                      <div className="size-full flex items-center justify-center">
-                        <Package className="size-5 text-slate-300" />
+              {/* Category */}
+              <section className={cardCls}>
+                <p className={sectionTitleCls}>
+                  <span className="size-1.5 rounded-full bg-emerald-500" />
+                  {ar ? "التصنيف" : "Category"}
+                </p>
+                <div>
+                  <label className={labelCls}>{ar ? "الفئة الرئيسية" : "Main category"}</label>
+                  <div ref={catRef} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setCatDropdownOpen(!catDropdownOpen)}
+                      className={cn(inputCls, "flex items-center justify-between text-start")}
+                    >
+                      <span className={branch ? "" : "text-slate-400"}>
+                        {branch
+                          ? (ar
+                              ? branchOptions.find((b) => b.value === branch)?.ar
+                              : branchOptions.find((b) => b.value === branch)?.en)
+                          : ar
+                            ? "اختر الفئة"
+                            : "Select category"}
+                      </span>
+                      <ChevronDown
+                        className={`size-4 text-slate-400 shrink-0 transition-transform ${catDropdownOpen ? "rotate-180" : ""}`}
+                      />
+                    </button>
+                    {catDropdownOpen && (
+                      <div className="absolute start-0 end-0 top-full mt-1 bg-white rounded-2xl shadow-xl border border-slate-200 max-h-60 overflow-y-auto py-2 z-50">
+                        {branchOptions.map((b) => (
+                          <button
+                            key={b.value}
+                            type="button"
+                            onClick={() => {
+                              setBranch(b.value);
+                              setSubCategory("");
+                              setCatDropdownOpen(false);
+                            }}
+                            className={`w-full px-4 py-2.5 text-sm transition-colors flex items-center justify-between hover:bg-emerald-50 hover:text-emerald-700 ${
+                              branch === b.value
+                                ? "bg-emerald-50 text-emerald-700 font-medium"
+                                : "text-slate-700"
+                            }`}
+                          >
+                            {ar ? b.ar : b.en}
+                          </button>
+                        ))}
                       </div>
                     )}
+                  </div>
+                </div>
+                {subcategoriesOf(branch).length > 0 && (
+                  <div>
+                    <label className={labelCls}>{ar ? "التصنيف الفرعي" : "Sub-category"}</label>
+                    <div className="relative">
+                      <select
+                        value={subCategory}
+                        onChange={(e) => setSubCategory(e.target.value)}
+                        className={cn(inputCls, "appearance-none pe-9")}
+                      >
+                        <option value="">{ar ? "-- اختر التصنيف الفرعي --" : "-- Select sub-category --"}</option>
+                        {subcategoriesOf(branch).map((s) => (
+                          <option key={s.en} value={s.en}>
+                            {ar ? s.ar : s.en}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute end-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400 pointer-events-none" />
+                    </div>
+                  </div>
+                )}
+              </section>
+
+              {/* Origin & Barcode */}
+              <section className={cardCls}>
+                <p className={sectionTitleCls}>
+                  <span className="size-1.5 rounded-full bg-emerald-500" />
+                  {ar ? "بلد المنشأ والباركود" : "Origin & Barcode"}
+                </p>
+                <div>
+                  <label className={labelCls}>{ar ? "بلد المنشأ" : "Country of Origin"}</label>
+                  <CountryCombobox value={origin} onChange={setOrigin} lang={lang} />
+                </div>
+                <div>
+                  <label className={labelCls}>{ar ? "الباركود" : "Barcode"}</label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <input
+                        value={barcode}
+                        onChange={(e) => setBarcode(e.target.value)}
+                        placeholder={ar ? "رمز الباركود أو امسحه" : "Barcode or scan it"}
+                        dir="ltr"
+                        className={inputCls}
+                      />
+                      {barcode && (
+                        <button
+                          type="button"
+                          onClick={() => setBarcode("")}
+                          className="absolute end-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-rose-500 transition"
+                        >
+                          <X className="size-4" />
+                        </button>
+                      )}
+                    </div>
                     <button
                       type="button"
-                      onClick={() => removeExistingImage(path)}
-                      className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition"
+                      onClick={() => setShowScanner(true)}
+                      className="shrink-0 h-12 px-4 rounded-2xl bg-slate-900 text-white flex items-center gap-1.5 text-sm font-bold shadow-sm hover:opacity-90 transition"
                     >
-                      <Trash2 className="size-4 text-white" />
+                      <ScanBarcode className="size-4" />
+                      {ar ? "مسح" : "Scan"}
                     </button>
                   </div>
-                ))}
-              </div>
-            )}
+                </div>
+              </section>
 
-            {/* New image upload zone */}
-            {imageFiles.length + (editing?.images.length ?? 0) < MAX_PRODUCT_IMAGES && (
-              <label className="w-full h-32 rounded-xl border-2 border-dashed border-[#D3E8F7] bg-[#F5FAFE] flex flex-col items-center justify-center gap-1.5 cursor-pointer hover:border-primary/40 hover:bg-sky-50/30 transition group">
-                <Upload className="size-6 text-slate-400 group-hover:text-primary transition" />
-                <p className="text-xs text-slate-400 group-hover:text-primary transition font-medium">
-                  {ar ? "اضغط لرفع صورة المنتج" : "Tap to upload product image"}
+              {/* Product Images */}
+              <section className={cardCls}>
+                <p className={sectionTitleCls}>
+                  <span className="size-1.5 rounded-full bg-emerald-500" />
+                  {ar ? "صور المنتج" : "Product Images"}
                 </p>
-                <p className="text-[10px] text-slate-300">
+                <div className="flex gap-2.5 overflow-x-auto pb-1 -mx-1 px-1">
+                  {editing &&
+                    editing.images.map((path) => (
+                      <div
+                        key={path}
+                        className="relative size-20 shrink-0 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden"
+                      >
+                        {editUrlMap[path] ? (
+                          <img src={editUrlMap[path]} alt="" className="size-full object-cover" />
+                        ) : (
+                          <div className="size-full flex items-center justify-center">
+                            <Package className="size-5 text-slate-300" />
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => removeExistingImage(path)}
+                          className="absolute top-1 end-1 size-5 rounded-full bg-black/60 text-white flex items-center justify-center"
+                        >
+                          <Trash2 className="size-3" />
+                        </button>
+                      </div>
+                    ))}
+                  {imagePreviews.map((url, i) => (
+                    <div
+                      key={url}
+                      className="relative size-20 shrink-0 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden"
+                    >
+                      <img src={url} alt="" className="size-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => removePreview(i)}
+                        className="absolute top-1 end-1 size-5 rounded-full bg-black/60 text-white flex items-center justify-center"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </div>
+                  ))}
+                  {imageFiles.length + (editing?.images.length ?? 0) < MAX_PRODUCT_IMAGES && (
+                    <label className="shrink-0 size-20 rounded-2xl border-2 border-dashed border-slate-300 bg-white/70 flex flex-col items-center justify-center gap-0.5 cursor-pointer hover:border-emerald-400 hover:text-emerald-500 transition text-slate-400">
+                      <Plus className="size-5" />
+                      <span className="text-[9px] font-bold">{ar ? "إضافة" : "Add"}</span>
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        multiple
+                        className="hidden"
+                        onChange={(e) => handleFiles(e.target.files)}
+                      />
+                    </label>
+                  )}
+                </div>
+                <p className="text-[10px] text-slate-400">
                   {imageFiles.length}/{MAX_PRODUCT_IMAGES} · JPG, PNG
                 </p>
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  multiple
-                  className="hidden"
-                  onChange={(e) => handleFiles(e.target.files)}
-                />
-              </label>
-            )}
+              </section>
 
-            {/* Image previews */}
-            {imagePreviews.length > 0 && (
-              <div className="flex gap-2 flex-wrap mt-3">
-                {imagePreviews.map((url, idx) => (
-                  <div
-                    key={idx}
-                    className="relative size-16 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] overflow-hidden shadow-sm"
-                  >
-                    <img src={url} alt="" className="size-full object-cover" />
+              {/* Composite Shades */}
+              {showShades && (
+                <section className={cardCls}>
+                  <p className={sectionTitleCls}>
+                    <span className="size-1.5 rounded-full bg-emerald-500" />
+                    {ar ? "درجة اللون / الشيد" : "Shade / Composite Shade"}
+                  </p>
+                  <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                    {(
+                      [
+                        ["classical", "VITA Classical"],
+                        ["3d", "VITA 3D-Master"],
+                        ["bleach", "Bleach"],
+                      ] as [ShadeTab, string][]
+                    ).map(([k, label]) => (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => {
+                          setShadeTab(k);
+                          setShades([]);
+                        }}
+                        className={cn(
+                          "shrink-0 h-9 px-3.5 rounded-full text-xs font-bold border transition whitespace-nowrap",
+                          shadeTab === k
+                            ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                            : "bg-white text-slate-600 border-slate-200 hover:border-slate-300",
+                        )}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {(shadeTab === "classical"
+                      ? VITA_SHADES
+                      : shadeTab === "3d"
+                        ? VITA_3D_SHADES
+                        : VITA_BLEACH_SHADES
+                    ).map((s) => {
+                      const active = shades.includes(s.code);
+                      return (
+                        <button
+                          key={s.code}
+                          type="button"
+                          onClick={() => toggleShade(s.code)}
+                          className={cn(
+                            "h-9 px-3 rounded-full text-[11px] font-bold border transition flex items-center gap-1.5",
+                            active
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-400 ring-2 ring-emerald-500/20"
+                              : "bg-white text-slate-600 border-slate-200 hover:border-slate-300",
+                          )}
+                        >
+                          <span
+                            className="size-4 rounded-full border border-white/70 shadow-inner"
+                            style={{ background: s.hex }}
+                          />
+                          {s.code}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {shades.length > 0 && (
+                    <p className="text-[11px] font-semibold text-emerald-700">
+                      {ar ? `المحدد: ${shades.join("، ")}` : `Selected: ${shades.join(", ")}`}
+                    </p>
+                  )}
+                </section>
+              )}
+
+              {/* Pricing, Volume & Inventory */}
+              <section className={cardCls}>
+                <div className="flex items-center justify-between">
+                  <p className={sectionTitleCls}>
+                    <span className="size-1.5 rounded-full bg-emerald-500" />
+                    {ar ? "السعر والحجم والمخزون" : "Pricing, Volume & Inventory"}
+                  </p>
+                  <div className="flex rounded-xl bg-slate-100 p-1">
                     <button
                       type="button"
-                      onClick={() => removePreview(idx)}
-                      className="absolute top-0.5 end-0.5 size-5 rounded-full bg-black/60 text-white flex items-center justify-center"
+                      onClick={() => setCurrency("USD")}
+                      className={cn(
+                        "px-3 h-7 rounded-lg text-xs font-bold transition",
+                        currency === "USD" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500",
+                      )}
                     >
-                      <X className="size-3" />
+                      $
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCurrency("IQD")}
+                      className={cn(
+                        "px-3 h-7 rounded-lg text-xs font-bold transition",
+                        currency === "IQD" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500",
+                      )}
+                    >
+                      {ar ? "د.ع" : "IQD"}
                     </button>
                   </div>
-                ))}
-              </div>
-            )}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelCls}>{ar ? "سعر الشراء" : "Purchase price"}</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={purchasePrice}
+                        onChange={(e) => setPurchasePrice(formatPriceInput(e.target.value))}
+                        onFocus={(e) => e.target.select()}
+                        placeholder="0"
+                        dir="ltr"
+                        className={cn(inputCls, "ps-9")}
+                      />
+                      <span className="absolute start-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                        {currency === "USD" ? "$" : "د.ع"}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className={labelCls}>
+                      {ar ? "سعر البيع" : "Selling price"} <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={price}
+                        onChange={(e) => setPrice(formatPriceInput(e.target.value))}
+                        onFocus={(e) => e.target.select()}
+                        placeholder="0"
+                        dir="ltr"
+                        className={cn(inputCls, "ps-9")}
+                      />
+                      <span className="absolute start-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                        {currency === "USD" ? "$" : "د.ع"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label className={labelCls}>{ar ? "الحجم / المقاس" : "Size / Volume"}</label>
+                  <input
+                    value={volume}
+                    onChange={(e) => setVolume(e.target.value)}
+                    placeholder={ar ? "مثال: 5 مل / 4 غم" : "e.g. 5ml / 4g"}
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>{ar ? "المخزون الحالي" : "Current stock"}</label>
+                  <div className="flex items-center justify-between gap-3 rounded-2xl bg-white border border-slate-200 shadow-sm p-2">
+                    <button
+                      type="button"
+                      onClick={() => setStock(String(Math.max(0, (Number(stock) || 0) - 1)))}
+                      className="size-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center hover:bg-slate-200 active:scale-95 transition"
+                    >
+                      <Minus className="size-4" />
+                    </button>
+                    <input
+                      type="number"
+                      value={stock}
+                      onChange={(e) => setStock(e.target.value)}
+                      onFocus={(e) => e.target.select()}
+                      placeholder="0"
+                      dir="ltr"
+                      className="w-full bg-transparent text-center font-display font-extrabold text-xl text-slate-900 outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setStock(String((Number(stock) || 0) + 1))}
+                      className="size-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center hover:bg-emerald-700 active:scale-95 transition"
+                    >
+                      <Plus className="size-4" />
+                    </button>
+                  </div>
+                </div>
+              </section>
+
+              {/* Quantity Discount */}
+              <section className={cardCls}>
+                <div className="flex items-center justify-between">
+                  <p className={sectionTitleCls}>
+                    <span className="size-1.5 rounded-full bg-emerald-500" />
+                    {ar ? "الخصم على الكمية (اختياري)" : "Quantity Discount (Optional)"}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setTiers((prev) => [...prev, emptyTier()])}
+                    className="flex items-center gap-1 text-xs font-bold text-emerald-600 hover:opacity-80 transition"
+                  >
+                    <Plus className="size-3.5" />
+                    {ar ? "إضافة درجة" : "Add tier"}
+                  </button>
+                </div>
+                {tiers.length === 0 ? (
+                  <p className="text-[11px] text-slate-400">
+                    {ar ? "لا توجد درجات خصم بعد" : "No discount tiers yet"}
+                  </p>
+                ) : (
+                  <div className="space-y-2.5">
+                    {tiers.map((t) => (
+                      <div
+                        key={t.key}
+                        className="rounded-2xl border border-slate-200 bg-slate-50/60 p-3 space-y-2.5"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
+                            <Tag className="size-3" />
+                            {ar ? "درجة خصم" : "Discount tier"}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setTiers((prev) => prev.filter((x) => x.key !== t.key))}
+                            className="size-7 rounded-lg bg-white border border-slate-200 text-rose-500 flex items-center justify-center hover:bg-rose-50 transition"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <input
+                            value={t.fromQty}
+                            onChange={(e) => updateTier(t.key, "fromQty", e.target.value)}
+                            inputMode="numeric"
+                            placeholder={ar ? "من كمية" : "From qty"}
+                            dir="ltr"
+                            className={cn(inputCls, "h-10 text-xs")}
+                          />
+                          <input
+                            value={t.toQty}
+                            onChange={(e) => updateTier(t.key, "toQty", e.target.value)}
+                            inputMode="numeric"
+                            placeholder={ar ? "إلى كمية" : "To qty"}
+                            dir="ltr"
+                            className={cn(inputCls, "h-10 text-xs")}
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <input
+                            value={t.price}
+                            onChange={(e) => updateTier(t.key, "price", e.target.value)}
+                            inputMode="decimal"
+                            placeholder={ar ? "سعر الدرجة" : "Tier price"}
+                            dir="ltr"
+                            className={cn(inputCls, "h-10 text-xs")}
+                          />
+                          <div className="relative">
+                            <input
+                              value={t.discountPct}
+                              onChange={(e) => updateTier(t.key, "discountPct", e.target.value)}
+                              inputMode="decimal"
+                              placeholder={ar ? "نسبة الخصم" : "Discount %"}
+                              dir="ltr"
+                              className={cn(inputCls, "h-10 text-xs pe-8")}
+                            />
+                            <Percent className="absolute end-2.5 top-1/2 -translate-y-1/2 size-3.5 text-slate-400 pointer-events-none" />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </div>
+
+            {/* Footer */}
+            <div className="absolute inset-x-0 bottom-0 bg-white/95 backdrop-blur border-t border-slate-200 p-4 pb-5">
+              {formError && (
+                <p className="text-xs font-semibold text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 mb-3 text-center">
+                  {formError}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={submit}
+                disabled={busy}
+                className="w-full h-14 rounded-2xl text-white font-display font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg transition hover:opacity-95 disabled:opacity-60"
+                style={{ background: "linear-gradient(to right, #10B981, #059669)" }}
+              >
+                {busy ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+                {busy
+                  ? ar
+                    ? "جارٍ الحفظ..."
+                    : "Saving..."
+                  : editing
+                    ? ar
+                      ? "حفظ التعديلات"
+                      : "Save changes"
+                    : ar
+                      ? "حفظ المنتج"
+                      : "Save Product"}
+              </button>
+            </div>
           </div>
-
-          {/* Error message */}
-          {formError && (
-            <p className="text-sm text-rose-600 bg-rose-50 rounded-xl px-4 py-2.5 text-center font-semibold">
-              {formError}
-            </p>
-          )}
-
-          {/* Submit */}
-          <button
-            type="button"
-            onClick={submit}
-            disabled={busy}
-            className={cn(
-              "w-full h-14 rounded-2xl font-display font-bold flex items-center justify-center gap-2 transition shadow-card",
-              busy
-                ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                : "text-white hover:opacity-95",
-            )}
-            style={busy ? undefined : { background: "linear-gradient(to right, #2AA6D1, #4FC3E8)" }}
-          >
-            {busy ? <Loader2 className="size-5 animate-spin" /> : null}
-            {busy
-              ? ar
-                ? "جارٍ الحفظ..."
-                : "Saving..."
-              : editing
-                ? ar
-                  ? "حفظ التعديلات"
-                  : "Save changes"
-                : ar
-                  ? "إضافة المنتج"
-                  : "Add product"}
-          </button>
         </div>
       )}
 
@@ -1029,6 +1409,13 @@ function ProductsPanel() {
                   <p className="text-[11px] text-muted-foreground mt-1 truncate">{p.brand}</p>
                 )}
 
+                {/* Country of origin */}
+                {originLabel(p) && (
+                  <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded-full px-2 py-0.5">
+                    {originLabel(p)}
+                  </span>
+                )}
+
                 {/* Sub-category */}
                 {p.subCategory && (
                   <span className="inline-block mt-1.5 text-[10px] font-bold bg-sky-50 text-sky-700 rounded-full px-2 py-0.5">
@@ -1075,7 +1462,7 @@ function ProductsPanel() {
 
       {/* Crop modal */}
       {cropModalOpen && cropFile && (
-        <div className="fixed inset-0 z-50 bg-black/70 flex flex-col">
+        <div className="fixed inset-0 z-[80] bg-black/70 flex flex-col">
           <div className="flex items-center justify-between px-4 py-3 bg-white">
             <button
               type="button"
@@ -1120,6 +1507,15 @@ function ProductsPanel() {
         </div>
       )}
       {showBoneGraft && <BoneGraftModal onClose={() => setShowBoneGraft(false)} />}
+      {showScanner && (
+        <BarcodeScannerModal
+          onScan={(code) => {
+            setBarcode(code);
+            setShowScanner(false);
+          }}
+          onClose={() => setShowScanner(false)}
+        />
+      )}
       </div>
   );
 }

@@ -64,6 +64,13 @@ export type BoneGraftSpec = {
   packSizes: BoneGraftPackSize[];
 };
 
+export type ProductDiscountTier = {
+  fromQty: number;
+  toQty: number;
+  price: number;
+  discountPct: number;
+};
+
 export type Product = {
   id: string;
   branch: string;
@@ -87,6 +94,13 @@ export type Product = {
   productType?: "main_implant" | "accessory";
   parentId?: string | null;
   boneGraft?: BoneGraftSpec;
+  purchasePrice?: number;
+  barcode?: string;
+  volume?: string;
+  shadeSystem?: string;
+  shades?: string[];
+  discountTiers?: ProductDiscountTier[];
+  countryOrigin?: string;
 };
 
 const fromDoc = (id: string, data: Record<string, unknown>): Product => {
@@ -131,6 +145,13 @@ const fromDoc = (id: string, data: Record<string, unknown>): Product => {
     productType: (data.productType as "main_implant" | "accessory") ?? undefined,
     parentId: (data.parentId as string | null) ?? undefined,
     boneGraft: (data.boneGraft as BoneGraftSpec | null) ?? undefined,
+    purchasePrice: (data.purchasePrice as number) ?? undefined,
+    barcode: (data.barcode as string) ?? undefined,
+    volume: (data.volume as string) ?? undefined,
+    shadeSystem: (data.shadeSystem as string) ?? undefined,
+    shades: (data.shades as string[]) ?? undefined,
+    discountTiers: (data.discountTiers as ProductDiscountTier[] | null) ?? undefined,
+    countryOrigin: (data.countryOrigin as string) ?? undefined,
   };
 };
 
@@ -174,6 +195,9 @@ export function useUpsertProduct() {
       const cleanBoneGraft = p.boneGraft
         ? (removeUndefined(p.boneGraft) as BoneGraftSpec)
         : null;
+      const cleanDiscountTiers = p.discountTiers
+        ? (removeUndefined(p.discountTiers) as ProductDiscountTier[])
+        : null;
       await setDoc(
         ref,
         {
@@ -200,6 +224,13 @@ export function useUpsertProduct() {
           productType: p.productType ?? null,
           parentId: p.parentId ?? null,
           boneGraft: cleanBoneGraft,
+          purchasePrice: p.purchasePrice ?? null,
+          barcode: p.barcode ?? null,
+          volume: p.volume ?? null,
+          shadeSystem: p.shadeSystem ?? null,
+          shades: p.shades ?? null,
+          discountTiers: cleanDiscountTiers,
+          countryOrigin: p.countryOrigin ?? null,
         },
         { merge: true },
       );
