@@ -7,6 +7,7 @@ import type { UserRoleDoc } from "@/integrations/firebase/types";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { RoleGuard } from "@/components/RoleGuard";
+import { BoneGraftModal } from "@/components/BoneGraftModal";
 import { TagInput } from "@/components/TagInput";
 import { NotificationBell } from "@/components/NotificationBell";
 import { BrandAutocomplete } from "@/components/BrandAutocomplete";
@@ -347,6 +348,7 @@ function ProductsPanel() {
     : null;
 
   const [showForm, setShowForm] = useState(false);
+  const [showBoneGraft, setShowBoneGraft] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [nameEn, setNameEn] = useState("");
   const [brand, setBrand] = useState("");
@@ -549,16 +551,25 @@ function ProductsPanel() {
 
   return (
     <div className="space-y-4">
-      {/* Add button */}
+      {/* Add buttons */}
       {!showForm && (
-        <button
-          onClick={openAdd}
-          className="w-full h-14 rounded-2xl text-white font-display font-bold flex items-center justify-center gap-2 hover:opacity-95 transition shadow-lg"
-          style={{ background: "linear-gradient(to right, #2AA6D1, #4FC3E8)" }}
-        >
-          <Plus className="size-5" />
-          {ar ? "إضافة منتج جديد" : "Add new product"}
-        </button>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={openAdd}
+            className="h-14 rounded-2xl text-white font-display font-bold flex items-center justify-center gap-2 hover:opacity-95 transition shadow-lg"
+            style={{ background: "linear-gradient(to right, #2AA6D1, #4FC3E8)" }}
+          >
+            <Plus className="size-5" />
+            {ar ? "إضافة منتج جديد" : "Add new product"}
+          </button>
+          <button
+            onClick={() => setShowBoneGraft(true)}
+            className="h-14 rounded-2xl bg-emerald-600 text-white font-display font-bold flex items-center justify-center gap-2 hover:opacity-90 transition shadow-card"
+          >
+            <Plus className="size-5" />
+            {ar ? "إضافة بون كرافت" : "Add Bone Graft"}
+          </button>
+        </div>
       )}
 
       {/* Product form card */}
@@ -1108,6 +1119,7 @@ function ProductsPanel() {
           </div>
         </div>
       )}
+      {showBoneGraft && <BoneGraftModal onClose={() => setShowBoneGraft(false)} />}
       </div>
   );
 }
