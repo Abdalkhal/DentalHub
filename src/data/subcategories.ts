@@ -67,6 +67,7 @@ export const SUBCATEGORIES: Record<string, SubCategory[]> = {
     { ar: "حافظات المسافة", en: "Space Maintainer" },
     { ar: "تيجان أطفال", en: "Pediatric Crowns" },
     { ar: "علاج اللب", en: "Pulp Therapy" },
+    { ar: "تخدير ومصفوفات الأطفال", en: "Pediatric Anesthesia & Matrices" },
   ],
   periodontic: [
     { ar: "أدوات اللثة", en: "Perio instruments" },
@@ -75,6 +76,7 @@ export const SUBCATEGORIES: Record<string, SubCategory[]> = {
     { ar: "ضمادات جراحية", en: "Surgical dressings" },
     { ar: "إدارة الأنسجة", en: "Tissue Management" },
     { ar: "طعوم عظمية", en: "Bone Grafts" },
+    { ar: "تثبيت GBR ومستلزمات PRF", en: "GBR Fixation & Biologics" },
     { ar: "التحكم بالبلاك", en: "Plaque Control" },
   ],
   equipment: [
@@ -104,6 +106,9 @@ export const SUBCATEGORIES: Record<string, SubCategory[]> = {
     { ar: "موزعات بدون لمس", en: "Contactless Dispensers" },
     { ar: "معقمات يدوية", en: "Hand Sanitizers" },
     { ar: "مطهرات الأسطح", en: "Surface Disinfectants" },
+    { ar: "معدات الحماية الشخصية", en: "Personal Protective Equipment" },
+    { ar: "حماية عازلة", en: "Barrier Protection" },
+    { ar: "مؤشرات التعقيم والتنظيف", en: "Sterilization Indicators & Cleaning" },
   ],
   "oral-care": [
     { ar: "خيط مائي", en: "Water Jet" },
@@ -111,6 +116,7 @@ export const SUBCATEGORIES: Record<string, SubCategory[]> = {
     { ar: "معجون أسنان", en: "Toothpaste" },
     { ar: "فرشاة أسنان", en: "Toothbrush" },
     { ar: "غسول فم", en: "Mouthwashes" },
+    { ar: "العناية بالأطقم", en: "Denture Care" },
   ],
   apparel: [
     { ar: "أزياء طبية", en: "Medical Scrubs" },
@@ -131,6 +137,8 @@ export const SUBCATEGORIES: Record<string, SubCategory[]> = {
     { ar: "أسنان أطقم", en: "Denture teeth" },
     { ar: "كاد كام", en: "CAD CAM" },
     { ar: "مواد سيراميك", en: "Ceramic Material" },
+    { ar: "مواد الطبعات والجبس", en: "Impression & Gypsum" },
+    { ar: "الأكريليك والشمع", en: "Acrylic Resins & Waxes" },
   ],
 };
 

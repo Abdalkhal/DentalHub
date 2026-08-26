@@ -13,6 +13,7 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { ref, uploadBytes, deleteObject, getDownloadURL } from "firebase/storage";
+import type { ProductSpecs } from "@/data/specs";
 
 export const MAX_PRODUCT_IMAGES = 5;
 export const PRODUCT_IMAGE_BUCKET = "product-images";
@@ -101,6 +102,9 @@ export type Product = {
   shades?: string[];
   discountTiers?: ProductDiscountTier[];
   countryOrigin?: string;
+  specs?: ProductSpecs;
+  technicalSpecifications?: ProductSpecs;
+  sku?: string;
 };
 
 const fromDoc = (id: string, data: Record<string, unknown>): Product => {
@@ -152,6 +156,9 @@ const fromDoc = (id: string, data: Record<string, unknown>): Product => {
     shades: (data.shades as string[]) ?? undefined,
     discountTiers: (data.discountTiers as ProductDiscountTier[] | null) ?? undefined,
     countryOrigin: (data.countryOrigin as string) ?? undefined,
+    specs: (data.specs as ProductSpecs | null) ?? undefined,
+    technicalSpecifications: (data.technicalSpecifications as ProductSpecs | null) ?? undefined,
+    sku: (data.sku as string) ?? undefined,
   };
 };
 
@@ -198,6 +205,10 @@ export function useUpsertProduct() {
       const cleanDiscountTiers = p.discountTiers
         ? (removeUndefined(p.discountTiers) as ProductDiscountTier[])
         : null;
+      const cleanSpecs = p.specs ? (removeUndefined(p.specs) as ProductSpecs) : null;
+      const cleanTechnicalSpecs = p.technicalSpecifications
+        ? (removeUndefined(p.technicalSpecifications) as ProductSpecs)
+        : null;
       await setDoc(
         ref,
         {
@@ -231,6 +242,9 @@ export function useUpsertProduct() {
           shades: p.shades ?? null,
           discountTiers: cleanDiscountTiers,
           countryOrigin: p.countryOrigin ?? null,
+          specs: cleanSpecs,
+          technicalSpecifications: cleanTechnicalSpecs,
+          sku: p.sku ?? null,
         },
         { merge: true },
       );

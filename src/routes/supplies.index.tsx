@@ -23,7 +23,16 @@ import { CITIES } from "@/data/offices";
 import { subcategoriesOf } from "@/data/subcategories";
 import { BRANDS } from "@/data/brands";
 import { ALL_COUNTRIES, countryCodeToFlag } from "@/data/countries";
-import { VITA_SHADES, VITA_3D_SHADES, VITA_BLEACH_SHADES, type ShadeTab } from "@/lib/dentalConfig";
+import {
+  SPEC_FIELDS,
+  activeSpecGroups,
+  strictSpecFieldsFor,
+  SHADE_SYSTEMS,
+  shadeListFor,
+  type ProductSpecs,
+  type SpecFieldDef,
+  type SpecFieldId,
+} from "@/data/specs";
 import { useAdminStore } from "@/lib/adminStore";
 import {
   useProducts,
@@ -383,8 +392,8 @@ function ProductsPanel() {
   const [barcode, setBarcode] = useState("");
   const [showScanner, setShowScanner] = useState(false);
   const [volume, setVolume] = useState("");
-  const [shadeTab, setShadeTab] = useState<ShadeTab>("classical");
-  const [shades, setShades] = useState<string[]>([]);
+  const [specs, setSpecs] = useState<ProductSpecs>({});
+  const [techSpecs, setTechSpecs] = useState<ProductSpecs>({});
   const [tiers, setTiers] = useState<TierRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState("");
@@ -407,7 +416,222 @@ function ProductsPanel() {
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, []);
 
-  const showShades = branch === "operative" && subCategory === "Composites";
+  const subCategoryAr = subcategoriesOf(branch).find((s) => s.en === subCategory)?.ar ?? "";
+  const isTechBranch =
+    branch === "endodontic" ||
+    branch === "prosthodontic" ||
+    branch === "surgery" ||
+    branch === "equipment" ||
+    branch === "periodontic" ||
+    branch === "orthopedic" ||
+    branch === "pedodontic" ||
+    branch === "apparel" ||
+    branch === "oral-care" ||
+    branch === "sterilization" ||
+    branch === "burs" ||
+    branch === "lab-materials" ||
+    branch === "maintenance" ||
+    branch === "training";
+  const isStrictBranch = branch === "general" || branch === "operative" || isTechBranch;
+  const strictFieldIds = isStrictBranch ? strictSpecFieldsFor(subCategory, subCategoryAr) : null;
+  const activeGroups = activeSpecGroups(branch, subCategory, subCategoryAr);
+  const activeFields = useMemo(
+    () => [...new Set(activeGroups.flatMap((g) => g.fields))],
+    [activeGroups],
+  );
+
+  const BRANCH_CODE: Record<string, string> = {
+    general: "GEN",
+    operative: "OPE",
+    endodontic: "END",
+    prosthodontic: "PRO",
+    surgery: "SUR",
+    orthopedic: "ORT",
+    pedodontic: "PED",
+    periodontic: "PER",
+    equipment: "EQP",
+    burs: "BUR",
+    sterilization: "STE",
+    "oral-care": "ORC",
+    apparel: "APR",
+    training: "TRN",
+    maintenance: "MNT",
+    "lab-materials": "LAB",
+  };
+
+  const sku = useMemo(() => {
+    const bag = isTechBranch ? techSpecs : specs;
+    const prefix = BRANCH_CODE[branch] ?? branch.slice(0, 3).toUpperCase();
+    const subCode = (subCategory || "")
+      .split(/[\s/&-]+/)
+      .map((w) => w.slice(0, 3))
+      .join("")
+      .toUpperCase();
+    const specParts = Object.values(bag)
+      .flatMap((v) => (Array.isArray(v) ? v : [v]))
+      .map((s) =>
+        s
+          .replace(/[^a-zA-Z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, "")
+          .toUpperCase(),
+      )
+      .filter(Boolean);
+    const all = [prefix, subCode, ...specParts].filter(Boolean);
+    return all.length > 0 ? all.join("-") : "";
+  }, [branch, subCategory, specs, techSpecs, isTechBranch]);
+
+  const setSpec = (id: SpecFieldId, value: string | string[] | undefined) => {
+    setSpecs((prev) => {
+      const next = { ...prev };
+      if (value === undefined || value === "" || (Array.isArray(value) && value.length === 0)) {
+        delete next[id];
+      } else {
+        next[id] = value;
+      }
+      return next;
+    });
+  };
+
+  const setTechSpec = (id: SpecFieldId, value: string | string[] | undefined) => {
+    setTechSpecs((prev) => {
+      const next = { ...prev };
+      if (value === undefined || value === "" || (Array.isArray(value) && value.length === 0)) {
+        delete next[id];
+      } else {
+        next[id] = value;
+      }
+      return next;
+    });
+  };
+
+  const resetSpecs = () => {
+    setSpecs({});
+    setTechSpecs({});
+  };
+
+  const visibleSpecIds = (ids: SpecFieldId[], bag: ProductSpecs): SpecFieldId[] =>
+    ids.filter((fid) => {
+      const cond = SPEC_FIELDS[fid]?.showWhen;
+      return !cond || bag[cond.field] === cond.value;
+    });
+
+  const renderField = (
+    field: SpecFieldDef,
+    bag: ProductSpecs,
+    setField: (id: SpecFieldId, value: string | string[] | undefined) => void,
+  ) => {
+    const current = bag[field.id];
+
+    const changeValue = (id: SpecFieldId, value: string | string[] | undefined) => {
+      setField(id, value);
+      Object.values(SPEC_FIELDS).forEach((f) => {
+        if (f.showWhen?.field !== id) return;
+        if (typeof value !== "string" || value === "" || f.showWhen.value !== value) {
+          setField(f.id, undefined);
+        }
+      });
+    };
+
+    if (field.id === "shades") {
+      const system = (bag.shadeSystem as string) || SHADE_SYSTEMS[0];
+      const selected = (current as string[]) || [];
+      return (
+        <div key={field.id}>
+          <label className={labelCls}>{ar ? field.ar : field.en}</label>
+          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+            {SHADE_SYSTEMS.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => {
+                  setField("shadeSystem", s);
+                  setField("shades", undefined);
+                }}
+                className={cn(
+                  "shrink-0 h-9 px-3.5 rounded-full text-xs font-bold border transition whitespace-nowrap",
+                  system === s
+                    ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                    : "bg-white text-slate-600 border-slate-200 hover:border-slate-300",
+                )}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2 mt-2">
+            {shadeListFor(system).map((sh) => {
+              const active = selected.includes(sh.code);
+              return (
+                <button
+                  key={sh.code}
+                  type="button"
+                  onClick={() => {
+                    const next = active
+                      ? selected.filter((x) => x !== sh.code)
+                      : [...selected, sh.code];
+                    setField("shades", next.length > 0 ? next : undefined);
+                  }}
+                  className={cn(
+                    "h-9 px-3 rounded-full text-[11px] font-bold border transition flex items-center gap-1.5",
+                    active
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-400 ring-2 ring-emerald-500/20"
+                      : "bg-white text-slate-600 border-slate-200 hover:border-slate-300",
+                  )}
+                >
+                  <span
+                    className="size-4 rounded-full border border-white/70 shadow-inner"
+                    style={{ background: sh.hex }}
+                  />
+                  {sh.code}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    if (field.type === "text") {
+      return (
+        <div key={field.id}>
+          <label className={labelCls}>{ar ? field.ar : field.en}</label>
+          <input
+            value={(current as string) || ""}
+            onChange={(e) => changeValue(field.id, e.target.value || undefined)}
+            placeholder={field.placeholder}
+            className={inputCls}
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div key={field.id}>
+        <label className={labelCls}>{ar ? field.ar : field.en}</label>
+        <div className="relative">
+          <select
+            value={(current as string) || ""}
+            onChange={(e) => changeValue(field.id, e.target.value || undefined)}
+            className={cn(inputCls, "appearance-none pe-9")}
+          >
+            <option value="">{ar ? "-- اختر --" : "-- Select --"}</option>
+            {field.options?.map((o) => (
+              <option key={o.value} value={o.value}>
+                {ar ? o.ar ?? o.value : o.value}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="absolute end-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400 pointer-events-none" />
+        </div>
+      </div>
+    );
+  };
+
+  const strictBag = isTechBranch ? techSpecs : specs;
+  const visibleStrictIds = useMemo(
+    () => visibleSpecIds(strictFieldIds ?? [], strictBag),
+    [strictFieldIds, strictBag],
+  );
 
   const inputCls =
     "w-full h-12 rounded-2xl bg-white border border-slate-200 px-4 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/40 transition";
@@ -439,8 +663,8 @@ function ProductsPanel() {
     setOrigin("");
     setBarcode("");
     setVolume("");
-    setShadeTab("classical");
-    setShades([]);
+    setSpecs({});
+    setTechSpecs({});
     setTiers([]);
     setImageFiles([]);
     setImagePreviews([]);
@@ -463,8 +687,8 @@ function ProductsPanel() {
     setOrigin(p.country || "");
     setBarcode(p.barcode || "");
     setVolume(p.volume || "");
-    setShadeTab((p.shadeSystem as ShadeTab) || "classical");
-    setShades(p.shades || []);
+    setSpecs(p.specs ? { ...p.specs } : {});
+    setTechSpecs(p.technicalSpecifications ? { ...p.technicalSpecifications } : {});
     setTiers(
       (p.discountTiers || []).map((t) => ({
         key: crypto.randomUUID(),
@@ -482,10 +706,6 @@ function ProductsPanel() {
 
   const updateTier = (key: string, field: keyof Omit<TierRow, "key">, value: string) => {
     setTiers((prev) => prev.map((t) => (t.key === key ? { ...t, [field]: value } : t)));
-  };
-
-  const toggleShade = (code: string) => {
-    setShades((prev) => (prev.includes(code) ? prev.filter((s) => s !== code) : [...prev, code]));
   };
 
   const handleFiles = (files: FileList | null) => {
@@ -599,6 +819,24 @@ function ProductsPanel() {
         ? `${countryCodeToFlag(originCountry.code)} ${originCountry.ar}`
         : undefined;
 
+      const cleanSpecs: ProductSpecs = {};
+      (Object.entries(specs) as [SpecFieldId, string | string[]][]).forEach(([k, v]) => {
+        if (Array.isArray(v)) {
+          if (v.length > 0) cleanSpecs[k] = v;
+        } else if (typeof v === "string" && v.trim()) {
+          cleanSpecs[k] = v.trim();
+        }
+      });
+
+      const cleanTech: ProductSpecs = {};
+      (Object.entries(techSpecs) as [SpecFieldId, string | string[]][]).forEach(([k, v]) => {
+        if (Array.isArray(v)) {
+          if (v.length > 0) cleanTech[k] = v;
+        } else if (typeof v === "string" && v.trim()) {
+          cleanTech[k] = v.trim();
+        }
+      });
+
       await upsert.mutateAsync({
         id: productId,
         branch,
@@ -617,8 +855,10 @@ function ProductsPanel() {
         countryOrigin,
         barcode: barcode.trim() || undefined,
         volume: volume.trim() || undefined,
-        shadeSystem: showShades ? shadeTab : undefined,
-        shades: showShades && shades.length > 0 ? shades : undefined,
+        specs: Object.keys(cleanSpecs).length > 0 ? cleanSpecs : undefined,
+        technicalSpecifications:
+          Object.keys(cleanTech).length > 0 ? cleanTech : undefined,
+        sku: sku || undefined,
         discountTiers: cleanTiers.length > 0 ? cleanTiers : undefined,
       });
 
@@ -650,6 +890,22 @@ function ProductsPanel() {
       if (c) return `${countryCodeToFlag(c.code)} ${c.ar}`;
     }
     return null;
+  };
+
+  const specChips = (p: Product): string[] => {
+    const out: string[] = [];
+    const bags = [p.specs ?? {}, p.technicalSpecifications ?? {}];
+    bags.forEach((bag) => {
+      (Object.entries(bag) as [SpecFieldId, string | string[]][]).forEach(([id, v]) => {
+        if (Array.isArray(v)) {
+          if (v.length > 0) out.push(v.join(" · "));
+        } else if (typeof v === "string" && v) {
+          const opt = SPEC_FIELDS[id]?.options?.find((o) => o.value === v);
+          out.push(opt?.ar ?? v);
+        }
+      });
+    });
+    return out.slice(0, 2);
   };
 
   const allImagePaths = myProducts.flatMap((p) => p.images);
@@ -800,6 +1056,7 @@ function ProductsPanel() {
                             onClick={() => {
                               setBranch(b.value);
                               setSubCategory("");
+                              resetSpecs();
                               setCatDropdownOpen(false);
                             }}
                             className={`w-full px-4 py-2.5 text-sm transition-colors flex items-center justify-between hover:bg-emerald-50 hover:text-emerald-700 ${
@@ -821,7 +1078,10 @@ function ProductsPanel() {
                     <div className="relative">
                       <select
                         value={subCategory}
-                        onChange={(e) => setSubCategory(e.target.value)}
+                        onChange={(e) => {
+                          setSubCategory(e.target.value);
+                          resetSpecs();
+                        }}
                         className={cn(inputCls, "appearance-none pe-9")}
                       >
                         <option value="">{ar ? "-- اختر التصنيف الفرعي --" : "-- Select sub-category --"}</option>
@@ -943,75 +1203,38 @@ function ProductsPanel() {
                 </p>
               </section>
 
-              {/* Composite Shades */}
-              {showShades && (
+              {/* Dynamic Technical Specs */}
+              {isStrictBranch ? (
+                visibleStrictIds.length > 0 && (
+                  <section className={cardCls}>
+                    <p className={sectionTitleCls}>
+                      <span className="size-1.5 rounded-full bg-emerald-500" />
+                      {ar ? "المواصفات الفنية" : "Technical Specifications"}
+                    </p>
+                    {visibleStrictIds.map((fid) =>
+                      renderField(SPEC_FIELDS[fid], strictBag, isTechBranch ? setTechSpec : setSpec),
+                    )}
+                  </section>
+                )
+              ) : activeGroups.length > 0 ? (
                 <section className={cardCls}>
                   <p className={sectionTitleCls}>
                     <span className="size-1.5 rounded-full bg-emerald-500" />
-                    {ar ? "درجة اللون / الشيد" : "Shade / Composite Shade"}
+                    {ar ? "المواصفات الفنية" : "Technical Specifications"}
                   </p>
-                  <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-                    {(
-                      [
-                        ["classical", "VITA Classical"],
-                        ["3d", "VITA 3D-Master"],
-                        ["bleach", "Bleach"],
-                      ] as [ShadeTab, string][]
-                    ).map(([k, label]) => (
-                      <button
-                        key={k}
-                        type="button"
-                        onClick={() => {
-                          setShadeTab(k);
-                          setShades([]);
-                        }}
-                        className={cn(
-                          "shrink-0 h-9 px-3.5 rounded-full text-xs font-bold border transition whitespace-nowrap",
-                          shadeTab === k
-                            ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
-                            : "bg-white text-slate-600 border-slate-200 hover:border-slate-300",
-                        )}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {(shadeTab === "classical"
-                      ? VITA_SHADES
-                      : shadeTab === "3d"
-                        ? VITA_3D_SHADES
-                        : VITA_BLEACH_SHADES
-                    ).map((s) => {
-                      const active = shades.includes(s.code);
-                      return (
-                        <button
-                          key={s.code}
-                          type="button"
-                          onClick={() => toggleShade(s.code)}
-                          className={cn(
-                            "h-9 px-3 rounded-full text-[11px] font-bold border transition flex items-center gap-1.5",
-                            active
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-400 ring-2 ring-emerald-500/20"
-                              : "bg-white text-slate-600 border-slate-200 hover:border-slate-300",
-                          )}
-                        >
-                          <span
-                            className="size-4 rounded-full border border-white/70 shadow-inner"
-                            style={{ background: s.hex }}
-                          />
-                          {s.code}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {shades.length > 0 && (
-                    <p className="text-[11px] font-semibold text-emerald-700">
-                      {ar ? `المحدد: ${shades.join("، ")}` : `Selected: ${shades.join(", ")}`}
-                    </p>
-                  )}
+                  {activeGroups.map((g) => (
+                    <div key={g.id} className="space-y-3 pt-1">
+                      <p className="text-[11px] font-extrabold text-emerald-700 flex items-center gap-1">
+                        <span className="size-1 rounded-full bg-emerald-600" />
+                        {ar ? g.ar : g.en}
+                      </p>
+                      {g.fields
+                        .filter((fid) => activeFields.includes(fid))
+                        .map((fid) => renderField(SPEC_FIELDS[fid], specs, setSpec))}
+                    </div>
+                  ))}
                 </section>
-              )}
+              ) : null}
 
               {/* Pricing, Volume & Inventory */}
               <section className={cardCls}>
@@ -1119,6 +1342,16 @@ function ProductsPanel() {
                       <Plus className="size-4" />
                     </button>
                   </div>
+                </div>
+                <div>
+                  <label className={labelCls}>{ar ? "رمز SKU (تلقائي)" : "SKU (auto)"}</label>
+                  <input
+                    value={sku}
+                    readOnly
+                    dir="ltr"
+                    placeholder={ar ? "يُولّد تلقائياً من المواصفات" : "Auto-generated from specs"}
+                    className={cn(inputCls, "bg-slate-50 text-slate-500 font-mono text-xs")}
+                  />
                 </div>
               </section>
 
@@ -1414,6 +1647,20 @@ function ProductsPanel() {
                   <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded-full px-2 py-0.5">
                     {originLabel(p)}
                   </span>
+                )}
+
+                {/* Spec chips */}
+                {specChips(p).length > 0 && (
+                  <span className="block mt-1.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-full px-2 py-0.5 truncate">
+                    {specChips(p).join(" · ")}
+                  </span>
+                )}
+
+                {/* SKU */}
+                {p.sku && (
+                  <p className="mt-1.5 text-[9px] font-mono font-semibold text-slate-400 truncate" dir="ltr">
+                    {p.sku}
+                  </p>
                 )}
 
                 {/* Sub-category */}
