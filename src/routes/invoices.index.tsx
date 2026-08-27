@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { OrderInvoiceModal } from "@/components/OrderInvoiceModal";
+import { OfficialInvoiceView } from "@/components/OfficialInvoiceView";
 import { useI18n } from "@/lib/i18n";
 import { useSession } from "@/lib/useAuth";
 import { useDentistCases, isCompletedStatus } from "@/lib/caseTracking";
@@ -10,9 +11,10 @@ import { useDentistInvoices } from "@/lib/invoices";
 import { resolveOrderTotal } from "@/lib/orderLines";
 import { db } from "@/integrations/firebase/client";
 import { doc, getDoc } from "firebase/firestore";
-import type { UserRoleDoc, InvoiceDoc, InvoiceItem } from "@/integrations/firebase/types";
+import type { UserRoleDoc, InvoiceDoc } from "@/integrations/firebase/types";
 import type { Order } from "@/lib/ordersStore";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import {
   Loader2,
   ReceiptText,
@@ -22,6 +24,7 @@ import {
   X,
   Printer,
   Hash,
+  Share2,
 } from "lucide-react";
 
 export const Route = createFileRoute("/invoices/")({
@@ -44,14 +47,6 @@ function fmtOfficeTotal(inv: InvoiceDoc): string {
   if (iqd > 0 && usd > 0) return `${iqd.toLocaleString("en-US")} د.ع + $${usd.toFixed(2)}`;
   if (iqd > 0) return `${iqd.toLocaleString("en-US")} د.ع`;
   return `$${(Number(inv.total) || usd).toFixed(2)}`;
-}
-
-function fmtDate(ts: { toDate?: () => Date } | null | undefined): string {
-  if (!ts || !ts.toDate) return "";
-  const d = ts.toDate();
-  return `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1)
-    .toString()
-    .padStart(2, "0")}/${d.getFullYear()}`;
 }
 
 /** Fetches `user_roles` profiles for a set of ids (labs / offices). */
@@ -305,6 +300,13 @@ function Invoices() {
         <OfficeInvoiceModal
           invoice={selectedOffice}
           officeName={profiles[selectedOffice.officeId]?.name}
+          officePhone={profiles[selectedOffice.officeId]?.phone}
+          officeAddress={[
+            profiles[selectedOffice.officeId]?.city,
+            profiles[selectedOffice.officeId]?.address,
+          ]
+            .filter(Boolean)
+            .join("، ")}
           ar={ar}
           onClose={() => setSelectedOffice(null)}
         />
@@ -316,18 +318,58 @@ function Invoices() {
 function OfficeInvoiceModal({
   invoice,
   officeName,
+  officePhone,
+  officeAddress,
   ar,
   onClose,
 }: {
   invoice: InvoiceDoc;
   officeName?: string;
+  officePhone?: string;
+  officeAddress?: string;
   ar: boolean;
   onClose: () => void;
 }) {
-  const itemTotal = (it: InvoiceItem) =>
-    it.currency === "IQD"
-      ? `${(it.price * it.quantity).toLocaleString("en-US")} د.ع`
-      : `$${(it.price * it.quantity).toFixed(2)}`;
+  const handlePrint = () => window.print();
+
+  const handleShare = async () => {
+    const lines = invoice.items.map((i) => {
+      const total =
+        i.currency === "IQD"
+          ? `${(i.price * i.quantity).toLocaleString("en-US")} د.ع`
+          : `$${(i.price * i.quantity).toFixed(2)}`;
+      return `• ${i.name} ×${i.quantity} — ${total}`;
+    });
+    const usd = Number(invoice.totalUSD) || 0;
+    const iqd = Number(invoice.totalIQD) || 0;
+    const text = [
+      ar ? "فاتورة" : "Invoice",
+      invoice.orderNumber,
+      invoice.doctorName,
+      ...lines,
+      ...(iqd > 0
+        ? [ar ? `الإجمالي بالدينار: ${iqd.toLocaleString("en-US")} د.ع` : `IQD total: ${iqd.toLocaleString("en-US")} IQD`]
+        : []),
+      ...(usd > 0
+        ? [ar ? `الإجمالي بالدولار: $${usd.toFixed(2)}` : `USD total: $${usd.toFixed(2)}`]
+        : []),
+    ].join("\n");
+
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({ title: ar ? "فاتورة" : "Invoice", text });
+      } catch {
+        // user cancelled
+      }
+    } else {
+      try {
+        await navigator.clipboard?.writeText(text);
+        toast.success(ar ? "تم نسخ ملخص الفاتورة" : "Invoice summary copied");
+      } catch {
+        toast.error(ar ? "تعذرت المشاركة" : "Share failed");
+      }
+    }
+  };
 
   return (
     <div
@@ -335,56 +377,47 @@ function OfficeInvoiceModal({
       onClick={onClose}
     >
       <div className="min-h-full flex items-start sm:items-center justify-center p-3 sm:p-6">
-        <div
-          className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="flex items-center justify-between px-5 py-4 bg-gradient-to-l from-sky-600 to-blue-600 text-white">
-            <div className="min-w-0">
-              <p className="font-display font-extrabold truncate">{officeName || (ar ? "فاتورة" : "Invoice")}</p>
-              <p className="text-xs text-white/80 font-mono" dir="ltr">
-                {invoice.orderNumber}
-              </p>
-            </div>
-            <button onClick={onClose} className="size-9 rounded-xl hover:bg-white/15 flex items-center justify-center">
-              <X className="size-5" />
+        <div className="w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3 bg-white rounded-t-2xl border border-slate-100 border-b-0 shadow-sm">
+            <h3 className="font-display font-extrabold text-base text-slate-900">
+              {ar ? "فاتورة المستلزمات" : "Supplies Invoice"}
+            </h3>
+            <button
+              onClick={onClose}
+              className="size-9 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center hover:bg-slate-200 transition"
+            >
+              <X className="size-4" />
             </button>
           </div>
 
-          <div className="px-5 py-4 space-y-3">
-            <div className="flex items-center justify-between text-xs text-slate-500">
-              <span>{ar ? "تاريخ الفاتورة" : "Date"}</span>
-              <span>{fmtDate(invoice.createdAt) || "—"}</span>
-            </div>
-
-            <div className="border-t border-slate-100 pt-3 space-y-2">
-              {invoice.items.map((it, i) => (
-                <div key={`${it.productId}-${i}`} className="flex items-center justify-between text-sm">
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-slate-700 truncate">{it.name}</p>
-                    <p className="text-[11px] text-slate-400">
-                      {it.quantity} {ar ? "×" : "×"} {it.currency === "IQD" ? it.price.toLocaleString() : `$${it.price.toFixed(2)}`}
-                    </p>
-                  </div>
-                  <span className="font-bold text-slate-800 shrink-0" dir="ltr">{itemTotal(it)}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="border-t border-slate-100 pt-3 flex items-center justify-between">
-              <span className="text-sm font-bold text-slate-600">{ar ? "الإجمالي" : "Total"}</span>
-              <span className="font-display font-extrabold text-lg text-emerald-700" dir="ltr">
-                {fmtOfficeTotal(invoice)}
-              </span>
-            </div>
-
+          {/* Print / Share */}
+          <div className="flex gap-2 bg-white px-4 pb-3 no-print">
             <button
-              onClick={() => window.print()}
-              className="w-full h-11 rounded-xl bg-slate-800 text-white font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition no-print"
+              onClick={handlePrint}
+              className="flex-1 h-11 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition"
+              style={{ backgroundColor: "#0E6E66" }}
             >
               <Printer className="size-4" />
-              {ar ? "طباعة الفاتورة" : "Print Invoice"}
+              {ar ? "طباعة" : "Print"}
             </button>
+            <button
+              onClick={handleShare}
+              className="flex-1 h-11 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold text-sm flex items-center justify-center gap-2 hover:bg-slate-50 transition"
+            >
+              <Share2 className="size-4" />
+              {ar ? "مشاركة" : "Share"}
+            </button>
+          </div>
+
+          {/* Invoice document */}
+          <div id="invoice-print" className="bg-white rounded-b-2xl border border-slate-100 p-4">
+            <OfficialInvoiceView
+              invoice={invoice}
+              storeName={officeName || (ar ? "مكتب المستلزمات الطبية" : "Medical Supplies Store")}
+              storePhone={officePhone || ""}
+              storeAddress={officeAddress || ""}
+            />
           </div>
         </div>
       </div>
