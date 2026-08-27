@@ -47,6 +47,9 @@ import {
   type Product,
 } from "@/lib/products";
 import { useOffers, useUpsertOffer, useDeleteOffer, type Offer } from "@/lib/offers";
+import { useOrders as useSupplierOrders } from "@/lib/orders";
+import type { OrderDoc } from "@/integrations/firebase/types";
+import { SupplierOrderDetailModal } from "@/components/SupplierOrderDetailModal";
 import { useUserRole } from "@/lib/useAuth";
 import { auth } from "@/integrations/firebase/client";
 import { useI18n } from "@/lib/i18n";
@@ -343,7 +346,7 @@ function SupplyDashboard() {
         {activeTab === "products" && <ProductsPanel />}
         {activeTab === "implants" && <ImplantsBoneGraftPanel />}
         {activeTab === "offers" && <OffersPanel supplierId={supplierId} />}
-        {activeTab === "orders" && <OrdersPanel />}
+        {activeTab === "orders" && <OrdersPanel supplierId={supplierId} />}
       </div>
     </MobileShell>
   );
@@ -2193,18 +2196,87 @@ function OffersPanel({ supplierId }: { supplierId: string }) {
   );
 }
 
-function OrdersPanel() {
+function OrdersPanel({ supplierId }: { supplierId: string }) {
   const { lang } = useI18n();
   const ar = lang === "ar";
+  const { data: orders = [], isLoading } = useSupplierOrders(supplierId);
+  const [selectedOrder, setSelectedOrder] = useState<OrderDoc | null>(null);
+
+  const fmtOrderTotal = (o: OrderDoc): string => {
+    const parts: string[] = [];
+    if ((o.totalUSD ?? 0) > 0) parts.push(`$${(o.totalUSD ?? 0).toFixed(2)}`);
+    if ((o.totalIQD ?? 0) > 0) parts.push(`${(o.totalIQD ?? 0).toLocaleString()} د.ع`);
+    return parts.length > 0 ? parts.join(" + ") : `$${(o.total || 0).toFixed(2)}`;
+  };
+
+  const statusBadge = (o: OrderDoc) => {
+    if (o.status === "confirmed")
+      return { ar: "تم التأكيد", en: "Confirmed", cls: "bg-emerald-100 text-emerald-700" };
+    if (o.status === "rejected")
+      return { ar: "غير متوفر", en: "Unavailable", cls: "bg-rose-100 text-rose-700" };
+    return { ar: "قيد الانتظار", en: "Pending", cls: "bg-amber-100 text-amber-700" };
+  };
+
   return (
-    <div className="py-20 flex flex-col items-center text-center text-muted-foreground">
-      <ClipboardList className="size-14 mb-4 opacity-20" />
-      <p className="font-display font-bold text-lg text-slate-400">
-        {ar ? "لا توجد طلبات بعد" : "No orders yet"}
-      </p>
-      <p className="text-sm mt-1 max-w-xs text-slate-400">
-        {ar ? "ستظهر الطلبات هنا عند استلامها" : "Orders will appear here when received"}
-      </p>
+    <div className="space-y-3">
+      {isLoading ? (
+        <div className="flex justify-center py-20">
+          <Loader2 className="size-6 text-primary animate-spin" />
+        </div>
+      ) : orders.length === 0 ? (
+        <div className="py-20 flex flex-col items-center text-center text-muted-foreground">
+          <ClipboardList className="size-14 mb-4 opacity-20" />
+          <p className="font-display font-bold text-lg text-slate-400">
+            {ar ? "لا توجد طلبات بعد" : "No orders yet"}
+          </p>
+          <p className="text-sm mt-1 max-w-xs text-slate-400">
+            {ar ? "ستظهر الطلبات هنا عند استلامها" : "Orders will appear here when received"}
+          </p>
+        </div>
+      ) : (
+        orders.map((o) => {
+          const meta = statusBadge(o);
+          const itemCount = (o.items ?? []).reduce((s, i) => s + (i.quantity || 1), 0);
+          return (
+            <div
+              key={o.id}
+              onClick={() => setSelectedOrder(o)}
+              className="bg-card border border-border rounded-2xl p-4 shadow-soft cursor-pointer hover:shadow-card transition"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="size-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                    <UserCircle2 className="size-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="font-bold text-sm truncate">
+                      {o.dentistName || (ar ? "طبيب" : "Doctor")}
+                    </p>
+                    <p className="text-[10px] text-slate-400">
+                      {o.orderNumber || ""} · {o.clinicName || o.dentistName || ""}
+                    </p>
+                  </div>
+                </div>
+                <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full", meta.cls)}>
+                  {ar ? meta.ar : meta.en}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span>
+                  {itemCount} {ar ? "منتجات" : "products"}
+                </span>
+                <span className="font-display font-extrabold text-sm text-foreground">
+                  {fmtOrderTotal(o)}
+                </span>
+              </div>
+            </div>
+          );
+        })
+      )}
+
+      {selectedOrder && (
+        <SupplierOrderDetailModal order={selectedOrder} onClose={() => setSelectedOrder(null)} />
+      )}
     </div>
   );
 }
@@ -2323,7 +2395,7 @@ function ImplantDashboard() {
       <div className="px-4 pt-4 pb-6">
         {activeTab === "products" && <ImplantProductsPanel />}
         {activeTab === "offers" && <OffersPanel supplierId={companyId} />}
-        {activeTab === "orders" && <OrdersPanel />}
+        {activeTab === "orders" && <OrdersPanel supplierId={companyId} />}
       </div>
     </MobileShell>
   );

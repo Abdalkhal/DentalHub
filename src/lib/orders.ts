@@ -32,6 +32,7 @@ const fromDoc = (id: string, data: Record<string, unknown>): OrderDoc => ({
       quantity: Number(o.quantity) || 1,
       price: Number(o.price) || 0,
       currency: o.currency === "IQD" ? "IQD" : "USD",
+      availability: (o.availability as "available" | "not_available" | undefined) ?? undefined,
     };
   }),
   total: Number(data.total) || 0,
@@ -215,6 +216,21 @@ export async function markOrderUnavailable(orderId: string): Promise<void> {
     status: "rejected",
     updatedAt: serverTimestamp(),
   });
+}
+
+/** Toggles the availability of a single item inside a pending order. */
+export async function updateOrderItemAvailability(
+  orderId: string,
+  index: number,
+  availability: "available" | "not_available",
+): Promise<void> {
+  const snap = await getDoc(doc(db, "orders", orderId));
+  if (!snap.exists()) return;
+  const items = (snap.data().items as unknown[]) ?? [];
+  const next = items.map((it, i) =>
+    i === index ? { ...(it as Record<string, unknown>), availability } : it,
+  );
+  await updateDoc(doc(db, "orders", orderId), { items: next });
 }
 
 export function useOrders(supplierId?: string) {

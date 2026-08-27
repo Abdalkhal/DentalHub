@@ -7,6 +7,7 @@ import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
 import { IncomingOrderRxModal } from "@/components/IncomingOrderRxModal";
+import { SupplierOrderDetailModal } from "@/components/SupplierOrderDetailModal";
 import { CombinedLabOrderModal, type CombinedLabOrder, type OrderPrefill } from "@/components/CombinedLabOrderModal";
 import { useI18n } from "@/lib/i18n";
 import { useUserRole, useSession } from "@/lib/useAuth";
@@ -35,8 +36,6 @@ import { useCaseUnreadCount } from "@/lib/caseMessages";
 import { useCart } from "@/lib/cartStore";
 import {
   placeCartOrder,
-  confirmOrder,
-  markOrderUnavailable,
   useOrders as useSupplierOrders,
   useDentistOrders,
 } from "@/lib/orders";
@@ -52,7 +51,6 @@ import {
   Loader2,
   Plus,
   Check,
-  X,
 } from "lucide-react";
 
 const ordersSearchSchema = z.object({
@@ -601,11 +599,10 @@ function SupplierOrders() {
   const ar = lang === "ar";
   const { role } = useUserRole();
   const supplierId = role?.userId ?? "";
-  const queryClient = useQueryClient();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "confirmed" | "rejected">("all");
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<OrderDoc | null>(null);
 
   const { data: supplierOrders = [], isLoading } = useSupplierOrders(supplierId);
 
@@ -630,34 +627,6 @@ function SupplierOrders() {
       return true;
     });
   }, [supplierOrders, statusFilter, search]);
-
-  const handleConfirm = async (o: OrderDoc) => {
-    setBusyId(o.id);
-    try {
-      await confirmOrder(o);
-      queryClient.invalidateQueries({ queryKey: ["orders", "supplier", supplierId] });
-      toast.success(
-        ar ? "تم تأكيد الطلب وتحويله إلى فاتورة" : "Order confirmed and converted to invoice",
-      );
-    } catch (e: any) {
-      toast.error(ar ? `فشل التأكيد: ${e?.message || e}` : `Confirm failed: ${e?.message || e}`);
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  const handleUnavailable = async (o: OrderDoc) => {
-    setBusyId(o.id);
-    try {
-      await markOrderUnavailable(o.id);
-      queryClient.invalidateQueries({ queryKey: ["orders", "supplier", supplierId] });
-      toast.success(ar ? "تم تحديد الطلب كغير متوفر" : "Order marked as unavailable");
-    } catch (e: any) {
-      toast.error(ar ? `فشل التحديث: ${e?.message || e}` : `Update failed: ${e?.message || e}`);
-    } finally {
-      setBusyId(null);
-    }
-  };
 
   const fmtTotal = (o: OrderDoc) => {
     const usd = o.totalUSD ?? 0;
@@ -722,9 +691,12 @@ function SupplierOrders() {
               const s = o.status;
               const itemCount = (o.items || []).reduce((sum, i) => sum + (i.quantity || 1), 0);
               const firstItem = o.items?.[0]?.name || (ar ? "منتج" : "Product");
-              const isPending = s === "pending";
               return (
-                <div key={o.id} className="bg-card border border-border rounded-2xl p-4 shadow-soft">
+                <div
+                  key={o.id}
+                  onClick={() => setSelectedOrder(o)}
+                  className="bg-card border border-border rounded-2xl p-4 shadow-soft cursor-pointer hover:shadow-card transition"
+                >
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <div className="flex items-center gap-2.5 min-w-0">
                       <span className="size-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
@@ -764,33 +736,15 @@ function SupplierOrders() {
                       {fmtTotal(o)}
                     </span>
                   </div>
-
-                  {isPending && (
-                    <div className="flex gap-2 mt-3 pt-3 border-t border-border">
-                      <button
-                        onClick={() => handleConfirm(o)}
-                        disabled={busyId === o.id}
-                        className="flex-1 h-10 rounded-xl bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-90 transition disabled:opacity-60"
-                      >
-                        {busyId === o.id ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
-                        {ar ? "تأكيد الطلب" : "Confirm"}
-                      </button>
-                      <button
-                        onClick={() => handleUnavailable(o)}
-                        disabled={busyId === o.id}
-                        className="flex-1 h-10 rounded-xl bg-card border border-border text-muted-foreground text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-rose-50 hover:text-rose-600 transition disabled:opacity-60"
-                      >
-                        <X className="size-4" />
-                        {ar ? "الطلب غير متوفر" : "Unavailable"}
-                      </button>
-                    </div>
-                  )}
                 </div>
               );
             })
           )}
         </div>
       </div>
+      {selectedOrder && (
+        <SupplierOrderDetailModal order={selectedOrder} onClose={() => setSelectedOrder(null)} />
+      )}
     </MobileShell>
   );
 }
