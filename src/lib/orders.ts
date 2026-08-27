@@ -83,6 +83,17 @@ export async function placeCartOrder(
 
   let created = 0;
   let firstOrderId: string | undefined;
+
+  let dentistPhotoURL = "";
+  try {
+    const dSnap = await getDoc(doc(db, "user_roles", dentist.id));
+    if (dSnap.exists()) {
+      dentistPhotoURL = ((dSnap.data() as Record<string, unknown>).photoURL as string) || "";
+    }
+  } catch {
+    // photo is best-effort
+  }
+
   for (const [supplierId, supplierItems] of bySupplier) {
     const orderId = doc(collection(db, "orders")).id;
     const orderNumber = generateOrderNumber();
@@ -134,6 +145,8 @@ export async function placeCartOrder(
           : `رقم الطلب ${orderNumber} · ${orderItems.length} ${itemLabel}`,
         type: "order_new",
         orderId,
+        senderName: dentist.name,
+        senderPhotoURL: dentistPhotoURL,
         isRead: false,
         createdAt: Date.now(),
         expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
@@ -172,27 +185,49 @@ export async function placeCartOrder(
 }
 
 /**
- * Confirms an order: generates the Invoice document (status "confirmed") and
- * updates the order status to "confirmed". Returns the new invoice id.
+ * Confirms an order: generates the Invoice document (status "confirmed"),
+ * updates the order status to "confirmed", and notifies the dentist about any
+ * products that could not be provided. Items marked "not_available" are
+ * excluded from the final invoice. Returns the new invoice id.
  */
 export async function confirmOrder(order: OrderDoc): Promise<string> {
   const invoiceId = doc(collection(db, "invoices")).id;
 
+  // Always re-read the latest order so per-item availability set just before
+  // confirming is honoured (the in-memory order may be stale).
+  const snap = await getDoc(doc(db, "orders", order.id));
+  const latest = snap.exists() ? fromDoc(order.id, snap.data()) : order;
+
+  const availableItems = (latest.items ?? []).filter(
+    (i) => i.availability !== "not_available",
+  );
+  const unavailableItems = (latest.items ?? []).filter(
+    (i) => i.availability === "not_available",
+  );
+
+  const totalUSD = availableItems
+    .filter((i) => i.currency !== "IQD")
+    .reduce((s, i) => s + i.price * i.quantity, 0);
+  const totalIQD = availableItems
+    .filter((i) => i.currency === "IQD")
+    .reduce((s, i) => s + i.price * i.quantity, 0);
+  const total = totalUSD + totalIQD;
+
   await setDoc(doc(db, "invoices", invoiceId), {
     id: invoiceId,
-    orderNumber: order.orderNumber || generateOrderNumber(),
-    officeId: order.supplierId,
-    doctorId: order.dentistId,
-    doctorName: order.dentistName,
-    clinicName: order.clinicName || order.dentistName,
-    doctorPhone: order.dentistPhone || "",
-    doctorAddress: order.dentistAddress || "",
-    items: order.items,
-    total: order.total,
-    totalUSD: order.totalUSD ?? 0,
-    totalIQD: order.totalIQD ?? 0,
-    note: order.note || "",
-    discount: order.discount ?? null,
+    orderNumber: latest.orderNumber || generateOrderNumber(),
+    officeId: latest.supplierId,
+    doctorId: latest.dentistId,
+    doctorName: latest.dentistName,
+    clinicName: latest.clinicName || latest.dentistName,
+    doctorPhone: latest.dentistPhone || "",
+    doctorAddress: latest.dentistAddress || "",
+    items: availableItems,
+    total,
+    totalUSD,
+    totalIQD,
+    note: latest.note || "",
+    discount: latest.discount ?? null,
     status: "confirmed",
     createdAt: serverTimestamp(),
     confirmedAt: serverTimestamp(),
@@ -201,7 +236,46 @@ export async function confirmOrder(order: OrderDoc): Promise<string> {
     rejectedAt: null,
   });
 
-  await updateDoc(doc(db, "orders", order.id), {
+  // Notify the dentist about products that could not be provided.
+  if (unavailableItems.length > 0 && latest.dentistId) {
+    const notifId = `${latest.dentistId}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    let senderName = "";
+    let senderPhotoURL = "";
+    try {
+      const sSnap = await getDoc(doc(db, "user_roles", latest.supplierId));
+      if (sSnap.exists()) {
+        const s = sSnap.data() as Record<string, unknown>;
+        senderName = (s.name as string) || "";
+        senderPhotoURL = (s.photoURL as string) || "";
+      }
+    } catch {
+      // sender info is best-effort
+    }
+    try {
+      await setDoc(doc(db, "notifications", notifId), {
+        id: notifId,
+        userId: latest.dentistId,
+        title: "تعذر توفير منتج في طلبك",
+        body:
+          unavailableItems.length === 1
+            ? `تعذر توفير المنتج "${unavailableItems[0].name}" في طلبك ${latest.orderNumber || ""}`
+            : `تعذر توفير المنتجات التالية في طلبك ${latest.orderNumber || ""}: ${unavailableItems
+                .map((i) => i.name)
+                .join("، ")}`,
+        type: "order_status",
+        orderId: latest.id,
+        senderName,
+        senderPhotoURL,
+        isRead: false,
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+      });
+    } catch {
+      // notification is best-effort
+    }
+  }
+
+  await updateDoc(doc(db, "orders", latest.id), {
     status: "confirmed",
     invoiceId,
     updatedAt: serverTimestamp(),

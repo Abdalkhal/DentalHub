@@ -4,7 +4,7 @@ import {
   updateDoc, doc, writeBatch, setDoc,
 } from "firebase/firestore";
 import { db } from "@/integrations/firebase/client";
-import { Bell, CheckCheck, Package, Truck, CheckCircle2, AlertCircle } from "lucide-react";
+import { Bell, CheckCheck, Package, Truck, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "@tanstack/react-router";
 
@@ -19,6 +19,8 @@ type Notification = {
   orderId?: string;
   invoiceId?: string;
   expiresAt?: number;
+  senderName?: string;
+  senderPhotoURL?: string;
 };
 
 export function createNotification(data: Omit<Notification, "id" | "isRead" | "createdAt" | "expiresAt">) {
@@ -111,9 +113,9 @@ export function NotificationBell({ userId }: { userId: string }) {
       </button>
 
       {open && (
-        <div className="absolute top-full end-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-            <h3 className="font-bold text-sm">الإشعارات</h3>
+        <div className="absolute top-full end-0 mt-2 w-[22rem] sm:w-[26rem] bg-white rounded-3xl shadow-2xl border border-slate-100 z-50 overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-gradient-to-r from-sky-50/60 to-transparent">
+            <h3 className="font-display font-extrabold text-sm text-slate-800">الإشعارات</h3>
             {unread > 0 && (
               <button onClick={markAllRead} className="text-[11px] font-semibold text-primary hover:underline flex items-center gap-1">
                 <CheckCheck className="size-3" />تحديد الكل كمقروء
@@ -135,19 +137,59 @@ export function NotificationBell({ userId }: { userId: string }) {
                     key={n.id}
                     onClick={() => handleItemClick(n)}
                     className={cn(
-                      "w-full text-start px-4 py-3 flex gap-3 border-b border-gray-50 hover:bg-sky-50/50 transition",
-                      !n.isRead && "bg-sky-50/30",
+                      "w-full text-start px-4 py-3.5 flex gap-3 border-b border-slate-100 transition",
+                      !n.isRead ? "bg-sky-50/40 hover:bg-sky-50" : "hover:bg-slate-50",
                     )}
                   >
-                    <span className={cn("size-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5", n.isRead ? "bg-slate-100 text-slate-500" : "bg-sky-100 text-sky-600")}>
-                      <Icon className="size-4" />
+                    <span className="relative shrink-0">
+                      {n.senderPhotoURL ? (
+                        <img
+                          src={n.senderPhotoURL}
+                          alt={n.senderName || ""}
+                          className={cn(
+                            "size-11 rounded-2xl object-cover ring-2",
+                            n.isRead ? "ring-slate-200" : "ring-sky-200",
+                          )}
+                        />
+                      ) : (
+                        <span
+                          className={cn(
+                            "size-11 rounded-2xl flex items-center justify-center",
+                            n.isRead ? "bg-slate-100 text-slate-500" : "bg-sky-100 text-sky-600",
+                          )}
+                        >
+                          <Icon className="size-5" />
+                        </span>
+                      )}
+                      {!n.isRead && (
+                        <span className="absolute -top-0.5 -end-0.5 size-3 rounded-full bg-rose-500 ring-2 ring-white" />
+                      )}
                     </span>
-                    <div className="flex-1 min-w-0">
-                      <p className={cn("text-xs leading-snug", !n.isRead && "font-bold text-slate-800")}>{n.title}</p>
-                      <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">{n.body}</p>
-                      <p className="text-[10px] text-slate-400 mt-1">{timeAgo(n.createdAt)}</p>
+
+                    <div className="flex-1 min-w-0 pt-0.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className={cn("text-[13px] leading-snug text-slate-800", !n.isRead && "font-bold")}>
+                          {n.title}
+                        </p>
+                        <span className="text-[11px] text-slate-400 whitespace-nowrap shrink-0 mt-0.5">
+                          {timeAgo(n.createdAt)}
+                        </span>
+                      </div>
+                      {n.senderName && (
+                        <p className="text-[11px] font-semibold text-slate-500 mt-0.5 flex items-center gap-1">
+                          <span className="size-1 rounded-full bg-slate-300" />
+                          {n.senderName}
+                        </p>
+                      )}
+                      <p
+                        className={cn(
+                          "text-xs leading-relaxed mt-1 line-clamp-2",
+                          n.isRead ? "text-slate-500" : "text-slate-700",
+                        )}
+                      >
+                        {n.body}
+                      </p>
                     </div>
-                    {!n.isRead && <span className="size-2 rounded-full bg-sky-500 shrink-0 mt-1" />}
                   </button>
                 );
               })
