@@ -95,6 +95,17 @@ function fmtPrice(o: Order, ar: boolean): string {
   return `$${price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function fmtOrderMoney(usd: number, iqd: number, ar: boolean): string {
+  const parts: string[] = [];
+  if (usd > 0) {
+    parts.push(`$${usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+  }
+  if (iqd > 0) {
+    parts.push(`${iqd.toLocaleString("en-US")} ${ar ? "د.ع" : "IQD"}`);
+  }
+  return parts.length > 0 ? parts.join(" + ") : "$0.00";
+}
+
 /* ── Rx → prefill helpers ────────────────────────── */
 
 const VALID_MATERIAL_IDS = new Set<string>(MATERIALS.map((m) => m.id));
@@ -492,7 +503,12 @@ function DentistOrders() {
               <div>
                 <p className="font-bold text-sm text-sky-800">{ar ? "سلة التسوق" : "Shopping Cart"}</p>
                 <p className="text-xs text-sky-600 mt-0.5">
-                  {cart.length} {ar ? "منتجات" : "products"} · ${cart.reduce((s, i) => s + i.unitPrice * i.quantity, 0).toFixed(2)}
+                  {cart.length} {ar ? "منتجات" : "products"} ·{" "}
+                  {fmtOrderMoney(
+                    cart.filter((i) => i.currency !== "IQD").reduce((s, i) => s + (i.unitPrice || 0) * (i.quantity || 1), 0),
+                    cart.filter((i) => i.currency === "IQD").reduce((s, i) => s + (i.unitPrice || 0) * (i.quantity || 1), 0),
+                    ar,
+                  )}
                 </p>
               </div>
             </div>
@@ -565,7 +581,7 @@ function DentistOrders() {
                   <div className="flex items-center justify-between text-xs text-slate-500">
                     <span>{itemCount} {ar ? "منتجات" : "products"}</span>
                     <span className="font-display font-extrabold text-sm text-foreground">
-                      ${(o.total || 0).toFixed(2)}
+                      {fmtOrderMoney(o.totalUSD ?? 0, o.totalIQD ?? 0, ar)}
                     </span>
                   </div>
                 </div>

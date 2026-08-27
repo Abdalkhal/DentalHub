@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { db } from "@/integrations/firebase/client";
 import {
-  collection, getDocs, query, where, Timestamp,
+  collection, getDocs, getDoc, query, where, Timestamp,
   doc, setDoc, updateDoc, serverTimestamp,
 } from "firebase/firestore";
 import type { OrderDoc, OrderStatus, InvoiceItem } from "@/integrations/firebase/types";
@@ -141,6 +141,29 @@ export async function placeCartOrder(
 
     if (!firstOrderId) firstOrderId = orderId;
     created++;
+  }
+
+  // Decrement stock for every ordered product so the new quantity is reflected
+  // automatically on both the dentist and the supplier sides. Best-effort:
+  // a failure here must never block the order itself.
+  const byProduct = new Map<string, number>();
+  for (const item of items) {
+    const id = item.productId || item.id;
+    if (!id) continue;
+    byProduct.set(id, (byProduct.get(id) ?? 0) + (item.quantity || 1));
+  }
+  for (const [productId, qty] of byProduct) {
+    try {
+      const pRef = doc(db, "products", productId);
+      const pSnap = await getDoc(pRef);
+      if (!pSnap.exists()) continue;
+      const current = Number((pSnap.data() as Record<string, unknown>).stock);
+      if (!Number.isFinite(current) || current <= 0) continue;
+      const next = Math.max(0, current - qty);
+      await updateDoc(pRef, { stock: next, inStock: next > 0 });
+    } catch {
+      // ignore — the order is already placed
+    }
   }
 
   clearCart();

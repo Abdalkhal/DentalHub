@@ -1,21 +1,45 @@
 import { useMemo, useState } from "react";
-import { X, ChevronLeft, ChevronRight, Package, Calendar, MapPin } from "lucide-react";
+import {
+  X,
+  ChevronLeft,
+  ChevronRight,
+  Package,
+  Calendar,
+  MapPin,
+  ShoppingCart,
+  Minus,
+  Plus,
+  Check,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { useSignedImageUrls, type Product } from "@/lib/products";
 import { ALL_COUNTRIES, countryCodeToFlag } from "@/data/countries";
 import { SPEC_FIELDS, type SpecFieldId } from "@/data/specs";
+import { addToCart } from "@/lib/cartStore";
+import { addToPurchaseHistory } from "@/lib/quickOrders";
 
 export function ProductDetailsModal({
   product,
   onClose,
+  isDoctorView = false,
+  cart,
 }: {
   product: Product;
   onClose: () => void;
+  isDoctorView?: boolean;
+  cart?: {
+    officeId: string;
+    officeName: string;
+    officeCity?: string;
+    inStock: boolean;
+  } | null;
 }) {
   const { lang } = useI18n();
   const ar = lang === "ar";
   const [activeImg, setActiveImg] = useState(0);
+  const [qty, setQty] = useState(1);
+  const [added, setAdded] = useState(false);
 
   const { data: urlMap = {} } = useSignedImageUrls(product.images);
   const images = product.images.map((p) => urlMap[p]).filter(Boolean) as string[];
@@ -54,6 +78,56 @@ export function ProductDetailsModal({
 
   const prev = () => setActiveImg((i) => (images.length === 0 ? 0 : (i - 1 + images.length) % images.length));
   const next = () => setActiveImg((i) => (images.length === 0 ? 0 : (i + 1) % images.length));
+
+  const cartSpecs = useMemo(() => {
+    const out: Record<string, string> = {};
+    const bags = [product.technicalSpecifications ?? {}, product.specs ?? {}];
+    bags.forEach((bag) => {
+      (Object.entries(bag) as [SpecFieldId, string | string[]][]).forEach(([id, v]) => {
+        const field = SPEC_FIELDS[id];
+        const label = field ? (ar ? field.ar : field.en) : id;
+        if (Array.isArray(v)) {
+          if (v.length > 0) out[label] = v.join("، ");
+        } else if (typeof v === "string" && v) {
+          const opt = field?.options?.find((o) => o.value === v);
+          out[label] = opt?.ar ?? v;
+        }
+      });
+    });
+    return out;
+  }, [product.specs, product.technicalSpecifications, ar]);
+
+  const handleAddToCart = () => {
+    if (!cart) return;
+    const name = ar ? product.ar || product.en : product.en || product.ar;
+    addToCart({
+      productId: product.id,
+      productName: name,
+      productImage: images[0],
+      officeId: cart.officeId,
+      officeName: cart.officeName,
+      brand: product.brand,
+      category: product.branch,
+      specs: cartSpecs,
+      unitPrice: product.price,
+      currency: product.currency,
+      quantity: qty,
+    });
+    addToPurchaseHistory({
+      productId: product.id,
+      productName: name,
+      vendor: cart.officeName,
+      brand: product.brand,
+      unitPrice: product.price,
+      image: images[0],
+      qty,
+    });
+    setAdded(true);
+    setTimeout(() => {
+      setAdded(false);
+      setQty(1);
+    }, 1500);
+  };
 
   return (
     <div className="fixed inset-0 z-[70]">
@@ -247,6 +321,68 @@ export function ProductDetailsModal({
             )}
           </div>
         </div>
+
+        {/* Cart footer (doctor view only) */}
+        {isDoctorView && cart && (
+          <div className="shrink-0 border-t border-slate-200 bg-white p-4 space-y-3">
+            {/* Store profile */}
+            <div className="flex items-center gap-3 rounded-2xl border border-slate-200 p-3">
+              <span className="size-11 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold shrink-0">
+                {(cart.officeName || "؟").charAt(0)}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold truncate">
+                  {cart.officeName || (ar ? "المكتب" : "Office")}
+                </p>
+                {cart.officeCity && (
+                  <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
+                    <MapPin className="size-3" /> {cart.officeCity}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Quantity + Add to cart */}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-between rounded-2xl bg-slate-100 border border-slate-200 h-12 px-1 w-32 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setQty((q) => Math.max(1, q - 1))}
+                  disabled={qty <= 1}
+                  className="size-9 flex items-center justify-center text-slate-600 hover:text-emerald-700 transition disabled:opacity-30"
+                >
+                  <Minus className="size-4" />
+                </button>
+                <span className="text-sm font-bold text-slate-800 min-w-6 text-center">{qty}</span>
+                <button
+                  type="button"
+                  onClick={() => setQty((q) => q + 1)}
+                  className="size-9 flex items-center justify-center text-slate-600 hover:text-emerald-700 transition"
+                >
+                  <Plus className="size-4" />
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={handleAddToCart}
+                disabled={!cart.inStock}
+                className={cn(
+                  "flex-1 h-12 rounded-2xl bg-emerald-600 text-white font-display font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg transition hover:bg-emerald-700 active:scale-[0.98]",
+                  !cart.inStock && "opacity-40",
+                )}
+              >
+                {added ? <Check className="size-4" /> : <ShoppingCart className="size-4" />}
+                {added
+                  ? ar
+                    ? "تمت الإضافة ✓"
+                    : "Added ✓"
+                  : ar
+                    ? `أضف للسلة${qty > 1 ? ` (${qty})` : ""}`
+                    : `Add to cart${qty > 1 ? ` (${qty})` : ""}`}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

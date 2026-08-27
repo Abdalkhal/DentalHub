@@ -5,7 +5,7 @@ import { RoleGuard } from "@/components/RoleGuard";
 import { useI18n } from "@/lib/i18n";
 import { useUserRole } from "@/lib/useAuth";
 import { useOfficeInvoices, invoiceItemCount } from "@/lib/invoices";
-import type { InvoiceStatus } from "@/integrations/firebase/types";
+import type { InvoiceStatus, InvoiceDoc } from "@/integrations/firebase/types";
 import { Loader2, ReceiptText, User, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +43,14 @@ function DoctorInvoicesListInner() {
   const { role } = useUserRole();
   const officeId = role?.userId;
   const { invoices, loading } = useOfficeInvoices(officeId);
+
+  const fmtInvTotal = (inv: InvoiceDoc): string => {
+    const parts: string[] = [];
+    if ((inv.totalUSD ?? 0) > 0) parts.push(`$${(inv.totalUSD ?? 0).toFixed(2)}`);
+    if ((inv.totalIQD ?? 0) > 0)
+      parts.push(`${(inv.totalIQD ?? 0).toLocaleString()} ${ar ? "د.ع" : "IQD"}`);
+    return parts.length > 0 ? parts.join(" + ") : `$${(inv.total || 0).toFixed(2)}`;
+  };
 
   // Only show invoices that have already been confirmed in "My Orders"
   // (pending requests live in the orders collection, not here).
@@ -113,7 +121,7 @@ function DoctorInvoicesListInner() {
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] text-muted-foreground">{fmtDate(inv.createdAt)}</span>
                       <span className="font-display font-extrabold text-base text-foreground">
-                        ${inv.total.toFixed(2)}
+                        {fmtInvTotal(inv)}
                       </span>
                     </div>
                   </Link>

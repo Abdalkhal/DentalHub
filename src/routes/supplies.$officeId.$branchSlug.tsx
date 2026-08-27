@@ -1,11 +1,12 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
 import { useAdminStore } from "@/lib/adminStore";
-import { useProducts, useSignedImageUrls } from "@/lib/products";
+import { useProducts, useSignedImageUrls, type Product } from "@/lib/products";
 import { ProductImageCarousel } from "@/components/ProductImageCarousel";
+import { ProductDetailsModal } from "@/components/ProductDetailsModal";
 import { SearchX, ArrowUpDown, ImageOff, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsFavorited, toggleFavorite } from "@/lib/favoritesStore";
@@ -49,7 +50,7 @@ function BranchPage() {
   const office = OFFICES.find((o) => o.id === officeId);
   const branch = BRANCHES.find((b) => b.slug === branchSlug);
   const { t, lang } = useI18n();
-  const navigate = useNavigate();
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [sort, setSort] = useState<Sort>("default");
@@ -180,8 +181,7 @@ function BranchPage() {
           <div className="grid grid-cols-2 gap-4">
             {items.map((p) => {
               const urls = p.images.map((path) => urlMap[path]).filter(Boolean);
-              const openProduct = () =>
-                navigate({ to: "/products/$productId", params: { productId: p.id } });
+              const openProduct = () => setSelectedProduct(p);
               return (
                 <div
                   key={p.id}
@@ -229,6 +229,19 @@ function BranchPage() {
           </div>
         )}
       </div>
+      {selectedProduct && (
+        <ProductDetailsModal
+          product={selectedProduct}
+          onClose={() => setSelectedProduct(null)}
+          isDoctorView
+          cart={{
+            officeId: selectedProduct.companyId || officeId,
+            officeName: lang === "ar" ? office?.ar ?? "" : office?.en ?? "",
+            officeCity: lang === "ar" ? office?.city?.ar ?? "" : office?.city?.en ?? "",
+            inStock: selectedProduct.inStock ?? true,
+          }}
+        />
+      )}
     </MobileShell>
   );
 }

@@ -1,11 +1,16 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/integrations/firebase/client";
+import type { UserRoleDoc } from "@/integrations/firebase/types";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
 import { useAdminStore } from "@/lib/adminStore";
-import { useProducts, useSignedImageUrls } from "@/lib/products";
+import { useProducts, useSignedImageUrls, type Product } from "@/lib/products";
 import { ProductGallery } from "@/components/ProductGallery";
+import { ProductDetailsModal } from "@/components/ProductDetailsModal";
 import { Plus, SearchX, Store, ArrowUpDown, ImageOff } from "lucide-react";
 
 export const Route = createFileRoute("/supplies/branch/$branchSlug")({
@@ -24,6 +29,7 @@ function BranchAllPage() {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [sort, setSort] = useState<Sort>("default");
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   const items = useMemo(() => {
     if (!branch) return [];
@@ -56,6 +62,26 @@ function BranchAllPage() {
 
   const allPaths = useMemo(() => items.flatMap((p) => p.images), [items]);
   const { data: urlMap = {} } = useSignedImageUrls(allPaths);
+
+  const { data: supplierNames = {} } = useQuery({
+    queryKey: [
+      "supplies-branch-suppliers",
+      items.map((i) => i.companyId ?? "").join("|"),
+    ],
+    enabled: items.length > 0,
+    queryFn: async (): Promise<Record<string, { name: string; city: string }>> => {
+      const ids = [...new Set(items.map((i) => i.companyId).filter(Boolean))] as string[];
+      const map: Record<string, { name: string; city: string }> = {};
+      for (const id of ids) {
+        const snap = await getDoc(doc(db, "user_roles", id));
+        if (snap.exists()) {
+          const d = snap.data() as UserRoleDoc;
+          map[id] = { name: d.name || "", city: d.city || "" };
+        }
+      }
+      return map;
+    },
+  });
 
   if (!branch) {
     return (
@@ -173,7 +199,11 @@ function BranchAllPage() {
               const urls = p.images.map((path) => urlMap[path]).filter(Boolean);
               const first = urls[0];
               return (
-                <li key={p.id} className="bg-card border border-border rounded-2xl p-3 shadow-soft">
+                <li
+                  key={p.id}
+                  onClick={() => setSelectedProduct(p)}
+                  className="bg-card border border-border rounded-2xl p-3 shadow-soft cursor-pointer"
+                >
                   <div className="flex items-center gap-3">
                     <div className="size-14 rounded-xl bg-surface flex items-center justify-center shrink-0 overflow-hidden">
                       {first ? (
@@ -204,15 +234,19 @@ function BranchAllPage() {
                       </div>
                     </div>
                     <button
-                      disabled={!p.inStock}
-                      className="size-9 rounded-xl bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40"
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedProduct(p);
+                      }}
+                      className="size-9 rounded-xl bg-primary text-primary-foreground flex items-center justify-center"
                       aria-label={t("add_to_order")}
                     >
                       <Plus className="size-4" />
                     </button>
                   </div>
                   {urls.length > 1 && (
-                    <div className="mt-2.5">
+                    <div className="mt-2.5" onClick={(e) => e.stopPropagation()}>
                       <ProductGallery urls={urls} alt={lang === "ar" ? p.ar : p.en} size="sm" />
                     </div>
                   )}
@@ -222,6 +256,21 @@ function BranchAllPage() {
           </ul>
         )}
       </div>
+      {selectedProduct && (
+        <ProductDetailsModal
+          product={selectedProduct}
+          onClose={() => setSelectedProduct(null)}
+          isDoctorView
+          cart={{
+            officeId: selectedProduct.companyId || "general",
+            officeName:
+              supplierNames[selectedProduct.companyId || ""]?.name ||
+              (lang === "ar" ? "مكتب" : "Office"),
+            officeCity: supplierNames[selectedProduct.companyId || ""]?.city || "",
+            inStock: selectedProduct.inStock ?? true,
+          }}
+        />
+      )}
     </MobileShell>
   );
 }

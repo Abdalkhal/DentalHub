@@ -1,11 +1,12 @@
-import { createFileRoute, useRouterState, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useRouterState } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useAdminStore } from "@/lib/adminStore";
 import { useI18n } from "@/lib/i18n";
-import { useProducts, useSignedImageUrls } from "@/lib/products";
+import { useProducts, useSignedImageUrls, type Product } from "@/lib/products";
 import { ProductImageCarousel } from "@/components/ProductImageCarousel";
+import { ProductDetailsModal } from "@/components/ProductDetailsModal";
 import {
   SearchX,
   Megaphone,
@@ -131,14 +132,14 @@ function OfficePage() {
   const { offices: OFFICES, branches: BRANCHES } = useAdminStore();
   const { data: PRODUCTS = [] } = useProducts();
   const office = OFFICES.find((o) => o.id === officeId);
-  const { t, lang, dir } = useI18n();
-  const navigate = useNavigate();
+  const { lang, dir } = useI18n();
   const BackIcon = BRANCH_BACK_ICON[dir] ?? ArrowRight;
   const isVisitor = useRouterState({
     select: (s) =>
       s.location.state != null &&
       (s.location.state as unknown as Record<string, unknown>)?.isVisitor === true,
   });
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [q, setQ] = useState("");
   const [branchFilter, setBranchFilter] = useState<string>("all");
   const [promos, setPromos] = useState<Promo[]>([]);
@@ -340,7 +341,7 @@ function OfficePage() {
                   return (
                     <div
                       key={p.id}
-                      onClick={() => navigate({ to: "/products/$productId", params: { productId: p.id } })}
+                      onClick={() => setSelectedProduct(p)}
                       className="bg-card border border-border rounded-2xl p-3 shadow-soft flex flex-col relative cursor-pointer"
                     >
                       <FavoriteHeart
@@ -388,6 +389,19 @@ function OfficePage() {
           </div>
         )}
       </div>
+      {selectedProduct && (
+        <ProductDetailsModal
+          product={selectedProduct}
+          onClose={() => setSelectedProduct(null)}
+          isDoctorView
+          cart={{
+            officeId: selectedProduct.companyId || officeId,
+            officeName: lang === "ar" ? office?.ar ?? "" : office?.en ?? "",
+            officeCity: lang === "ar" ? office?.city?.ar ?? "" : office?.city?.en ?? "",
+            inStock: selectedProduct.inStock ?? true,
+          }}
+        />
+      )}
     </MobileShell>
   );
 }

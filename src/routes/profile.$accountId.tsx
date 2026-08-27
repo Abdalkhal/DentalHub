@@ -1,11 +1,12 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
-import { useProducts, useSignedImageUrls } from "@/lib/products";
+import { useProducts, useSignedImageUrls, type Product } from "@/lib/products";
 import { ProductImageCarousel } from "@/components/ProductImageCarousel";
+import { ProductDetailsModal } from "@/components/ProductDetailsModal";
 import { useOffers } from "@/lib/offers";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/integrations/firebase/client";
@@ -25,7 +26,6 @@ import {
   HeartPulse,
   ShoppingCart,
   Check,
-  Layers,
   Wrench,
   Cog,
   Shield,
@@ -131,7 +131,8 @@ function ProfilePage() {
   const { accountId } = Route.useParams();
   const { lang } = useI18n();
   const ar = lang === "ar";
-  const navigate = useNavigate();
+
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   const { data: account, isLoading } = useQuery({
     queryKey: ["profile-account", accountId],
@@ -385,6 +386,7 @@ function ProfilePage() {
                         ar={ar}
                         officeId={accountId}
                         officeName={account.name || ""}
+                        onOpen={() => setSelectedProduct(p)}
                       />
                       );
                     })}
@@ -461,7 +463,7 @@ function ProfilePage() {
                 return (
                   <div
                     key={p.id}
-                    onClick={() => navigate({ to: "/products/$productId", params: { productId: p.id } })}
+                    onClick={() => setSelectedProduct(p)}
                     className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all cursor-pointer"
                   >
                     {urls.length > 0 ? (
@@ -504,6 +506,19 @@ function ProfilePage() {
           </div>
         )}
       </div>
+      {selectedProduct && (
+        <ProductDetailsModal
+          product={selectedProduct}
+          onClose={() => setSelectedProduct(null)}
+          isDoctorView
+          cart={{
+            officeId: selectedProduct.companyId || accountId,
+            officeName: account.name || (ar ? "المكتب" : "Office"),
+            officeCity: account.city || "",
+            inStock: selectedProduct.inStock ?? true,
+          }}
+        />
+      )}
     </MobileShell>
   );
 }
@@ -514,14 +529,15 @@ function ProductCard({
   ar,
   officeId,
   officeName,
+  onOpen,
 }: {
-  product: { id: string; ar: string; en: string; brand: string; price: number; currency: string };
+  product: Product;
   urls: string[];
   ar: boolean;
   officeId: string;
   officeName: string;
+  onOpen: () => void;
 }) {
-  const navigate = useNavigate();
   const liked = useIsFavorited(product.id);
   const [added, setAdded] = useState(false);
   const title = ar ? product.ar || product.en : product.en || product.ar;
@@ -545,7 +561,7 @@ function ProductCard({
 
   return (
     <div
-      onClick={() => navigate({ to: "/products/$productId", params: { productId: product.id } })}
+      onClick={onOpen}
       className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all relative cursor-pointer"
     >
       <button
