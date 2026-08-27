@@ -3,7 +3,14 @@ import { X, Plus, Trash2, Upload, Image, Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { TagInput } from "@/components/TagInput";
-import { useUpsertProduct, uploadProductImage, MAX_PRODUCT_IMAGES } from "@/lib/products";
+import {
+  useUpsertProduct,
+  uploadProductImage,
+  removeProductImage,
+  useSignedImageUrls,
+  MAX_PRODUCT_IMAGES,
+  type Product,
+} from "@/lib/products";
 import { auth } from "@/integrations/firebase/client";
 import { toast } from "sonner";
 
@@ -32,28 +39,53 @@ function newRow(): PackRow {
   return { key: crypto.randomUUID(), volume: "", priceUsd: "", priceIqd: "", available: true };
 }
 
-export function BoneGraftModal({ onClose }: { onClose: () => void }) {
+export function BoneGraftModal({
+  onClose,
+  product,
+}: {
+  onClose: () => void;
+  product?: Product;
+}) {
   const { lang } = useI18n();
   const ar = lang === "ar";
   const upsert = useUpsertProduct();
+  const isEdit = !!product;
 
-  const [name, setName] = useState("");
-  const [manufacturer, setManufacturer] = useState("");
-  const [country, setCountry] = useState("");
-  const [graftType, setGraftType] = useState(GRAFT_TYPES[0].ar);
-  const [form, setForm] = useState(GRAFT_FORMS[0].ar);
-  const [materialSource, setMaterialSource] = useState("");
-  const [composition, setComposition] = useState("");
-  const [particleSize, setParticleSize] = useState("");
-  const [sterilizationMethod, setSterilizationMethod] = useState("");
-  const [shelfLife, setShelfLife] = useState("");
-  const [features, setFeatures] = useState<string[]>([]);
-  const [description, setDescription] = useState("");
-  const [rows, setRows] = useState<PackRow[]>([newRow()]);
+  const [name, setName] = useState(product?.ar ?? "");
+  const [manufacturer, setManufacturer] = useState(product?.brand ?? "");
+  const [country, setCountry] = useState(product?.country ?? "");
+  const [graftType, setGraftType] = useState(product?.boneGraft?.graftType ?? GRAFT_TYPES[0].ar);
+  const [form, setForm] = useState(product?.boneGraft?.form ?? GRAFT_FORMS[0].ar);
+  const [materialSource, setMaterialSource] = useState(product?.boneGraft?.materialSource ?? "");
+  const [composition, setComposition] = useState(product?.boneGraft?.composition ?? "");
+  const [particleSize, setParticleSize] = useState(product?.boneGraft?.particleSize ?? "");
+  const [sterilizationMethod, setSterilizationMethod] = useState(
+    product?.boneGraft?.sterilizationMethod ?? "",
+  );
+  const [shelfLife, setShelfLife] = useState(product?.boneGraft?.shelfLife ?? "");
+  const [features, setFeatures] = useState<string[]>(product?.boneGraft?.features ?? []);
+  const [description, setDescription] = useState(product?.description ?? "");
+  const [rows, setRows] = useState<PackRow[]>(() => {
+    const pack = product?.boneGraft?.packSizes;
+    if (pack && pack.length > 0) {
+      return pack.map((p) => ({
+        key: crypto.randomUUID(),
+        volume: p.volume,
+        priceUsd: p.priceUsd ? String(p.priceUsd) : "",
+        priceIqd: p.priceIqd ? String(p.priceIqd) : "",
+        available: p.available,
+      }));
+    }
+    return [newRow()];
+  });
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [existingImages, setExistingImages] = useState<string[]>(product?.images ?? []);
+  const [removedImages, setRemovedImages] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  const { data: existingUrlMap = {} } = useSignedImageUrls(existingImages);
 
   const inputCls =
     "w-full h-11 rounded-xl bg-[#F5FAFE] border border-[#D3E8F7] px-3 text-sm text-[#17324A] placeholder:text-[#7A94A8] focus:outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0]";
@@ -66,7 +98,10 @@ export function BoneGraftModal({ onClose }: { onClose: () => void }) {
 
   const addFiles = (files: FileList | null) => {
     if (!files) return;
-    const incoming = Array.from(files).slice(0, MAX_PRODUCT_IMAGES - imageFiles.length);
+    const incoming = Array.from(files).slice(
+      0,
+      MAX_PRODUCT_IMAGES - imageFiles.length - existingImages.length,
+    );
     if (incoming.length === 0) return;
     setImageFiles((prev) => [...prev, ...incoming]);
     setImagePreviews((prev) => [...prev, ...incoming.map((f) => URL.createObjectURL(f))]);
@@ -78,6 +113,11 @@ export function BoneGraftModal({ onClose }: { onClose: () => void }) {
       URL.revokeObjectURL(prev[idx]);
       return prev.filter((_, i) => i !== idx);
     });
+  };
+
+  const removeExistingImage = (path: string) => {
+    setRemovedImages((prev) => [...prev, path]);
+    setExistingImages((prev) => prev.filter((p) => p !== path));
   };
 
   const updateRow = (key: string, patch: Partial<PackRow>) => {
@@ -97,7 +137,14 @@ export function BoneGraftModal({ onClose }: { onClose: () => void }) {
 
     setBusy(true);
     try {
-      const productId = crypto.randomUUID();
+      const productId = product?.id ?? crypto.randomUUID();
+
+      for (const path of removedImages) {
+        try {
+          await removeProductImage(path);
+        } catch { /* image already removed */ }
+      }
+
       const uploadedPaths: string[] = [];
       for (const file of imageFiles) {
         uploadedPaths.push(await uploadProductImage(productId, file));
@@ -122,12 +169,12 @@ export function BoneGraftModal({ onClose }: { onClose: () => void }) {
         brand: manufacturer.trim(),
         price: firstUsd,
         currency: "USD",
-        stock: 1,
-        inStock: true,
-        images: uploadedPaths,
+        stock: product?.stock ?? 1,
+        inStock: (product?.stock ?? 1) > 0,
+        images: [...existingImages, ...uploadedPaths],
         category: "implant",
         country,
-        companyId: auth.currentUser?.uid ?? "",
+        companyId: product?.companyId || auth.currentUser?.uid || "",
         description: description.trim() || undefined,
         boneGraft: {
           graftType,
@@ -142,7 +189,15 @@ export function BoneGraftModal({ onClose }: { onClose: () => void }) {
         },
       });
 
-      toast.success(ar ? "تمت إضافة البون كرافت بنجاح" : "Bone graft added successfully");
+      toast.success(
+        isEdit
+          ? ar
+            ? "تم تحديث البون كرافت بنجاح"
+            : "Bone graft updated successfully"
+          : ar
+            ? "تمت إضافة البون كرافت بنجاح"
+            : "Bone graft added successfully",
+      );
       onClose();
     } catch (e: any) {
       setError(e?.message || String(e));
@@ -162,7 +217,15 @@ export function BoneGraftModal({ onClose }: { onClose: () => void }) {
           className="flex items-center justify-between px-4 pt-4 pb-3 shrink-0 text-white"
           style={{ background: "linear-gradient(to right, #2E93E0, #1C6FB5)" }}
         >
-          <h2 className="font-display font-extrabold text-base">{ar ? "إضافة بون كرافت" : "Add Bone Graft"}</h2>
+          <h2 className="font-display font-extrabold text-base">
+            {isEdit
+              ? ar
+                ? "تعديل بون كرافت"
+                : "Edit Bone Graft"
+              : ar
+                ? "إضافة بون كرافت"
+                : "Add Bone Graft"}
+          </h2>
           <button
             type="button"
             onClick={onClose}
@@ -323,6 +386,27 @@ export function BoneGraftModal({ onClose }: { onClose: () => void }) {
           <section className={sectionCls}>
             <p className={sectionTitleCls}><span className="size-1.5 rounded-full bg-[#1C6FB5]" />{ar ? "الصور والمرفقات" : "Product Images"}</p>
             <div className="grid grid-cols-3 gap-2">
+              {existingImages.map((path) => (
+                <div
+                  key={path}
+                  className="relative aspect-square rounded-xl overflow-hidden border border-[#D3E8F7]"
+                >
+                  {existingUrlMap[path] ? (
+                    <img src={existingUrlMap[path]} alt="" className="size-full object-cover" />
+                  ) : (
+                    <div className="size-full flex items-center justify-center bg-[#E7F4FE]">
+                      <Image className="size-5 text-slate-300" />
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => removeExistingImage(path)}
+                    className="absolute top-1 end-1 size-6 rounded-full bg-black/60 text-white flex items-center justify-center"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+              ))}
               {imagePreviews.map((src, i) => (
                 <div key={i} className="relative aspect-square rounded-xl overflow-hidden border border-[#D3E8F7]">
                   <img src={src} alt="" className="size-full object-cover" />
@@ -335,7 +419,7 @@ export function BoneGraftModal({ onClose }: { onClose: () => void }) {
                   </button>
                 </div>
               ))}
-              {imageFiles.length < MAX_PRODUCT_IMAGES && (
+              {imageFiles.length + existingImages.length < MAX_PRODUCT_IMAGES && (
                 <label className="aspect-square rounded-xl border-2 border-dashed border-[#D3E8F7] flex flex-col items-center justify-center gap-1 text-[#7A94A8] cursor-pointer hover:border-[#2E93E0] hover:text-[#1C6FB5] transition bg-[#E7F4FE]/50">
                   <Upload className="size-5" />
                   <span className="text-[10px] font-bold">{ar ? "إضافة" : "Add"}</span>
@@ -366,7 +450,13 @@ export function BoneGraftModal({ onClose }: { onClose: () => void }) {
             style={{ background: "linear-gradient(to right, #2AA6D1, #4FC3E8)" }}
           >
             {busy ? <Loader2 className="size-4 animate-spin" /> : <Image className="size-4" />}
-            {ar ? "حفظ البون كرافت" : "Save Bone Graft"}
+            {isEdit
+              ? ar
+                ? "حفظ التعديلات"
+                : "Save Changes"
+              : ar
+                ? "حفظ البون كرافت"
+                : "Save Bone Graft"}
           </button>
         </div>
       </div>

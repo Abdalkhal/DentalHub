@@ -14,6 +14,7 @@ import { BrandAutocomplete } from "@/components/BrandAutocomplete";
 import { CountryCombobox } from "@/components/CountryCombobox";
 import { BarcodeScannerModal } from "@/components/BarcodeScannerModal";
 import { ProductDetailsModal } from "@/components/ProductDetailsModal";
+import { ImplantFormModal } from "@/components/ImplantFormModal";
 import {
   Dialog,
   DialogContent,
@@ -95,6 +96,7 @@ import {
   Percent,
   ScanBarcode,
   Tag,
+  Bone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Currency } from "@/lib/products";
@@ -235,7 +237,7 @@ function SupplyDashboard() {
   const ar = lang === "ar";
   const { role } = useUserRole();
   const supplierId = role?.userId ?? "";
-  const [activeTab, setActiveTab] = useState<"products" | "offers" | "orders">("products");
+  const [activeTab, setActiveTab] = useState<"products" | "implants" | "offers" | "orders">("products");
 
   const mapsUrl = getMapsUrl(role ?? {});
 
@@ -314,6 +316,7 @@ function SupplyDashboard() {
         <div className="flex bg-slate-100 rounded-2xl p-1 mt-2">
           {[
             { key: "products" as const, ar: "المنتجات", en: "Products", icon: Package },
+            { key: "implants" as const, ar: "الزرعات", en: "Implants", icon: Bone },
             { key: "offers" as const, ar: "العروض", en: "Offers", icon: Megaphone },
             { key: "orders" as const, ar: "الطلبات", en: "Orders", icon: ClipboardList },
           ].map((tab) => (
@@ -338,6 +341,7 @@ function SupplyDashboard() {
       {/* Tab content */}
       <div className="px-4 pt-4 pb-6">
         {activeTab === "products" && <ProductsPanel />}
+        {activeTab === "implants" && <ImplantsBoneGraftPanel />}
         {activeTab === "offers" && <OffersPanel supplierId={supplierId} />}
         {activeTab === "orders" && <OrdersPanel />}
       </div>
@@ -352,15 +356,19 @@ function ProductsPanel() {
   const upsert = useUpsertProduct();
   const remove = useDeleteProduct();
 
+  // Strict multi-tenant isolation: a store owner only ever sees their own items.
+  const supplierUid = auth.currentUser?.uid ?? "";
+
   const [branchFilter, setBranchFilter] = useState<string>("all");
   const [subFilter, setSubFilter] = useState<string>("");
 
   const myProducts = useMemo(() => {
-    if (branchFilter === "all") return allProducts;
-    let list = allProducts.filter((p) => p.branch === branchFilter);
+    const own = allProducts.filter((p) => p.companyId === supplierUid);
+    if (branchFilter === "all") return own;
+    let list = own.filter((p) => p.branch === branchFilter);
     if (subFilter) list = list.filter((p) => p.subCategory === subFilter);
     return list;
-  }, [allProducts, branchFilter, subFilter]);
+  }, [allProducts, branchFilter, subFilter, supplierUid]);
 
   const branchOptions = [
     { value: "general", ar: "مواد عامة واستهلاكية", en: "General & Consumables" },
@@ -386,7 +394,6 @@ function ProductsPanel() {
     : null;
 
   const [showForm, setShowForm] = useState(false);
-  const [showBoneGraft, setShowBoneGraft] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [editing, setEditing] = useState<Product | null>(null);
   const [nameEn, setNameEn] = useState("");
@@ -902,25 +909,16 @@ function ProductsPanel() {
 
   return (
     <div className="space-y-4">
-      {/* Add buttons */}
+      {/* Add button */}
       {!showForm && (
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            onClick={openAdd}
-            className="h-14 rounded-2xl text-white font-display font-bold flex items-center justify-center gap-2 hover:opacity-95 transition shadow-lg"
-            style={{ background: "linear-gradient(to right, #2AA6D1, #4FC3E8)" }}
-          >
-            <Plus className="size-5" />
-            {ar ? "إضافة منتج جديد" : "Add new product"}
-          </button>
-          <button
-            onClick={() => setShowBoneGraft(true)}
-            className="h-14 rounded-2xl bg-emerald-600 text-white font-display font-bold flex items-center justify-center gap-2 hover:opacity-90 transition shadow-card"
-          >
-            <Plus className="size-5" />
-            {ar ? "إضافة بون كرافت" : "Add Bone Graft"}
-          </button>
-        </div>
+        <button
+          onClick={openAdd}
+          className="w-full h-14 rounded-2xl text-white font-display font-bold flex items-center justify-center gap-2 hover:opacity-95 transition shadow-lg"
+          style={{ background: "linear-gradient(to right, #2AA6D1, #4FC3E8)" }}
+        >
+          <Plus className="size-5" />
+          {ar ? "إضافة منتج جديد" : "Add new product"}
+        </button>
       )}
 
       {/* ── Add / Edit Product Modal (Mobile Sheet) ── */}
@@ -1533,7 +1531,9 @@ function ProductsPanel() {
                 {branchOptions.map((b) => {
                   const Badge = BRANCH_BADGE[b.value] ?? Package;
                   const image = BRANCH_IMAGES[b.value];
-                  const count = allProducts.filter((p) => p.branch === b.value).length;
+                  const count = allProducts.filter(
+                    (p) => p.branch === b.value && p.companyId === supplierUid,
+                  ).length;
                   return (
                     <button
                       key={b.value}
@@ -1709,7 +1709,6 @@ function ProductsPanel() {
           </div>
         </div>
       )}
-      {showBoneGraft && <BoneGraftModal onClose={() => setShowBoneGraft(false)} />}
       {selectedProduct && (
         <ProductDetailsModal
           product={selectedProduct}
@@ -1726,6 +1725,171 @@ function ProductsPanel() {
         />
       )}
       </div>
+  );
+}
+
+function ImplantsBoneGraftPanel() {
+  const { lang } = useI18n();
+  const ar = lang === "ar";
+  const { data: allProducts = [], isLoading } = useProducts();
+  const remove = useDeleteProduct();
+
+  const [showBoneGraft, setShowBoneGraft] = useState(false);
+  const [showImplant, setShowImplant] = useState(false);
+  const [editingGraft, setEditingGraft] = useState<Product | null>(null);
+  const [editingImplant, setEditingImplant] = useState<Product | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+
+  // Strict multi-tenant isolation: only this supplier's implants / bone grafts.
+  const supplierUid = auth.currentUser?.uid ?? "";
+  const grafts = useMemo(
+    () =>
+      allProducts.filter(
+        (p) =>
+          p.companyId === supplierUid &&
+          (p.category === "implant" || p.branch === "bone_graft"),
+      ),
+    [allProducts, supplierUid],
+  );
+
+  const allImagePaths = useMemo(() => grafts.flatMap((p) => p.images), [grafts]);
+  const { data: imageUrlMap = {} } = useSignedImageUrls(allImagePaths);
+
+  const fmtPrice = (p: Product) => {
+    const isIQD = p.currency === "IQD";
+    const val = isIQD ? Number(p.price).toLocaleString() : p.price.toFixed(2);
+    const sym = isIQD ? "د.ع" : "$";
+    return isIQD ? `${val} ${sym}` : `${sym}${val}`;
+  };
+
+  const handleDelete = async (p: Product) => {
+    if (!confirm(ar ? "حذف هذا المنتج؟" : "Delete this product?")) return;
+    await remove.mutateAsync(p.id);
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Header + Add buttons */}
+      <div className="space-y-3">
+        <div>
+          <h2 className="font-display font-bold text-sm text-foreground">
+            {ar ? "الزرعات والبون كرافت" : "Implants & Bone Graft"}
+          </h2>
+          <p className="text-[11px] text-muted-foreground">
+            {grafts.length} {ar ? "منتج" : "products"}
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => setShowImplant(true)}
+            className="h-12 rounded-2xl bg-sky-600 text-white font-display font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition shadow-card px-2"
+          >
+            <Plus className="size-5 shrink-0" />
+            {ar ? "إضافة زرعة جديدة" : "Add New Implant"}
+          </button>
+          <button
+            onClick={() => setShowBoneGraft(true)}
+            className="h-12 rounded-2xl bg-emerald-600 text-white font-display font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition shadow-card px-2"
+          >
+            <Plus className="size-5 shrink-0" />
+            {ar ? "إضافة بون كرافت" : "Add Bone Graft"}
+          </button>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="size-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : grafts.length === 0 ? (
+        <div className="py-20 flex flex-col items-center text-center text-muted-foreground">
+          <Package className="size-14 mb-4 opacity-20" />
+          <p className="font-display font-bold text-lg text-slate-400">
+            {ar ? "لا توجد زرعات أو بون كرافت بعد" : "No implants or bone grafts yet"}
+          </p>
+          <p className="text-sm mt-1 max-w-xs text-slate-400">
+            {ar
+              ? "اضغط على زر 'إضافة بون كرافت' لإضافة أول منتج"
+              : "Tap 'Add Bone Graft' to add the first product"}
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-3 gap-3">
+          {grafts.map((p) => {
+            const isOut = (p.stock ?? 0) === 0;
+            return (
+              <div
+                key={p.id}
+                onClick={() => setSelectedProduct(p)}
+                className="bg-card border border-border rounded-2xl p-3 shadow-soft hover:shadow-card transition relative overflow-hidden group cursor-pointer"
+              >
+                {isOut && (
+                  <span className="absolute top-2 end-2 text-[10px] font-bold bg-rose-100 text-rose-600 px-2 py-0.5 rounded-full z-10">
+                    {ar ? "نفد" : "Out"}
+                  </span>
+                )}
+                {p.images.length > 0 && imageUrlMap[p.images[0]] ? (
+                  <div className="w-full h-32 rounded-xl bg-slate-100 overflow-hidden mb-2.5">
+                    <img src={imageUrlMap[p.images[0]]} alt="" className="size-full object-cover" />
+                  </div>
+                ) : (
+                  <div className="w-full h-32 rounded-xl bg-slate-100 flex items-center justify-center mb-2.5">
+                    <Package className="size-9 text-slate-300" />
+                  </div>
+                )}
+                <p className="font-display font-bold text-sm leading-snug line-clamp-2 min-h-[2.25rem]">
+                  {ar ? p.ar || p.en : p.en || p.ar}
+                </p>
+                <p className="mt-1.5 font-display font-extrabold text-base text-primary">
+                  {fmtPrice(p)}
+                </p>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <Layers className="size-3 text-slate-400" />
+                  <span className={cn("text-[11px] font-semibold", isOut ? "text-rose-500" : "text-emerald-600")}>
+                    {ar ? "المخزون:" : "Stock:"} {p.stock ?? 0}
+                  </span>
+                </div>
+                <div
+                  className="flex gap-1.5 mt-2.5 pt-2.5 border-t border-border"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    onClick={() =>
+                      p.branch === "implant" ? setEditingImplant(p) : setEditingGraft(p)
+                    }
+                    className="flex-1 h-8 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-sky-100 hover:text-sky-600 flex items-center justify-center gap-1 transition"
+                  >
+                    <Pencil className="size-3" />
+                    {ar ? "تعديل" : "Edit"}
+                  </button>
+                  <button
+                    onClick={() => handleDelete(p)}
+                    className="w-8 h-8 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-rose-100 hover:text-rose-600 flex items-center justify-center transition"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {showBoneGraft && <BoneGraftModal onClose={() => setShowBoneGraft(false)} />}
+      {showImplant && <ImplantFormModal onClose={() => setShowImplant(false)} />}
+      {editingGraft && (
+        <BoneGraftModal product={editingGraft} onClose={() => setEditingGraft(null)} />
+      )}
+      {editingImplant && (
+        <ImplantFormModal product={editingImplant} onClose={() => setEditingImplant(null)} />
+      )}
+      {selectedProduct && (
+        <ProductDetailsModal
+          product={selectedProduct}
+          onClose={() => setSelectedProduct(null)}
+        />
+      )}
+    </div>
   );
 }
 
