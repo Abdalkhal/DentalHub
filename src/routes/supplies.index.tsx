@@ -1747,7 +1747,9 @@ function ImplantsBoneGraftPanel() {
       allProducts.filter(
         (p) =>
           p.companyId === supplierUid &&
-          (p.category === "implant" || p.branch === "bone_graft"),
+          (p.category === "implant" ||
+            p.branch === "bone_graft" ||
+            p.category === "surgical_kit"),
       ),
     [allProducts, supplierUid],
   );

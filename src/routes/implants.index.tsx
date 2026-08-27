@@ -1,44 +1,36 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { doc, updateDoc } from "firebase/firestore";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { RoleGuard } from "@/components/RoleGuard";
 import { BoneGraftModal } from "@/components/BoneGraftModal";
+import { ImplantFormModal } from "@/components/ImplantFormModal";
 import { NotificationBell } from "@/components/NotificationBell";
-import { COUNTRIES, SURGICAL_GUIDE_COMPANIES, IMPLANTS } from "@/data/implants";
+import { COUNTRIES } from "@/data/implants";
 import {
   useProducts,
-  useUpsertProduct,
   useDeleteProduct,
   uploadProductImage,
-  removeProductImage,
   useSignedImageUrls,
-  MAX_PRODUCT_IMAGES,
   COUNTRY_CODE_TO_SLUG,
-  productsQueryKey,
   type Product,
   type ProductAccessory,
-  type Currency,
 } from "@/lib/products";
 import { useOffers, useUpsertOffer, useDeleteOffer, type Offer } from "@/lib/offers";
 import { useOrders, confirmOrder, markOrderUnavailable } from "@/lib/orders";
 import type { OrderDoc } from "@/integrations/firebase/types";
 import { useUserRole } from "@/lib/useAuth";
-import { auth, db } from "@/integrations/firebase/client";
+import { auth } from "@/integrations/firebase/client";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { CountryCombobox } from "@/components/CountryCombobox";
 import { ALL_COUNTRIES, countryCodeToFlag } from "@/data/countries";
 import {
-  Crosshair,
   Search,
   UserCircle2,
   Phone,
   MapPin,
-  LogOut,
   Package,
   Megaphone,
   ClipboardList,
@@ -51,14 +43,9 @@ import {
   Pencil,
   Calendar,
   ArrowLeft,
-  Image,
-  Paperclip,
-  Settings,
   SlidersHorizontal,
   ChevronLeft,
   ChevronRight,
-  Bone,
-  Stethoscope,
   Check,
   Ruler,
 } from "lucide-react";
@@ -213,32 +200,6 @@ function ImplantCompanyDashboard() {
   );
 }
 
-type AccessoryRow = {
-  key: string;
-  imageFile: File | null;
-  imagePreview: string;
-  existingImageUrl: string;
-  type: string;
-  subType: string;
-  specs: string;
-  price: string;
-  currency: Currency;
-};
-
-type VariantRow = {
-  key: string;
-  diameter: string;
-  length: string;
-  stock: string;
-};
-
-const emptyVariant = (): VariantRow => ({
-  key: crypto.randomUUID(),
-  diameter: "",
-  length: "",
-  stock: "0",
-});
-
 const LEGACY_TYPE_MAP: Record<string, string> = {
   Abutment: "abutment",
   "Healing Screw": "healing-cover",
@@ -331,295 +292,36 @@ function ImplantProductsPanel() {
   const { lang } = useI18n();
   const ar = lang === "ar";
   const { data: allProducts = [], isLoading } = useProducts();
-  const upsert = useUpsertProduct();
   const remove = useDeleteProduct();
-  const queryClient = useQueryClient();
 
   const companyId = auth.currentUser?.uid ?? "";
 
   const implantProducts = allProducts.filter(
-    (p) => p.category === "implant" && p.companyId === companyId,
+    (p) =>
+      (p.category === "implant" || p.category === "surgical_kit") &&
+      p.companyId === companyId,
   );
 
-  const [showForm, setShowForm] = useState(false);
   const [showBoneGraft, setShowBoneGraft] = useState(false);
-  const [editing, setEditing] = useState<Product | null>(null);
+  const [showImplantForm, setShowImplantForm] = useState(false);
+  const [editingImplant, setEditingImplant] = useState<Product | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-
-  const [productType, setProductType] = useState<"main_implant" | "accessory">("main_implant");
-  const [name, setName] = useState("");
-  const [brand, setBrand] = useState("");
-  const [country, setCountry] = useState("KR");
-  const [implantCategory, setImplantCategory] = useState<"comprehensive" | "basal" | "non_immediate">("comprehensive");
-  const [line, setLine] = useState("");
-  const [accessoryCategory, setAccessoryCategory] = useState("");
-  const [accessorySubType, setAccessorySubType] = useState("");
-  const [variants, setVariants] = useState<VariantRow[]>([emptyVariant()]);
-  const [accessoryRows, setAccessoryRows] = useState<AccessoryRow[]>([]);
-  const [price, setPrice] = useState("");
-  const [currency, setCurrency] = useState<Currency>("USD");
-  const [minOrderQty, setMinOrderQty] = useState("");
-  const [description, setDescription] = useState("");
-  const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
-  const [attachmentNames, setAttachmentNames] = useState<string[]>([]);
-  const [imageFiles, setImageFiles] = useState<File[]>([]);
-  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
-  const [parentId, setParentId] = useState<string>("");
-  const [busy, setBusy] = useState(false);
-  const [formError, setFormError] = useState("");
 
   const countryByCode = useMemo(
     () => Object.fromEntries(ALL_COUNTRIES.map((c) => [c.code, c])),
     [],
   );
 
-  const brandSuggestions = useMemo(() => [...new Set(IMPLANTS.map((i) => i.name))], []);
-
-  const clearForm = () => {
-    setEditing(null);
-    setName("");
-    setBrand("");
-    setCountry("KR");
-    setImplantCategory("comprehensive");
-    setLine("");
-    setAccessoryCategory("");
-    setAccessorySubType("");
-    setVariants([emptyVariant()]);
-    setAccessoryRows([]);
-    setPrice("");
-    setCurrency("USD");
-    setMinOrderQty("");
-    setDescription("");
-    setAttachmentFiles([]);
-    setAttachmentNames([]);
-    setImageFiles([]);
-    setImagePreviews([]);
-    setFormError("");
-    setProductType("main_implant");
-    setParentId("");
-  };
-
   const openAdd = () => {
-    clearForm();
-    setShowForm(true);
+    setEditingImplant(null);
+    setShowImplantForm(true);
   };
 
   const openEdit = (p: Product) => {
-    setEditing(p);
-    setName(p.ar);
-    setBrand(p.brand);
-    setCountry(p.country || p.implantSpec?.country || "KR");
-    setImplantCategory(
-      p.implantSpec?.implantType === "non-immediate"
-        ? "non_immediate"
-        : p.implantSpec?.subType === "basal"
-          ? "basal"
-          : "comprehensive",
-    );
-    setLine(p.implantSpec?.connectionType || "");
-    setAccessoryCategory("");
-    setAccessorySubType(p.productType === "accessory" ? p.ar : "");
-    const srcVariants = (
-      p.implantSpec?.variants ?? p.implantSpec?.dimensionStocks ?? []
-    ).map((v) => ({
-      diameter: Number(v.diameter) || 0,
-      length: Number(v.length) || 0,
-      stock: Number((v as { stock?: number }).stock ?? (v as { quantity?: number }).quantity ?? 0),
-    }));
-    setVariants(
-      srcVariants.length > 0
-        ? srcVariants.map((v) => ({
-            key: crypto.randomUUID(),
-            diameter: v.diameter ? String(v.diameter) : "",
-            length: v.length ? String(v.length) : "",
-            stock: String(v.stock),
-          }))
-        : [emptyVariant()],
-    );
-    setAccessoryRows(
-      (p.accessories || []).map((a) => ({
-        key: crypto.randomUUID(),
-        imageFile: null,
-        imagePreview: "",
-        existingImageUrl: a.imageUrl || "",
-        type: LEGACY_TYPE_MAP[a.type] ?? a.type ?? "",
-        subType: a.name || "",
-        specs: a.specs || "",
-        price: a.price ? String(a.price) : "",
-        currency: a.currency || "USD",
-      })),
-    );
-    setPrice(p.price ? String(p.price) : "");
-    setCurrency(p.currency || "USD");
-    setMinOrderQty("");
-    setDescription(p.description || "");
-    setAttachmentFiles([]);
-    setAttachmentNames([]);
-    setImageFiles([]);
-    setImagePreviews([]);
-    setFormError("");
-    setProductType(p.productType || "main_implant");
-    setParentId(p.parentId || "");
-    setShowForm(true);
+    setEditingImplant(p);
+    setShowImplantForm(true);
   };
 
-  const handleFiles = (files: FileList | null) => {
-    if (!files) return;
-    const incoming = Array.from(files).slice(0, MAX_PRODUCT_IMAGES - imageFiles.length);
-    if (incoming.length === 0) return;
-    setImageFiles((prev) => [...prev, ...incoming]);
-    setImagePreviews((prev) => [...prev, ...incoming.map((f) => URL.createObjectURL(f))]);
-  };
-
-  const removePreview = (idx: number) => {
-    setImageFiles((prev) => prev.filter((_, i) => i !== idx));
-    setImagePreviews((prev) => {
-      URL.revokeObjectURL(prev[idx]);
-      return prev.filter((_, i) => i !== idx);
-    });
-  };
-
-  const removeExistingImage = async (path: string) => {
-    if (!editing) return;
-    await removeProductImage(path);
-    setEditing({ ...editing, images: editing.images.filter((img) => img !== path) });
-  };
-
-  const updateVariant = (key: string, field: "diameter" | "length" | "stock", value: string) => {
-    setVariants((prev) => prev.map((v) => (v.key === key ? { ...v, [field]: value } : v)));
-  };
-
-  const addVariant = () => {
-    setVariants((prev) => [...prev, emptyVariant()]);
-  };
-
-  const removeVariant = (key: string) => {
-    setVariants((prev) => (prev.length > 1 ? prev.filter((v) => v.key !== key) : prev));
-  };
-
-  const submit = async () => {
-    setFormError("");
-    if (!name.trim()) {
-      setFormError(ar ? "الرجاء إدخال اسم المنتج" : "Please enter the product name");
-      return;
-    }
-    if (productType !== "accessory" && !brand.trim()) {
-      setFormError(ar ? "الرجاء إدخال اسم الشركة" : "Please enter the company name");
-      return;
-    }
-
-    const parentImplant =
-      productType === "accessory" && parentId
-        ? implantProducts.find((p) => p.id === parentId)
-        : undefined;
-    const finalBrand =
-      productType === "accessory" ? (parentImplant?.brand || "") : brand.trim();
-
-    setBusy(true);
-    try {
-      if (productType === "accessory") {
-        if (!parentId || !parentImplant) {
-          setBusy(false);
-          setFormError(ar ? "الرجاء اختيار الزرعة الأساسية" : "Please select the main implant");
-          return;
-        }
-        let imageUrl = "";
-        for (const file of imageFiles) {
-          try {
-            imageUrl = await uploadProductImage(parentId, file);
-          } catch {
-            setBusy(false);
-            return;
-          }
-        }
-        const newAccessory: ProductAccessory = {
-          type: ACCESSORY_CATEGORIES.find((c) => c.id === accessoryCategory)?.en ?? accessoryCategory,
-          name: name.trim(),
-          specs: "",
-          price: 0,
-          imageUrl,
-          currency: "USD",
-        };
-        await updateDoc(doc(db, "products", parentId), {
-          accessories: [...(parentImplant.accessories ?? []), newAccessory],
-        });
-        queryClient.invalidateQueries({ queryKey: productsQueryKey });
-      } else {
-        const productId = editing?.id ?? crypto.randomUUID();
-
-        const uploadedPaths: string[] = [];
-        for (const file of imageFiles) {
-          try {
-            uploadedPaths.push(await uploadProductImage(productId, file));
-          } catch {
-            setBusy(false);
-            return;
-          }
-        }
-
-        const savedAccessories: ProductAccessory[] = accessoryRows
-          .filter((a) => a.type && a.subType)
-          .map((a) => ({
-            type: ACCESSORY_CATEGORIES.find((c) => c.id === a.type)?.en ?? a.type,
-            name: a.subType,
-            specs: a.specs.trim(),
-            price: Math.max(0, parseFloat(a.price) || 0),
-            imageUrl: a.existingImageUrl || "",
-            currency: a.currency,
-          }));
-
-        const variantsArr = variants
-          .map((v) => ({
-            diameter: Number(v.diameter),
-            length: Number(v.length),
-            stock: Math.max(0, parseInt(v.stock || "0") || 0),
-          }))
-          .filter(
-            (v) =>
-              !isNaN(v.diameter) && v.diameter > 0 && !isNaN(v.length) && v.length > 0,
-          );
-        const totalStock = variantsArr.reduce((sum, v) => sum + v.stock, 0);
-        const uniqueDiameters = [...new Set(variantsArr.map((v) => v.diameter))];
-        const uniqueLengths = [...new Set(variantsArr.map((v) => v.length))];
-
-        await upsert.mutateAsync({
-          id: productId,
-          branch: "implant",
-          ar: name.trim(),
-          en: name.trim(),
-          brand: finalBrand,
-          price: Math.max(0, parseFloat(price) || 0),
-          currency,
-          stock: totalStock,
-          inStock: totalStock > 0,
-          images: [...(editing?.images ?? []), ...uploadedPaths],
-          category: "implant",
-          country,
-          countryFlag: countryCodeToFlag(country),
-          companyId: auth.currentUser?.uid ?? editing?.companyId ?? "",
-          implantSpec: {
-            country,
-            implantType: implantCategory === "non_immediate" ? "non-immediate" : "immediate",
-            subType: implantCategory === "basal" ? "basal" : undefined,
-            connectionType: line.trim() || undefined,
-            diameters: uniqueDiameters.length > 0 ? uniqueDiameters : undefined,
-            lengths: uniqueLengths.length > 0 ? uniqueLengths : undefined,
-            variants: variantsArr.length > 0 ? variantsArr : undefined,
-          },
-          accessories: savedAccessories.length > 0 ? savedAccessories : undefined,
-          productType: "main_implant",
-          parentId: null,
-          description: description.trim() || undefined,
-        });
-      }
-
-      setShowForm(false);
-    } catch (e: any) {
-      setFormError(e?.message || String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const handleDelete = async (p: Product) => {
     if (!confirm(ar ? "حذف هذه الزرعة؟" : "Delete this implant?")) return;
@@ -638,17 +340,6 @@ function ImplantProductsPanel() {
   }, [implantProducts]);
   const { data: imageUrlMap = {} } = useSignedImageUrls(allImagePaths);
 
-  const editingImagePaths = editing?.images ?? [];
-  const { data: editUrlMap = {} } = useSignedImageUrls(editingImagePaths);
-
-  const previewImageUrl = useMemo(() => {
-    if (imagePreviews.length > 0) return imagePreviews[0];
-    if (editing && editing.images.length > 0) {
-      const firstPath = editing.images[0];
-      return editUrlMap[firstPath] || null;
-    }
-    return null;
-  }, [imagePreviews, editing, editUrlMap]);
 
   const groupedProducts = useMemo(
     () => implantProducts.filter((p) => !p.productType || p.productType === "main_implant"),
@@ -666,8 +357,7 @@ function ImplantProductsPanel() {
 
   return (
     <div className="space-y-4">
-      {!showForm && (
-        <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3">
           <button
             onClick={openAdd}
             className="h-14 rounded-2xl bg-primary text-primary-foreground font-display font-bold flex items-center justify-center gap-2 hover:opacity-90 transition shadow-card"
@@ -683,771 +373,8 @@ function ImplantProductsPanel() {
             {ar ? "إضافة بون كرافت" : "Add Bone Graft"}
           </button>
         </div>
-      )}
 
-      {showForm && (
-        <>
-          <button
-            type="button"
-            onClick={() => setShowForm(false)}
-            className="flex items-center gap-2 text-sm font-semibold text-[#7A94A8] hover:text-[#1C6FB5] transition mb-1"
-          >
-            <ArrowLeft className="size-4" />
-            {ar ? "رجوع إلى المنتجات" : "Back to products"}
-          </button>
-
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <div>
-              <h2 className="font-display font-bold text-xl text-[#17324A]">
-                {ar ? "إضافة زرعة جديدة" : "Add New Implant"}
-              </h2>
-              <p className="text-sm text-[#7A94A8] mt-0.5">
-                {ar ? "أضف زرعة وإكسسواراتها بسهولة" : "Add implant and its accessories easily"}
-              </p>
-            </div>
-            <div className="flex rounded-2xl bg-[#E7F4FE] p-1">
-              <button
-                type="button"
-                onClick={() => setProductType("main_implant")}
-                className={cn(
-                  "flex items-center gap-1.5 h-10 px-5 rounded-xl text-sm font-bold transition",
-                  productType === "main_implant"
-                    ? "bg-[#2E93E0] text-white shadow-sm"
-                    : "text-[#7A94A8] hover:text-[#17324A]",
-                )}
-              >
-                <Settings className="size-4" />
-                {ar ? "زرعة" : "Implant"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setProductType("accessory")}
-                className={cn(
-                  "flex items-center gap-1.5 h-10 px-5 rounded-xl text-sm font-bold transition",
-                  productType === "accessory"
-                    ? "bg-[#2E93E0] text-white shadow-sm"
-                    : "text-[#7A94A8] hover:text-[#17324A]",
-                )}
-              >
-                <Paperclip className="size-4" />
-                {ar ? "إكسسوار" : "Accessory"}
-              </button>
-            </div>
-          </div>
-
-          {productType === "main_implant" ? (
-            <>
-              <div className="bg-white border border-[#D3E8F7] rounded-3xl p-5 shadow-md">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div>
-                    <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-                      {ar ? "صورة المنتج" : "Product Image"}
-                    </label>
-
-                    {editing && editing.images.length > 0 && (
-                      <div className="flex gap-2 flex-wrap mb-3">
-                        {editing.images.map((path) => (
-                          <div
-                            key={path}
-                            className="relative size-20 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] overflow-hidden group"
-                          >
-                            {editUrlMap[path] ? (
-                              <img
-                                src={editUrlMap[path]}
-                                alt=""
-                                className="size-full object-cover"
-                              />
-                            ) : (
-                              <div className="size-full flex items-center justify-center">
-                                <Package className="size-6 text-slate-300" />
-                              </div>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => removeExistingImage(path)}
-                              className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition"
-                            >
-                              <Trash2 className="size-5 text-white" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {imageFiles.length + (editing?.images.length ?? 0) < MAX_PRODUCT_IMAGES && (
-                      <label className="w-full aspect-square max-w-[280px] rounded-2xl border-2 border-dashed border-[#D3E8F7] bg-[#F5FAFE] flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/40 hover:bg-sky-50/30 transition group">
-                        <Image className="size-10 text-slate-300 group-hover:text-primary transition" />
-                        <p className="text-xs text-slate-400 group-hover:text-primary transition font-semibold">
-                          {ar ? "إضافة صورة (PNG, JPG)" : "Add Image (PNG, JPG)"}
-                        </p>
-                        <p className="text-[10px] text-slate-300">
-                          {imageFiles.length + (editing?.images.length ?? 0)}/{MAX_PRODUCT_IMAGES}
-                        </p>
-                        <input
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp"
-                          multiple
-                          className="hidden"
-                          onChange={(e) => handleFiles(e.target.files)}
-                        />
-                      </label>
-                    )}
-
-                    {imagePreviews.length > 0 && (
-                      <div className="flex gap-2 flex-wrap mt-3">
-                        {imagePreviews.map((url, idx) => (
-                          <div
-                            key={idx}
-                            className="relative size-20 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] overflow-hidden shadow-sm"
-                          >
-                            <img src={url} alt="" className="size-full object-cover" />
-                            <button
-                              type="button"
-                              onClick={() => removePreview(idx)}
-                              className="absolute top-0.5 end-0.5 size-5 rounded-full bg-black/60 text-white flex items-center justify-center"
-                            >
-                              <X className="size-3" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-                        {ar ? "اسم الزرعة" : "Implant Name"}{" "}
-                        <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder={ar ? "مثال: Straumann BLX" : "e.g. Straumann BLX"}
-                        className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-                        {ar ? "الشركة المصنعة" : "Manufacturer"}{" "}
-                        <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        value={brand}
-                        onChange={(e) => setBrand(e.target.value)}
-                        placeholder={ar ? "مثال: Straumann" : "e.g. Straumann"}
-                        list="brand-suggestions"
-                        className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
-                      />
-                      <datalist id="brand-suggestions">
-                        {brandSuggestions.map((b) => (
-                          <option key={b} value={b} />
-                        ))}
-                      </datalist>
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-                        {ar ? "بلد الصنع" : "Country of Manufacture"}
-                      </label>
-                      <CountryCombobox value={country} onChange={setCountry} lang={lang} />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-                        {ar ? "نوع الزرعة" : "Implant Type"}
-                      </label>
-                      <select
-                        value={implantCategory}
-                        onChange={(e) =>
-                          setImplantCategory(e.target.value as "comprehensive" | "basal" | "non_immediate")
-                        }
-                        className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
-                      >
-                        <option value="comprehensive">
-                          {ar ? "فورية (شاملة)" : "Immediate (Comprehensive)"}
-                        </option>
-                        <option value="basal">{ar ? "فورية (قاعدية)" : "Immediate (Basal)"}</option>
-                        <option value="non_immediate">{ar ? "غير فورية" : "Non-Immediate"}</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-                        {ar ? "خط المنتج (اختياري)" : "Product Line (Optional)"}
-                      </label>
-                      <input
-                        value={line}
-                        onChange={(e) => setLine(e.target.value)}
-                        placeholder={ar ? "مثال: BLX" : "e.g. BLX"}
-                        className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white border border-[#D3E8F7] rounded-3xl p-5 space-y-4 shadow-md">
-                <h3 className="font-display font-bold text-base text-[#1C6FB5] flex items-center gap-1.5">
-                  <span className="size-1.5 rounded-full bg-[#1C6FB5]" />
-                  {ar ? "أطوال وأقطار الزرعة" : "Implant Dimensions"}
-                </h3>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  <div className="flex items-center justify-center">
-                    <div className="relative w-full max-w-[200px] aspect-[3/4] max-h-64 bg-[#E7F4FE] rounded-2xl border-2 border-[#D3E8F7] overflow-hidden">
-                      {previewImageUrl ? (
-                        <>
-                          <img
-                            src={previewImageUrl}
-                            alt=""
-                            className="size-full object-contain p-4"
-                          />
-                          <svg
-                            className="absolute inset-0 size-full pointer-events-none"
-                            viewBox="0 0 100 100"
-                            preserveAspectRatio="none"
-                          >
-                            <line
-                              x1="18"
-                              y1="12"
-                              x2="18"
-                              y2="88"
-                              stroke="currentColor"
-                              strokeWidth="0.5"
-                              strokeDasharray="3 2"
-                              className="text-primary/50"
-                            />
-                            <line
-                              x1="12"
-                              y1="12"
-                              x2="24"
-                              y2="12"
-                              stroke="currentColor"
-                              strokeWidth="0.5"
-                              className="text-primary/40"
-                            />
-                            <line
-                              x1="12"
-                              y1="88"
-                              x2="24"
-                              y2="88"
-                              stroke="currentColor"
-                              strokeWidth="0.5"
-                              className="text-primary/40"
-                            />
-                            <text
-                              x="10"
-                              y="50"
-                              textAnchor="middle"
-                              transform="rotate(-90,10,50)"
-                              fill="currentColor"
-                              className="text-primary/60"
-                              fontSize="3.5"
-                              fontWeight="bold"
-                            >
-                              {ar ? "الطول" : "Length"}
-                            </text>
-                            <line
-                              x1="28"
-                              y1="82"
-                              x2="75"
-                              y2="82"
-                              stroke="currentColor"
-                              strokeWidth="0.5"
-                              strokeDasharray="3 2"
-                              className="text-primary/50"
-                            />
-                            <line
-                              x1="28"
-                              y1="77"
-                              x2="28"
-                              y2="87"
-                              stroke="currentColor"
-                              strokeWidth="0.5"
-                              className="text-primary/40"
-                            />
-                            <line
-                              x1="75"
-                              y1="77"
-                              x2="75"
-                              y2="87"
-                              stroke="currentColor"
-                              strokeWidth="0.5"
-                              className="text-primary/40"
-                            />
-                            <text
-                              x="52"
-                              y="95"
-                              textAnchor="middle"
-                              fill="currentColor"
-                              className="text-primary/60"
-                              fontSize="3.5"
-                              fontWeight="bold"
-                            >
-                              {ar ? "القطر" : "Diameter"}
-                            </text>
-                          </svg>
-                        </>
-                      ) : (
-                        <>
-                          <div className="absolute inset-0 grid grid-cols-3 grid-rows-4 opacity-30">
-                            {Array.from({ length: 12 }).map((_, i) => (
-                              <div key={i} className="border border-slate-300" />
-                            ))}
-                          </div>
-                          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
-                            <Image className="size-7 text-slate-300" />
-                            <p className="text-[10px] text-slate-400 font-medium text-center px-2 leading-tight">
-                              {ar
-                                ? "ارفع صورة للزرعة لعرضها هنا"
-                                : "Upload implant image to preview"}
-                            </p>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="md:col-span-2 space-y-4">
-                    <div>
-                      <label className="text-xs font-semibold text-[#17324A] mb-2 block">
-                        {ar ? "القياسات المتوفرة" : "Available Sizes"}
-                      </label>
-                      <div className="space-y-2.5">
-                        <div className="grid grid-cols-[1fr_1fr_1fr_44px] gap-2 px-1 text-[10px] font-bold text-[#7A94A8]">
-                          <span>{ar ? "القطر (Ø mm)" : "Diameter (Ø mm)"}</span>
-                          <span>{ar ? "الطول (mm)" : "Length (mm)"}</span>
-                          <span>{ar ? "الكمية المتوفرة" : "Available Qty"}</span>
-                          <span />
-                        </div>
-                        {variants.map((v) => (
-                          <div
-                            key={v.key}
-                            className="grid grid-cols-[1fr_1fr_1fr_44px] gap-2 items-center"
-                          >
-                            <input
-                              type="number"
-                              step="0.1"
-                              min="0"
-                              dir="ltr"
-                              placeholder="3.3"
-                              value={v.diameter}
-                              onChange={(e) => updateVariant(v.key, "diameter", e.target.value)}
-                              className="w-full h-11 rounded-lg bg-white border border-[#D3E8F7] px-3 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
-                            />
-                            <input
-                              type="number"
-                              step="0.5"
-                              min="0"
-                              dir="ltr"
-                              placeholder="10"
-                              value={v.length}
-                              onChange={(e) => updateVariant(v.key, "length", e.target.value)}
-                              className="w-full h-11 rounded-lg bg-white border border-[#D3E8F7] px-3 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
-                            />
-                            <input
-                              type="number"
-                              min="0"
-                              dir="ltr"
-                              placeholder="0"
-                              value={v.stock}
-                              onChange={(e) => updateVariant(v.key, "stock", e.target.value)}
-                              className="w-full h-11 rounded-lg bg-white border border-[#D3E8F7] px-3 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => removeVariant(v.key)}
-                              disabled={variants.length <= 1}
-                              className="size-11 rounded-lg border border-rose-200 text-rose-500 hover:bg-rose-50 flex items-center justify-center transition disabled:opacity-30"
-                              aria-label={ar ? "حذف القياس" : "Delete size"}
-                            >
-                              <Trash2 className="size-4" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={addVariant}
-                        className="mt-2.5 w-full h-11 rounded-xl border-2 border-dashed border-[#BFE1F7] bg-white text-[#2E93E0] text-sm font-bold flex items-center justify-center gap-1.5 hover:bg-sky-50/40 transition"
-                      >
-                        <Plus className="size-4" />
-                        {ar ? "إضافة قياس جديد" : "Add New Size"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="bg-white border border-[#D3E8F7] rounded-3xl p-5 shadow-md">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-                        {ar ? "اسم الإكسسوار الرئيسي" : "Main Accessory Category"}{" "}
-                        <span className="text-rose-500">*</span>
-                      </label>
-                      <select
-                        value={accessoryCategory}
-                        onChange={(e) => {
-                          setAccessoryCategory(e.target.value);
-                          setAccessorySubType("");
-                          setName("");
-                        }}
-                        className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition appearance-none"
-                      >
-                        <option value="">{ar ? "-- اختر الفئة --" : "-- Select category --"}</option>
-                        {ACCESSORY_CATEGORIES.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {ar ? c.ar : c.en}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-                        {ar ? "نوع وشكل الإكسسوار التفصيلي" : "Detailed Sub-type"}{" "}
-                        <span className="text-rose-500">*</span>
-                      </label>
-                      <select
-                        value={accessorySubType}
-                        onChange={(e) => {
-                          setAccessorySubType(e.target.value);
-                          setName(e.target.value);
-                        }}
-                        disabled={!accessoryCategory}
-                        className={cn(
-                          "w-full h-12 rounded-xl border px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition appearance-none",
-                          !accessoryCategory
-                            ? "bg-[#F5FAFE] border-[#D3E8F7] text-[#7A94A8] cursor-not-allowed"
-                            : "bg-[#F5FAFE] border-[#D3E8F7] text-[#17324A]",
-                        )}
-                      >
-                        <option value="">{ar ? "-- اختر النوع --" : "-- Select sub-type --"}</option>
-                        {(ACCESSORY_CATEGORIES.find((c) => c.id === accessoryCategory)?.subTypes ?? []).map((st) => (
-                          <option key={st.en} value={ar ? st.ar : st.en}>
-                            {ar ? st.ar : st.en}
-                          </option>
-                        ))}
-                      </select>
-                      {accessoryCategory && accessorySubType && (
-                        <p className="mt-1.5 text-[11px] text-[#1C6FB5] bg-[#E7F4FE] border border-[#BFE1F7] rounded-lg px-2.5 py-1.5">
-                          {ar
-                            ? `المعاينة: ${ACCESSORY_CATEGORIES.find((c) => c.id === accessoryCategory)?.ar ?? ""} · ${accessorySubType}`
-                            : `Preview: ${ACCESSORY_CATEGORIES.find((c) => c.id === accessoryCategory)?.en ?? ""} · ${accessorySubType}`}
-                        </p>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-                        {ar ? "ربط مع زرعة أساسية" : "Link to Main Implant"}
-                      </label>
-                      <select
-                        value={parentId}
-                        onChange={(e) => setParentId(e.target.value)}
-                        className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition appearance-none"
-                      >
-                        <option value="">
-                          {ar ? "-- اختر الزرعة الأساسية --" : "-- Select main implant --"}
-                        </option>
-                        {allProducts
-                          .filter(
-                            (p) =>
-                              p.category === "implant" &&
-                              p.companyId === companyId &&
-                              (!p.productType || p.productType === "main_implant") &&
-                              p.id !== editing?.id,
-                          )
-                          .map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.ar || p.en} ({p.brand})
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-                      {ar ? "صورة المنتج" : "Product Image"}
-                    </label>
-
-                    {editing && editing.images.length > 0 && (
-                      <div className="flex gap-2 flex-wrap mb-3">
-                        {editing.images.map((path) => (
-                          <div
-                            key={path}
-                            className="relative size-16 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] overflow-hidden group"
-                          >
-                            {editUrlMap[path] ? (
-                              <img
-                                src={editUrlMap[path]}
-                                alt=""
-                                className="size-full object-cover"
-                              />
-                            ) : (
-                              <div className="size-full flex items-center justify-center">
-                                <Package className="size-5 text-slate-300" />
-                              </div>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => removeExistingImage(path)}
-                              className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition"
-                            >
-                              <Trash2 className="size-4 text-white" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {imageFiles.length + (editing?.images.length ?? 0) < MAX_PRODUCT_IMAGES && (
-                      <label className="w-full h-40 rounded-2xl border-2 border-dashed border-[#D3E8F7] bg-[#F5FAFE] flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/40 hover:bg-sky-50/30 transition group">
-                        <Upload className="size-8 text-slate-400 group-hover:text-primary transition" />
-                        <p className="text-xs text-slate-400 group-hover:text-primary transition font-semibold">
-                          {ar ? "اضغط لرفع صورة" : "Tap to upload image"}
-                        </p>
-                        <p className="text-[10px] text-slate-300">
-                          {imageFiles.length + (editing?.images.length ?? 0)}/{MAX_PRODUCT_IMAGES} ·
-                          JPG, PNG
-                        </p>
-                        <input
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp"
-                          multiple
-                          className="hidden"
-                          onChange={(e) => handleFiles(e.target.files)}
-                        />
-                      </label>
-                    )}
-
-                    {imagePreviews.length > 0 && (
-                      <div className="flex gap-2 flex-wrap mt-3">
-                        {imagePreviews.map((url, idx) => (
-                          <div
-                            key={idx}
-                            className="relative size-16 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] overflow-hidden shadow-sm"
-                          >
-                            <img src={url} alt="" className="size-full object-cover" />
-                            <button
-                              type="button"
-                              onClick={() => removePreview(idx)}
-                              className="absolute top-0.5 end-0.5 size-5 rounded-full bg-black/60 text-white flex items-center justify-center"
-                            >
-                              <X className="size-3" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div className={cn("bg-white border border-[#D3E8F7] rounded-3xl p-5 space-y-4 shadow-md", productType === "accessory" && "md:col-span-2")}>
-              <h3 className="font-display font-bold text-base text-[#1C6FB5] flex items-center gap-1.5">
-                <span className="size-1.5 rounded-full bg-[#1C6FB5]" />
-                {ar ? "السعر والمخزون" : "Price & Stock"}
-              </h3>
-
-              <div>
-                <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-                  {ar ? "العملة" : "Currency"}
-                </label>
-                <div className="flex rounded-xl bg-[#F5FAFE] border border-[#D3E8F7] overflow-hidden w-fit">
-                  <button
-                    type="button"
-                    onClick={() => setCurrency("USD")}
-                    className={cn(
-                      "px-4 py-2.5 text-sm font-bold transition",
-                      currency === "USD"
-                        ? "bg-[#2E93E0] text-white"
-                        : "text-[#7A94A8] hover:text-[#17324A]",
-                    )}
-                  >
-                    $
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCurrency("IQD")}
-                    className={cn(
-                      "px-4 py-2.5 text-sm font-bold transition",
-                      currency === "IQD"
-                        ? "bg-[#2E93E0] text-white"
-                        : "text-[#7A94A8] hover:text-[#17324A]",
-                    )}
-                  >
-                    IQD
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-                  {ar ? "السعر الأساسي للزرعة" : "Base Implant Price"}{" "}
-                  <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  placeholder="0"
-                  dir="ltr"
-                  className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-                  {ar ? "أدنى كمية طلب (اختياري)" : "Min Order Qty (Optional)"}
-                </label>
-                <input
-                  type="number"
-                  value={minOrderQty}
-                  onChange={(e) => setMinOrderQty(e.target.value)}
-                  placeholder="1"
-                  min="1"
-                  dir="ltr"
-                  className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
-                />
-              </div>
-            </div>
-
-            {productType === "main_implant" && (
-              <div className="bg-white border border-[#D3E8F7] rounded-3xl p-5 space-y-4 shadow-md">
-                <h3 className="font-display font-bold text-base text-[#1C6FB5] flex items-center gap-1.5">
-                  <span className="size-1.5 rounded-full bg-[#1C6FB5]" />
-                  {ar ? "معلومات إضافية" : "Additional Information"}
-                </h3>
-
-              <div>
-                <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-                  {ar ? "الوصف (اختياري)" : "Description (Optional)"}
-                </label>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder={
-                    ar
-                      ? "وصف المنتج، المميزات، الاستخدامات..."
-                      : "Product description, features, uses..."
-                  }
-                  rows={4}
-                  className="w-full rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition resize-none"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-                  {ar ? "المرفقات (اختياري)" : "Attachments (Optional)"}
-                </label>
-                <label className="w-full h-28 rounded-xl border-2 border-dashed border-[#D3E8F7] bg-[#F5FAFE] flex flex-col items-center justify-center gap-1.5 cursor-pointer hover:border-primary/40 hover:bg-sky-50/30 transition group">
-                  <Paperclip className="size-6 text-slate-400 group-hover:text-primary transition" />
-                  <p className="text-xs text-slate-400 group-hover:text-primary transition font-medium">
-                    {ar
-                      ? "اضغط لرفع ملفات أو اسحب وأفلت..."
-                      : "Click to upload files or drag and drop..."}
-                  </p>
-                  <p className="text-[10px] text-slate-300">PDF, DOC, XLS</p>
-                  <input
-                    type="file"
-                    accept=".pdf,.doc,.docx,.xls,.xlsx,.txt"
-                    multiple
-                    className="hidden"
-                    onChange={(e) => {
-                      const files = e.target.files;
-                      if (!files) return;
-                      setAttachmentFiles((prev) => [...prev, ...Array.from(files)]);
-                      setAttachmentNames((prev) => [
-                        ...prev,
-                        ...Array.from(files).map((f) => f.name),
-                      ]);
-                    }}
-                  />
-                </label>
-                {attachmentNames.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {attachmentNames.map((fname, idx) => (
-                      <span
-                        key={idx}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 text-[11px] font-medium text-slate-600"
-                      >
-                        <Paperclip className="size-3" />
-                        {fname}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setAttachmentNames((prev) => prev.filter((_, i) => i !== idx));
-                            setAttachmentFiles((prev) => prev.filter((_, i) => i !== idx));
-                          }}
-                          className="ml-0.5 hover:text-rose-500 transition"
-                        >
-                          <X className="size-3" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-            )}
-          </div>
-
-          {formError && (
-            <p className="text-sm text-rose-600 bg-rose-50 rounded-xl px-4 py-2.5 text-center font-semibold">
-              {formError}
-            </p>
-          )}
-
-          <div className="flex gap-3 pt-2 border-t border-border">
-            <button
-              type="button"
-              onClick={submit}
-              disabled={busy}
-              className={cn(
-                "flex-1 h-14 rounded-2xl font-display font-bold flex items-center justify-center gap-2 transition shadow-lg text-white",
-                busy
-                  ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                  : "hover:opacity-95",
-              )}
-              style={busy ? undefined : { background: "linear-gradient(to right, #2AA6D1, #4FC3E8)" }}
-            >
-              {busy ? <Loader2 className="size-5 animate-spin" /> : null}
-              {busy
-                ? ar
-                  ? "جارٍ الحفظ..."
-                  : "Saving..."
-                : editing
-                  ? ar
-                    ? "حفظ التعديلات"
-                    : "Save Changes"
-                  : ar
-                    ? "حفظ المنتج"
-                    : "Save Product"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowForm(false)}
-              className="h-14 px-8 rounded-2xl font-display font-bold flex items-center gap-2 transition bg-[#E7F4FE] hover:bg-[#DCEEFB] text-[#1C6FB5]"
-            >
-              {ar ? "إلغاء" : "Cancel"}
-            </button>
-          </div>
-        </>
-      )}
-
-      {!showForm &&
-        (isLoading ? (
+      {isLoading ? (
           <div className="flex items-center justify-center py-20">
             <div className="size-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
@@ -1567,9 +494,13 @@ function ImplantProductsPanel() {
               </div>
             ))}
           </div>
-        ))}
+        )}
 
       {showBoneGraft && <BoneGraftModal onClose={() => setShowBoneGraft(false)} />}
+      {showImplantForm && <ImplantFormModal onClose={() => setShowImplantForm(false)} />}
+      {editingImplant && (
+        <ImplantFormModal product={editingImplant} onClose={() => setEditingImplant(null)} />
+      )}
     </div>
   );
 }

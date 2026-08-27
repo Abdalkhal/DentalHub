@@ -72,6 +72,14 @@ export type ProductDiscountTier = {
   discountPct: number;
 };
 
+export type SurgicalKitSpec = {
+  productLine?: string;
+  kitType?: string;
+  placementType?: string;
+  compatibility?: string[];
+  toolsCount?: number;
+};
+
 export type Product = {
   id: string;
   branch: string;
@@ -106,6 +114,9 @@ export type Product = {
   technicalSpecifications?: ProductSpecs;
   sku?: string;
   expiryDate?: string;
+  surgicalGuide?: string;
+  surgicalGuideTools?: string[];
+  surgicalKit?: SurgicalKitSpec;
 };
 
 const fromDoc = (id: string, data: Record<string, unknown>): Product => {
@@ -161,6 +172,9 @@ const fromDoc = (id: string, data: Record<string, unknown>): Product => {
     technicalSpecifications: (data.technicalSpecifications as ProductSpecs | null) ?? undefined,
     sku: (data.sku as string) ?? undefined,
     expiryDate: (data.expiryDate as string) ?? undefined,
+    surgicalGuide: (data.surgicalGuide as string) ?? undefined,
+    surgicalGuideTools: (data.surgicalGuideTools as string[] | null) ?? undefined,
+    surgicalKit: (data.surgicalKit as SurgicalKitSpec | null) ?? undefined,
   };
 };
 
@@ -211,6 +225,9 @@ export function useUpsertProduct() {
       const cleanTechnicalSpecs = p.technicalSpecifications
         ? (removeUndefined(p.technicalSpecifications) as ProductSpecs)
         : null;
+      const cleanSurgicalKit = p.surgicalKit
+        ? (removeUndefined(p.surgicalKit) as SurgicalKitSpec)
+        : null;
       await setDoc(
         ref,
         {
@@ -248,6 +265,9 @@ export function useUpsertProduct() {
           technicalSpecifications: cleanTechnicalSpecs,
           sku: p.sku ?? null,
           expiryDate: p.expiryDate ?? null,
+          surgicalGuide: p.surgicalGuide ?? null,
+          surgicalGuideTools: p.surgicalGuideTools ?? null,
+          surgicalKit: cleanSurgicalKit,
         },
         { merge: true },
       );

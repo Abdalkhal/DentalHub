@@ -18,6 +18,7 @@ import { ALL_COUNTRIES, countryCodeToFlag } from "@/data/countries";
 import { SPEC_FIELDS, type SpecFieldId } from "@/data/specs";
 import { addToCart } from "@/lib/cartStore";
 import { addToPurchaseHistory } from "@/lib/quickOrders";
+import { SURGICAL_GUIDE_TOOLS } from "@/components/ImplantFormModal";
 
 export function ProductDetailsModal({
   product,
@@ -261,6 +262,98 @@ export function ProductDetailsModal({
                     <span dir="ltr">{product.expiryDate}</span>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Surgical guide system */}
+            {product.surgicalGuide && (
+              <div className="rounded-2xl border border-slate-200 overflow-hidden">
+                <div className="flex items-center justify-between bg-slate-50 px-3 py-2">
+                  <span className="text-xs font-bold text-slate-500">
+                    {ar ? "نظام الدليل الجراحي" : "Surgical Guide System"}
+                  </span>
+                  <span
+                    className={cn(
+                      "text-[10px] font-bold px-2 py-0.5 rounded-full",
+                      product.surgicalGuide === "Guided"
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-slate-100 text-slate-500",
+                    )}
+                  >
+                    {product.surgicalGuide === "Guided"
+                      ? ar
+                        ? "موجّه"
+                        : "Guided"
+                      : ar
+                        ? "غير موجّه"
+                        : "Unguided"}
+                  </span>
+                </div>
+                {product.surgicalGuide === "Guided" &&
+                  product.surgicalGuideTools &&
+                  product.surgicalGuideTools.length > 0 && (
+                    <div className="px-3 py-2.5 space-y-2">
+                      {product.surgicalGuideTools.map((tool) => {
+                        const def = SURGICAL_GUIDE_TOOLS.find((t) => t.en === tool);
+                        return (
+                          <div key={tool} className="flex items-center gap-2 text-[13px] text-slate-700">
+                            <span className="size-5 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                              <Check className="size-3.5" />
+                            </span>
+                            {ar && def ? def.ar : tool}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+              </div>
+            )}
+
+            {/* Surgical kit details */}
+            {product.surgicalKit && (
+              <div className="rounded-2xl border border-slate-200 overflow-hidden">
+                <div className="bg-slate-50 px-3 py-2 text-xs font-bold text-slate-500">
+                  {ar ? "الكت الجراحي" : "Surgical Kit"}
+                </div>
+                <div className="p-3 space-y-1.5 text-[13px] text-slate-700">
+                  {product.surgicalKit.kitType && (
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-slate-500">{ar ? "نوع الكت" : "Kit Type"}</span>
+                      <span className="font-semibold text-end">{product.surgicalKit.kitType}</span>
+                    </div>
+                  )}
+                  {product.surgicalKit.placementType && (
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-slate-500">{ar ? "بروتوكول الزرع" : "Placement"}</span>
+                      <span className="font-semibold text-end">{product.surgicalKit.placementType}</span>
+                    </div>
+                  )}
+                  {!!product.surgicalKit.toolsCount && (
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-slate-500">{ar ? "عدد الأدوات" : "Tools Count"}</span>
+                      <span className="font-semibold">{product.surgicalKit.toolsCount}</span>
+                    </div>
+                  )}
+                  {product.sku && (
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-slate-500">SKU</span>
+                      <span className="font-semibold font-mono" dir="ltr">{product.sku}</span>
+                    </div>
+                  )}
+                  {product.surgicalKit.compatibility &&
+                    product.surgicalKit.compatibility.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {product.surgicalKit.compatibility.map((c) => (
+                          <span
+                            key={c}
+                            className="text-[10px] font-bold bg-emerald-50 text-emerald-700 rounded-full px-2 py-0.5"
+                          >
+                            {c}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                </div>
               </div>
             )}
 
