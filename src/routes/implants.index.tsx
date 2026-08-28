@@ -49,6 +49,7 @@ import {
   Check,
   Ruler,
 } from "lucide-react";
+import specializedImplantImg from "@/assets/spetialized_implant.jpg";
 
 export const Route = createFileRoute("/implants/")({
   component: ImplantsIndex,
@@ -1501,7 +1502,7 @@ function BrowseImplants() {
   const categories = [
     { to: "", img: "/photo/bonecraft.jpg", title: ar ? "البون كرافت" : "Bone Graft" },
     { to: "/surgical-guide" as const, img: "/photo/surgecalguid.jpg", title: ar ? "الدليل الجراحي" : "Surgical Guide" },
-    { to: "", img: "/photo/subperustul.jpg", title: ar ? "زرعات Subperiosteal" : "Subperiosteal Implants" },
+    { to: "/specialized-implants" as const, img: specializedImplantImg, title: ar ? "الزرعات المتخصصة" : "Specialized Implants" },
   ];
 
   return (

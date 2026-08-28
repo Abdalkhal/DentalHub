@@ -20,7 +20,6 @@ import {
   Image,
   Check,
   Loader2,
-  ChevronDown,
   Building2,
   Phone,
   Layers,
@@ -34,7 +33,7 @@ export const Route = createFileRoute("/surgical-guide/create")({
   component: SurgicalGuideCreate,
 });
 
-const MAX_GALLERY = 10;
+const MAX_GALLERY = 30;
 
 function SurgicalGuideCreate() {
   const { lang } = useI18n();
@@ -226,15 +225,18 @@ function SurgicalGuideCreate() {
                   {ar ? "برنامج التصميم" : "Design Software"}{" "}
                   <span className="text-rose-500">*</span>
                 </label>
-                <div className="relative">
-                  <select value={software} onChange={(e) => setSoftware(e.target.value)} className={cn(inputCls, "appearance-none pe-9")}>
-                    <option value="">{ar ? "-- اختر --" : "-- Select --"}</option>
-                    {SURGICAL_GUIDE_SOFTWARE.map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute end-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400 pointer-events-none" />
-                </div>
+                <input
+                  value={software}
+                  onChange={(e) => setSoftware(e.target.value)}
+                  list="software-suggestions"
+                  placeholder={ar ? "مثال: exocad, 3Shape, RealGUIDE..." : "e.g. exocad, 3Shape, RealGUIDE..."}
+                  className={inputCls}
+                />
+                <datalist id="software-suggestions">
+                  {SURGICAL_GUIDE_SOFTWARE.map((s) => (
+                    <option key={s} value={s} />
+                  ))}
+                </datalist>
               </div>
               <div className="sm:col-span-2">
                 <label className={labelCls}>{ar ? "رقم الهاتف" : "Phone Number"}</label>

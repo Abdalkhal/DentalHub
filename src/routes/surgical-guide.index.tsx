@@ -120,23 +120,6 @@ function SurgicalGuideDirectory() {
                         </span>
                       )}
                     </div>
-                    {c.phone && (
-                      <p className="text-[11px] text-slate-500 flex items-center gap-1" dir="ltr">
-                        <Phone className="size-3" /> {c.phone}
-                      </p>
-                    )}
-                    {c.systems.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {c.systems.map((s) => (
-                          <span
-                            key={s}
-                            className="text-[10px] font-bold bg-emerald-50 text-emerald-700 rounded-full px-2 py-0.5"
-                          >
-                            {systemLabel(s, ar)}
-                          </span>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 </div>
               );

@@ -31,6 +31,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as TrackCasesIndexRouteImport } from './routes/track-cases.index'
 import { Route as SurgicalGuideIndexRouteImport } from './routes/surgical-guide.index'
 import { Route as SuppliesIndexRouteImport } from './routes/supplies.index'
+import { Route as SpecializedImplantsIndexRouteImport } from './routes/specialized-implants.index'
 import { Route as PatientsIndexRouteImport } from './routes/patients.index'
 import { Route as LabsIndexRouteImport } from './routes/labs.index'
 import { Route as InvoicesIndexRouteImport } from './routes/invoices.index'
@@ -181,6 +182,12 @@ const SuppliesIndexRoute = SuppliesIndexRouteImport.update({
   path: '/supplies/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SpecializedImplantsIndexRoute =
+  SpecializedImplantsIndexRouteImport.update({
+    id: '/specialized-implants/',
+    path: '/specialized-implants/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const PatientsIndexRoute = PatientsIndexRouteImport.update({
   id: '/patients/',
   path: '/patients/',
@@ -432,6 +439,7 @@ export interface FileRoutesByFullPath {
   '/invoices/': typeof InvoicesIndexRoute
   '/labs/': typeof LabsIndexRoute
   '/patients/': typeof PatientsIndexRoute
+  '/specialized-implants/': typeof SpecializedImplantsIndexRoute
   '/supplies/': typeof SuppliesIndexRoute
   '/surgical-guide/': typeof SurgicalGuideIndexRoute
   '/track-cases/': typeof TrackCasesIndexRoute
@@ -495,6 +503,7 @@ export interface FileRoutesByTo {
   '/invoices': typeof InvoicesIndexRoute
   '/labs': typeof LabsIndexRoute
   '/patients': typeof PatientsIndexRoute
+  '/specialized-implants': typeof SpecializedImplantsIndexRoute
   '/supplies': typeof SuppliesIndexRoute
   '/surgical-guide': typeof SurgicalGuideIndexRoute
   '/track-cases': typeof TrackCasesIndexRoute
@@ -559,6 +568,7 @@ export interface FileRoutesById {
   '/invoices/': typeof InvoicesIndexRoute
   '/labs/': typeof LabsIndexRoute
   '/patients/': typeof PatientsIndexRoute
+  '/specialized-implants/': typeof SpecializedImplantsIndexRoute
   '/supplies/': typeof SuppliesIndexRoute
   '/surgical-guide/': typeof SurgicalGuideIndexRoute
   '/track-cases/': typeof TrackCasesIndexRoute
@@ -624,6 +634,7 @@ export interface FileRouteTypes {
     | '/invoices/'
     | '/labs/'
     | '/patients/'
+    | '/specialized-implants/'
     | '/supplies/'
     | '/surgical-guide/'
     | '/track-cases/'
@@ -687,6 +698,7 @@ export interface FileRouteTypes {
     | '/invoices'
     | '/labs'
     | '/patients'
+    | '/specialized-implants'
     | '/supplies'
     | '/surgical-guide'
     | '/track-cases'
@@ -750,6 +762,7 @@ export interface FileRouteTypes {
     | '/invoices/'
     | '/labs/'
     | '/patients/'
+    | '/specialized-implants/'
     | '/supplies/'
     | '/surgical-guide/'
     | '/track-cases/'
@@ -810,6 +823,7 @@ export interface RootRouteChildren {
   InvoicesIndexRoute: typeof InvoicesIndexRoute
   LabsIndexRoute: typeof LabsIndexRoute
   PatientsIndexRoute: typeof PatientsIndexRoute
+  SpecializedImplantsIndexRoute: typeof SpecializedImplantsIndexRoute
   SuppliesIndexRoute: typeof SuppliesIndexRoute
   SurgicalGuideIndexRoute: typeof SurgicalGuideIndexRoute
   TrackCasesIndexRoute: typeof TrackCasesIndexRoute
@@ -973,6 +987,13 @@ declare module '@tanstack/react-router' {
       path: '/supplies'
       fullPath: '/supplies/'
       preLoaderRoute: typeof SuppliesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/specialized-implants/': {
+      id: '/specialized-implants/'
+      path: '/specialized-implants'
+      fullPath: '/specialized-implants/'
+      preLoaderRoute: typeof SpecializedImplantsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/patients/': {
@@ -1341,6 +1362,7 @@ const rootRouteChildren: RootRouteChildren = {
   InvoicesIndexRoute: InvoicesIndexRoute,
   LabsIndexRoute: LabsIndexRoute,
   PatientsIndexRoute: PatientsIndexRoute,
+  SpecializedImplantsIndexRoute: SpecializedImplantsIndexRoute,
   SuppliesIndexRoute: SuppliesIndexRoute,
   SurgicalGuideIndexRoute: SurgicalGuideIndexRoute,
   TrackCasesIndexRoute: TrackCasesIndexRoute,
