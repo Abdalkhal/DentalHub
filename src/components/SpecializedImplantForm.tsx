@@ -1,8 +1,16 @@
-import { useState } from "react";
-import { X, Loader2, Check } from "lucide-react";
+import { useRef, useState } from "react";
+import { X, Plus, Upload, Loader2, Check, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
-import { useUpsertProduct, type Product, type Currency } from "@/lib/products";
+import {
+  useUpsertProduct,
+  uploadProductImage,
+  removeProductImage,
+  useSignedImageUrls,
+  MAX_PRODUCT_IMAGES,
+  type Product,
+  type Currency,
+} from "@/lib/products";
 import {
   SPECIALIZED_CATEGORIES,
   SPECIALIZED_FIELDS,
@@ -11,14 +19,65 @@ import {
 import { auth } from "@/integrations/firebase/client";
 import { toast } from "sonner";
 
+const MAX_CLINICAL_IMAGES = 10;
+
 const inputCls =
   "w-full h-12 rounded-2xl bg-white border border-slate-200 px-4 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/40 transition";
 const labelCls = "text-[11px] font-bold text-slate-500 mb-1.5 block";
+const cardCls = "rounded-2xl bg-white border border-slate-200/80 shadow-sm p-4 space-y-3";
+
+function CreatableSelect({
+  field,
+  value,
+  onChange,
+  ar,
+}: {
+  field: SpecializedField;
+  value: string;
+  onChange: (v: string) => void;
+  ar: boolean;
+}) {
+  const [customMode, setCustomMode] = useState(false);
+  const inOptions = field.options?.some((o) => o.value === value) ?? false;
+  const showCustom = customMode || (!!value && !inOptions);
+
+  return (
+    <div className="space-y-2">
+      <select
+        value={inOptions ? value : "custom"}
+        onChange={(e) => {
+          if (e.target.value === "custom") setCustomMode(true);
+          else {
+            setCustomMode(false);
+            onChange(e.target.value);
+          }
+        }}
+        className={cn(inputCls, "appearance-none pe-9")}
+      >
+        <option value="">{ar ? "-- اختر --" : "-- Select --"}</option>
+        {field.options?.map((o) => (
+          <option key={o.value} value={o.value}>
+            {ar ? (o.ar ?? o.value) : o.value}
+          </option>
+        ))}
+        <option value="custom">{ar ? "أخرى (إدخال يدوي)" : "Other (manual entry)"}</option>
+      </select>
+      {showCustom && (
+        <input
+          value={value || ""}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={ar ? "اكتب قيمة مخصصة..." : "Type custom value..."}
+          className={inputCls}
+        />
+      )}
+    </div>
+  );
+}
 
 function renderField(
   field: SpecializedField,
-  value: string,
-  onChange: (v: string) => void,
+  value: string | string[] | undefined,
+  onChange: (v: string | string[] | undefined) => void,
   ar: boolean,
 ) {
   if (field.type === "text") {
@@ -26,29 +85,59 @@ function renderField(
       <div key={field.id}>
         <label className={labelCls}>{ar ? field.ar : field.en}</label>
         <input
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
+          value={(value as string) || ""}
+          onChange={(e) => onChange(e.target.value || undefined)}
           placeholder={field.placeholder}
           className={inputCls}
         />
       </div>
     );
   }
+
+  if (field.type === "multi") {
+    const selected = (value as string[]) || [];
+    return (
+      <div key={field.id}>
+        <label className={labelCls}>{ar ? field.ar : field.en}</label>
+        <div className="flex flex-wrap gap-2">
+          {field.options?.map((o) => {
+            const active = selected.includes(o.value);
+            return (
+              <button
+                key={o.value}
+                type="button"
+                onClick={() => {
+                  const next = active
+                    ? selected.filter((x) => x !== o.value)
+                    : [...selected, o.value];
+                  onChange(next.length > 0 ? next : undefined);
+                }}
+                className={cn(
+                  "flex items-center gap-1.5 h-10 px-3.5 rounded-full text-xs font-bold border transition",
+                  active
+                    ? "bg-indigo-600 text-white border-indigo-600"
+                    : "bg-white text-slate-600 border-slate-200 hover:border-indigo-400",
+                )}
+              >
+                {active && <Check className="size-3.5" />}
+                {ar ? (o.ar ?? o.value) : o.value}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div key={field.id}>
       <label className={labelCls}>{ar ? field.ar : field.en}</label>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={cn(inputCls, "appearance-none pe-9")}
-      >
-        <option value="">{ar ? "-- اختر --" : "-- Select --"}</option>
-        {field.options?.map((o) => (
-          <option key={o.value} value={o.value}>
-            {ar ? o.ar ?? o.value : o.value}
-          </option>
-        ))}
-      </select>
+      <CreatableSelect
+        field={field}
+        value={(value as string) || ""}
+        onChange={(v) => onChange(v || undefined)}
+        ar={ar}
+      />
     </div>
   );
 }
@@ -63,6 +152,8 @@ export function SpecializedImplantForm({
   const { lang } = useI18n();
   const ar = lang === "ar";
   const upsert = useUpsertProduct();
+  const productInputRef = useRef<HTMLInputElement>(null);
+  const clinicalInputRef = useRef<HTMLInputElement>(null);
 
   const [category, setCategory] = useState(
     product?.specializedImplant?.category ?? "subperiosteal",
@@ -72,32 +163,104 @@ export function SpecializedImplantForm({
   const [price, setPrice] = useState(product?.price ? String(product.price) : "");
   const [currency, setCurrency] = useState<Currency>(product?.currency || "USD");
   const [stock, setStock] = useState(product?.stock ? String(product.stock) : "0");
-  const [fields, setFields] = useState<Record<string, string>>(
+  const [description, setDescription] = useState(product?.description ?? "");
+  const [fields, setFields] = useState<Record<string, string | string[]>>(
     product?.specializedImplant?.fields ?? {},
   );
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [existingImages, setExistingImages] = useState<string[]>(product?.images ?? []);
+  const [removedImages, setRemovedImages] = useState<string[]>([]);
+  const [clinicalFiles, setClinicalFiles] = useState<File[]>([]);
+  const [clinicalPreviews, setClinicalPreviews] = useState<string[]>([]);
+  const [existingClinical, setExistingClinical] = useState<string[]>(
+    product?.specializedImplant?.clinicalImages ?? [],
+  );
+  const [removedClinical, setRemovedClinical] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   const activeFields = SPECIALIZED_FIELDS[category] ?? [];
+  const hideStock = category === "subperiosteal";
+
+  const { data: existingUrlMap = {} } = useSignedImageUrls(existingImages);
+  const { data: clinicalUrlMap = {} } = useSignedImageUrls(existingClinical);
 
   const selectCategory = (id: string) => {
     setCategory(id);
     setFields({});
   };
 
-  const setField = (id: string, value: string) => {
+  const setField = (id: string, value: string | string[] | undefined) => {
     setFields((prev) => {
       const next = { ...prev };
-      if (value.trim()) next[id] = value;
-      else delete next[id];
+      if (
+        value === undefined ||
+        (typeof value === "string" && !value.trim()) ||
+        (Array.isArray(value) && value.length === 0)
+      ) {
+        delete next[id];
+      } else {
+        next[id] = value;
+      }
       return next;
     });
+  };
+
+  const handleProductFiles = (files: FileList | null) => {
+    if (!files) return;
+    const incoming = Array.from(files).slice(
+      0,
+      MAX_PRODUCT_IMAGES - imageFiles.length - existingImages.length,
+    );
+    if (incoming.length === 0) return;
+    setImageFiles((prev) => [...prev, ...incoming]);
+    setImagePreviews((prev) => [...prev, ...incoming.map((f) => URL.createObjectURL(f))]);
+  };
+
+  const removeProductPreview = (idx: number) => {
+    setImageFiles((prev) => prev.filter((_, i) => i !== idx));
+    setImagePreviews((prev) => {
+      URL.revokeObjectURL(prev[idx]);
+      return prev.filter((_, i) => i !== idx);
+    });
+  };
+
+  const removeExistingProductImage = (path: string) => {
+    setRemovedImages((prev) => [...prev, path]);
+    setExistingImages((prev) => prev.filter((p) => p !== path));
+  };
+
+  const handleClinicalFiles = (files: FileList | null) => {
+    if (!files) return;
+    const incoming = Array.from(files).slice(
+      0,
+      MAX_CLINICAL_IMAGES - clinicalFiles.length - existingClinical.length,
+    );
+    if (incoming.length === 0) return;
+    setClinicalFiles((prev) => [...prev, ...incoming]);
+    setClinicalPreviews((prev) => [...prev, ...incoming.map((f) => URL.createObjectURL(f))]);
+  };
+
+  const removeClinicalPreview = (idx: number) => {
+    setClinicalFiles((prev) => prev.filter((_, i) => i !== idx));
+    setClinicalPreviews((prev) => {
+      URL.revokeObjectURL(prev[idx]);
+      return prev.filter((_, i) => i !== idx);
+    });
+  };
+
+  const removeExistingClinical = (path: string) => {
+    setRemovedClinical((prev) => [...prev, path]);
+    setExistingClinical((prev) => prev.filter((p) => p !== path));
   };
 
   const submit = async () => {
     setError("");
     if (!name.trim()) {
-      setError(ar ? "الرجاء إدخال اسم الزرعة المتخصصة" : "Please enter the specialized implant name");
+      setError(
+        ar ? "الرجاء إدخال اسم الزرعة المتخصصة" : "Please enter the specialized implant name",
+      );
       return;
     }
     if (!manufacturer.trim()) {
@@ -112,10 +275,34 @@ export function SpecializedImplantForm({
     setBusy(true);
     try {
       const productId = product?.id ?? crypto.randomUUID();
-      const cleanFields: Record<string, string> = {};
+
+      for (const path of [...removedImages, ...removedClinical]) {
+        try {
+          await removeProductImage(path);
+        } catch {
+          /* already removed */
+        }
+      }
+
+      const uploadedPaths: string[] = [];
+      for (const file of imageFiles) {
+        uploadedPaths.push(await uploadProductImage(productId, file));
+      }
+      const clinicalPaths: string[] = [];
+      for (const file of clinicalFiles) {
+        clinicalPaths.push(await uploadProductImage(productId, file));
+      }
+
+      const cleanFields: Record<string, string | string[]> = {};
       Object.entries(fields).forEach(([k, v]) => {
-        if (v && v.trim()) cleanFields[k] = v.trim();
+        if (Array.isArray(v)) {
+          if (v.length > 0) cleanFields[k] = v;
+        } else if (typeof v === "string" && v.trim()) {
+          cleanFields[k] = v.trim();
+        }
       });
+
+      const clinicalImages = [...existingClinical, ...clinicalPaths];
 
       await upsert.mutateAsync({
         id: productId,
@@ -125,14 +312,16 @@ export function SpecializedImplantForm({
         brand: manufacturer.trim(),
         price: Math.max(0, Number(price) || 0),
         currency,
-        stock: Math.max(0, Number(stock) || 0),
-        inStock: Number(stock) > 0,
-        images: product?.images ?? [],
+        stock: hideStock ? 1 : Math.max(0, Number(stock) || 0),
+        inStock: true,
+        images: [...existingImages, ...uploadedPaths],
         category: "specialized_implant",
         companyId: product?.companyId || auth.currentUser?.uid || "",
+        description: description.trim() || undefined,
         specializedImplant: {
           category,
           fields: cleanFields,
+          clinicalImages: clinicalImages.length > 0 ? clinicalImages : undefined,
         },
       });
 
@@ -159,7 +348,9 @@ export function SpecializedImplantForm({
               {ar ? "إضافة زرعة متخصصة" : "Add Specialized Implant"}
             </h2>
             <p className="text-[11px] text-slate-500 mt-0.5">
-              {ar ? "حلول متقدمة للحالات المعقدة وفقدان العظم الشديد" : "Advanced solutions for complex cases"}
+              {ar
+                ? "حلول متقدمة للحالات المعقدة وفقدان العظم الشديد"
+                : "Advanced solutions for complex cases"}
             </p>
           </div>
           <button
@@ -174,7 +365,9 @@ export function SpecializedImplantForm({
         <div className="flex-1 overflow-y-auto px-4 pt-4 pb-6 space-y-4">
           {/* Category selector */}
           <div>
-            <label className={labelCls}>{ar ? "فئة الزرعة المتخصصة" : "Specialized Category"}</label>
+            <label className={labelCls}>
+              {ar ? "فئة الزرعة المتخصصة" : "Specialized Category"}
+            </label>
             <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
               {SPECIALIZED_CATEGORIES.map((c) => (
                 <button
@@ -195,7 +388,7 @@ export function SpecializedImplantForm({
           </div>
 
           {/* Basic fields */}
-          <div className="rounded-2xl bg-white border border-slate-200/80 shadow-sm p-4 space-y-3">
+          <div className={cardCls}>
             <p className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
               <span className="size-1.5 rounded-full bg-indigo-500" />
               {ar ? "معلومات أساسية" : "Basic Information"}
@@ -205,7 +398,9 @@ export function SpecializedImplantForm({
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder={ar ? "مثال: Subperiosteal Mesh Upper" : "e.g. Subperiosteal Mesh Upper"}
+                placeholder={
+                  ar ? "مثال: Subperiosteal Mesh Upper" : "e.g. Subperiosteal Mesh Upper"
+                }
                 className={inputCls}
               />
             </div>
@@ -218,29 +413,106 @@ export function SpecializedImplantForm({
                 className={inputCls}
               />
             </div>
+            <div>
+              <label className={labelCls}>{ar ? "الوصف" : "Description"}</label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value.slice(0, 1000))}
+                rows={3}
+                placeholder={ar ? "اكتب وصفاً للمنتج..." : "Describe the implant..."}
+                className={cn(inputCls, "h-auto py-3 resize-none")}
+              />
+            </div>
+          </div>
+
+          {/* Product images */}
+          <div className={cardCls}>
+            <p className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+              <span className="size-1.5 rounded-full bg-indigo-500" />
+              {ar ? "صور المنتج" : "Product Images"}
+            </p>
+            <div className="flex gap-2.5 overflow-x-auto pb-1 -mx-1 px-1">
+              {existingImages.map((path) => (
+                <div
+                  key={path}
+                  className="relative size-20 shrink-0 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden"
+                >
+                  {existingUrlMap[path] ? (
+                    <img src={existingUrlMap[path]} alt="" className="size-full object-cover" />
+                  ) : (
+                    <div className="size-full flex items-center justify-center">
+                      <Package className="size-5 text-slate-300" />
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => removeExistingProductImage(path)}
+                    className="absolute top-1 end-1 size-5 rounded-full bg-black/60 text-white flex items-center justify-center"
+                  >
+                    <X className="size-3" />
+                  </button>
+                </div>
+              ))}
+              {imagePreviews.map((url, i) => (
+                <div
+                  key={url}
+                  className="relative size-20 shrink-0 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden"
+                >
+                  <img src={url} alt="" className="size-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => removeProductPreview(i)}
+                    className="absolute top-1 end-1 size-5 rounded-full bg-black/60 text-white flex items-center justify-center"
+                  >
+                    <X className="size-3" />
+                  </button>
+                </div>
+              ))}
+              {imageFiles.length + existingImages.length < MAX_PRODUCT_IMAGES && (
+                <button
+                  type="button"
+                  onClick={() => productInputRef.current?.click()}
+                  className="shrink-0 size-20 rounded-2xl border-2 border-dashed border-slate-300 bg-white/70 flex flex-col items-center justify-center gap-0.5 text-slate-400 hover:border-indigo-400 hover:text-indigo-500 transition"
+                >
+                  <Plus className="size-5" />
+                  <span className="text-[9px] font-bold">{ar ? "إضافة" : "Add"}</span>
+                </button>
+              )}
+            </div>
+            <p className="text-[10px] text-slate-400">
+              {imageFiles.length + existingImages.length}/{MAX_PRODUCT_IMAGES} · JPG, PNG
+            </p>
+            <input
+              ref={productInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              className="hidden"
+              onChange={(e) => handleProductFiles(e.target.files)}
+            />
           </div>
 
           {/* Dynamic fields */}
           {activeFields.length > 0 && (
-            <div className="rounded-2xl bg-white border border-slate-200/80 shadow-sm p-4 space-y-3">
+            <div className={cardCls}>
               <p className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
                 <span className="size-1.5 rounded-full bg-indigo-500" />
                 {ar ? "المواصفات الخاصة" : "Category Specifications"}
               </p>
-              {activeFields.map((f) =>
-                renderField(f, fields[f.id] ?? "", (v) => setField(f.id, v), ar),
-              )}
+              {activeFields.map((f) => renderField(f, fields[f.id], (v) => setField(f.id, v), ar))}
             </div>
           )}
 
           {/* Pricing & stock */}
-          <div className="rounded-2xl bg-white border border-slate-200/80 shadow-sm p-4 space-y-3">
+          <div className={cardCls}>
             <p className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
               <span className="size-1.5 rounded-full bg-indigo-500" />
               {ar ? "السعر والمخزون" : "Price & Stock"}
             </p>
             <div className="flex items-center justify-between">
-              <label className="text-xs font-semibold text-slate-500">{ar ? "العملة" : "Currency"}</label>
+              <label className="text-xs font-semibold text-slate-500">
+                {ar ? "العملة" : "Currency"}
+              </label>
               <div className="flex rounded-xl bg-slate-100 p-1">
                 <button
                   type="button"
@@ -266,7 +538,7 @@ export function SpecializedImplantForm({
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className={labelCls}>{ar ? "السعر" : "Price"}</label>
+                <label className={labelCls}>{ar ? "سعر الوحدة الواحدة" : "Unit Price"}</label>
                 <input
                   type="number"
                   value={price}
@@ -276,18 +548,87 @@ export function SpecializedImplantForm({
                   className={inputCls}
                 />
               </div>
-              <div>
-                <label className={labelCls}>{ar ? "المخزون" : "Stock"}</label>
-                <input
-                  type="number"
-                  value={stock}
-                  onChange={(e) => setStock(e.target.value)}
-                  placeholder="0"
-                  dir="ltr"
-                  className={inputCls}
-                />
-              </div>
+              {!hideStock && (
+                <div>
+                  <label className={labelCls}>{ar ? "المخزون" : "Stock"}</label>
+                  <input
+                    type="number"
+                    value={stock}
+                    onChange={(e) => setStock(e.target.value)}
+                    placeholder="0"
+                    dir="ltr"
+                    className={inputCls}
+                  />
+                </div>
+              )}
             </div>
+          </div>
+
+          {/* Clinical cases images */}
+          <div className={cardCls}>
+            <p className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+              <span className="size-1.5 rounded-full bg-indigo-500" />
+              {ar ? "رفع صور حالات العمل" : "Clinical Cases Images"}
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              {existingClinical.map((path) => (
+                <div
+                  key={path}
+                  className="relative aspect-square rounded-xl bg-slate-100 border border-slate-200 overflow-hidden"
+                >
+                  {clinicalUrlMap[path] ? (
+                    <img src={clinicalUrlMap[path]} alt="" className="size-full object-cover" />
+                  ) : (
+                    <div className="size-full flex items-center justify-center">
+                      <Package className="size-5 text-slate-300" />
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => removeExistingClinical(path)}
+                    className="absolute top-1 end-1 size-5 rounded-full bg-black/60 text-white flex items-center justify-center"
+                  >
+                    <X className="size-3" />
+                  </button>
+                </div>
+              ))}
+              {clinicalPreviews.map((url, i) => (
+                <div
+                  key={url}
+                  className="relative aspect-square rounded-xl bg-slate-100 border border-slate-200 overflow-hidden"
+                >
+                  <img src={url} alt="" className="size-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => removeClinicalPreview(i)}
+                    className="absolute top-1 end-1 size-5 rounded-full bg-black/60 text-white flex items-center justify-center"
+                  >
+                    <X className="size-3" />
+                  </button>
+                </div>
+              ))}
+              {clinicalFiles.length + existingClinical.length < MAX_CLINICAL_IMAGES && (
+                <button
+                  type="button"
+                  onClick={() => clinicalInputRef.current?.click()}
+                  className="aspect-square rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 flex flex-col items-center justify-center gap-0.5 text-slate-400 hover:border-indigo-400 hover:text-indigo-500 transition"
+                >
+                  <Upload className="size-5" />
+                  <span className="text-[9px] font-bold">{ar ? "إضافة" : "Add"}</span>
+                </button>
+              )}
+            </div>
+            <p className="text-[10px] text-slate-400">
+              {clinicalFiles.length + existingClinical.length}/{MAX_CLINICAL_IMAGES} · JPG, PNG
+            </p>
+            <input
+              ref={clinicalInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              className="hidden"
+              onChange={(e) => handleClinicalFiles(e.target.files)}
+            />
           </div>
 
           {error && (
@@ -306,7 +647,13 @@ export function SpecializedImplantForm({
             className="w-full h-13 min-h-12 rounded-2xl bg-indigo-600 text-white font-display font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg transition hover:bg-indigo-700 disabled:opacity-60"
           >
             {busy ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
-            {busy ? (ar ? "جارٍ الحفظ..." : "Saving...") : ar ? "حفظ الزرعة المتخصصة" : "Save Specialized Implant"}
+            {busy
+              ? ar
+                ? "جارٍ الحفظ..."
+                : "Saving..."
+              : ar
+                ? "حفظ الزرعة المتخصصة"
+                : "Save Specialized Implant"}
           </button>
         </div>
       </div>

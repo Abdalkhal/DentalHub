@@ -2,7 +2,7 @@ export type SpecializedField = {
   id: string;
   ar: string;
   en: string;
-  type: "select" | "text";
+  type: "select" | "text" | "multi";
   options?: { value: string; ar?: string }[];
   placeholder?: string;
 };
@@ -44,7 +44,7 @@ export const SPECIALIZED_FIELDS: Record<string, SpecializedField[]> = {
       id: "boneCoverage",
       ar: "تغطية العظم",
       en: "Bone Coverage",
-      type: "select",
+      type: "multi",
       options: [
         { value: "Full Arch", ar: "فك كامل" },
         { value: "Posterior", ar: "خلفي" },
@@ -55,7 +55,7 @@ export const SPECIALIZED_FIELDS: Record<string, SpecializedField[]> = {
       id: "arch",
       ar: "القوس",
       en: "Arch",
-      type: "select",
+      type: "multi",
       options: [
         { value: "Upper", ar: "علوي" },
         { value: "Lower", ar: "سفلي" },
@@ -82,10 +82,7 @@ export const SPECIALIZED_FIELDS: Record<string, SpecializedField[]> = {
       ar: "عدد الزرعات",
       en: "Implant Count",
       type: "select",
-      options: [
-        { value: "2" },
-        { value: "4" },
-      ],
+      options: [{ value: "2" }, { value: "4" }],
     },
     {
       id: "platform",
@@ -117,11 +114,7 @@ export const SPECIALIZED_FIELDS: Record<string, SpecializedField[]> = {
       ar: "القطر",
       en: "Diameter",
       type: "select",
-      options: [
-        { value: "3.75mm" },
-        { value: "4.0mm" },
-        { value: "4.5mm" },
-      ],
+      options: [{ value: "3.75mm" }, { value: "4.0mm" }, { value: "4.5mm" }],
     },
     {
       id: "connection",
@@ -151,22 +144,14 @@ export const SPECIALIZED_FIELDS: Record<string, SpecializedField[]> = {
       ar: "الطول",
       en: "Length",
       type: "select",
-      options: [
-        { value: "8mm" },
-        { value: "10mm" },
-        { value: "11.5mm" },
-      ],
+      options: [{ value: "8mm" }, { value: "10mm" }, { value: "11.5mm" }],
     },
     {
       id: "diameter",
       ar: "القطر",
       en: "Diameter",
       type: "select",
-      options: [
-        { value: "4.0mm" },
-        { value: "4.5mm" },
-        { value: "5.0mm" },
-      ],
+      options: [{ value: "4.0mm" }, { value: "4.5mm" }, { value: "5.0mm" }],
     },
   ],
   all_on_x: [
@@ -175,11 +160,7 @@ export const SPECIALIZED_FIELDS: Record<string, SpecializedField[]> = {
       ar: "عدد الزرعات",
       en: "Implant Count",
       type: "select",
-      options: [
-        { value: "4" },
-        { value: "6" },
-        { value: "8" },
-      ],
+      options: [{ value: "4" }, { value: "6" }, { value: "8" }],
     },
     {
       id: "material",
@@ -209,22 +190,14 @@ export const SPECIALIZED_FIELDS: Record<string, SpecializedField[]> = {
       ar: "سماكة الشبكة",
       en: "Mesh Thickness",
       type: "select",
-      options: [
-        { value: "0.2mm" },
-        { value: "0.3mm" },
-        { value: "0.4mm" },
-      ],
+      options: [{ value: "0.2mm" }, { value: "0.3mm" }, { value: "0.4mm" }],
     },
     {
       id: "fixationScrews",
       ar: "براغي التثبيت",
       en: "Fixation Screws",
       type: "select",
-      options: [
-        { value: "1.2mm" },
-        { value: "1.4mm" },
-        { value: "1.6mm" },
-      ],
+      options: [{ value: "1.2mm" }, { value: "1.4mm" }, { value: "1.6mm" }],
     },
     {
       id: "boneGraft",

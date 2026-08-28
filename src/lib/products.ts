@@ -82,7 +82,8 @@ export type SurgicalKitSpec = {
 
 export type SpecializedImplantSpec = {
   category: string;
-  fields: Record<string, string>;
+  fields: Record<string, string | string[]>;
+  clinicalImages?: string[];
 };
 
 export type Product = {

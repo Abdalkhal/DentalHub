@@ -6,7 +6,6 @@ import {
   Sparkles,
   Zap,
   Brain,
-  ChevronLeft,
   Plus,
   type LucideIcon,
 } from "lucide-react";
@@ -121,7 +120,11 @@ function SpecializedImplantsPage() {
           <button
             type="button"
             onClick={() =>
-              toast.info(ar ? "المساعدة: استشر مختصاً لاختيار النظام المناسب" : "Help: consult a specialist for the right system")
+              toast.info(
+                ar
+                  ? "المساعدة: استشر مختصاً لاختيار النظام المناسب"
+                  : "Help: consult a specialist for the right system",
+              )
             }
             className="flex items-center gap-1 h-10 px-3 rounded-xl bg-sky-50 text-sky-700 text-xs font-bold hover:bg-sky-100 transition"
           >
@@ -130,7 +133,9 @@ function SpecializedImplantsPage() {
           </button>
         </div>
         <p className="text-xs text-slate-500 mt-2">
-          {ar ? "حلول زرع متقدمة للحالات المعقدة وفقدان العظم الشديد" : "Advanced implant solutions for complex cases and severe bone loss"}
+          {ar
+            ? "حلول زرع متقدمة للحالات المعقدة وفقدان العظم الشديد"
+            : "Advanced implant solutions for complex cases and severe bone loss"}
         </p>
       </div>
 
@@ -138,44 +143,45 @@ function SpecializedImplantsPage() {
         {/* Specialized systems grid */}
         <div className="grid grid-cols-2 gap-3">
           {SYSTEMS.map((s) => (
-            <div
+            <Link
               key={s.id}
-              className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition flex flex-col"
+              to="/specialized-implants/$category"
+              params={{ category: s.id }}
+              className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition flex flex-col cursor-pointer"
             >
               {/* Top row: title (dual language) */}
               <div className="px-3.5 pt-3 pb-2.5">
-                <p className="font-display font-bold text-sm leading-snug text-slate-800">
-                  {s.ar}
-                </p>
-                <p className="text-[11px] text-slate-400 mt-0.5 truncate" dir="ltr">
+                <p className="font-display font-bold text-sm leading-snug text-slate-800">{s.ar}</p>
+                <p className="text-[11px] font-bold text-slate-800 mt-0.5 truncate" dir="ltr">
                   {s.en}
                 </p>
               </div>
 
               {/* Middle row: image */}
               <div className="h-36 bg-slate-100 overflow-hidden">
-                <img src={s.img} alt={`${s.ar} / ${s.en}`} className="size-full object-cover" loading="lazy" />
+                <img
+                  src={s.img}
+                  alt={`${s.ar} / ${s.en}`}
+                  className="size-full object-cover"
+                  loading="lazy"
+                />
               </div>
 
-              {/* Bottom section: description + action */}
+              {/* Bottom section: description */}
               <div className="px-3.5 pt-2.5 pb-3.5 flex flex-col flex-1">
                 <p className="text-[11px] text-slate-500 leading-relaxed line-clamp-3">
                   {ar ? s.descAr : s.descEn}
                 </p>
-                <button
-                  type="button"
-                  className="mt-3 w-full h-9 rounded-xl bg-sky-50 text-sky-700 text-xs font-bold flex items-center justify-center gap-1 hover:bg-sky-100 transition"
-                >
-                  {ar ? "عرض الأنظمة" : "View systems"}
-                  <ChevronLeft className="size-3.5 rtl:rotate-180" />
-                </button>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
 
         {/* Features banner */}
-        <div className="rounded-3xl p-4 text-white shadow-lg relative overflow-hidden" style={{ background: "linear-gradient(135deg, #1d4ed8, #0ea5e9)" }}>
+        <div
+          className="rounded-3xl p-4 text-white shadow-lg relative overflow-hidden"
+          style={{ background: "linear-gradient(135deg, #1d4ed8, #0ea5e9)" }}
+        >
           <div className="absolute -top-10 -end-10 size-36 rounded-full bg-white/10 blur-2xl" />
           <div className="relative">
             <p className="font-display font-extrabold text-base mb-3">
@@ -185,7 +191,10 @@ function SpecializedImplantsPage() {
               {FEATURES.map((f) => {
                 const Icon = f.icon;
                 return (
-                  <div key={f.en} className="flex items-center gap-2.5 bg-white/10 backdrop-blur rounded-2xl p-3">
+                  <div
+                    key={f.en}
+                    className="flex items-center gap-2.5 bg-white/10 backdrop-blur rounded-2xl p-3"
+                  >
                     <span className="size-9 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
                       <Icon className="size-4" />
                     </span>

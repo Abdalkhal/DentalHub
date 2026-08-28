@@ -16,6 +16,7 @@ import { useI18n } from "@/lib/i18n";
 import { useSignedImageUrls, type Product } from "@/lib/products";
 import { ALL_COUNTRIES, countryCodeToFlag } from "@/data/countries";
 import { SPEC_FIELDS, type SpecFieldId } from "@/data/specs";
+import { SPECIALIZED_CATEGORIES, SPECIALIZED_FIELDS } from "@/data/specializedImplants";
 import { addToCart } from "@/lib/cartStore";
 import { addToPurchaseHistory } from "@/lib/quickOrders";
 import { SURGICAL_GUIDE_TOOLS } from "@/components/ImplantFormModal";
@@ -45,19 +46,43 @@ export function ProductDetailsModal({
   const { data: urlMap = {} } = useSignedImageUrls(product.images);
   const images = product.images.map((p) => urlMap[p]).filter(Boolean) as string[];
 
-  const country = product.country
-    ? ALL_COUNTRIES.find((c) => c.code === product.country)
-    : null;
+  const { data: clinicalUrlMap = {} } = useSignedImageUrls(
+    product.specializedImplant?.clinicalImages ?? [],
+  );
+
+  const spec = product.specializedImplant;
+  const categoryMeta = spec ? SPECIALIZED_CATEGORIES.find((c) => c.id === spec.category) : null;
+  const specializedEntries = useMemo(() => {
+    if (!spec) return [];
+    const out: { label: string; value: string }[] = [];
+    const fieldDefs = SPECIALIZED_FIELDS[spec.category] ?? [];
+    Object.entries(spec.fields ?? {}).forEach(([id, v]) => {
+      const field = fieldDefs.find((f) => f.id === id);
+      const label = field ? (ar ? field.ar : field.en) : id;
+      if (Array.isArray(v)) {
+        if (v.length > 0) {
+          const parts = v.map((x) => {
+            const opt = field?.options?.find((o) => o.value === x);
+            return opt ? (ar ? (opt.ar ?? opt.value) : opt.value) : x;
+          });
+          out.push({ label, value: parts.join(" · ") });
+        }
+      } else if (typeof v === "string" && v) {
+        const opt = field?.options?.find((o) => o.value === v);
+        out.push({ label, value: opt ? (ar ? (opt.ar ?? opt.value) : opt.value) : v });
+      }
+    });
+    return out;
+  }, [spec, ar]);
+
+  const country = product.country ? ALL_COUNTRIES.find((c) => c.code === product.country) : null;
   const originLabel =
-    product.countryOrigin ||
-    (country ? `${countryCodeToFlag(country.code)} ${country.ar}` : null);
+    product.countryOrigin || (country ? `${countryCodeToFlag(country.code)} ${country.ar}` : null);
 
   const isIQD = product.currency === "IQD";
   const sym = isIQD ? "د.ع" : "$";
   const money = (n: number) =>
-    isIQD
-      ? `${Number(n).toLocaleString()} ${sym}`
-      : `${sym}${n.toFixed(2)}`;
+    isIQD ? `${Number(n).toLocaleString()} ${sym}` : `${sym}${n.toFixed(2)}`;
 
   const specEntries = useMemo(() => {
     const bags = [product.technicalSpecifications ?? {}, product.specs ?? {}];
@@ -77,7 +102,8 @@ export function ProductDetailsModal({
     return out;
   }, [product.specs, product.technicalSpecifications, ar]);
 
-  const prev = () => setActiveImg((i) => (images.length === 0 ? 0 : (i - 1 + images.length) % images.length));
+  const prev = () =>
+    setActiveImg((i) => (images.length === 0 ? 0 : (i - 1 + images.length) % images.length));
   const next = () => setActiveImg((i) => (images.length === 0 ? 0 : (i + 1) % images.length));
 
   const cartSpecs = useMemo(() => {
@@ -153,11 +179,7 @@ export function ProductDetailsModal({
           <div className="relative bg-slate-100">
             {images.length > 0 ? (
               <>
-                <img
-                  src={images[activeImg]}
-                  alt=""
-                  className="w-full h-64 object-contain"
-                />
+                <img src={images[activeImg]} alt="" className="w-full h-64 object-contain" />
                 {images.length > 1 && (
                   <>
                     <button
@@ -203,9 +225,7 @@ export function ProductDetailsModal({
               <h2 className="font-display font-bold text-lg text-slate-900 leading-snug">
                 {ar ? product.ar || product.en : product.en || product.ar}
               </h2>
-              {product.brand && (
-                <p className="text-xs text-slate-500 mt-0.5">{product.brand}</p>
-              )}
+              {product.brand && <p className="text-xs text-slate-500 mt-0.5">{product.brand}</p>}
             </div>
 
             {/* Description */}
@@ -223,13 +243,17 @@ export function ProductDetailsModal({
             {/* Price & stock */}
             <div className="flex items-center justify-between gap-3 rounded-2xl bg-emerald-50/70 border border-emerald-100 p-3">
               <div>
-                <p className="text-[11px] font-bold text-emerald-700/70">{ar ? "السعر" : "Price"}</p>
+                <p className="text-[11px] font-bold text-emerald-700/70">
+                  {ar ? "السعر" : "Price"}
+                </p>
                 <p className="font-display font-extrabold text-lg text-emerald-700">
                   {money(product.price)}
                 </p>
               </div>
               <div className="text-end">
-                <p className="text-[11px] font-bold text-emerald-700/70">{ar ? "المخزون" : "Stock"}</p>
+                <p className="text-[11px] font-bold text-emerald-700/70">
+                  {ar ? "المخزون" : "Stock"}
+                </p>
                 <p
                   className={cn(
                     "font-display font-extrabold text-lg",
@@ -296,7 +320,10 @@ export function ProductDetailsModal({
                       {product.surgicalGuideTools.map((tool) => {
                         const def = SURGICAL_GUIDE_TOOLS.find((t) => t.en === tool);
                         return (
-                          <div key={tool} className="flex items-center gap-2 text-[13px] text-slate-700">
+                          <div
+                            key={tool}
+                            className="flex items-center gap-2 text-[13px] text-slate-700"
+                          >
                             <span className="size-5 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
                               <Check className="size-3.5" />
                             </span>
@@ -325,7 +352,9 @@ export function ProductDetailsModal({
                   {product.surgicalKit.placementType && (
                     <div className="flex items-center justify-between gap-3">
                       <span className="text-slate-500">{ar ? "بروتوكول الزرع" : "Placement"}</span>
-                      <span className="font-semibold text-end">{product.surgicalKit.placementType}</span>
+                      <span className="font-semibold text-end">
+                        {product.surgicalKit.placementType}
+                      </span>
                     </div>
                   )}
                   {!!product.surgicalKit.toolsCount && (
@@ -337,7 +366,9 @@ export function ProductDetailsModal({
                   {product.sku && (
                     <div className="flex items-center justify-between gap-3">
                       <span className="text-slate-500">SKU</span>
-                      <span className="font-semibold font-mono" dir="ltr">{product.sku}</span>
+                      <span className="font-semibold font-mono" dir="ltr">
+                        {product.sku}
+                      </span>
                     </div>
                   )}
                   {product.surgicalKit.compatibility &&
@@ -357,6 +388,49 @@ export function ProductDetailsModal({
               </div>
             )}
 
+            {/* Specialized implant */}
+            {spec && (
+              <div className="rounded-2xl border border-indigo-200 bg-indigo-50/40 overflow-hidden">
+                <div className="flex items-center justify-between bg-indigo-50 px-3 py-2">
+                  <span className="text-xs font-bold text-indigo-600">
+                    {ar ? "زرعة متخصصة" : "Specialized Implant"}
+                  </span>
+                  {categoryMeta && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-600 text-white">
+                      {ar ? categoryMeta.ar : categoryMeta.en}
+                    </span>
+                  )}
+                </div>
+                {specializedEntries.length > 0 && (
+                  <div className="px-3 py-2.5 space-y-1.5">
+                    {specializedEntries.map((s, i) => (
+                      <div key={i} className="flex items-center justify-between gap-3 text-[13px]">
+                        <span className="text-slate-500">{s.label}</span>
+                        <span className="font-semibold text-slate-800 text-end">{s.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {(spec.clinicalImages?.length ?? 0) > 0 && (
+                  <div className="px-3 pb-3">
+                    <p className="text-[11px] font-bold text-indigo-500 mb-1.5">
+                      {ar ? "صور حالات العمل" : "Clinical Cases"}
+                    </p>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {spec.clinicalImages!.map((path) => (
+                        <img
+                          key={path}
+                          src={clinicalUrlMap[path]}
+                          alt=""
+                          className="aspect-square w-full rounded-lg object-cover bg-slate-100"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Volume discounts table */}
             {product.discountTiers && product.discountTiers.length > 0 && (
               <div>
@@ -367,9 +441,13 @@ export function ProductDetailsModal({
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="bg-slate-50 text-slate-500">
-                        <th className="text-start font-bold px-3 py-2">{ar ? "من كمية" : "From"}</th>
+                        <th className="text-start font-bold px-3 py-2">
+                          {ar ? "من كمية" : "From"}
+                        </th>
                         <th className="text-start font-bold px-3 py-2">{ar ? "إلى كمية" : "To"}</th>
-                        <th className="text-center font-bold px-3 py-2">{ar ? "الخصم %" : "Disc. %"}</th>
+                        <th className="text-center font-bold px-3 py-2">
+                          {ar ? "الخصم %" : "Disc. %"}
+                        </th>
                         <th className="text-end font-bold px-3 py-2">{ar ? "السعر" : "Price"}</th>
                       </tr>
                     </thead>
@@ -403,7 +481,9 @@ export function ProductDetailsModal({
                     <tbody>
                       {specEntries.map((s, i) => (
                         <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-slate-50/60"}>
-                          <td className="px-3 py-2 text-slate-500 font-semibold w-1/2">{s.label}</td>
+                          <td className="px-3 py-2 text-slate-500 font-semibold w-1/2">
+                            {s.label}
+                          </td>
                           <td className="px-3 py-2 text-slate-800">{s.value}</td>
                         </tr>
                       ))}

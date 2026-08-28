@@ -42,6 +42,7 @@ import { Route as DesignerIndexRouteImport } from './routes/designer.index'
 import { Route as ClinicIndexRouteImport } from './routes/clinic.index'
 import { Route as BrandsIndexRouteImport } from './routes/brands.index'
 import { Route as SurgicalGuideCreateRouteImport } from './routes/surgical-guide.create'
+import { Route as SpecializedImplantsCategoryRouteImport } from './routes/specialized-implants.$category'
 import { Route as ProfileAccountIdRouteImport } from './routes/profile.$accountId'
 import { Route as ProductsProductIdRouteImport } from './routes/products.$productId'
 import { Route as PatientsPatientIdRouteImport } from './routes/patients.$patientId'
@@ -238,6 +239,12 @@ const SurgicalGuideCreateRoute = SurgicalGuideCreateRouteImport.update({
   path: '/surgical-guide/create',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SpecializedImplantsCategoryRoute =
+  SpecializedImplantsCategoryRouteImport.update({
+    id: '/specialized-implants/$category',
+    path: '/specialized-implants/$category',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ProfileAccountIdRoute = ProfileAccountIdRouteImport.update({
   id: '/profile/$accountId',
   path: '/profile/$accountId',
@@ -429,6 +436,7 @@ export interface FileRoutesByFullPath {
   '/patients/$patientId': typeof PatientsPatientIdRoute
   '/products/$productId': typeof ProductsProductIdRoute
   '/profile/$accountId': typeof ProfileAccountIdRoute
+  '/specialized-implants/$category': typeof SpecializedImplantsCategoryRoute
   '/surgical-guide/create': typeof SurgicalGuideCreateRoute
   '/brands/': typeof BrandsIndexRoute
   '/clinic/': typeof ClinicIndexRoute
@@ -493,6 +501,7 @@ export interface FileRoutesByTo {
   '/patients/$patientId': typeof PatientsPatientIdRoute
   '/products/$productId': typeof ProductsProductIdRoute
   '/profile/$accountId': typeof ProfileAccountIdRoute
+  '/specialized-implants/$category': typeof SpecializedImplantsCategoryRoute
   '/surgical-guide/create': typeof SurgicalGuideCreateRoute
   '/brands': typeof BrandsIndexRoute
   '/clinic': typeof ClinicIndexRoute
@@ -558,6 +567,7 @@ export interface FileRoutesById {
   '/patients/$patientId': typeof PatientsPatientIdRoute
   '/products/$productId': typeof ProductsProductIdRoute
   '/profile/$accountId': typeof ProfileAccountIdRoute
+  '/specialized-implants/$category': typeof SpecializedImplantsCategoryRoute
   '/surgical-guide/create': typeof SurgicalGuideCreateRoute
   '/brands/': typeof BrandsIndexRoute
   '/clinic/': typeof ClinicIndexRoute
@@ -624,6 +634,7 @@ export interface FileRouteTypes {
     | '/patients/$patientId'
     | '/products/$productId'
     | '/profile/$accountId'
+    | '/specialized-implants/$category'
     | '/surgical-guide/create'
     | '/brands/'
     | '/clinic/'
@@ -688,6 +699,7 @@ export interface FileRouteTypes {
     | '/patients/$patientId'
     | '/products/$productId'
     | '/profile/$accountId'
+    | '/specialized-implants/$category'
     | '/surgical-guide/create'
     | '/brands'
     | '/clinic'
@@ -752,6 +764,7 @@ export interface FileRouteTypes {
     | '/patients/$patientId'
     | '/products/$productId'
     | '/profile/$accountId'
+    | '/specialized-implants/$category'
     | '/surgical-guide/create'
     | '/brands/'
     | '/clinic/'
@@ -813,6 +826,7 @@ export interface RootRouteChildren {
   PatientsPatientIdRoute: typeof PatientsPatientIdRoute
   ProductsProductIdRoute: typeof ProductsProductIdRoute
   ProfileAccountIdRoute: typeof ProfileAccountIdRoute
+  SpecializedImplantsCategoryRoute: typeof SpecializedImplantsCategoryRoute
   SurgicalGuideCreateRoute: typeof SurgicalGuideCreateRoute
   BrandsIndexRoute: typeof BrandsIndexRoute
   ClinicIndexRoute: typeof ClinicIndexRoute
@@ -1064,6 +1078,13 @@ declare module '@tanstack/react-router' {
       path: '/surgical-guide/create'
       fullPath: '/surgical-guide/create'
       preLoaderRoute: typeof SurgicalGuideCreateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/specialized-implants/$category': {
+      id: '/specialized-implants/$category'
+      path: '/specialized-implants/$category'
+      fullPath: '/specialized-implants/$category'
+      preLoaderRoute: typeof SpecializedImplantsCategoryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/profile/$accountId': {
@@ -1352,6 +1373,7 @@ const rootRouteChildren: RootRouteChildren = {
   PatientsPatientIdRoute: PatientsPatientIdRoute,
   ProductsProductIdRoute: ProductsProductIdRoute,
   ProfileAccountIdRoute: ProfileAccountIdRoute,
+  SpecializedImplantsCategoryRoute: SpecializedImplantsCategoryRoute,
   SurgicalGuideCreateRoute: SurgicalGuideCreateRoute,
   BrandsIndexRoute: BrandsIndexRoute,
   ClinicIndexRoute: ClinicIndexRoute,
