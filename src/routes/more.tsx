@@ -15,6 +15,7 @@ import {
   BarChart3,
   CreditCard,
   MessageSquare,
+  Megaphone,
   Layers,
   Heart,
   Stethoscope,
@@ -178,6 +179,13 @@ function More() {
       label: ar ? "الرسائل" : "Messages",
       tone: "bg-blue-50 ring-blue-200 text-blue-600",
       roles: ["dentist", "supply", "lab", "implant"],
+    },
+    {
+      to: "/my-ads",
+      icon: Megaphone,
+      label: ar ? "إعلاناتي" : "My Ads",
+      tone: "bg-blue-50 ring-blue-200 text-blue-600",
+      roles: ["dentist", "supply", "implant"],
     },
     {
       to: "/explore",

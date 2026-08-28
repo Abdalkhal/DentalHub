@@ -33,6 +33,7 @@ import {
   Search,
   Bell,
   MessageSquare,
+  Megaphone,
   Plus,
   List,
   Users,
@@ -106,6 +107,7 @@ const NAV_ITEMS = [
   { key: "labs", ar: "المختبرات", en: "Labs", icon: Building2, path: "/labs" },
   { key: "services", ar: "خدمات المختبر", en: "Lab Services", icon: Sparkles, path: "/lab/my-services" },
   { key: "messages", ar: "الرسائل", en: "Messages", icon: MessageSquare, path: "/messages" },
+  { key: "myads", ar: "إعلاناتي", en: "My Ads", icon: Megaphone, path: "/my-ads" },
   { key: "settings", ar: "الإعدادات", en: "Settings", icon: Edit3, path: "/account/settings" },
 ];
 

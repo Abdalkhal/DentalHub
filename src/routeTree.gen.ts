@@ -17,6 +17,7 @@ import { Route as ProductionRouteImport } from './routes/production'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as OffersRouteImport } from './routes/offers'
+import { Route as MyAdsRouteImport } from './routes/my-ads'
 import { Route as MoreRouteImport } from './routes/more'
 import { Route as MessagesRouteImport } from './routes/messages'
 import { Route as LoginRouteImport } from './routes/login'
@@ -112,6 +113,11 @@ const OrdersRoute = OrdersRouteImport.update({
 const OffersRoute = OffersRouteImport.update({
   id: '/offers',
   path: '/offers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MyAdsRoute = MyAdsRouteImport.update({
+  id: '/my-ads',
+  path: '/my-ads',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MoreRoute = MoreRouteImport.update({
@@ -411,6 +417,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
   '/more': typeof MoreRoute
+  '/my-ads': typeof MyAdsRoute
   '/offers': typeof OffersRoute
   '/orders': typeof OrdersRoute
   '/pricing': typeof PricingRoute
@@ -477,6 +484,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
   '/more': typeof MoreRoute
+  '/my-ads': typeof MyAdsRoute
   '/offers': typeof OffersRoute
   '/orders': typeof OrdersRoute
   '/pricing': typeof PricingRoute
@@ -544,6 +552,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
   '/more': typeof MoreRoute
+  '/my-ads': typeof MyAdsRoute
   '/offers': typeof OffersRoute
   '/orders': typeof OrdersRoute
   '/pricing': typeof PricingRoute
@@ -612,6 +621,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/messages'
     | '/more'
+    | '/my-ads'
     | '/offers'
     | '/orders'
     | '/pricing'
@@ -678,6 +688,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/messages'
     | '/more'
+    | '/my-ads'
     | '/offers'
     | '/orders'
     | '/pricing'
@@ -744,6 +755,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/messages'
     | '/more'
+    | '/my-ads'
     | '/offers'
     | '/orders'
     | '/pricing'
@@ -811,6 +823,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   MessagesRoute: typeof MessagesRoute
   MoreRoute: typeof MoreRoute
+  MyAdsRoute: typeof MyAdsRoute
   OffersRoute: typeof OffersRoute
   OrdersRoute: typeof OrdersRoute
   PricingRoute: typeof PricingRoute
@@ -916,6 +929,13 @@ declare module '@tanstack/react-router' {
       path: '/offers'
       fullPath: '/offers'
       preLoaderRoute: typeof OffersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/my-ads': {
+      id: '/my-ads'
+      path: '/my-ads'
+      fullPath: '/my-ads'
+      preLoaderRoute: typeof MyAdsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/more': {
@@ -1366,6 +1386,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   MessagesRoute: MessagesRoute,
   MoreRoute: MoreRoute,
+  MyAdsRoute: MyAdsRoute,
   OffersRoute: OffersRoute,
   OrdersRoute: OrdersRoute,
   PricingRoute: PricingRoute,
