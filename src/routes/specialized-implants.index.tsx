@@ -3,12 +3,6 @@ import {
   ArrowRight,
   ShieldCheck,
   HelpCircle,
-  Bone,
-  Syringe,
-  Smile,
-  LayoutGrid,
-  Waves,
-  Box,
   Sparkles,
   Zap,
   Brain,
@@ -19,7 +13,6 @@ import {
 import { MobileShell } from "@/components/MobileShell";
 import { useI18n } from "@/lib/i18n";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 import specializedImplantImg from "@/assets/spetialized_implant.jpg";
 import tiryGuidImg from "@/assets/tiry_guid.jpg";
 import zigumaticImg from "@/assets/zigumatic.jpg";
@@ -37,8 +30,6 @@ type System = {
   en: string;
   descAr: string;
   descEn: string;
-  icon: LucideIcon;
-  color: string;
   img: string;
 };
 
@@ -49,8 +40,6 @@ const SYSTEMS: System[] = [
     en: "Subperiosteal Implant",
     descAr: "إطار معدني مخصص يوضع على العظم للحالات ذات الفقد العظمي الشديد",
     descEn: "Custom metal frame over bone for severe bone loss cases",
-    icon: Bone,
-    color: "text-sky-600 bg-sky-50",
     img: specializedImplantImg,
   },
   {
@@ -59,8 +48,6 @@ const SYSTEMS: System[] = [
     en: "Pterygoid Implant",
     descAr: "تثبيت خلفي عبر الناتئ الجناحي للفك العلوي",
     descEn: "Posterior anchorage through the pterygoid process",
-    icon: Syringe,
-    color: "text-amber-600 bg-amber-50",
     img: tiryGuidImg,
   },
   {
@@ -69,8 +56,6 @@ const SYSTEMS: System[] = [
     en: "Zygomatic Implant",
     descAr: "رسوٌّ طويل في العظم الوجني لتفادي الترقيع",
     descEn: "Long anchorage in the zygomatic bone avoiding grafts",
-    icon: Smile,
-    color: "text-rose-600 bg-rose-50",
     img: zigumaticImg,
   },
   {
@@ -79,8 +64,6 @@ const SYSTEMS: System[] = [
     en: "All-on-4® / All-on-X",
     descAr: "تركيبة فك كامل على 4 زرعات أو أكثر في جلسة واحدة",
     descEn: "Full-arch prosthesis on 4+ implants in a single session",
-    icon: LayoutGrid,
-    color: "text-emerald-600 bg-emerald-50",
     img: allOn4Img,
   },
   {
@@ -89,8 +72,6 @@ const SYSTEMS: System[] = [
     en: "Trans Sinus Implant",
     descAr: "زرع عبر الجيب الفكي العلوي للفك الخلفي الضعيف",
     descEn: "Through the maxillary sinus for a weak posterior maxilla",
-    icon: Waves,
-    color: "text-indigo-600 bg-indigo-50",
     img: tranusImg,
   },
   {
@@ -99,8 +80,6 @@ const SYSTEMS: System[] = [
     en: "3D Custom Titanium Mesh",
     descAr: "شبكة مطبوعة ثلاثية الأبعاد لإعادة بناء العظم بدقة",
     descEn: "3D-printed mesh for precise bone reconstruction",
-    icon: Box,
-    color: "text-slate-600 bg-slate-100",
     img: customMeshImg,
   },
 ];
@@ -157,38 +136,42 @@ function SpecializedImplantsPage() {
 
       <div className="px-4 pt-4 pb-10 space-y-6">
         {/* Specialized systems grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {SYSTEMS.map((s) => {
-            const Icon = s.icon;
-            return (
-              <div
-                key={s.id}
-                className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition flex flex-col"
-              >
-                <div className="h-36 bg-slate-100 overflow-hidden">
-                  <img src={s.img} alt={ar ? s.ar : s.en} className="size-full object-cover" loading="lazy" />
-                </div>
-                <div className="p-3.5 flex flex-col flex-1">
-                  <span className={cn("size-10 rounded-xl flex items-center justify-center mb-2.5", s.color)}>
-                    <Icon className="size-5" />
-                  </span>
-                  <p className="font-display font-bold text-sm leading-snug text-slate-800 min-h-[2.5rem]">
-                    {ar ? s.ar : s.en}
-                  </p>
-                  <p className="text-[11px] text-slate-500 leading-relaxed mt-1 line-clamp-3">
-                    {ar ? s.descAr : s.descEn}
-                  </p>
-                  <button
-                    type="button"
-                    className="mt-3 w-full h-9 rounded-xl bg-sky-50 text-sky-700 text-xs font-bold flex items-center justify-center gap-1 hover:bg-sky-100 transition"
-                  >
-                    {ar ? "عرض الأنظمة" : "View systems"}
-                    <ChevronLeft className="size-3.5 rtl:rotate-180" />
-                  </button>
-                </div>
+        <div className="grid grid-cols-2 gap-3">
+          {SYSTEMS.map((s) => (
+            <div
+              key={s.id}
+              className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition flex flex-col"
+            >
+              {/* Top row: title (dual language) */}
+              <div className="px-3.5 pt-3 pb-2.5">
+                <p className="font-display font-bold text-sm leading-snug text-slate-800">
+                  {s.ar}
+                </p>
+                <p className="text-[11px] text-slate-400 mt-0.5 truncate" dir="ltr">
+                  {s.en}
+                </p>
               </div>
-            );
-          })}
+
+              {/* Middle row: image */}
+              <div className="h-36 bg-slate-100 overflow-hidden">
+                <img src={s.img} alt={`${s.ar} / ${s.en}`} className="size-full object-cover" loading="lazy" />
+              </div>
+
+              {/* Bottom section: description + action */}
+              <div className="px-3.5 pt-2.5 pb-3.5 flex flex-col flex-1">
+                <p className="text-[11px] text-slate-500 leading-relaxed line-clamp-3">
+                  {ar ? s.descAr : s.descEn}
+                </p>
+                <button
+                  type="button"
+                  className="mt-3 w-full h-9 rounded-xl bg-sky-50 text-sky-700 text-xs font-bold flex items-center justify-center gap-1 hover:bg-sky-100 transition"
+                >
+                  {ar ? "عرض الأنظمة" : "View systems"}
+                  <ChevronLeft className="size-3.5 rtl:rotate-180" />
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
 
         {/* Features banner */}
