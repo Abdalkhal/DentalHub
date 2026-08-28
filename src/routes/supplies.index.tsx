@@ -15,6 +15,7 @@ import { CountryCombobox } from "@/components/CountryCombobox";
 import { BarcodeScannerModal } from "@/components/BarcodeScannerModal";
 import { ProductDetailsModal } from "@/components/ProductDetailsModal";
 import { ImplantFormModal } from "@/components/ImplantFormModal";
+import { SpecializedImplantForm } from "@/components/SpecializedImplantForm";
 import {
   Dialog,
   DialogContent,
@@ -1739,8 +1740,10 @@ function ImplantsBoneGraftPanel() {
 
   const [showBoneGraft, setShowBoneGraft] = useState(false);
   const [showImplant, setShowImplant] = useState(false);
+  const [showSpecialized, setShowSpecialized] = useState(false);
   const [editingGraft, setEditingGraft] = useState<Product | null>(null);
   const [editingImplant, setEditingImplant] = useState<Product | null>(null);
+  const [editingSpecialized, setEditingSpecialized] = useState<Product | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   // Strict multi-tenant isolation: only this supplier's implants / bone grafts.
@@ -1752,7 +1755,8 @@ function ImplantsBoneGraftPanel() {
           p.companyId === supplierUid &&
           (p.category === "implant" ||
             p.branch === "bone_graft" ||
-            p.category === "surgical_kit"),
+            p.category === "surgical_kit" ||
+            p.category === "specialized_implant"),
       ),
     [allProducts, supplierUid],
   );
@@ -1800,6 +1804,13 @@ function ImplantsBoneGraftPanel() {
             {ar ? "إضافة بون كرافت" : "Add Bone Graft"}
           </button>
         </div>
+        <button
+          onClick={() => setShowSpecialized(true)}
+          className="w-full h-12 rounded-2xl bg-indigo-600 text-white font-display font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition shadow-card"
+        >
+          <Plus className="size-5 shrink-0" />
+          {ar ? "إضافة زرعة متخصصة" : "Add Specialized Implant"}
+        </button>
       </div>
 
       {isLoading ? (
@@ -1860,7 +1871,11 @@ function ImplantsBoneGraftPanel() {
                 >
                   <button
                     onClick={() =>
-                      p.branch === "implant" ? setEditingImplant(p) : setEditingGraft(p)
+                      p.branch === "implant"
+                        ? setEditingImplant(p)
+                        : p.branch === "specialized_implant"
+                          ? setEditingSpecialized(p)
+                          : setEditingGraft(p)
                     }
                     className="flex-1 h-8 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-sky-100 hover:text-sky-600 flex items-center justify-center gap-1 transition"
                   >
@@ -1882,11 +1897,15 @@ function ImplantsBoneGraftPanel() {
 
       {showBoneGraft && <BoneGraftModal onClose={() => setShowBoneGraft(false)} />}
       {showImplant && <ImplantFormModal onClose={() => setShowImplant(false)} />}
+      {showSpecialized && <SpecializedImplantForm onClose={() => setShowSpecialized(false)} />}
       {editingGraft && (
         <BoneGraftModal product={editingGraft} onClose={() => setEditingGraft(null)} />
       )}
       {editingImplant && (
         <ImplantFormModal product={editingImplant} onClose={() => setEditingImplant(null)} />
+      )}
+      {editingSpecialized && (
+        <SpecializedImplantForm product={editingSpecialized} onClose={() => setEditingSpecialized(null)} />
       )}
       {selectedProduct && (
         <ProductDetailsModal

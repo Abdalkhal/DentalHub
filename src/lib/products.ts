@@ -80,6 +80,11 @@ export type SurgicalKitSpec = {
   toolsCount?: number;
 };
 
+export type SpecializedImplantSpec = {
+  category: string;
+  fields: Record<string, string>;
+};
+
 export type Product = {
   id: string;
   branch: string;
@@ -117,6 +122,7 @@ export type Product = {
   surgicalGuide?: string;
   surgicalGuideTools?: string[];
   surgicalKit?: SurgicalKitSpec;
+  specializedImplant?: SpecializedImplantSpec;
 };
 
 const fromDoc = (id: string, data: Record<string, unknown>): Product => {
@@ -175,6 +181,7 @@ const fromDoc = (id: string, data: Record<string, unknown>): Product => {
     surgicalGuide: (data.surgicalGuide as string) ?? undefined,
     surgicalGuideTools: (data.surgicalGuideTools as string[] | null) ?? undefined,
     surgicalKit: (data.surgicalKit as SurgicalKitSpec | null) ?? undefined,
+    specializedImplant: (data.specializedImplant as SpecializedImplantSpec | null) ?? undefined,
   };
 };
 
@@ -228,6 +235,9 @@ export function useUpsertProduct() {
       const cleanSurgicalKit = p.surgicalKit
         ? (removeUndefined(p.surgicalKit) as SurgicalKitSpec)
         : null;
+      const cleanSpecialized = p.specializedImplant
+        ? (removeUndefined(p.specializedImplant) as SpecializedImplantSpec)
+        : null;
       await setDoc(
         ref,
         {
@@ -268,6 +278,7 @@ export function useUpsertProduct() {
           surgicalGuide: p.surgicalGuide ?? null,
           surgicalGuideTools: p.surgicalGuideTools ?? null,
           surgicalKit: cleanSurgicalKit,
+          specializedImplant: cleanSpecialized,
         },
         { merge: true },
       );

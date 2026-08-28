@@ -6,6 +6,7 @@ import { TopBar } from "@/components/TopBar";
 import { RoleGuard } from "@/components/RoleGuard";
 import { BoneGraftModal } from "@/components/BoneGraftModal";
 import { ImplantFormModal } from "@/components/ImplantFormModal";
+import { SpecializedImplantForm } from "@/components/SpecializedImplantForm";
 import { NotificationBell } from "@/components/NotificationBell";
 import { COUNTRIES } from "@/data/implants";
 import {
@@ -299,13 +300,17 @@ function ImplantProductsPanel() {
 
   const implantProducts = allProducts.filter(
     (p) =>
-      (p.category === "implant" || p.category === "surgical_kit") &&
+      (p.category === "implant" ||
+        p.category === "surgical_kit" ||
+        p.category === "specialized_implant") &&
       p.companyId === companyId,
   );
 
   const [showBoneGraft, setShowBoneGraft] = useState(false);
   const [showImplantForm, setShowImplantForm] = useState(false);
+  const [showSpecialized, setShowSpecialized] = useState(false);
   const [editingImplant, setEditingImplant] = useState<Product | null>(null);
+  const [editingSpecialized, setEditingSpecialized] = useState<Product | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   const countryByCode = useMemo(
@@ -374,6 +379,13 @@ function ImplantProductsPanel() {
             {ar ? "إضافة بون كرافت" : "Add Bone Graft"}
           </button>
         </div>
+        <button
+          onClick={() => setShowSpecialized(true)}
+          className="w-full h-13 min-h-12 rounded-2xl bg-indigo-600 text-white font-display font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition shadow-card"
+        >
+          <Plus className="size-5 shrink-0" />
+          {ar ? "إضافة زرعة متخصصة" : "Add Specialized Implant"}
+        </button>
 
       {isLoading ? (
           <div className="flex items-center justify-center py-20">
@@ -474,7 +486,11 @@ function ImplantProductsPanel() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        openEdit(product);
+                        if (product.branch === "specialized_implant") {
+                          setEditingSpecialized(product);
+                        } else {
+                          openEdit(product);
+                        }
                       }}
                       className="flex-1 h-8 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-sky-100 hover:text-sky-600 flex items-center justify-center gap-1 transition"
                     >
@@ -499,8 +515,12 @@ function ImplantProductsPanel() {
 
       {showBoneGraft && <BoneGraftModal onClose={() => setShowBoneGraft(false)} />}
       {showImplantForm && <ImplantFormModal onClose={() => setShowImplantForm(false)} />}
+      {showSpecialized && <SpecializedImplantForm onClose={() => setShowSpecialized(false)} />}
       {editingImplant && (
         <ImplantFormModal product={editingImplant} onClose={() => setEditingImplant(null)} />
+      )}
+      {editingSpecialized && (
+        <SpecializedImplantForm product={editingSpecialized} onClose={() => setEditingSpecialized(null)} />
       )}
     </div>
   );
