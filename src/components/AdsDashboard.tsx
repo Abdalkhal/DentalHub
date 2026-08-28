@@ -16,7 +16,7 @@ import { useI18n } from "@/lib/i18n";
 import { useOffers } from "@/lib/offers";
 import { useUserRole } from "@/lib/useAuth";
 import { useSignedImageUrls } from "@/lib/products";
-import { toast } from "sonner";
+import { AdsCreationWizard, type AdsType } from "@/components/AdsCreationWizard";
 
 type AdStatus = "all" | "active" | "pending" | "expired";
 
@@ -44,6 +44,7 @@ export function AdsDashboard() {
   const { role } = useUserRole();
   const userId = role?.userId ?? "";
   const [filter, setFilter] = useState<AdStatus>("all");
+  const [wizardType, setWizardType] = useState<AdsType | null>(null);
 
   const { data: offers = [], isLoading } = useOffers(userId);
 
@@ -62,7 +63,7 @@ export function AdsDashboard() {
           title: o.title,
           description: o.description,
           image: o.imageUrl ? urlMap[o.imageUrl] : undefined,
-          status: expired ? "expired" : "active",
+          status: o.status ?? (expired ? "expired" : "active"),
           views: 0,
           clicks: 0,
           expiryDate: o.expiryDate,
@@ -83,9 +84,6 @@ export function AdsDashboard() {
   };
 
   const filtered = filter === "all" ? ads : ads.filter((a) => a.status === filter);
-
-  const comingSoon = () =>
-    toast.info(ar ? "ميزة إدارة الحملات الإعلانية قريباً" : "Ad campaign management coming soon");
 
   const statusBadge = (s: AdItem["status"]) => {
     const map = {
@@ -117,36 +115,38 @@ export function AdsDashboard() {
   };
 
   return (
-    <div className="min-h-full flex flex-col bg-[#F1F5F9]" dir="rtl">
+    <div className="min-h-full flex flex-col bg-[#F1F5F9] pb-28" dir="rtl">
       {/* Hero header */}
-      <div
-        className="px-5 pt-6 pb-12 text-white relative overflow-hidden"
-        style={{ background: "linear-gradient(135deg, #0052FF, #00A3FF)" }}
-      >
-        <div className="absolute -top-10 -end-10 size-40 rounded-full bg-white/10 blur-2xl" />
-        <div className="absolute -bottom-16 -start-8 size-40 rounded-full bg-white/10 blur-2xl" />
-        <div className="relative flex items-center gap-3.5">
-          <span className="size-12 rounded-2xl bg-white/15 backdrop-blur border border-white/20 flex items-center justify-center shrink-0">
-            <Megaphone className="size-6" />
-          </span>
-          <div className="min-w-0">
-            <h1 className="font-display font-extrabold text-xl text-white">
-              {ar ? "إعلاناتي" : "My Ads"}
-            </h1>
-            <p className="text-white/80 text-xs mt-0.5 truncate">
-              {ar
-                ? "أطلق إعلانك وصل للآلاف من الأطباء والعيادات"
-                : "Launch your ad and reach thousands of dentists and clinics"}
-            </p>
+      <div className="px-3 pt-3">
+        <div
+          className="w-full rounded-2xl overflow-hidden text-white relative"
+          style={{ background: "linear-gradient(135deg, #0052FF, #00A3FF)" }}
+        >
+          <div className="absolute -top-10 -end-10 size-40 rounded-full bg-white/10 blur-2xl" />
+          <div className="absolute -bottom-16 -start-8 size-40 rounded-full bg-white/10 blur-2xl" />
+          <div className="relative flex items-center gap-3.5 px-5 pt-6 pb-10">
+            <span className="size-12 rounded-2xl bg-white/15 backdrop-blur border border-white/20 flex items-center justify-center shrink-0">
+              <Megaphone className="size-6" />
+            </span>
+            <div className="min-w-0">
+              <h1 className="font-display font-extrabold text-xl text-white">
+                {ar ? "إعلاناتي" : "My Ads"}
+              </h1>
+              <p className="text-white/80 text-xs mt-0.5 truncate">
+                {ar
+                  ? "أطلق إعلانك وصل للآلاف من الأطباء والعيادات"
+                  : "Launch your ad and reach thousands of dentists and clinics"}
+              </p>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Campaign setup cards */}
-      <div className="-mt-7 px-4 space-y-3">
+      <div className="px-4 mt-3 space-y-3">
         <button
           type="button"
-          onClick={comingSoon}
+          onClick={() => setWizardType("main")}
           className="w-full bg-white border border-slate-200 rounded-2xl shadow-sm p-4 flex items-center gap-3.5 hover:shadow-md hover:border-[#0052FF]/40 transition text-start"
         >
           <span className="size-11 rounded-2xl bg-[#0052FF]/10 text-[#0052FF] flex items-center justify-center shrink-0">
@@ -170,7 +170,7 @@ export function AdsDashboard() {
 
         <button
           type="button"
-          onClick={comingSoon}
+          onClick={() => setWizardType("deals")}
           className="w-full bg-white border border-slate-200 rounded-2xl shadow-sm p-4 flex items-center gap-3.5 hover:shadow-md hover:border-[#0052FF]/40 transition text-start"
         >
           <span className="size-11 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center shrink-0">
@@ -268,7 +268,7 @@ export function AdsDashboard() {
             </p>
             <button
               type="button"
-              onClick={comingSoon}
+              onClick={() => setWizardType("main")}
               className="mt-5 h-11 px-6 rounded-2xl bg-[#0052FF] text-white text-sm font-bold flex items-center gap-2 shadow-lg hover:opacity-90 transition"
             >
               <Plus className="size-4" />
@@ -329,7 +329,7 @@ export function AdsDashboard() {
       </div>
 
       {/* WhatsApp support CTA */}
-      <div className="px-4 pt-5 pb-28">
+      <div className="px-4 pt-5">
         <a
           href="https://wa.me/9640000000000?text=مرحباً،%20أريد%20الاستفسار%20عن%20الإعلانات"
           target="_blank"
@@ -353,6 +353,8 @@ export function AdsDashboard() {
           <ArrowUpRight className="size-5 shrink-0" />
         </a>
       </div>
+
+      {wizardType && <AdsCreationWizard type={wizardType} onClose={() => setWizardType(null)} />}
     </div>
   );
 }

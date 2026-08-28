@@ -20,6 +20,8 @@ export type Offer = {
   expiryDate: string;
   price?: number;
   currency?: string;
+  discountPct?: number;
+  status?: "active" | "pending" | "expired";
   createdAt?: string;
 };
 
@@ -32,6 +34,8 @@ const fromDoc = (id: string, data: Record<string, unknown>): Offer => ({
   expiryDate: (data.expiryDate as string) ?? "",
   price: typeof data.price === "number" ? data.price : undefined,
   currency: (data.currency as string) ?? "USD",
+  discountPct: typeof data.discountPct === "number" ? data.discountPct : undefined,
+  status: (data.status as Offer["status"]) ?? undefined,
   createdAt: (data.createdAt as Timestamp)?.toDate?.()?.toISOString?.() ?? undefined,
 });
 
@@ -80,6 +84,8 @@ export function useUpsertOffer() {
           expiryDate: offer.expiryDate,
           price: offer.price ?? null,
           currency: offer.currency ?? "USD",
+          discountPct: offer.discountPct ?? null,
+          status: offer.status ?? "active",
           createdAt: Timestamp.now(),
           updatedAt: Timestamp.now(),
         },
