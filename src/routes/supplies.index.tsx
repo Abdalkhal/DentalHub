@@ -2457,13 +2457,6 @@ function ImplantProductsPanel() {
 
   const connectionOptions = ["Internal Hex", "Conical Connection", "External Hex", "Morse Taper"];
 
-  const countryOptions = [
-    { value: "KR", ar: "كورية", en: "Korean" },
-    { value: "CH", ar: "سويسرية", en: "Swiss" },
-    { value: "DE", ar: "ألمانية", en: "German" },
-    { value: "IT", ar: "إيطالية", en: "Italian" },
-  ];
-
   const clearForm = () => {
     setEditing(null);
     setNameAr("");
@@ -2787,17 +2780,7 @@ function ImplantProductsPanel() {
             <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
               {ar ? "بلد الصنع" : "Manufacturing country"}
             </label>
-            <select
-              value={country}
-              onChange={(e) => setCountry(e.target.value)}
-              className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
-            >
-              {countryOptions.map((c) => (
-                <option key={c.value} value={c.value}>
-                  {ar ? c.ar : c.en} ({c.value})
-                </option>
-              ))}
-            </select>
+            <CountryCombobox value={country} onChange={setCountry} lang={lang} />
           </div>
 
           <div>
@@ -3048,8 +3031,8 @@ function ImplantProductsPanel() {
               p.images.length > 0 && imageUrlMap[p.images[0]] ? imageUrlMap[p.images[0]] : null;
             const diams = spec?.diameters ?? [];
             const lens = spec?.lengths ?? [];
-            const countryLabel = countryOptions.find(
-              (c) => c.value === (p.country || spec?.country),
+            const originCountry = ALL_COUNTRIES.find(
+              (c) => c.code === (p.country || spec?.country),
             );
             return (
               <div
@@ -3070,9 +3053,10 @@ function ImplantProductsPanel() {
                     </p>
                     <p className="text-xs text-muted-foreground">{p.brand}</p>
                     <div className="flex flex-wrap gap-1.5 mt-1">
-                      {countryLabel && (
+                      {originCountry && (
                         <span className="inline-block text-[10px] font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
-                          {ar ? countryLabel.ar : countryLabel.en}
+                          {countryCodeToFlag(originCountry.code)}{" "}
+                          {ar ? originCountry.ar : originCountry.en}
                         </span>
                       )}
                       {spec?.implantType && (
