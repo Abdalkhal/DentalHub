@@ -3,6 +3,7 @@ import { X, Plus, Trash2, Upload, Image, Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { TagInput } from "@/components/TagInput";
+import { CountryCombobox } from "@/components/CountryCombobox";
 import {
   useUpsertProduct,
   uploadProductImage,
@@ -290,7 +291,7 @@ export function BoneGraftModal({
             </div>
             <div>
               <label className={labelCls}>{ar ? "بلد المنشأ" : "Country of Origin"}</label>
-              <input value={country} onChange={(e) => setCountry(e.target.value)} placeholder={ar ? "مثال: سويسرا" : "e.g. Switzerland"} className={inputCls} />
+              <CountryCombobox value={country} onChange={setCountry} lang={lang} />
             </div>
           </section>
 
