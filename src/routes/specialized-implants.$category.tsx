@@ -1,12 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { doc, getDoc } from "firebase/firestore";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
 import { useProducts, useSignedImageUrls, type Product } from "@/lib/products";
 import { ProductDetailsModal } from "@/components/ProductDetailsModal";
 import { SPECIALIZED_CATEGORIES, SPECIALIZED_FIELDS } from "@/data/specializedImplants";
-import { Package, Loader2 } from "lucide-react";
+import { db } from "@/integrations/firebase/client";
+import type { UserRoleDoc } from "@/integrations/firebase/types";
+import { Package, Loader2, UserCircle2 } from "lucide-react";
 
 export const Route = createFileRoute("/specialized-implants/$category")({
   component: SpecializedCategoryPage,
@@ -36,6 +40,28 @@ function SpecializedCategoryPage() {
 
   const allImagePaths = useMemo(() => items.flatMap((p) => p.images), [items]);
   const { data: imageUrlMap = {} } = useSignedImageUrls(allImagePaths);
+
+  const supplierIds = useMemo(
+    () => Array.from(new Set(items.map((p) => p.companyId).filter(Boolean))) as string[],
+    [items],
+  );
+
+  const { data: supplierMap = {} } = useQuery({
+    queryKey: ["specialized-supplier-docs", supplierIds],
+    enabled: supplierIds.length > 0,
+    queryFn: async (): Promise<Record<string, UserRoleDoc>> => {
+      const entries = await Promise.all(
+        supplierIds.map(async (id) => {
+          const snap = await getDoc(doc(db, "user_roles", id));
+          return [id, snap.exists() ? (snap.data() as UserRoleDoc) : null] as const;
+        }),
+      );
+      return Object.fromEntries(entries.filter(([, d]) => d !== null)) as Record<
+        string,
+        UserRoleDoc
+      >;
+    },
+  });
 
   const specChips = (p: Product): { label: string; value: string }[] => {
     const out: { label: string; value: string }[] = [];
@@ -119,6 +145,17 @@ function SpecializedCategoryPage() {
                     <p className="font-display font-bold text-sm leading-snug text-slate-800 line-clamp-2">
                       {ar ? p.ar || p.en : p.en || p.ar}
                     </p>
+                    {p.companyId && supplierMap[p.companyId] && (
+                      <p className="text-[11px] text-slate-500 mt-1 flex items-center gap-1 min-w-0">
+                        <UserCircle2 className="size-3.5 text-slate-400 shrink-0" />
+                        <span className="truncate">
+                          {ar ? "بواسطة" : "By"}:{" "}
+                          <span className="font-semibold text-slate-600">
+                            {supplierMap[p.companyId].name}
+                          </span>
+                        </span>
+                      </p>
+                    )}
                     {p.brand && (
                       <p className="text-[11px] text-slate-400 mt-0.5 truncate">{p.brand}</p>
                     )}

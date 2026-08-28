@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import {
   X,
   ChevronLeft,
@@ -10,7 +12,9 @@ import {
   Minus,
   Plus,
   Check,
+  Phone,
 } from "lucide-react";
+import { doc, getDoc } from "firebase/firestore";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { useSignedImageUrls, type Product } from "@/lib/products";
@@ -20,6 +24,8 @@ import { SPECIALIZED_CATEGORIES, SPECIALIZED_FIELDS } from "@/data/specializedIm
 import { addToCart } from "@/lib/cartStore";
 import { addToPurchaseHistory } from "@/lib/quickOrders";
 import { SURGICAL_GUIDE_TOOLS } from "@/components/ImplantFormModal";
+import { db } from "@/integrations/firebase/client";
+import type { UserRoleDoc } from "@/integrations/firebase/types";
 
 export function ProductDetailsModal({
   product,
@@ -39,9 +45,25 @@ export function ProductDetailsModal({
 }) {
   const { lang } = useI18n();
   const ar = lang === "ar";
+  const navigate = useNavigate();
   const [activeImg, setActiveImg] = useState(0);
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
+
+  const { data: supplier } = useQuery({
+    queryKey: ["product-detail-supplier", product.companyId],
+    enabled: !!product.specializedImplant && !!product.companyId,
+    queryFn: async (): Promise<UserRoleDoc | null> => {
+      const snap = await getDoc(doc(db, "user_roles", product.companyId!));
+      if (!snap.exists()) return null;
+      return snap.data() as UserRoleDoc;
+    },
+  });
+
+  const goToProfile = () => {
+    if (!product.companyId) return;
+    navigate({ to: "/profile/$accountId", params: { accountId: product.companyId } });
+  };
 
   const { data: urlMap = {} } = useSignedImageUrls(product.images);
   const images = product.images.map((p) => urlMap[p]).filter(Boolean) as string[];
@@ -177,6 +199,37 @@ export function ProductDetailsModal({
         <div className="flex-1 overflow-y-auto">
           {/* Image gallery */}
           <div className="relative bg-slate-100">
+            {/* Supplier contact banner (specialized implants only) */}
+            {product.specializedImplant && supplier && (
+              <div className="absolute top-3 inset-x-3 z-10 rounded-2xl bg-white/90 backdrop-blur border border-slate-200 shadow-lg p-3 flex items-center gap-3">
+                <span className="size-11 rounded-full bg-indigo-50 text-indigo-600 ring-2 ring-indigo-100 flex items-center justify-center font-bold shrink-0 overflow-hidden">
+                  {supplier.photoURL ? (
+                    <img src={supplier.photoURL} alt="" className="size-full object-cover" />
+                  ) : (
+                    (supplier.name || "؟").charAt(0)
+                  )}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold text-slate-800 truncate">{supplier.name}</p>
+                  {supplier.phone && (
+                    <p
+                      className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5"
+                      dir="ltr"
+                    >
+                      <Phone className="size-3 text-slate-400 shrink-0" />
+                      <span className="truncate">{supplier.phone}</span>
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={goToProfile}
+                  className="shrink-0 h-9 px-3 rounded-xl bg-indigo-600 text-white text-xs font-bold flex items-center gap-1 hover:bg-indigo-700 transition"
+                >
+                  {ar ? "زيارة الملف الشخصي" : "Visit Profile"}
+                </button>
+              </div>
+            )}
             {images.length > 0 ? (
               <>
                 <img src={images[activeImg]} alt="" className="w-full h-64 object-contain" />
