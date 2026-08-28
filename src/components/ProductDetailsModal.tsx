@@ -196,40 +196,41 @@ export function ProductDetailsModal({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto flex flex-col gap-4">
+          {/* Supplier contact card (specialized implants only) */}
+          {product.specializedImplant && supplier && (
+            <div className="mx-4 mt-4 rounded-2xl bg-white border border-slate-200 shadow-sm p-3 flex items-center gap-3">
+              <span className="size-11 rounded-full bg-indigo-50 text-indigo-600 ring-2 ring-indigo-100 flex items-center justify-center font-bold shrink-0 overflow-hidden">
+                {supplier.photoURL ? (
+                  <img src={supplier.photoURL} alt="" className="size-full object-cover" />
+                ) : (
+                  (supplier.name || "؟").charAt(0)
+                )}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold text-slate-800 truncate">{supplier.name}</p>
+                {supplier.phone && (
+                  <p
+                    className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5"
+                    dir="ltr"
+                  >
+                    <Phone className="size-3 text-slate-400 shrink-0" />
+                    <span className="truncate">{supplier.phone}</span>
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={goToProfile}
+                className="shrink-0 h-9 px-3 rounded-xl bg-indigo-600 text-white text-xs font-bold flex items-center gap-1 hover:bg-indigo-700 transition"
+              >
+                {ar ? "زيارة الملف الشخصي" : "Visit Profile"}
+              </button>
+            </div>
+          )}
+
           {/* Image gallery */}
           <div className="relative bg-slate-100">
-            {/* Supplier contact banner (specialized implants only) */}
-            {product.specializedImplant && supplier && (
-              <div className="absolute top-3 inset-x-3 z-10 rounded-2xl bg-white/90 backdrop-blur border border-slate-200 shadow-lg p-3 flex items-center gap-3">
-                <span className="size-11 rounded-full bg-indigo-50 text-indigo-600 ring-2 ring-indigo-100 flex items-center justify-center font-bold shrink-0 overflow-hidden">
-                  {supplier.photoURL ? (
-                    <img src={supplier.photoURL} alt="" className="size-full object-cover" />
-                  ) : (
-                    (supplier.name || "؟").charAt(0)
-                  )}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold text-slate-800 truncate">{supplier.name}</p>
-                  {supplier.phone && (
-                    <p
-                      className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5"
-                      dir="ltr"
-                    >
-                      <Phone className="size-3 text-slate-400 shrink-0" />
-                      <span className="truncate">{supplier.phone}</span>
-                    </p>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={goToProfile}
-                  className="shrink-0 h-9 px-3 rounded-xl bg-indigo-600 text-white text-xs font-bold flex items-center gap-1 hover:bg-indigo-700 transition"
-                >
-                  {ar ? "زيارة الملف الشخصي" : "Visit Profile"}
-                </button>
-              </div>
-            )}
             {images.length > 0 ? (
               <>
                 <img src={images[activeImg]} alt="" className="w-full h-64 object-contain" />
