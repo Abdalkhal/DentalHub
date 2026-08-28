@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import { X, Plus, Upload, Loader2, Check, Package } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { X, Plus, Upload, Loader2, Check, Package, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import {
@@ -26,7 +26,7 @@ const inputCls =
 const labelCls = "text-[11px] font-bold text-slate-500 mb-1.5 block";
 const cardCls = "rounded-2xl bg-white border border-slate-200/80 shadow-sm p-4 space-y-3";
 
-function CreatableSelect({
+function CreatableCombobox({
   field,
   value,
   onChange,
@@ -37,38 +37,88 @@ function CreatableSelect({
   onChange: (v: string) => void;
   ar: boolean;
 }) {
-  const [customMode, setCustomMode] = useState(false);
-  const inOptions = field.options?.some((o) => o.value === value) ?? false;
-  const showCustom = customMode || (!!value && !inOptions);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState(() => {
+    if (!value) return "";
+    const opt = field.options?.find((o) => o.value === value);
+    return opt ? (ar ? (opt.ar ?? opt.value) : opt.value) : value;
+  });
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const options = field.options ?? [];
+  const label = (o: { value: string; ar?: string }) => (ar ? (o.ar ?? o.value) : o.value);
+  const normalized = query.trim().toLowerCase();
+  const filtered = options.filter((o) => label(o).toLowerCase().includes(normalized));
 
   return (
-    <div className="space-y-2">
-      <select
-        value={inOptions ? value : "custom"}
+    <div ref={containerRef} className="relative">
+      <input
+        type="text"
+        value={query}
+        placeholder={ar ? "اختر أو اكتب القيمة..." : "Select or type a value..."}
+        onFocus={() => setOpen(true)}
+        onClick={() => setOpen(true)}
         onChange={(e) => {
-          if (e.target.value === "custom") setCustomMode(true);
-          else {
-            setCustomMode(false);
-            onChange(e.target.value);
-          }
+          setQuery(e.target.value);
+          onChange(e.target.value);
+          setOpen(true);
         }}
-        className={cn(inputCls, "appearance-none pe-9")}
-      >
-        <option value="">{ar ? "-- اختر --" : "-- Select --"}</option>
-        {field.options?.map((o) => (
-          <option key={o.value} value={o.value}>
-            {ar ? (o.ar ?? o.value) : o.value}
-          </option>
-        ))}
-        <option value="custom">{ar ? "أخرى (إدخال يدوي)" : "Other (manual entry)"}</option>
-      </select>
-      {showCustom && (
-        <input
-          value={value || ""}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={ar ? "اكتب قيمة مخصصة..." : "Type custom value..."}
-          className={inputCls}
-        />
+        className={cn(inputCls, "pe-10")}
+      />
+      <ChevronDown
+        className={cn(
+          "absolute top-1/2 -translate-y-1/2 end-3 size-4 pointer-events-none transition",
+          open ? "text-indigo-500 rotate-180" : "text-slate-400",
+        )}
+      />
+      {open && (
+        <div className="absolute z-30 mt-1.5 w-full max-h-48 overflow-y-auto rounded-2xl bg-white border border-slate-200 shadow-xl py-1">
+          {filtered.length > 0 ? (
+            filtered.map((o) => {
+              const active = o.value === value;
+              return (
+                <button
+                  key={o.value}
+                  type="button"
+                  onClick={() => {
+                    setQuery(label(o));
+                    onChange(o.value);
+                    setOpen(false);
+                  }}
+                  className={cn(
+                    "w-full text-start px-3.5 py-2.5 text-sm transition flex items-center justify-between gap-2",
+                    active
+                      ? "bg-indigo-50 text-indigo-700 font-semibold"
+                      : "text-slate-700 hover:bg-slate-50",
+                  )}
+                >
+                  <span>{label(o)}</span>
+                  {active && <Check className="size-4 shrink-0" />}
+                </button>
+              );
+            })
+          ) : (
+            <p className="px-3.5 py-3 text-xs text-slate-400">
+              {query.trim()
+                ? ar
+                  ? `ستُحفظ القيمة المدخلة: "${query.trim()}"`
+                  : `The typed value will be saved: "${query.trim()}"`
+                : ar
+                  ? "لا توجد اقتراحات"
+                  : "No suggestions"}
+            </p>
+          )}
+        </div>
       )}
     </div>
   );
@@ -132,7 +182,7 @@ function renderField(
   return (
     <div key={field.id}>
       <label className={labelCls}>{ar ? field.ar : field.en}</label>
-      <CreatableSelect
+      <CreatableCombobox
         field={field}
         value={(value as string) || ""}
         onChange={(v) => onChange(v || undefined)}
