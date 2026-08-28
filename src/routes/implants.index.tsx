@@ -26,7 +26,7 @@ import { auth } from "@/integrations/firebase/client";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { ALL_COUNTRIES, countryCodeToFlag } from "@/data/countries";
+import { ALL_COUNTRIES, countryFlagUrl } from "@/data/countries";
 import {
   Search,
   UserCircle2,
@@ -431,7 +431,11 @@ function ImplantProductsPanel() {
                       const c = countryCode ? countryByCode[countryCode] : null;
                       return c ? (
                         <span className="text-xs font-semibold bg-gradient-to-r from-slate-100 to-slate-200/60 text-slate-700 border border-slate-200/60 px-2.5 py-1 rounded-xl flex items-center gap-1.5 shadow-sm">
-                          <span className="text-lg leading-none">{countryCodeToFlag(c.code)}</span>
+                          <img
+                            src={countryFlagUrl(c.code)}
+                            alt=""
+                            className="size-4 rounded-sm object-cover ring-1 ring-black/5"
+                          />
                           {ar ? c.ar : c.en}
                         </span>
                       ) : null;
@@ -787,7 +791,11 @@ function ImplantDetailView({
             <p className="font-display font-bold text-sm text-[#17324A] mt-1 flex items-center gap-1.5 truncate">
               {country ? (
                 <>
-                  <span className="text-base leading-none">{countryCodeToFlag(country.code)}</span>
+                  <img
+                    src={countryFlagUrl(country.code)}
+                    alt=""
+                    className="size-4 rounded-sm object-cover ring-1 ring-black/5"
+                  />
                   {ar ? country.ar : country.en}
                 </>
               ) : (

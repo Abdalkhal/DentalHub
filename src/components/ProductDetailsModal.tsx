@@ -18,7 +18,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { useSignedImageUrls, type Product } from "@/lib/products";
-import { ALL_COUNTRIES, countryCodeToFlag } from "@/data/countries";
+import { ALL_COUNTRIES, countryFlagUrl } from "@/data/countries";
 import { SPEC_FIELDS, type SpecFieldId } from "@/data/specs";
 import { SPECIALIZED_CATEGORIES, SPECIALIZED_FIELDS } from "@/data/specializedImplants";
 import { addToCart } from "@/lib/cartStore";
@@ -99,8 +99,17 @@ export function ProductDetailsModal({
 
   const country = product.country ? ALL_COUNTRIES.find((c) => c.code === product.country) : null;
   const originLabel =
-    product.countryOrigin || (country ? `${countryCodeToFlag(country.code)} ${country.ar}` : null);
-
+    product.countryOrigin ||
+    (country ? (
+      <span className="inline-flex items-center gap-1.5">
+        <img
+          src={countryFlagUrl(country.code)}
+          alt=""
+          className="size-4 rounded-sm object-cover ring-1 ring-black/5"
+        />
+        {country.ar}
+      </span>
+    ) : null);
   const isIQD = product.currency === "IQD";
   const sym = isIQD ? "د.ع" : "$";
   const money = (n: number) =>

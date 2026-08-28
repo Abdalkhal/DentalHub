@@ -13,6 +13,11 @@ export function countryCodeToFlag(code: string): string {
   );
 }
 
+export function countryFlagUrl(code: string): string {
+  if (!code || code.length !== 2) return "";
+  return `https://flagcdn.com/w80/${code.toLowerCase()}.png`;
+}
+
 export function sortCountries(countries: CountryEntry[], lang: "ar" | "en"): CountryEntry[] {
   return [...countries].sort((a, b) =>
     lang === "ar"

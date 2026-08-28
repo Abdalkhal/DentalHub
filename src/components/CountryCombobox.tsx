@@ -14,7 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import {
   type CountryEntry,
   ALL_COUNTRIES,
-  countryCodeToFlag,
+  countryFlagUrl,
   sortCountries,
   filterCountries,
 } from "@/data/countries";
@@ -65,9 +65,11 @@ export function CountryCombobox({
           <span className="flex items-center gap-2 min-w-0">
             {selected ? (
               <>
-                <span className="text-lg shrink-0 leading-none">
-                  {countryCodeToFlag(selected.code)}
-                </span>
+                <img
+                  src={countryFlagUrl(selected.code)}
+                  alt=""
+                  className="size-5 shrink-0 rounded-sm object-cover ring-1 ring-black/5"
+                />
                 <span className="truncate">{lang === "ar" ? selected.ar : selected.en}</span>
               </>
             ) : (
@@ -96,7 +98,11 @@ export function CountryCombobox({
                     setOpen(false);
                   }}
                 >
-                  <span className="text-lg shrink-0 leading-none">{countryCodeToFlag(c.code)}</span>
+                  <img
+                    src={countryFlagUrl(c.code)}
+                    alt=""
+                    className="size-5 shrink-0 rounded-sm object-cover ring-1 ring-black/5"
+                  />
                   <span className="flex-1 truncate">{lang === "ar" ? c.ar : c.en}</span>
                   <Check
                     className={cn(

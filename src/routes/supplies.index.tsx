@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/dialog";
 import { CITIES } from "@/data/offices";
 import { subcategoriesOf } from "@/data/subcategories";
-import { ALL_COUNTRIES, countryCodeToFlag } from "@/data/countries";
+import { ALL_COUNTRIES, countryFlagUrl } from "@/data/countries";
 import {
   SPEC_FIELDS,
   activeSpecGroups,
@@ -836,9 +836,7 @@ function ProductsPanel() {
         }));
 
       const originCountry = ALL_COUNTRIES.find((c) => c.code === origin);
-      const countryOrigin = originCountry
-        ? `${countryCodeToFlag(originCountry.code)} ${originCountry.ar}`
-        : undefined;
+      const countryOrigin = originCountry ? originCountry.ar : undefined;
 
       const cleanSpecs: ProductSpecs = {};
       (Object.entries(specs) as [SpecFieldId, string | string[]][]).forEach(([k, v]) => {
@@ -3055,7 +3053,11 @@ function ImplantProductsPanel() {
                     <div className="flex flex-wrap gap-1.5 mt-1">
                       {originCountry && (
                         <span className="inline-block text-[10px] font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
-                          {countryCodeToFlag(originCountry.code)}{" "}
+                          <img
+                            src={countryFlagUrl(originCountry.code)}
+                            alt=""
+                            className="size-3.5 inline-block rounded-sm object-cover align-[-2px] ms-0.5"
+                          />
                           {ar ? originCountry.ar : originCountry.en}
                         </span>
                       )}
