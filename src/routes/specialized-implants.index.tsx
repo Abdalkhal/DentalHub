@@ -6,7 +6,6 @@ import {
   Sparkles,
   Zap,
   Brain,
-  Plus,
   type LucideIcon,
 } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
@@ -89,8 +88,6 @@ const FEATURES: { ar: string; en: string; icon: LucideIcon }[] = [
   { ar: "ثبات فوري عالٍ", en: "High primary stability", icon: Zap },
   { ar: "حلول للحالات المعقدة", en: "Solutions for complex cases", icon: Brain },
 ];
-
-const BRANDS = ["Nobel Biocare", "Zygoma", "Osteogenics", "Osstem"];
 
 function SpecializedImplantsPage() {
   const { lang } = useI18n();
@@ -204,39 +201,6 @@ function SpecializedImplantsPage() {
               })}
             </div>
           </div>
-        </div>
-
-        {/* Brands carousel */}
-        <div>
-          <p className="font-display font-bold text-sm text-slate-800 mb-3">
-            {ar ? "الماركات المدعومة" : "Supported Brands"}
-          </p>
-          <div className="flex gap-2.5 overflow-x-auto pb-2 -mx-1 px-1">
-            {BRANDS.map((b) => (
-              <div
-                key={b}
-                className="shrink-0 inline-flex items-center justify-center h-12 px-5 rounded-2xl bg-white border border-slate-200 text-slate-700 text-sm font-bold shadow-sm"
-              >
-                {b}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Bottom action + disclaimer */}
-        <div className="space-y-3">
-          <Link
-            to="/implants"
-            className="w-full h-14 rounded-2xl bg-sky-600 text-white font-display font-extrabold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition shadow-lg"
-          >
-            <Plus className="size-5" />
-            {ar ? "إضافة زرعة متخصصة جديدة" : "Add New Specialized Implant"}
-          </Link>
-          <p className="text-[11px] text-slate-400 leading-relaxed text-center">
-            {ar
-              ? "هذه الأنظمة تتطلب تخطيطاً دقيقاً وتقييماً سريرياً وتصويراً متقدماً (CBCT) من قبل مختص ذوي خبرة"
-              : "These systems require careful planning, clinical evaluation, and advanced imaging (CBCT) by an experienced specialist"}
-          </p>
         </div>
       </div>
     </MobileShell>
