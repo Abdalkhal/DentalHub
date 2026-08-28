@@ -41,6 +41,7 @@ import { Route as DoctorInvoicesIndexRouteImport } from './routes/doctor-invoice
 import { Route as DesignerIndexRouteImport } from './routes/designer.index'
 import { Route as ClinicIndexRouteImport } from './routes/clinic.index'
 import { Route as BrandsIndexRouteImport } from './routes/brands.index'
+import { Route as BoneGraftsIndexRouteImport } from './routes/bone-grafts.index'
 import { Route as SurgicalGuideCreateRouteImport } from './routes/surgical-guide.create'
 import { Route as SpecializedImplantsCategoryRouteImport } from './routes/specialized-implants.$category'
 import { Route as ProfileAccountIdRouteImport } from './routes/profile.$accountId'
@@ -232,6 +233,11 @@ const ClinicIndexRoute = ClinicIndexRouteImport.update({
 const BrandsIndexRoute = BrandsIndexRouteImport.update({
   id: '/brands/',
   path: '/brands/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BoneGraftsIndexRoute = BoneGraftsIndexRouteImport.update({
+  id: '/bone-grafts/',
+  path: '/bone-grafts/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SurgicalGuideCreateRoute = SurgicalGuideCreateRouteImport.update({
@@ -438,6 +444,7 @@ export interface FileRoutesByFullPath {
   '/profile/$accountId': typeof ProfileAccountIdRoute
   '/specialized-implants/$category': typeof SpecializedImplantsCategoryRoute
   '/surgical-guide/create': typeof SurgicalGuideCreateRoute
+  '/bone-grafts/': typeof BoneGraftsIndexRoute
   '/brands/': typeof BrandsIndexRoute
   '/clinic/': typeof ClinicIndexRoute
   '/designer/': typeof DesignerIndexRoute
@@ -503,6 +510,7 @@ export interface FileRoutesByTo {
   '/profile/$accountId': typeof ProfileAccountIdRoute
   '/specialized-implants/$category': typeof SpecializedImplantsCategoryRoute
   '/surgical-guide/create': typeof SurgicalGuideCreateRoute
+  '/bone-grafts': typeof BoneGraftsIndexRoute
   '/brands': typeof BrandsIndexRoute
   '/clinic': typeof ClinicIndexRoute
   '/designer': typeof DesignerIndexRoute
@@ -569,6 +577,7 @@ export interface FileRoutesById {
   '/profile/$accountId': typeof ProfileAccountIdRoute
   '/specialized-implants/$category': typeof SpecializedImplantsCategoryRoute
   '/surgical-guide/create': typeof SurgicalGuideCreateRoute
+  '/bone-grafts/': typeof BoneGraftsIndexRoute
   '/brands/': typeof BrandsIndexRoute
   '/clinic/': typeof ClinicIndexRoute
   '/designer/': typeof DesignerIndexRoute
@@ -636,6 +645,7 @@ export interface FileRouteTypes {
     | '/profile/$accountId'
     | '/specialized-implants/$category'
     | '/surgical-guide/create'
+    | '/bone-grafts/'
     | '/brands/'
     | '/clinic/'
     | '/designer/'
@@ -701,6 +711,7 @@ export interface FileRouteTypes {
     | '/profile/$accountId'
     | '/specialized-implants/$category'
     | '/surgical-guide/create'
+    | '/bone-grafts'
     | '/brands'
     | '/clinic'
     | '/designer'
@@ -766,6 +777,7 @@ export interface FileRouteTypes {
     | '/profile/$accountId'
     | '/specialized-implants/$category'
     | '/surgical-guide/create'
+    | '/bone-grafts/'
     | '/brands/'
     | '/clinic/'
     | '/designer/'
@@ -828,6 +840,7 @@ export interface RootRouteChildren {
   ProfileAccountIdRoute: typeof ProfileAccountIdRoute
   SpecializedImplantsCategoryRoute: typeof SpecializedImplantsCategoryRoute
   SurgicalGuideCreateRoute: typeof SurgicalGuideCreateRoute
+  BoneGraftsIndexRoute: typeof BoneGraftsIndexRoute
   BrandsIndexRoute: typeof BrandsIndexRoute
   ClinicIndexRoute: typeof ClinicIndexRoute
   DesignerIndexRoute: typeof DesignerIndexRoute
@@ -1071,6 +1084,13 @@ declare module '@tanstack/react-router' {
       path: '/brands'
       fullPath: '/brands/'
       preLoaderRoute: typeof BrandsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bone-grafts/': {
+      id: '/bone-grafts/'
+      path: '/bone-grafts'
+      fullPath: '/bone-grafts/'
+      preLoaderRoute: typeof BoneGraftsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/surgical-guide/create': {
@@ -1375,6 +1395,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProfileAccountIdRoute: ProfileAccountIdRoute,
   SpecializedImplantsCategoryRoute: SpecializedImplantsCategoryRoute,
   SurgicalGuideCreateRoute: SurgicalGuideCreateRoute,
+  BoneGraftsIndexRoute: BoneGraftsIndexRoute,
   BrandsIndexRoute: BrandsIndexRoute,
   ClinicIndexRoute: ClinicIndexRoute,
   DesignerIndexRoute: DesignerIndexRoute,

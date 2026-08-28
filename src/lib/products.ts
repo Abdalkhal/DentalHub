@@ -63,6 +63,7 @@ export type BoneGraftSpec = {
   shelfLife: string;
   features: string[];
   packSizes: BoneGraftPackSize[];
+  clinicalImages?: string[];
 };
 
 export type ProductDiscountTier = {

@@ -14,6 +14,8 @@ import {
 import { auth } from "@/integrations/firebase/client";
 import { toast } from "sonner";
 
+const MAX_CLINICAL_IMAGES = 10;
+
 const GRAFT_TYPES = [
   { ar: "تركيبي", en: "Synthetic" },
   { ar: "حيواني", en: "Xenograft" },
@@ -82,10 +84,17 @@ export function BoneGraftModal({
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [existingImages, setExistingImages] = useState<string[]>(product?.images ?? []);
   const [removedImages, setRemovedImages] = useState<string[]>([]);
+  const [clinicalFiles, setClinicalFiles] = useState<File[]>([]);
+  const [clinicalPreviews, setClinicalPreviews] = useState<string[]>([]);
+  const [existingClinical, setExistingClinical] = useState<string[]>(
+    product?.boneGraft?.clinicalImages ?? [],
+  );
+  const [removedClinical, setRemovedClinical] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   const { data: existingUrlMap = {} } = useSignedImageUrls(existingImages);
+  const { data: clinicalUrlMap = {} } = useSignedImageUrls(existingClinical);
 
   const inputCls =
     "w-full h-11 rounded-xl bg-[#F5FAFE] border border-[#D3E8F7] px-3 text-sm text-[#17324A] placeholder:text-[#7A94A8] focus:outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0]";
@@ -120,6 +129,30 @@ export function BoneGraftModal({
     setExistingImages((prev) => prev.filter((p) => p !== path));
   };
 
+  const addClinicalFiles = (files: FileList | null) => {
+    if (!files) return;
+    const incoming = Array.from(files).slice(
+      0,
+      MAX_CLINICAL_IMAGES - clinicalFiles.length - existingClinical.length,
+    );
+    if (incoming.length === 0) return;
+    setClinicalFiles((prev) => [...prev, ...incoming]);
+    setClinicalPreviews((prev) => [...prev, ...incoming.map((f) => URL.createObjectURL(f))]);
+  };
+
+  const removeClinicalPreview = (idx: number) => {
+    setClinicalFiles((prev) => prev.filter((_, i) => i !== idx));
+    setClinicalPreviews((prev) => {
+      URL.revokeObjectURL(prev[idx]);
+      return prev.filter((_, i) => i !== idx);
+    });
+  };
+
+  const removeExistingClinical = (path: string) => {
+    setRemovedClinical((prev) => [...prev, path]);
+    setExistingClinical((prev) => prev.filter((p) => p !== path));
+  };
+
   const updateRow = (key: string, patch: Partial<PackRow>) => {
     setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
   };
@@ -139,7 +172,7 @@ export function BoneGraftModal({
     try {
       const productId = product?.id ?? crypto.randomUUID();
 
-      for (const path of removedImages) {
+      for (const path of [...removedImages, ...removedClinical]) {
         try {
           await removeProductImage(path);
         } catch { /* image already removed */ }
@@ -148,6 +181,10 @@ export function BoneGraftModal({
       const uploadedPaths: string[] = [];
       for (const file of imageFiles) {
         uploadedPaths.push(await uploadProductImage(productId, file));
+      }
+      const clinicalPaths: string[] = [];
+      for (const file of clinicalFiles) {
+        clinicalPaths.push(await uploadProductImage(productId, file));
       }
 
       const packSizes = rows
@@ -186,6 +223,10 @@ export function BoneGraftModal({
           shelfLife: shelfLife.trim(),
           features,
           packSizes,
+          clinicalImages:
+            existingClinical.length > 0 || clinicalPaths.length > 0
+              ? [...existingClinical, ...clinicalPaths]
+              : undefined,
         },
       });
 
@@ -199,8 +240,8 @@ export function BoneGraftModal({
             : "Bone graft added successfully",
       );
       onClose();
-    } catch (e: any) {
-      setError(e?.message || String(e));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
@@ -433,6 +474,62 @@ export function BoneGraftModal({
                 </label>
               )}
             </div>
+          </section>
+
+          {/* Section 6 - Clinical case images */}
+          <section className={sectionCls}>
+            <p className={sectionTitleCls}><span className="size-1.5 rounded-full bg-[#1C6FB5]" />{ar ? "رفع صور حالات العمل" : "Clinical Cases Images"}</p>
+            <div className="grid grid-cols-3 gap-2">
+              {existingClinical.map((path) => (
+                <div
+                  key={path}
+                  className="relative aspect-square rounded-xl overflow-hidden border border-[#D3E8F7]"
+                >
+                  {clinicalUrlMap[path] ? (
+                    <img src={clinicalUrlMap[path]} alt="" className="size-full object-cover" />
+                  ) : (
+                    <div className="size-full flex items-center justify-center bg-[#E7F4FE]">
+                      <Image className="size-5 text-slate-300" />
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => removeExistingClinical(path)}
+                    className="absolute top-1 end-1 size-6 rounded-full bg-black/60 text-white flex items-center justify-center"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+              ))}
+              {clinicalPreviews.map((src, i) => (
+                <div key={i} className="relative aspect-square rounded-xl overflow-hidden border border-[#D3E8F7]">
+                  <img src={src} alt="" className="size-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => removeClinicalPreview(i)}
+                    className="absolute top-1 end-1 size-6 rounded-full bg-black/60 text-white flex items-center justify-center"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+              ))}
+              {clinicalFiles.length + existingClinical.length < MAX_CLINICAL_IMAGES && (
+                <label className="aspect-square rounded-xl border-2 border-dashed border-[#D3E8F7] flex flex-col items-center justify-center gap-1 text-[#7A94A8] cursor-pointer hover:border-[#2E93E0] hover:text-[#1C6FB5] transition bg-[#E7F4FE]/50">
+                  <Upload className="size-5" />
+                  <span className="text-[10px] font-bold">{ar ? "إضافة" : "Add"}</span>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => addClinicalFiles(e.target.files)}
+                  />
+                </label>
+              )}
+            </div>
+            <p className="text-[10px] text-[#7A94A8]">
+              {clinicalFiles.length + existingClinical.length}/{MAX_CLINICAL_IMAGES} · JPG, PNG
+            </p>
           </section>
 
           {error && (

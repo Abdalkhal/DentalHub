@@ -1520,7 +1520,7 @@ function BrowseImplants() {
   const countryCodeMap: Record<string, string> = { korean: "kr", swiss: "ch", italian: "it", german: "de", brazilian: "br" };
 
   const categories = [
-    { to: "", img: "/photo/bonecraft.jpg", title: ar ? "البون كرافت" : "Bone Graft" },
+    { to: "/bone-grafts" as const, img: "/photo/bonecraft.jpg", title: ar ? "البون كرافت" : "Bone Graft" },
     { to: "/surgical-guide" as const, img: "/photo/surgecalguid.jpg", title: ar ? "الدليل الجراحي" : "Surgical Guide" },
     { to: "/specialized-implants" as const, img: specializedImplantImg, title: ar ? "الزرعات المتخصصة" : "Specialized Implants" },
   ];
@@ -1564,32 +1564,23 @@ function BrowseImplants() {
         <div>
           <h3 className="font-bold text-sm mb-3">{ar ? "اختر الفئة" : "Select category"}</h3>
           <div className="grid grid-cols-3 gap-2.5">
-            {categories.map((c) => {
-              const inner = (
-                <>
-                  <div className="h-24 bg-slate-50 flex items-center justify-center p-2">
-                    <img src={c.img} alt={c.title} className="size-full object-cover rounded-lg" loading="lazy" />
-                  </div>
-                  <p className="p-2 text-[11px] font-bold text-center">{c.title}</p>
-                </>
-              );
-              return c.to ? (
-                <Link
-                  key={c.title}
-                  to={c.to}
-                  className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition cursor-pointer"
-                >
-                  {inner}
-                </Link>
-              ) : (
-                <div
-                  key={c.title}
-                  className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition cursor-pointer"
-                >
-                  {inner}
+            {categories.map((c) => (
+              <Link
+                key={c.title}
+                to={c.to}
+                className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition cursor-pointer"
+              >
+                <div className="h-24 bg-slate-50 flex items-center justify-center p-2">
+                  <img
+                    src={c.img}
+                    alt={c.title}
+                    className="size-full object-cover rounded-lg"
+                    loading="lazy"
+                  />
                 </div>
-              );
-            })}
+                <p className="p-2 text-[11px] font-bold text-center">{c.title}</p>
+              </Link>
+            ))}
           </div>
         </div>
 
