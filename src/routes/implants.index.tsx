@@ -115,8 +115,8 @@ function ImplantCompanyDashboard() {
       <div className="min-h-full">
         <div className="px-4 pt-4 pb-2">
           <div
-            className="rounded-3xl overflow-hidden shadow-lg text-white"
-            style={{ background: "linear-gradient(135deg, #0F172A, #1E40AF)" }}
+          className="rounded-3xl shadow-lg text-white"
+          style={{ background: "linear-gradient(135deg, #0F172A, #1E40AF)" }}
           >
             <div className="p-4 space-y-3">
               <div className="flex items-center justify-between gap-3">
