@@ -14,6 +14,7 @@ import { BrandAutocomplete } from "@/components/BrandAutocomplete";
 import { CountryCombobox } from "@/components/CountryCombobox";
 import { BarcodeScannerModal } from "@/components/BarcodeScannerModal";
 import { ProductDetailsModal } from "@/components/ProductDetailsModal";
+import { BoneGraftDetailsModal } from "@/components/BoneGraftDetailsModal";
 import { ImplantFormModal } from "@/components/ImplantFormModal";
 import { SpecializedImplantForm } from "@/components/SpecializedImplantForm";
 import {
@@ -1913,12 +1914,17 @@ function ImplantsBoneGraftPanel() {
       {editingSpecialized && (
         <SpecializedImplantForm product={editingSpecialized} onClose={() => setEditingSpecialized(null)} />
       )}
-      {selectedProduct && (
+      {selectedProduct && selectedProduct.branch === "bone_graft" ? (
+        <BoneGraftDetailsModal
+          product={selectedProduct}
+          onClose={() => setSelectedProduct(null)}
+        />
+      ) : selectedProduct ? (
         <ProductDetailsModal
           product={selectedProduct}
           onClose={() => setSelectedProduct(null)}
         />
-      )}
+      ) : null}
     </div>
   );
 }

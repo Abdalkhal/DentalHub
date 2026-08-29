@@ -5,6 +5,7 @@ import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { RoleGuard } from "@/components/RoleGuard";
 import { BoneGraftModal } from "@/components/BoneGraftModal";
+import { BoneGraftDetailsModal } from "@/components/BoneGraftDetailsModal";
 import { ImplantFormModal } from "@/components/ImplantFormModal";
 import { SpecializedImplantForm } from "@/components/SpecializedImplantForm";
 import { NotificationBell } from "@/components/NotificationBell";
@@ -314,7 +315,8 @@ function ImplantProductsPanel() {
     (p) =>
       (p.category === "implant" ||
         p.category === "surgical_kit" ||
-        p.category === "specialized_implant") &&
+        p.category === "specialized_implant" ||
+        p.branch === "bone_graft") &&
       p.companyId === companyId,
   );
 
@@ -323,7 +325,9 @@ function ImplantProductsPanel() {
   const [showSpecialized, setShowSpecialized] = useState(false);
   const [editingImplant, setEditingImplant] = useState<Product | null>(null);
   const [editingSpecialized, setEditingSpecialized] = useState<Product | null>(null);
+  const [editingGraft, setEditingGraft] = useState<Product | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [showGraftDetails, setShowGraftDetails] = useState<Product | null>(null);
 
   const countryByCode = useMemo(
     () => Object.fromEntries(ALL_COUNTRIES.map((c) => [c.code, c])),
@@ -420,7 +424,11 @@ function ImplantProductsPanel() {
             {groupedProducts.map((product) => (
               <div key={product.id}>
                 <div
-                  onClick={() => setSelectedProduct(product)}
+                  onClick={() =>
+                    product.branch === "bone_graft"
+                      ? setShowGraftDetails(product)
+                      : setSelectedProduct(product)
+                  }
                   className="bg-card border border-border rounded-2xl p-3.5 shadow-soft hover:shadow-card transition relative overflow-hidden group cursor-pointer"
                 >
                   {product.images.length > 0 && imageUrlMap[product.images[0]] ? (
@@ -470,11 +478,13 @@ function ImplantProductsPanel() {
                             : "Non-Immediate"}
                       </span>
                     )}
-                    {(product.accessories?.length ?? 0) > 0 && (
-                      <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-md">
-                        {product.accessories!.length} {ar ? "قطعة تكميلية" : "accessory"}
-                      </span>
-                    )}
+                    {(product.accessories?.length ?? 0) > 0 &&
+                      product.branch !== "bone_graft" &&
+                      product.branch !== "specialized_implant" && (
+                        <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-md">
+                          {product.accessories!.length} {ar ? "قطعة تكميلية" : "accessory"}
+                        </span>
+                      )}
                   </div>
 
                   <p className="font-display font-bold text-sm leading-snug line-clamp-2">
@@ -504,6 +514,8 @@ function ImplantProductsPanel() {
                         e.stopPropagation();
                         if (product.branch === "specialized_implant") {
                           setEditingSpecialized(product);
+                        } else if (product.branch === "bone_graft") {
+                          setEditingGraft(product);
                         } else {
                           openEdit(product);
                         }
@@ -535,8 +547,17 @@ function ImplantProductsPanel() {
       {editingImplant && (
         <ImplantFormModal product={editingImplant} onClose={() => setEditingImplant(null)} />
       )}
+      {editingGraft && (
+        <BoneGraftModal product={editingGraft} onClose={() => setEditingGraft(null)} />
+      )}
       {editingSpecialized && (
         <SpecializedImplantForm product={editingSpecialized} onClose={() => setEditingSpecialized(null)} />
+      )}
+      {showGraftDetails && (
+        <BoneGraftDetailsModal
+          product={showGraftDetails}
+          onClose={() => setShowGraftDetails(null)}
+        />
       )}
     </div>
   );
@@ -924,8 +945,9 @@ function ImplantDetailView({
         </div>
       ) : null}
 
-      {/* Accessories grouped by category */}
-      <div className="space-y-5">
+      {/* Accessories grouped by category (regular implants only) */}
+      {product.branch !== "bone_graft" && product.branch !== "specialized_implant" && (
+        <div className="space-y-5">
         <h3 className="font-display font-bold text-base">
           {ar ? "الإكسسوارات الملحقة" : "Attached Accessories"}
         </h3>
@@ -970,7 +992,8 @@ function ImplantDetailView({
             );
           })
         )}
-      </div>
+        </div>
+      )}
 
 
 

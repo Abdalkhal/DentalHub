@@ -17,6 +17,7 @@ import {
   type SpecializedField,
 } from "@/data/specializedImplants";
 import { auth } from "@/integrations/firebase/client";
+import { CountryCombobox } from "@/components/CountryCombobox";
 import { toast } from "sonner";
 
 const MAX_CLINICAL_IMAGES = 10;
@@ -210,6 +211,7 @@ export function SpecializedImplantForm({
   );
   const [name, setName] = useState(product?.ar ?? "");
   const [manufacturer, setManufacturer] = useState(product?.brand ?? "");
+  const [country, setCountry] = useState(product?.country ?? "");
   const [price, setPrice] = useState(product?.price ? String(product.price) : "");
   const [currency, setCurrency] = useState<Currency>(product?.currency || "USD");
   const [stock, setStock] = useState(product?.stock ? String(product.stock) : "0");
@@ -367,6 +369,7 @@ export function SpecializedImplantForm({
         images: [...existingImages, ...uploadedPaths],
         category: "specialized_implant",
         companyId: product?.companyId || auth.currentUser?.uid || "",
+        country: country || undefined,
         description: description.trim() || undefined,
         specializedImplant: {
           category,
@@ -462,6 +465,10 @@ export function SpecializedImplantForm({
                 placeholder={ar ? "مثال: Zygoma" : "e.g. Zygoma"}
                 className={inputCls}
               />
+            </div>
+            <div>
+              <label className={labelCls}>{ar ? "بلد المنشأ" : "Country of Origin"}</label>
+              <CountryCombobox value={country} onChange={setCountry} lang={lang} />
             </div>
             <div>
               <label className={labelCls}>{ar ? "الوصف" : "Description"}</label>
