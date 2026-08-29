@@ -2319,68 +2319,77 @@ function ImplantDashboard() {
     <MobileShell hideBottomNav>
       {/* Header — mirrors SupplyDashboard layout */}
       <div className="px-4 pt-4 pb-2">
-        <div className="flex items-center justify-between">
-          <Link
-            to="/account"
-            className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition"
-          >
-            <div className="size-12 rounded-full bg-primary/10 ring-2 ring-primary/20 flex items-center justify-center overflow-hidden">
-              {role?.photoURL ? (
-                <img src={role.photoURL} alt="" className="size-full object-cover" />
-              ) : (
-                <UserCircle2 className="size-7 text-primary" />
-              )}
-            </div>
-            <div>
-              <p className="font-display font-bold text-sm text-foreground">
-                {role?.name || (ar ? "المستخدم" : "User")}
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                {ar ? "شركة زرعات" : "Implant Company"}
-              </p>
-              <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
-                <Phone className="size-3 shrink-0" />
-                {role?.phone || (ar ? "لم يتم إضافة رقم هاتف" : "No phone number added")}
-              </p>
-            </div>
-          </Link>
+        <div
+          className="rounded-3xl overflow-hidden shadow-lg text-white"
+          style={{ background: "linear-gradient(135deg, #0F172A, #1E40AF)" }}
+        >
+          <div className="p-4 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <Link
+                to="/account"
+                className="flex items-center gap-3 min-w-0 cursor-pointer hover:opacity-80 transition"
+              >
+                <div className="size-12 rounded-full bg-white/10 ring-2 ring-white/25 flex items-center justify-center overflow-hidden shrink-0">
+                  {role?.photoURL ? (
+                    <img src={role.photoURL} alt="" className="size-full object-cover" />
+                  ) : (
+                    <UserCircle2 className="size-7 text-white/80" />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <p className="font-display font-bold text-sm text-white truncate">
+                    {role?.name || (ar ? "المستخدم" : "User")}
+                  </p>
+                  <p className="text-[11px] text-white/70 truncate">
+                    {ar ? "شركة زرعات" : "Implant Company"}
+                  </p>
+                  <p className="text-[11px] text-white/70 flex items-center gap-1 mt-0.5 truncate">
+                    <Phone className="size-3 shrink-0" />
+                    {role?.phone || (ar ? "لم يتم إضافة رقم هاتف" : "No phone number added")}
+                  </p>
+                </div>
+              </Link>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={toggle}
-              className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-sky-100 hover:text-sky-600 text-xs font-bold transition"
-            >
-              {lang === "ar" ? "EN" : "AR"}
-            </button>
-            <button
-              type="button"
-              onClick={() => auth.signOut()}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-rose-100 hover:text-rose-600 text-xs font-semibold transition"
-            >
-              <LogOut className="size-4" />
-              {ar ? "خروج" : "Logout"}
-            </button>
+              <div className="flex items-center gap-2 shrink-0">
+                <NotificationBell userId={companyId} dark />
+                <button
+                  type="button"
+                  onClick={toggle}
+                  className="px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-white/90 hover:bg-white/20 text-xs font-bold transition"
+                >
+                  {lang === "ar" ? "EN" : "AR"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => auth.signOut()}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-white/90 hover:bg-rose-500/30 hover:text-rose-100 text-xs font-semibold transition"
+                >
+                  <LogOut className="size-4" />
+                  {ar ? "خروج" : "Logout"}
+                </button>
+              </div>
+            </div>
+
+            {role &&
+            (role.latitude != null || role.longitude != null || role.mapUrl || role.address) ? (
+              <a
+                href={mapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="text-[11px] text-white/70 flex items-center gap-1 ps-[60px] pt-3 border-t border-white/15 hover:text-white transition-colors cursor-pointer z-50 pointer-events-auto"
+              >
+                <MapPin className="size-3 shrink-0" />
+                {role?.address || (ar ? "عرض الموقع على الخريطة" : "View on map")}
+              </a>
+            ) : (
+              <p className="text-[11px] text-white/70 flex items-center gap-1 ps-[60px] pt-3 border-t border-white/15">
+                <MapPin className="size-3 shrink-0" />
+                {ar ? "لم يتم تحديد العنوان بعد" : "No address set yet"}
+              </p>
+            )}
           </div>
         </div>
-        {role &&
-        (role.latitude != null || role.longitude != null || role.mapUrl || role.address) ? (
-          <a
-            href={mapsUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="text-[11px] text-muted-foreground flex items-center gap-1 mt-1 hover:text-primary transition-colors cursor-pointer z-50 pointer-events-auto"
-          >
-            <MapPin className="size-3 shrink-0" />
-            {role?.address || (ar ? "عرض الموقع على الخريطة" : "View on map")}
-          </a>
-        ) : (
-          <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-1">
-            <MapPin className="size-3 shrink-0" />
-            {ar ? "لم يتم تحديد العنوان بعد" : "No address set yet"}
-          </p>
-        )}
       </div>
 
       {/* Dashboard title — mirrored from supplies */}
