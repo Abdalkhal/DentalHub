@@ -102,7 +102,7 @@ export function NotificationBell({ userId }: { userId: string }) {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="relative size-10 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-500"
+        className="relative size-10 rounded-xl border border-slate-200 bg-white shadow-sm hover:bg-slate-100 flex items-center justify-center text-slate-500"
       >
         <Bell className="size-5" />
         {unread > 0 && (

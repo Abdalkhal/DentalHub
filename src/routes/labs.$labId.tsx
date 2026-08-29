@@ -7,6 +7,7 @@ import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { LabRxFormModal } from "@/components/LabRxFormModal";
 import { useI18n } from "@/lib/i18n";
+import { useUserRole } from "@/lib/useAuth";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
@@ -32,6 +33,7 @@ function LabPage() {
   const ar = lang === "ar";
   const navigate = useNavigate();
   const BackIcon = dir === "rtl" ? ChevronLeft : ChevronRight;
+  const { role } = useUserRole();
 
   const [profile, setProfile] = useState<UserRoleDoc | null>(null);
   const [services, setServices] = useState<Service[]>([]);
@@ -102,13 +104,15 @@ function LabPage() {
           </div>
           {address && <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-3 border-t border-sky-100 pt-3"><MapPin className="size-3.5" />{address}</p>}
 
-          <button
-            onClick={() => setShowSendCase(true)}
-            className="w-full mt-4 h-10 rounded-xl bg-emerald-500 text-white font-bold text-sm flex items-center justify-center gap-2 hover:bg-emerald-600 transition"
-          >
-            <Send className="size-4" />
-            {ar ? "إرسال حالة للمختبر" : "Send case to lab"}
-          </button>
+          {role?.accountType === "dentist" && (
+            <button
+              onClick={() => setShowSendCase(true)}
+              className="w-full mt-4 h-10 rounded-xl bg-emerald-500 text-white font-bold text-sm flex items-center justify-center gap-2 hover:bg-emerald-600 transition"
+            >
+              <Send className="size-4" />
+              {ar ? "إرسال حالة للمختبر" : "Send case to lab"}
+            </button>
+          )}
         </div>
 
         {/* Filter pills */}

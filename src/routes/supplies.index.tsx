@@ -289,7 +289,7 @@ function SupplyDashboard() {
             <button
               type="button"
               onClick={toggle}
-              className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-sky-100 hover:text-sky-600 text-xs font-bold transition"
+              className="px-3 py-2 rounded-xl bg-white border border-slate-200 shadow-sm hover:bg-sky-100 hover:text-sky-600 text-xs font-bold transition"
             >
               {lang === "ar" ? "EN" : "AR"}
             </button>
@@ -302,13 +302,13 @@ function SupplyDashboard() {
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="text-[11px] text-muted-foreground flex items-center gap-1 mt-1 hover:text-primary transition-colors cursor-pointer z-50 pointer-events-auto"
+            className="text-[11px] text-muted-foreground flex items-center gap-1 mt-1 ps-[60px] hover:text-primary transition-colors cursor-pointer z-50 pointer-events-auto"
           >
             <MapPin className="size-3 shrink-0" />
             {role?.address || (ar ? "عرض الموقع على الخريطة" : "View on map")}
           </a>
         ) : (
-          <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-1">
+          <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-1 ps-[60px]">
             <MapPin className="size-3 shrink-0" />
             {ar ? "لم يتم تحديد العنوان بعد" : "No address set yet"}
           </p>
@@ -329,10 +329,10 @@ function SupplyDashboard() {
               type="button"
               onClick={() => setActiveTab(tab.key)}
               className={cn(
-                "flex-1 h-11 rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 transition-all",
+                "flex-1 h-11 rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 transition-all border",
                 activeTab === tab.key
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700",
+                  ? "bg-white text-slate-900 shadow-sm border-slate-300"
+                  : "text-slate-500 hover:text-slate-700 border-slate-200",
               )}
             >
               <tab.icon className="size-4" />
