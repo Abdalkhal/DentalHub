@@ -36,7 +36,7 @@ const TYPE_ICONS: Record<string, typeof Package> = {
   message: CheckCircle2,
 };
 
-export function NotificationBell({ userId }: { userId: string }) {
+export function NotificationBell({ userId, dark = false }: { userId: string; dark?: boolean }) {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const ref = useRef<HTMLDivElement>(null);
@@ -102,7 +102,12 @@ export function NotificationBell({ userId }: { userId: string }) {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="relative size-10 rounded-xl border border-slate-200 bg-white shadow-sm hover:bg-slate-100 flex items-center justify-center text-slate-500"
+        className={cn(
+          "relative size-10 rounded-xl flex items-center justify-center transition",
+          dark
+            ? "bg-white/10 border border-white/20 text-white hover:bg-white/20"
+            : "border border-slate-200 bg-white shadow-sm hover:bg-slate-100 text-slate-500",
+        )}
       >
         <Bell className="size-5" />
         {unread > 0 && (
