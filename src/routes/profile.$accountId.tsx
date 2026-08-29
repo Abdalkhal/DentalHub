@@ -1,5 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { createFileRoute, useRouterState } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
@@ -134,6 +134,11 @@ function ProfilePage() {
 
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
+  const routerState = useRouterState({
+    select: (s) => s.location.state as { openProductId?: string } | null,
+  });
+  const openProductId = routerState?.openProductId;
+
   const { data: account, isLoading } = useQuery({
     queryKey: ["profile-account", accountId],
     queryFn: async () => {
@@ -152,6 +157,13 @@ function ProfilePage() {
     () => allProducts.filter((p) => p.companyId === accountId),
     [allProducts, accountId],
   );
+
+  useEffect(() => {
+    if (openProductId && !selectedProduct) {
+      const target = products.find((p) => p.id === openProductId);
+      if (target) setSelectedProduct(target);
+    }
+  }, [openProductId, products, selectedProduct]);
 
   const isSupply = account?.accountType === "supply";
 

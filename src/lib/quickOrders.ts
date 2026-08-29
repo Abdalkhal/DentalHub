@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 
 export type QuickOrderItem = {
+  productId: string;
   name: string;
   vendor: string;
   brand: string;
@@ -53,6 +54,7 @@ export function useQuickOrders(): QuickOrderItem[] {
       .sort((a, b) => b.count - a.count || new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 10)
       .map((h) => ({
+        productId: h.productId,
         name: h.productName,
         vendor: h.vendor,
         brand: h.brand,
