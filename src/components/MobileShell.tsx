@@ -21,7 +21,7 @@ export function MobileShell({
   const [cartOpen, setCartOpen] = useState(false);
   return (
     <div className="min-h-screen w-full bg-slate-50 overflow-x-hidden flex justify-center">
-      <div className={cn("relative w-full min-h-screen flex flex-col bg-[#F0F7FF]", isLab ? "max-w-none" : "max-w-md", className)}>
+      <div className={cn("relative w-full min-h-screen flex flex-col bg-[#E6F0FF]", isLab ? "max-w-none" : "max-w-md", className)}>
         <div className={cn("flex-1", hideBottomNav || isLab ? "pb-0" : "pb-24")}>{children}</div>
         {!hideBottomNav && !isLab && <BottomTabBar onCartClick={() => setCartOpen(true)} />}
         <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} />
