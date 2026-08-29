@@ -199,10 +199,10 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-100 overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-slate-100 overflow-y-auto mx-auto w-full max-w-md">
       {/* Sticky top bar */}
       <div className="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-slate-200">
-        <div className="max-w-3xl mx-auto flex items-center justify-between px-4 h-14">
+        <div className="max-w-md mx-auto flex items-center justify-between px-4 h-14">
           <div className="flex items-center gap-2.5">
             <span className="size-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${TEAL}14`, color: TEAL }}>
               <ShoppingCart className="size-5" />
@@ -224,7 +224,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
       </div>
 
       {cart.length === 0 ? (
-        <div className="max-w-3xl mx-auto flex flex-col items-center justify-center py-24 text-center px-6">
+        <div className="max-w-md mx-auto flex flex-col items-center justify-center py-24 text-center px-6">
           <div className="size-20 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: `${TEAL}14` }}>
             <ShoppingCart className="size-9" style={{ color: TEAL }} />
           </div>
@@ -246,7 +246,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
         </div>
       ) : (
         <>
-          <div id="cart-invoice" className="max-w-3xl mx-auto px-4 py-4 space-y-4 pb-40">
+          <div id="cart-invoice" className="max-w-md mx-auto px-4 py-4 space-y-4 pb-40">
             {/* Invoice header */}
             <div className="rounded-3xl p-5 text-white shadow-lg relative overflow-hidden" style={{ background: `linear-gradient(135deg, ${TEAL}, #0B5952)` }}>
               <div className="absolute -top-12 -end-12 size-40 rounded-full bg-white/10 blur-2xl" />
@@ -265,84 +265,55 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
               </div>
             </div>
 
-            {/* Items table */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-soft overflow-hidden">
-              <div className="overflow-x-auto">
-                <div className="min-w-[640px]">
-                  {/* header row */}
-                  <div
-                    className="grid grid-cols-[minmax(180px,1.6fr)_56px_96px_96px_108px_40px] items-center gap-2 px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wide border-b border-slate-100"
-                    style={{ backgroundColor: `${TEAL}08` }}
-                  >
-                    <span>{ar ? "المنتج" : "Product"}</span>
-                    <span className="text-center">{ar ? "الكمية" : "Qty"}</span>
-                    <span className="text-center">{ar ? "السعر (د.ع)" : "Price (IQD)"}</span>
-                    <span className="text-center">{ar ? "السعر ($)" : "Price ($)"}</span>
-                    <span className="text-center">{ar ? "الإجمالي" : "Total"}</span>
-                    <span />
-                  </div>
-
-                  {cart.map((item) => (
-                    <div
-                      key={item.id}
-                      className="grid grid-cols-[minmax(180px,1.6fr)_56px_96px_96px_108px_40px] items-center gap-2 px-4 py-3 border-b border-slate-50 last:border-0"
-                    >
-                      {/* Product name + image */}
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        {item.productImage ? (
-                          <img
-                            src={item.productImage}
-                            alt=""
-                            className="size-11 rounded-lg object-cover bg-slate-100 shrink-0"
-                          />
-                        ) : (
-                          <div className="size-11 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
-                            <Package className="size-5 text-slate-300" />
-                          </div>
-                        )}
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-slate-800 truncate">{item.productName}</p>
-                          {item.category && (
-                            <p className="text-[10px] text-slate-400 truncate">{item.category}</p>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Qty */}
-                      <span className="text-sm font-bold text-slate-700 text-center">{item.quantity}</span>
-
-                      {/* IQD price */}
-                      <span className="text-xs text-slate-500 text-center">
-                        {item.currency === "IQD" ? item.unitPrice.toLocaleString() : "—"}
-                      </span>
-
-                      {/* USD price */}
-                      <span className="text-xs text-slate-500 text-center">
-                        {item.currency !== "IQD" ? `$${item.unitPrice.toFixed(2)}` : "—"}
-                      </span>
-
-                      {/* Total */}
-                      <span className="text-sm font-display font-extrabold text-center" style={{ color: TEAL }}>
-                        {item.currency === "IQD"
-                          ? (item.unitPrice * item.quantity).toLocaleString()
-                          : `$${(item.unitPrice * item.quantity).toFixed(2)}`}
-                      </span>
-
-                      {/* Delete */}
-                      <button
-                        onClick={() => removeFromCart(item.id)}
-                        className="size-8 rounded-lg hover:bg-rose-50 flex items-center justify-center text-slate-400 hover:text-rose-500 transition justify-self-center"
-                      >
-                        <Trash2 className="size-4" />
-                      </button>
+            {/* Items */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-soft overflow-hidden divide-y divide-slate-50">
+              {cart.map((item) => (
+                <div key={item.id} className="px-3.5 py-3 flex items-center gap-3">
+                  {item.productImage ? (
+                    <img
+                      src={item.productImage}
+                      alt=""
+                      className="size-12 rounded-xl object-cover bg-slate-100 shrink-0"
+                    />
+                  ) : (
+                    <div className="size-12 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
+                      <Package className="size-5 text-slate-300" />
                     </div>
-                  ))}
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-800 truncate">{item.productName}</p>
+                    {item.category && (
+                      <p className="text-[10px] text-slate-400 truncate">{item.category}</p>
+                    )}
+                    <div className="flex items-center gap-1.5 mt-1 text-xs">
+                      <span className="text-slate-500">
+                        {item.currency === "IQD"
+                          ? `${item.unitPrice.toLocaleString()} د.ع`
+                          : `$${item.unitPrice.toFixed(2)}`}
+                      </span>
+                      <span className="text-slate-300">×</span>
+                      <span className="font-bold text-slate-700">{item.quantity}</span>
+                    </div>
+                  </div>
+                  <div className="text-end shrink-0">
+                    <p className="text-sm font-display font-extrabold" style={{ color: TEAL }}>
+                      {item.currency === "IQD"
+                        ? (item.unitPrice * item.quantity).toLocaleString()
+                        : `$${(item.unitPrice * item.quantity).toFixed(2)}`}
+                    </p>
+                    <button
+                      onClick={() => removeFromCart(item.id)}
+                      className="mt-1 size-8 rounded-lg hover:bg-rose-50 flex items-center justify-center text-slate-400 hover:text-rose-500 transition ms-auto"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </div>
                 </div>
-              </div>
+              ))}
             </div>
 
-            {/* Left (discount + note) and Right (summary) */}
-            <div className="grid md:grid-cols-2 gap-4">
+            {/* Discount + note + summary */}
+            <div className="grid grid-cols-1 gap-4">
               {/* Left column */}
               <div className="space-y-4">
                 {/* Discount code */}
@@ -472,8 +443,8 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
 
       {/* Sticky bottom actions */}
       {cart.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-slate-200">
-          <div className="max-w-3xl mx-auto px-4 py-3 flex items-center gap-2">
+        <div className="fixed bottom-0 inset-x-0 z-20 bg-white border-t border-slate-200 mx-auto w-full max-w-md">
+          <div className="max-w-md mx-auto px-4 py-3 flex items-center gap-2">
             <button
               onClick={handleShare}
               className="h-12 px-4 rounded-xl border border-slate-200 text-slate-600 font-bold text-sm flex items-center gap-2 hover:bg-slate-50 transition"
