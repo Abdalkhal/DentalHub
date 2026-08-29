@@ -1,5 +1,5 @@
 import { createFileRoute, useRouterState } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
@@ -158,12 +158,17 @@ function ProfilePage() {
     [allProducts, accountId],
   );
 
+  const autoOpenedRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (openProductId && !selectedProduct) {
+    if (openProductId && autoOpenedRef.current !== openProductId) {
       const target = products.find((p) => p.id === openProductId);
-      if (target) setSelectedProduct(target);
+      if (target) {
+        setSelectedProduct(target);
+        autoOpenedRef.current = openProductId;
+      }
     }
-  }, [openProductId, products, selectedProduct]);
+  }, [openProductId, products]);
 
   const isSupply = account?.accountType === "supply";
 
