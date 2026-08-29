@@ -26,7 +26,7 @@ function ClinicHome() {
   return (
     <MobileShell hideBottomNav>
       <div className="min-h-svh bg-slate-50 flex justify-center">
-        <div className="w-full max-w-[440px] bg-white">
+        <div className="w-full max-w-[440px] bg-[#E6F0FF]">
           {/* Header */}
           <header className="flex items-center justify-between px-4 pt-4 pb-2">
             <div className="flex items-center gap-2">
