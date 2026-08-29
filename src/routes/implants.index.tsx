@@ -1551,7 +1551,7 @@ function BrowseImplants() {
   const countryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const p of products) {
-      if (p.category !== "implant") continue;
+      if (p.category !== "implant" || p.branch === "bone_graft") continue;
       const c = p.country || p.implantSpec?.country;
       if (!c) continue;
       const slug = COUNTRY_CODE_TO_SLUG[c] ?? c.toLowerCase();

@@ -368,7 +368,11 @@ export function useProductsByCountry(countrySlug: string) {
       const snap = await getDocs(q);
       return snap.docs
         .map((d) => fromDoc(d.id, d.data()))
-        .filter((p) => p.country === countryCode || p.implantSpec?.country === countryCode);
+        .filter(
+          (p) =>
+            p.branch !== "bone_graft" &&
+            (p.country === countryCode || p.implantSpec?.country === countryCode),
+        );
     },
     staleTime: 30_000,
   });
