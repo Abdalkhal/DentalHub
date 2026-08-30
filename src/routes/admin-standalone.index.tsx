@@ -1,24 +1,31 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { signInWithEmailAndPassword, signOut } from "firebase/auth";
-import { auth } from "@/integrations/firebase/client";
+import { signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword } from "firebase/auth";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { auth, db } from "@/integrations/firebase/client";
 import { useIsAdmin, fetchUserRoleDoc } from "@/lib/useAuth";
 import { AdminStandaloneApp } from "@/components/admin/AdminStandaloneApp";
-import { ShieldCheck, Loader2, LogOut } from "lucide-react";
+import { ShieldCheck, Loader2, LogOut, KeyRound } from "lucide-react";
 
 export const Route = createFileRoute("/admin-standalone/")({
   component: AdminStandalonePage,
 });
 
+const ADMIN_EMAIL = "admin@dentalhub.com";
+const ADMIN_PASSWORD = "admin123";
+
 function AdminLogin() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState(ADMIN_EMAIL);
+  const [password, setPassword] = useState(ADMIN_PASSWORD);
   const [busy, setBusy] = useState(false);
+  const [seeding, setSeeding] = useState(false);
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setInfo("");
     setBusy(true);
     try {
       await signInWithEmailAndPassword(auth, email.trim(), password);
@@ -26,6 +33,41 @@ function AdminLogin() {
       setError("بيانات الدخول غير صحيحة");
     } finally {
       setBusy(false);
+    }
+  };
+
+  const seedAdmin = async () => {
+    setError("");
+    setInfo("");
+    setSeeding(true);
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, ADMIN_EMAIL, ADMIN_PASSWORD);
+      await setDoc(doc(db, "user_roles", cred.user.uid), {
+        userId: cred.user.uid,
+        role: "admin",
+        accountType: "dentist",
+        name: "مدير النظام",
+        surname: "Admin",
+        email: ADMIN_EMAIL,
+        accountStatus: "active",
+        createdAt: serverTimestamp(),
+      });
+      setInfo(`تم إنشاء حساب المدير بنجاح — ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`);
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code;
+      if (code === "auth/email-already-in-use") {
+        setInfo(
+          `الحساب ${ADMIN_EMAIL} موجود مسبقاً — استخدم بيانات الدخول التالية: ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`,
+        );
+      } else if (code === "auth/operation-not-allowed") {
+        setError(
+          "إنشاء المستخدم معطّل في إعدادات Firebase Authentication (Email/Password). فعّله من لوحة Firebase ثم أعد المحاولة.",
+        );
+      } else {
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    } finally {
+      setSeeding(false);
     }
   };
 
@@ -73,6 +115,11 @@ function AdminLogin() {
             {error}
           </p>
         )}
+        {info && (
+          <p className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 leading-relaxed">
+            {info}
+          </p>
+        )}
         <button
           type="submit"
           disabled={busy}
@@ -81,6 +128,21 @@ function AdminLogin() {
           {busy ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
           دخول
         </button>
+        <div className="text-center">
+          <button
+            type="button"
+            onClick={seedAdmin}
+            disabled={seeding}
+            className="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-500 hover:text-[#0052FF] transition disabled:opacity-60"
+          >
+            {seeding ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <KeyRound className="size-3.5" />
+            )}
+            إنشاء حساب المدير الافتراضي (مرة واحدة)
+          </button>
+        </div>
       </form>
     </div>
   );
