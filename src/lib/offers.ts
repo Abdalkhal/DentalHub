@@ -1,15 +1,15 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { db } from "@/integrations/firebase/client";
 import {
   collection,
   doc,
-  getDocs,
   setDoc,
   deleteDoc,
   query,
   orderBy,
   Timestamp,
 } from "firebase/firestore";
+import { useRealtimeQuery } from "@/lib/realtime";
 
 export type Offer = {
   id: string;
@@ -21,7 +21,8 @@ export type Offer = {
   price?: number;
   currency?: string;
   discountPct?: number;
-  status?: "active" | "pending" | "expired";
+  status?: "active" | "pending" | "expired" | "rejected";
+  rejectReason?: string;
   createdAt?: string;
 };
 
@@ -36,36 +37,24 @@ const fromDoc = (id: string, data: Record<string, unknown>): Offer => ({
   currency: (data.currency as string) ?? "USD",
   discountPct: typeof data.discountPct === "number" ? data.discountPct : undefined,
   status: (data.status as Offer["status"]) ?? undefined,
+  rejectReason: (data.rejectReason as string) ?? undefined,
   createdAt: (data.createdAt as Timestamp)?.toDate?.()?.toISOString?.() ?? undefined,
 });
 
 export const offersQueryKey = ["offers"] as const;
 
 export function useOffers(supplierId: string) {
-  return useQuery({
-    queryKey: [...offersQueryKey, supplierId],
-    enabled: !!supplierId,
-    queryFn: async (): Promise<Offer[]> => {
-      const q = query(collection(db, "offers"), orderBy("createdAt", "desc"));
-      const snap = await getDocs(q);
-      return snap.docs
-        .map((d) => fromDoc(d.id, d.data()))
-        .filter((o) => o.supplierId === supplierId);
-    },
-    staleTime: 30_000,
-  });
+  const q = supplierId
+    ? query(collection(db, "offers"), orderBy("createdAt", "desc"))
+    : null;
+  const { data, loading } = useRealtimeQuery<Offer>(q, (d) => fromDoc(d.id, d.data()));
+  return { data: data.filter((o) => o.supplierId === supplierId), isLoading: loading };
 }
 
 export function useAllOffers() {
-  return useQuery({
-    queryKey: ["offers", "all"],
-    queryFn: async (): Promise<Offer[]> => {
-      const q = query(collection(db, "offers"), orderBy("createdAt", "desc"));
-      const snap = await getDocs(q);
-      return snap.docs.map((d) => fromDoc(d.id, d.data()));
-    },
-    staleTime: 30_000,
-  });
+  const q = query(collection(db, "offers"), orderBy("createdAt", "desc"));
+  const { data, loading } = useRealtimeQuery<Offer>(q, (d) => fromDoc(d.id, d.data()));
+  return { data, isLoading: loading };
 }
 
 export function useUpsertOffer() {
@@ -86,6 +75,7 @@ export function useUpsertOffer() {
           currency: offer.currency ?? "USD",
           discountPct: offer.discountPct ?? null,
           status: offer.status ?? "active",
+          rejectReason: offer.rejectReason ?? null,
           createdAt: Timestamp.now(),
           updatedAt: Timestamp.now(),
         },

@@ -43,6 +43,7 @@ import { Route as DesignerIndexRouteImport } from './routes/designer.index'
 import { Route as ClinicIndexRouteImport } from './routes/clinic.index'
 import { Route as BrandsIndexRouteImport } from './routes/brands.index'
 import { Route as BoneGraftsIndexRouteImport } from './routes/bone-grafts.index'
+import { Route as AdminStandaloneIndexRouteImport } from './routes/admin-standalone.index'
 import { Route as SurgicalGuideCreateRouteImport } from './routes/surgical-guide.create'
 import { Route as SpecializedImplantsCategoryRouteImport } from './routes/specialized-implants.$category'
 import { Route as ProfileAccountIdRouteImport } from './routes/profile.$accountId'
@@ -244,6 +245,11 @@ const BrandsIndexRoute = BrandsIndexRouteImport.update({
 const BoneGraftsIndexRoute = BoneGraftsIndexRouteImport.update({
   id: '/bone-grafts/',
   path: '/bone-grafts/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminStandaloneIndexRoute = AdminStandaloneIndexRouteImport.update({
+  id: '/admin-standalone/',
+  path: '/admin-standalone/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SurgicalGuideCreateRoute = SurgicalGuideCreateRouteImport.update({
@@ -451,6 +457,7 @@ export interface FileRoutesByFullPath {
   '/profile/$accountId': typeof ProfileAccountIdRoute
   '/specialized-implants/$category': typeof SpecializedImplantsCategoryRoute
   '/surgical-guide/create': typeof SurgicalGuideCreateRoute
+  '/admin-standalone/': typeof AdminStandaloneIndexRoute
   '/bone-grafts/': typeof BoneGraftsIndexRoute
   '/brands/': typeof BrandsIndexRoute
   '/clinic/': typeof ClinicIndexRoute
@@ -518,6 +525,7 @@ export interface FileRoutesByTo {
   '/profile/$accountId': typeof ProfileAccountIdRoute
   '/specialized-implants/$category': typeof SpecializedImplantsCategoryRoute
   '/surgical-guide/create': typeof SurgicalGuideCreateRoute
+  '/admin-standalone': typeof AdminStandaloneIndexRoute
   '/bone-grafts': typeof BoneGraftsIndexRoute
   '/brands': typeof BrandsIndexRoute
   '/clinic': typeof ClinicIndexRoute
@@ -586,6 +594,7 @@ export interface FileRoutesById {
   '/profile/$accountId': typeof ProfileAccountIdRoute
   '/specialized-implants/$category': typeof SpecializedImplantsCategoryRoute
   '/surgical-guide/create': typeof SurgicalGuideCreateRoute
+  '/admin-standalone/': typeof AdminStandaloneIndexRoute
   '/bone-grafts/': typeof BoneGraftsIndexRoute
   '/brands/': typeof BrandsIndexRoute
   '/clinic/': typeof ClinicIndexRoute
@@ -655,6 +664,7 @@ export interface FileRouteTypes {
     | '/profile/$accountId'
     | '/specialized-implants/$category'
     | '/surgical-guide/create'
+    | '/admin-standalone/'
     | '/bone-grafts/'
     | '/brands/'
     | '/clinic/'
@@ -722,6 +732,7 @@ export interface FileRouteTypes {
     | '/profile/$accountId'
     | '/specialized-implants/$category'
     | '/surgical-guide/create'
+    | '/admin-standalone'
     | '/bone-grafts'
     | '/brands'
     | '/clinic'
@@ -789,6 +800,7 @@ export interface FileRouteTypes {
     | '/profile/$accountId'
     | '/specialized-implants/$category'
     | '/surgical-guide/create'
+    | '/admin-standalone/'
     | '/bone-grafts/'
     | '/brands/'
     | '/clinic/'
@@ -853,6 +865,7 @@ export interface RootRouteChildren {
   ProfileAccountIdRoute: typeof ProfileAccountIdRoute
   SpecializedImplantsCategoryRoute: typeof SpecializedImplantsCategoryRoute
   SurgicalGuideCreateRoute: typeof SurgicalGuideCreateRoute
+  AdminStandaloneIndexRoute: typeof AdminStandaloneIndexRoute
   BoneGraftsIndexRoute: typeof BoneGraftsIndexRoute
   BrandsIndexRoute: typeof BrandsIndexRoute
   ClinicIndexRoute: typeof ClinicIndexRoute
@@ -1111,6 +1124,13 @@ declare module '@tanstack/react-router' {
       path: '/bone-grafts'
       fullPath: '/bone-grafts/'
       preLoaderRoute: typeof BoneGraftsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin-standalone/': {
+      id: '/admin-standalone/'
+      path: '/admin-standalone'
+      fullPath: '/admin-standalone/'
+      preLoaderRoute: typeof AdminStandaloneIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/surgical-guide/create': {
@@ -1416,6 +1436,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProfileAccountIdRoute: ProfileAccountIdRoute,
   SpecializedImplantsCategoryRoute: SpecializedImplantsCategoryRoute,
   SurgicalGuideCreateRoute: SurgicalGuideCreateRoute,
+  AdminStandaloneIndexRoute: AdminStandaloneIndexRoute,
   BoneGraftsIndexRoute: BoneGraftsIndexRoute,
   BrandsIndexRoute: BrandsIndexRoute,
   ClinicIndexRoute: ClinicIndexRoute,

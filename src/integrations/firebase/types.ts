@@ -36,6 +36,8 @@ export type UserRoleDoc = {
   labDescription?: string;
   notificationsEnabled?: boolean;
   clinicName?: string;
+  accountStatus?: "active" | "suspended" | "expired";
+  subscriptionExpiry?: string;
   createdAt: Timestamp;
 };
 

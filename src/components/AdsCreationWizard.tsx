@@ -1,7 +1,6 @@
 import { useRef, useState } from "react";
 import {
   X,
-  Upload,
   Loader2,
   Megaphone,
   Tag,

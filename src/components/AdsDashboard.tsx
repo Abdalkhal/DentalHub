@@ -63,7 +63,8 @@ export function AdsDashboard() {
           title: o.title,
           description: o.description,
           image: o.imageUrl ? urlMap[o.imageUrl] : undefined,
-          status: o.status ?? (expired ? "expired" : "active"),
+          status:
+            o.status === "rejected" ? "expired" : (o.status ?? (expired ? "expired" : "active")),
           views: 0,
           clicks: 0,
           expiryDate: o.expiryDate,
