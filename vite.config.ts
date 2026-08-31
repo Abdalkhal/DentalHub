@@ -12,7 +12,15 @@ const lovableConfig = lovableDefineConfig({
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
     server: { entry: "server" },
+    // The app talks to Firebase entirely from the client, so deploy it as a
+    // static SPA that Firebase Hosting can serve (no SSR server required).
+    // Prerendering is skipped because Firebase Hosting's SPA rewrite already
+    // serves index.html for every route.
+    spa: { enabled: true, prerender: { enabled: false } },
   },
+  // No server runtime is needed — the app is fully client-side, so skip the
+  // nitro/Cloudflare build entirely and emit a static SPA for Firebase Hosting.
+  nitro: false,
   vite: {
     // Resolve tsconfig `paths` (e.g. `@/*`) natively via Vite, instead of the
     // deprecated `vite-tsconfig-paths` plugin.
