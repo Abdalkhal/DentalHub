@@ -154,7 +154,7 @@ export default function HomeScreen() {
   // Invited lab staff have no `user_roles` document — only a custom claim — so
   // route them from the claim before falling through to the account-type logic,
   // otherwise they land on the dentist marketplace with no role at all.
-  if (labStaff?.role === 'DESIGNER') return <Redirect href="/designer" />;
+  if (labStaff?.role === 'DESIGNER') return <Redirect href={'/designer' as never} />;
 
   // Match the web app: the Home tab takes each role to its own dashboard rather
   // than to the dentist marketplace. `getAccountDashboard` returns '/' for

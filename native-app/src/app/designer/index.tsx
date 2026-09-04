@@ -35,7 +35,7 @@ export default function DesignerIndexScreen() {
         renderItem={({ item: { order } }) => (
           <Pressable
             onPress={() =>
-              router.push({ pathname: '/designer/[caseId]', params: { caseId: order.id } })
+              router.push({ pathname: '/designer/[caseId]', params: { caseId: order.id } } as never)
             }
             className="mb-3 flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-card p-4 shadow-sm"
           >

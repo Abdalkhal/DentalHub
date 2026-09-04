@@ -46,7 +46,7 @@ export default function DesignerCaseScreen() {
           <Text className="text-center text-sm font-semibold text-slate-400">
             {ar ? 'الحالة غير موجودة أو غير مسندة إليك' : 'Case not found or not assigned to you'}
           </Text>
-          <Pressable onPress={() => router.push('/designer')} className="mt-3">
+            <Pressable onPress={() => router.push('/designer' as never)} className="mt-3">
             <Text className="text-xs font-bold text-primary">
               {ar ? 'العودة لقائمة الحالات' : 'Back to my cases'}
             </Text>

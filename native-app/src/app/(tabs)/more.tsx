@@ -1,5 +1,5 @@
 ﻿import { Pressable, View } from 'react-native';
-import { router, type Href } from 'expo-router';
+import { router } from 'expo-router';
 import { signOut } from 'firebase/auth';
 import {
   Bell,
@@ -36,7 +36,7 @@ const ROLE_AR: Record<string, string> = {
   admin: 'مدير النظام',
 };
 
-type Item = { icon: LucideIcon; ar: string; en: string; to: Href };
+type Item = { icon: LucideIcon; ar: string; en: string; to: string };
 
 const ITEMS: Record<string, Item[]> = {
   dentist: [
@@ -130,7 +130,7 @@ export default function MoreScreen() {
           return (
             <View key={it.en}>
               <Pressable
-                onPress={() => router.push(it.to)}
+                onPress={() => router.push(it.to as never)}
                 className="flex-row items-center gap-3 px-4 py-3.5"
               >
                 <View className="h-10 w-10 items-center justify-center rounded-full bg-slate-100">
