@@ -1,84 +1,212 @@
 rules_version = '2';
 
+// Storage Security Rules are OR-based across matching path patterns: if any
+// `match` block grants access, access is granted. A trailing
+// `match /{allPaths=**} { allow read: if request.auth != null; }` therefore
+// *cannot* be a fallback — it silently overrides every stricter rule above it.
+// This file previously ended with exactly that, which meant any signed-in user
+// could read every case scan in the system.
+//
+// There is deliberately no catch-all here. Anything without an explicit rule
+// below is denied by default. Adding a new storage prefix means adding a rule.
+
 service firebase.storage {
   match /b/{bucket}/o {
-    match /products/{allPaths=**} {
-      allow read: if true;
-      allow write: if request.auth != null && request.resource.size < 10 * 1024 * 1024
-                   && request.resource.contentType.matches('image/.*');
+
+    /* ── helpers ─────────────────────────────────────────────── */
+
+    function isSignedIn() {
+      return request.auth != null;
     }
 
-    match /avatars/{allPaths=**} {
-      allow read: if true;
-      allow write: if request.auth != null && request.resource.size < 5 * 1024 * 1024
-                   && request.resource.contentType.matches('image/.*');
+    function uid() {
+      return request.auth.uid;
     }
 
-    // ---- PHASE 0: case_scans security hardening ----
-    // Uploads must be authenticated, carry dentistId + caseId metadata, and
-    // only the referring dentist, the lab owner, or an authorized lab staff
-    // member (via custom claims) may write. Reads are equally restricted.
+    // Lab staff custom claims, set by the `inviteLabMember` Cloud Function.
+    // Read with a default: most accounts (dentists, suppliers) carry no lab
+    // claims at all, and reading a missing property raises an evaluation error
+    // rather than returning null.
+    function claimLabId() {
+      return request.auth.token.get('labId', '');
+    }
+
+    function claimRole() {
+      return request.auth.token.get('role', '');
+    }
+
+    function isLabOwner(labId) {
+      return isSignedIn() && uid() == labId;
+    }
+
+    function isLabStaff(labId) {
+      return isSignedIn()
+        && claimLabId() == labId
+        && claimRole() in ['ADMIN', 'DESIGNER', 'TECHNICIAN'];
+    }
+
+    // Designers and technicians get per-case access, not lab-wide access: the
+    // case document's `designerId` is the source of truth, matching the
+    // Firestore rule for `lab_orders/{labId}/cases/{caseId}`. Lab ADMINs are
+    // exempt so the common path avoids a billed Firestore read.
+    function isAssignedStaff(labId, caseId) {
+      return isLabStaff(labId) && (
+        claimRole() == 'ADMIN'
+        || firestore.get(/databases/(default)/documents/lab_orders/$(labId)/cases/$(caseId))
+             .data.designerId == uid()
+      );
+    }
+
+    // Object metadata is likewise absent on legacy uploads, so default it.
+    function isCaseDentist() {
+      return isSignedIn() && resource.metadata.get('dentistId', '') == uid();
+    }
+
+    // Objects are immutable once written: without this an attacker who can
+    // create a file can also overwrite someone else's scan (and restamp its
+    // metadata to grant themselves read access).
+    function isNewObject() {
+      return resource == null;
+    }
+
+    function hasCaseMetadata(caseId) {
+      return request.resource.metadata.get('dentistId', '').size() > 0
+        && request.resource.metadata.get('caseId', '') == caseId;
+    }
+
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+
+    /* ── public catalogue imagery ────────────────────────────── */
+
+    // Product images are shown to signed-out visitors, so read stays open.
+    // Ownership cannot be checked from the path (it is keyed by productId, not
+    // by company), so writes remain restricted only by auth, type and size.
+    match /products/{productId}/{file} {
+      allow read: if true;
+      allow write: if isSignedIn()
+        && request.resource.size < 10 * 1024 * 1024
+        && isImage();
+    }
+
+    match /surgical-guides/{ownerId}/{file} {
+      allow read: if true;
+      allow write: if isSignedIn() && uid() == ownerId
+        && request.resource.size < 10 * 1024 * 1024
+        && isImage();
+    }
+
+    /* ── profile imagery ─────────────────────────────────────── */
+
+    // Shown on public profile pages; only the owner may write their own.
+    match /avatars/{userId}/{file} {
+      allow read: if true;
+      allow write: if isSignedIn() && uid() == userId
+        && request.resource.size < 5 * 1024 * 1024
+        && isImage();
+    }
+
+    match /profile_pictures/{userId}/{file} {
+      allow read: if true;
+      allow write: if isSignedIn() && uid() == userId
+        && request.resource.size < 5 * 1024 * 1024
+        && isImage();
+    }
+
+    /* ── patient case files (medical data) ───────────────────── */
+
+    // The dentist's scans. Readable by the referring dentist, the lab owner,
+    // and only the staff member the case is actually assigned to.
     match /case_scans/{labId}/{caseId}/{file} {
-      allow read: if request.auth != null &&
-        (request.auth.uid == labId
-         || request.auth.uid == resource.metadata.dentistId
-         || (request.auth.token.labId == labId
-             && request.auth.token.role in ['ADMIN', 'DESIGNER', 'TECHNICIAN']));
+      allow read: if isLabOwner(labId)
+        || isCaseDentist()
+        || isAssignedStaff(labId, caseId);
 
-      allow write: if request.auth != null
-        && request.resource.size < 50 * 1024 * 1024
-        && request.resource.metadata.dentistId is string
-        && request.resource.metadata.dentistId.size() > 0
-        && request.resource.metadata.caseId is string
-        && request.resource.metadata.caseId == caseId
-        && (request.auth.uid == request.resource.metadata.dentistId
-            || request.auth.uid == labId
-            || (request.auth.token.labId == labId
-                && request.auth.token.role in ['ADMIN', 'DESIGNER', 'TECHNICIAN']));
+      allow create: if isSignedIn()
+        && isNewObject()
+        && request.resource.size < 60 * 1024 * 1024
+        && hasCaseMetadata(caseId)
+        && (uid() == request.resource.metadata.get('dentistId', '') || isLabOwner(labId));
+
+      allow update, delete: if isLabOwner(labId);
     }
 
-    // ---- PHASE 4/5: designer output (.stl designs) + preview meshes ----
-    // Designers upload completed designs; a lightweight 200KB preview mesh is
-    // written alongside the raw master file for rendering + retention.
+    // The designer's finished work. Kept in a separate tree from the dentist's
+    // scans so that granting design-upload rights can never overwrite or delete
+    // the original impression.
     match /case_designs/{labId}/{caseId}/{file} {
-      allow read: if request.auth != null &&
-        (request.auth.uid == labId
-         || request.auth.uid == resource.metadata.dentistId
-         || (request.auth.token.labId == labId
-             && request.auth.token.role in ['ADMIN', 'DESIGNER', 'TECHNICIAN']));
+      allow read: if isLabOwner(labId)
+        || isCaseDentist()
+        || isAssignedStaff(labId, caseId);
 
-      allow write: if request.auth != null
+      allow create: if isNewObject()
         && request.resource.size < 100 * 1024 * 1024
-        && request.resource.metadata.caseId is string
-        && request.resource.metadata.caseId == caseId
-        && request.resource.metadata.dentistId is string
-        && (request.auth.uid == labId
-            || (request.auth.token.labId == labId
-                && request.auth.token.role in ['ADMIN', 'DESIGNER']));
+        && hasCaseMetadata(caseId)
+        && (isLabOwner(labId) || isAssignedStaff(labId, caseId));
+
+      allow update, delete: if isLabOwner(labId);
     }
 
-    // ---- PHASE 5: preview meshes (kept permanently, ~200KB) ----
+    // Lightweight (<=1MB) preview meshes, kept permanently for browsing so the
+    // full master file is only fetched when a designer actually opens a case.
     match /previews/{labId}/{caseId}/{file} {
-      allow read: if request.auth != null &&
-        (request.auth.uid == labId
-         || request.auth.uid == resource.metadata.dentistId
-         || (request.auth.token.labId == labId
-             && request.auth.token.role in ['ADMIN', 'DESIGNER', 'TECHNICIAN']));
+      allow read: if isLabOwner(labId)
+        || isCaseDentist()
+        || isAssignedStaff(labId, caseId);
 
-      allow write: if request.auth != null
+      allow create: if isNewObject()
         && request.resource.size < 1024 * 1024
-        && request.resource.metadata.caseId is string
-        && request.resource.metadata.caseId == caseId
-        && request.resource.metadata.dentistId is string
-        && (request.auth.uid == labId
-            || request.auth.uid == request.resource.metadata.dentistId
-            || (request.auth.token.labId == labId
-                && request.auth.token.role in ['ADMIN', 'DESIGNER', 'TECHNICIAN']));
+        && hasCaseMetadata(caseId)
+        && (uid() == request.resource.metadata.get('dentistId', '')
+            || isLabOwner(labId)
+            || isAssignedStaff(labId, caseId));
+
+      allow update, delete: if isLabOwner(labId);
     }
 
-    match /{allPaths=**} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.resource.size < 10 * 1024 * 1024;
+    // Rx attachments uploaded from the lab order form. The path carries no
+    // labId, so the owning lab is recorded in metadata at write time — and
+    // because objects here are immutable, that stamp cannot later be forged by
+    // overwriting someone else's file.
+    match /orders_files/{orderId}/{file} {
+      allow read: if isSignedIn() && (
+        uid() == resource.metadata.get('dentistId', '')
+        || uid() == resource.metadata.get('labId', '')
+        || isLabStaff(resource.metadata.get('labId', ''))
+      );
+
+      allow create: if isSignedIn()
+        && isNewObject()
+        && request.resource.size < 60 * 1024 * 1024
+        && request.resource.metadata.get('labId', '').size() > 0
+        && uid() == request.resource.metadata.get('dentistId', '');
+
+      allow update, delete: if isSignedIn() && uid() == resource.metadata.get('labId', '');
+    }
+
+    // Attachments on the dentist <-> lab case chat. Unlike the scan paths there
+    // is no upload metadata to lean on here, so the referring dentist is read
+    // from the case document itself.
+    match /case_messages/{labId}/{caseId}/{file} {
+      function chatDentistId() {
+        return firestore
+          .get(/databases/(default)/documents/lab_orders/$(labId)/cases/$(caseId))
+          .data.dentistId;
+      }
+
+      allow read: if isLabOwner(labId)
+        || (isSignedIn() && chatDentistId() == uid())
+        || isAssignedStaff(labId, caseId);
+
+      allow create: if isNewObject()
+        && request.resource.size < 10 * 1024 * 1024
+        && isImage()
+        && (isLabOwner(labId)
+            || (isSignedIn() && chatDentistId() == uid())
+            || isAssignedStaff(labId, caseId));
+
+      allow update, delete: if isLabOwner(labId);
     }
   }
 }
