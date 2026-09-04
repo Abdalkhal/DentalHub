@@ -110,6 +110,13 @@ export default function LoginScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
+  // Navigate only after the auth state change has fully committed. Navigating
+  // in the same tick as the async write can hit "no navigation context".
+  const go = (path: string) => {
+    setBusy(false);
+    setTimeout(() => setNext(path as never), 80);
+  };
+
   const submit = async () => {
     if (!email.trim() || !password.trim()) {
       setError(ar ? 'الرجاء إدخال البريد الإلكتروني وكلمة المرور' : 'Please enter email and password');
@@ -152,7 +159,7 @@ export default function LoginScreen() {
           await auth.signOut();
           return;
         }
-        setNext(getAccountDashboard(roleDoc.role));
+        go(getAccountDashboard(roleDoc.role));
       } else {
         const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
         const roleData: Record<string, unknown> = {
@@ -170,7 +177,7 @@ export default function LoginScreen() {
           roleData.clinicName = clinicName.trim() || null;
         }
         await setDoc(doc(db, 'user_roles', cred.user.uid), roleData);
-        setNext(getAccountDashboard(accountType));
+        go(getAccountDashboard(accountType));
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : '';
