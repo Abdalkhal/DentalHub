@@ -9,13 +9,71 @@ import { useEffect, useState } from 'react';
 import '@/global.css';
 import '@/lib/polyfills';
 import { hydrateStorage } from '@/lib/storage';
-import { LanguageProvider } from '@/lib/i18n';
+import { LanguageProvider, useI18n, type DictKey } from '@/lib/i18n';
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { ToastHost } from '@/components/ToastHost';
 
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
+
+/**
+ * Screens presented with a native header, and the dictionary key for the title.
+ *
+ * Titles were previously hardcoded Arabic string literals, so switching the app
+ * to English left every header in Arabic. Driving them from the dictionary
+ * means the header re-renders with the language, like the rest of the UI.
+ */
+const TITLED_SCREENS: { name: string; title: DictKey }[] = [
+  { name: 'supplies', title: 'screen_supplies' },
+  { name: 'product-detail/[productId]', title: 'screen_product' },
+  { name: 'cart', title: 'screen_cart' },
+  { name: 'patients', title: 'screen_patients' },
+  { name: 'patient/[patientId]', title: 'screen_patient' },
+  { name: 'clinic', title: 'screen_clinic' },
+  { name: 'clinic-appointments', title: 'screen_appointments' },
+  { name: 'clinic-finance', title: 'screen_finance' },
+  { name: 'rx/[patientId]', title: 'screen_rx' },
+  { name: 'notifications', title: 'screen_notifications' },
+  { name: 'labs', title: 'screen_labs' },
+  { name: 'implants', title: 'screen_implants' },
+  { name: 'brands', title: 'screen_brands' },
+  { name: 'profile/[accountId]', title: 'screen_profile' },
+  { name: 'specialized-implants/index', title: 'screen_specialized_implants' },
+  { name: 'specialized-implants/[category]', title: 'screen_specialized_implants' },
+  { name: 'bone-grafts', title: 'screen_bone_grafts' },
+  { name: 'track-cases', title: 'screen_track_cases' },
+  { name: 'surgical-guide', title: 'screen_surgical_guide' },
+  { name: 'messages', title: 'screen_messages' },
+  { name: 'doctor-invoices', title: 'screen_doctor_invoices' },
+  { name: 'help', title: 'screen_help' },
+  { name: 'clinic-reports', title: 'screen_reports' },
+  { name: 'doctors', title: 'screen_doctors' },
+  { name: 'designer/index', title: 'screen_designer_cases' },
+  { name: 'designer/[caseId]', title: 'screen_case_details' },
+];
+
+/**
+ * Split out from RootLayout so it sits *inside* LanguageProvider and can read
+ * the current language — RootLayout renders the provider and therefore cannot.
+ */
+function RootStack() {
+  const { t } = useI18n();
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="login" />
+      <Stack.Screen name="scan" options={{ headerShown: false }} />
+      {/* supplies-office / implants-office / labs-office / admin live inside the
+          (tabs) group so vendor roles keep the bottom tab bar on their own
+          dashboard. Their URLs are unchanged — route groups do not appear in
+          the path. */}
+      {TITLED_SCREENS.map(({ name, title }) => (
+        <Stack.Screen key={name} name={name} options={{ headerShown: true, title: t(title) }} />
+      ))}
+    </Stack>
+  );
+}
 
 export default function RootLayout() {
   const [ready, setReady] = useState(false);
@@ -54,53 +112,7 @@ export default function RootLayout() {
         <ThemeProvider value={DefaultTheme}>
           <AnimatedSplashOverlay />
           <ToastHost />
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="login" />
-            <Stack.Screen
-              name="supplies"
-              options={{ headerShown: true, title: 'المستلزمات الطبية' }}
-            />
-            <Stack.Screen
-              name="product-detail/[productId]"
-              options={{ headerShown: true, title: 'المنتج' }}
-            />
-            <Stack.Screen name="cart" options={{ headerShown: true, title: 'السلة' }} />
-            {/* supplies-office / implants-office / labs-office / admin now live
-                inside the (tabs) group so vendor roles keep the bottom tab bar
-                on their own dashboard. Their URLs are unchanged — route groups
-                do not appear in the path. */}
-            <Stack.Screen name="patients" options={{ headerShown: true, title: 'المرضى' }} />
-            <Stack.Screen
-              name="patient/[patientId]"
-              options={{ headerShown: true, title: 'المريض' }}
-            />
-            <Stack.Screen name="clinic" options={{ headerShown: true, title: 'عيادتي' }} />
-            <Stack.Screen
-              name="clinic-appointments"
-              options={{ headerShown: true, title: 'المواعيد' }}
-            />
-            <Stack.Screen name="clinic-finance" options={{ headerShown: true, title: 'المالية' }} />
-            <Stack.Screen name="rx/[patientId]" options={{ headerShown: true, title: 'الوصفة' }} />
-            <Stack.Screen name="notifications" options={{ headerShown: true, title: 'الإشعارات' }} />
-            <Stack.Screen name="labs" options={{ headerShown: true, title: 'المختبرات' }} />
-            <Stack.Screen name="implants" options={{ headerShown: true, title: 'الزرعات' }} />
-            <Stack.Screen name="brands" options={{ headerShown: true, title: 'البراندات' }} />
-            <Stack.Screen name="profile/[accountId]" options={{ headerShown: true, title: 'الملف' }} />
-            <Stack.Screen name="specialized-implants/index" options={{ headerShown: true, title: 'الزرعات المتخصصة' }} />
-            <Stack.Screen name="specialized-implants/[category]" options={{ headerShown: true, title: 'الزرعات المتخصصة' }} />
-            <Stack.Screen name="bone-grafts" options={{ headerShown: true, title: 'البون كرافت' }} />
-            <Stack.Screen name="track-cases" options={{ headerShown: true, title: 'تتبع الحالات' }} />
-            <Stack.Screen name="surgical-guide" options={{ headerShown: true, title: 'الدليل الجراحي' }} />
-            <Stack.Screen name="messages" options={{ headerShown: true, title: 'الرسائل' }} />
-            <Stack.Screen name="doctor-invoices" options={{ headerShown: true, title: 'فواتير الأطباء' }} />
-            <Stack.Screen name="help" options={{ headerShown: true, title: 'المساعدة' }} />
-            <Stack.Screen name="scan" options={{ headerShown: false }} />
-            <Stack.Screen name="clinic-reports" options={{ headerShown: true, title: 'التقارير' }} />
-            <Stack.Screen name="doctors" options={{ headerShown: true, title: 'الأطباء' }} />
-            <Stack.Screen name="designer/index" options={{ headerShown: true, title: 'حالاتي كمصمم' }} />
-            <Stack.Screen name="designer/[caseId]" options={{ headerShown: true, title: 'تفاصيل الحالة' }} />
-          </Stack>
+          <RootStack />
         </ThemeProvider>
       </LanguageProvider>
     </QueryClientProvider>
