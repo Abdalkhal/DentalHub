@@ -1,6 +1,69 @@
-# Welcome to your Expo app 👋
+# DentalHub — mobile app
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+React Native (Expo) client for DentalHub. The web app lives in the repository
+root; this directory is a separate Expo project with its own dependencies.
+
+## Setup
+
+Two config files are **not** in git — this repository is public and both carry
+Firebase credentials. You need to provide them before the app will run.
+
+1. **Install dependencies**
+
+   ```bash
+   npm install
+   ```
+
+2. **Create `.env`** with the Firebase *client* config (Firebase console ->
+   Project settings -> Your apps -> Web app). These are public by design; the
+   service-account private key must never go here.
+
+   ```
+   EXPO_PUBLIC_FIREBASE_API_KEY=...
+   EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=...
+   EXPO_PUBLIC_FIREBASE_PROJECT_ID=...
+   EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=...
+   EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=...
+   EXPO_PUBLIC_FIREBASE_APP_ID=...
+   ```
+
+   Without these the app throws `Missing Firebase environment variable(s)` and
+   renders a blank screen.
+
+3. **Download `google-services.json`** (Android) and, for iOS builds,
+   `GoogleService-Info.plist`, from Firebase console -> Project settings ->
+   Your apps. Place them in this directory. Native builds fail without them.
+
+4. **Run it**
+
+   ```bash
+   npx expo run:android      # builds and installs a dev build
+   ```
+
+   `expo-dev-client` is configured, so plain `npx expo start` expects a dev
+   build. Use `npx expo start --go` if you want Expo Go instead.
+
+## Checks
+
+```bash
+npm run typecheck
+```
+
+Typed routes only validate navigation once Expo has generated
+`.expo/types/router.d.ts`, which is gitignored. If the typecheck guard tells you
+route types are missing, run `npx expo start` once and stop it.
+
+## Known issues
+
+- **NativeWind 4.2.6 does not tolerate toggling `shadow-*` classes** on RN
+  0.86: switching a shadow class on and off crashes with a misleading
+  "Couldn't find a navigation context" error. Keep shadows applied on both
+  branches of a conditional `className` and toggle only colour. Upgrading
+  NativeWind is the real fix.
+
+---
+
+## Expo template notes
 
 ## Get started
 
