@@ -1,14 +1,19 @@
 ﻿import { Pressable, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { signOut } from 'firebase/auth';
 import {
   Bell,
   ChevronLeft,
   Crown,
+  FileText,
   FlaskConical,
   HelpCircle,
   Heart,
   ListChecks,
+  MessageSquare,
+  Package,
+  PenTool,
+  Shield,
   ShoppingBag,
   ShoppingCart,
   Store,
@@ -19,7 +24,7 @@ import {
 import type { LucideIcon } from 'lucide-react-native';
 
 import { Screen, Text } from '@/components/ui';
-import { useUserRole } from '@/lib/useAuth';
+import { useLabStaffClaim, useUserRole } from '@/lib/useAuth';
 import { auth } from '@/integrations/firebase/client';
 import { useI18n } from '@/lib/i18n';
 
@@ -31,35 +36,57 @@ const ROLE_AR: Record<string, string> = {
   admin: 'مدير النظام',
 };
 
-type Item = { icon: LucideIcon; label: string; to: string };
+type Item = { icon: LucideIcon; ar: string; en: string; to: Href };
 
 const ITEMS: Record<string, Item[]> = {
   dentist: [
-    { icon: Stethoscope, label: 'عيادتي', to: '/clinic' },
-    { icon: Users, label: 'المرضى', to: '/patients' },
-    { icon: ListChecks, label: 'تتبع الحالات', to: '/track-cases' },
-    { icon: Heart, label: 'المفضلة', to: '/favorites' },
-    { icon: Crown, label: 'البراندات', to: '/brands' },
-    { icon: ShoppingBag, label: 'المستلزمات', to: '/supplies' },
-    { icon: Bell, label: 'الإشعارات', to: '/notifications' },
-    { icon: HelpCircle, label: 'المساعدة', to: '/help' },
-    { icon: ShoppingCart, label: 'السلة', to: '/cart' },
+    { icon: Stethoscope, ar: 'عيادتي', en: 'My Clinic', to: '/clinic' },
+    { icon: Users, ar: 'المرضى', en: 'Patients', to: '/patients' },
+    { icon: ListChecks, ar: 'تتبع الحالات', en: 'Track Cases', to: '/track-cases' },
+    { icon: Heart, ar: 'المفضلة', en: 'Favorites', to: '/favorites' },
+    { icon: Crown, ar: 'البراندات', en: 'Brands', to: '/brands' },
+    { icon: ShoppingBag, ar: 'المستلزمات', en: 'Supplies', to: '/supplies' },
+    { icon: Bell, ar: 'الإشعارات', en: 'Notifications', to: '/notifications' },
+    { icon: HelpCircle, ar: 'المساعدة', en: 'Help', to: '/help' },
+    { icon: ShoppingCart, ar: 'السلة', en: 'Cart', to: '/cart' },
   ],
   supply: [
-    { icon: Store, label: 'لوحة المورد', to: '/supplies-office' },
-    { icon: ShoppingBag, label: 'المستلزمات', to: '/supplies' },
-    { icon: Bell, label: 'الإشعارات', to: '/notifications' },
+    { icon: Store, ar: 'لوحة المورد', en: 'Supplier Dashboard', to: '/supplies-office' },
+    { icon: ShoppingBag, ar: 'المستلزمات', en: 'Supplies', to: '/supplies' },
+    { icon: FileText, ar: 'فواتير الأطباء', en: 'Doctor Invoices', to: '/doctor-invoices' },
+    { icon: MessageSquare, ar: 'الرسائل', en: 'Messages', to: '/messages' },
+    { icon: Bell, ar: 'الإشعارات', en: 'Notifications', to: '/notifications' },
+    { icon: HelpCircle, ar: 'المساعدة', en: 'Help', to: '/help' },
   ],
+  // Web parity: labs get their dashboard, doctors, invoices and messages —
+  // previously this menu had only two entries, leaving most of the lab's own
+  // features unreachable on mobile.
   lab: [
-    { icon: FlaskConical, label: 'لوحة المختبر', to: '/labs-office' },
-    { icon: Bell, label: 'الإشعارات', to: '/notifications' },
+    { icon: FlaskConical, ar: 'لوحة المختبر', en: 'Lab Dashboard', to: '/labs-office' },
+    { icon: PenTool, ar: 'حالات التصميم', en: 'Design Cases', to: '/designer' },
+    { icon: Stethoscope, ar: 'الأطباء', en: 'Doctors', to: '/doctors' },
+    { icon: FileText, ar: 'فواتير الأطباء', en: 'Doctor Invoices', to: '/doctor-invoices' },
+    { icon: MessageSquare, ar: 'الرسائل', en: 'Messages', to: '/messages' },
+    { icon: Bell, ar: 'الإشعارات', en: 'Notifications', to: '/notifications' },
+    { icon: HelpCircle, ar: 'المساعدة', en: 'Help', to: '/help' },
   ],
   implant: [
-    { icon: Syringe, label: 'لوحة الزرعات', to: '/implants-office' },
-    { icon: Bell, label: 'الإشعارات', to: '/notifications' },
+    { icon: Syringe, ar: 'لوحة الزرعات', en: 'Implant Dashboard', to: '/implants-office' },
+    { icon: Package, ar: 'الزرعات', en: 'Implants', to: '/implants' },
+    { icon: MessageSquare, ar: 'الرسائل', en: 'Messages', to: '/messages' },
+    { icon: Bell, ar: 'الإشعارات', en: 'Notifications', to: '/notifications' },
+    { icon: HelpCircle, ar: 'المساعدة', en: 'Help', to: '/help' },
+  ],
+  // Invited lab staff (custom claim, no user_roles doc). A designer must never
+  // see lab dashboards — finance lives behind them.
+  designer: [
+    { icon: PenTool, ar: 'حالاتي كمصمم', en: 'My Design Cases', to: '/designer' },
+    { icon: Bell, ar: 'الإشعارات', en: 'Notifications', to: '/notifications' },
+    { icon: HelpCircle, ar: 'المساعدة', en: 'Help', to: '/help' },
   ],
   admin: [
-    { icon: Bell, label: 'الإشعارات', to: '/notifications' },
+    { icon: Shield, ar: 'لوحة الإدارة', en: 'Admin Panel', to: '/admin' },
+    { icon: Bell, ar: 'الإشعارات', en: 'Notifications', to: '/notifications' },
   ],
 };
 
@@ -67,8 +94,10 @@ export default function MoreScreen() {
   const { lang, toggle } = useI18n();
   const ar = lang === 'ar';
   const { role } = useUserRole();
+  const { claim: labStaff } = useLabStaffClaim();
 
-  const type = role?.accountType ?? 'dentist';
+  // Invited staff have a claim but no user_roles doc — key the menu off that.
+  const type = labStaff?.role === 'DESIGNER' ? 'designer' : (role?.accountType ?? 'dentist');
   const items = ITEMS[type] ?? ITEMS.dentist;
   const roleAr = ROLE_AR[type] ?? type;
 
@@ -99,15 +128,15 @@ export default function MoreScreen() {
         {items.map((it, i) => {
           const Icon = it.icon;
           return (
-            <View key={it.to + it.label}>
+            <View key={it.en}>
               <Pressable
-                onPress={() => router.push(it.to as never)}
+                onPress={() => router.push(it.to)}
                 className="flex-row items-center gap-3 px-4 py-3.5"
               >
                 <View className="h-10 w-10 items-center justify-center rounded-full bg-slate-100">
                   <Icon size={19} color="#334155" strokeWidth={2.1} />
                 </View>
-                <Text className="flex-1 text-sm font-bold text-slate-800">{it.label}</Text>
+                <Text className="flex-1 text-sm font-bold text-slate-800">{ar ? it.ar : it.en}</Text>
                 <ChevronLeft size={18} color="#CBD5E1" />
               </Pressable>
               {i < items.length - 1 && <View className="ml-16 mr-4 h-px bg-slate-100" />}

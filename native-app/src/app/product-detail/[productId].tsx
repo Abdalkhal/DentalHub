@@ -207,7 +207,7 @@ export default function ProductDetailScreen() {
           <Pressable
             onPress={() =>
               product.companyId &&
-              router.push({ pathname: '/profile/[accountId]', params: { accountId: product.companyId } } as never)
+              router.push({ pathname: '/profile/[accountId]', params: { accountId: product.companyId } })
             }
             className="mt-3 flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-card p-3 shadow-sm"
           >
@@ -303,7 +303,7 @@ export default function ProductDetailScreen() {
                   <Pressable
                     key={rp.id}
                     onPress={() =>
-                      router.push({ pathname: '/product-detail/[productId]', params: { productId: rp.id } } as never)
+                      router.push({ pathname: '/product-detail/[productId]', params: { productId: rp.id } })
                     }
                     className="w-36 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
                   >

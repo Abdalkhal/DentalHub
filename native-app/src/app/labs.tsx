@@ -102,7 +102,7 @@ export default function LabsScreen() {
             <Pressable
               key={item.id}
               onPress={() =>
-                router.push({ pathname: '/profile/[accountId]', params: { accountId: item.id } } as never)
+                router.push({ pathname: '/profile/[accountId]', params: { accountId: item.id } })
               }
               className="flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-card p-3.5 shadow-sm"
             >

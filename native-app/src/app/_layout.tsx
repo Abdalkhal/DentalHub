@@ -66,19 +66,10 @@ export default function RootLayout() {
               options={{ headerShown: true, title: 'المنتج' }}
             />
             <Stack.Screen name="cart" options={{ headerShown: true, title: 'السلة' }} />
-            <Stack.Screen
-              name="supplies-office"
-              options={{ headerShown: true, title: 'لوحة المورد' }}
-            />
-            <Stack.Screen
-              name="implants-office"
-              options={{ headerShown: true, title: 'شركة الزرعات' }}
-            />
-            <Stack.Screen
-              name="labs-office"
-              options={{ headerShown: true, title: 'لوحة المختبر' }}
-            />
-            <Stack.Screen name="admin" options={{ headerShown: true, title: 'لوحة الإدارة' }} />
+            {/* supplies-office / implants-office / labs-office / admin now live
+                inside the (tabs) group so vendor roles keep the bottom tab bar
+                on their own dashboard. Their URLs are unchanged — route groups
+                do not appear in the path. */}
             <Stack.Screen name="patients" options={{ headerShown: true, title: 'المرضى' }} />
             <Stack.Screen
               name="patient/[patientId]"
@@ -107,6 +98,8 @@ export default function RootLayout() {
             <Stack.Screen name="scan" options={{ headerShown: false }} />
             <Stack.Screen name="clinic-reports" options={{ headerShown: true, title: 'التقارير' }} />
             <Stack.Screen name="doctors" options={{ headerShown: true, title: 'الأطباء' }} />
+            <Stack.Screen name="designer/index" options={{ headerShown: true, title: 'حالاتي كمصمم' }} />
+            <Stack.Screen name="designer/[caseId]" options={{ headerShown: true, title: 'تفاصيل الحالة' }} />
           </Stack>
         </ThemeProvider>
       </LanguageProvider>

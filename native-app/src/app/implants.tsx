@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, TextInput, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { Layers, Package, Search, SlidersHorizontal, Sparkles } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 
@@ -8,12 +8,12 @@ import { Screen, Text } from '@/components/ui';
 import { countryCodeToFlag, ALL_COUNTRIES } from '@/data/countries';
 import { useI18n } from '@/lib/i18n';
 
-type Category = { ar: string; en: string; icon: LucideIcon; tint: string; to: string };
+type Category = { ar: string; en: string; icon: LucideIcon; tint: string; to: Href };
 
 const CATEGORIES: Category[] = [
   { ar: 'البون كرافت', en: 'Bone Graft', icon: Package, tint: 'bg-emerald-100 text-emerald-600', to: '/bone-grafts' },
   { ar: 'الدليل الجراحي', en: 'Surgical Guides', icon: Layers, tint: 'bg-sky-100 text-sky-600', to: '/surgical-guide' },
-  { ar: 'الزرعات المتخصصة', en: 'Specialized Implants', icon: Sparkles, tint: 'bg-violet-100 text-violet-600', to: '/specialized-implants/index' },
+  { ar: 'الزرعات المتخصصة', en: 'Specialized Implants', icon: Sparkles, tint: 'bg-violet-100 text-violet-600', to: '/specialized-implants' },
 ];
 
 export default function ImplantsScreen() {
@@ -65,8 +65,8 @@ export default function ImplantsScreen() {
               const Icon = c.icon;
               return (
                 <Pressable
-                  key={c.to}
-                  onPress={() => router.push(c.to as never)}
+                  key={c.en}
+                  onPress={() => router.push(c.to)}
                   className="w-36 items-center rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
                 >
                   <View className={`h-14 w-14 items-center justify-center rounded-full ${c.tint}`}>

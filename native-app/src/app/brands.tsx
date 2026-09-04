@@ -73,7 +73,7 @@ export default function BrandsScreen() {
           {filtered.map((b) => (
             <Pressable
               key={b.id}
-              onPress={() => router.push({ pathname: '/supplies', params: { brand: b.name } } as never)}
+              onPress={() => router.push({ pathname: '/supplies', params: { brand: b.name } })}
               className="w-[31%]"
             >
               <BrandTile name={b.name} ar={ar ? b.ar : b.name} image={b.image} color={b.color} />

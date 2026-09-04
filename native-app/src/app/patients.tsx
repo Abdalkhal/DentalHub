@@ -73,7 +73,7 @@ export default function PatientsScreen() {
           <View className="mb-3 flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-card p-3.5 shadow-sm">
             <Pressable
               onPress={() =>
-                router.push({ pathname: '/patient/[patientId]', params: { patientId: p.id } } as never)
+                router.push({ pathname: '/patient/[patientId]', params: { patientId: p.id } })
               }
               className="min-w-0 flex-1 flex-row items-center gap-3"
             >
@@ -193,7 +193,7 @@ function AddPatientModal({ open, onClose, ar }: { open: boolean; onClose: () => 
     setAge('');
     setError('');
     onClose();
-    router.push({ pathname: '/patient/[patientId]', params: { patientId: p.id } } as never);
+    router.push({ pathname: '/patient/[patientId]', params: { patientId: p.id } });
   };
 
   return (

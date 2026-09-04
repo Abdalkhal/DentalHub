@@ -22,7 +22,7 @@ import type { LucideIcon } from 'lucide-react-native';
 import { Screen, Text } from '@/components/ui';
 import { Input } from '@/components/ui/Input';
 import { auth, db } from '@/integrations/firebase/client';
-import { fetchUserRoleDoc, getAccountDashboard } from '@/lib/useAuth';
+import { fetchUserRoleDoc, getAccountDashboard, type AccountDashboardHref } from '@/lib/useAuth';
 import { CITIES } from '@/data/offices';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
@@ -95,7 +95,7 @@ const ROLES: RoleMeta[] = [
 export default function LoginScreen() {
   const { lang } = useI18n();
   const ar = lang === 'ar';
-  const [next, setNext] = useState<string | null>(null);
+  const [next, setNext] = useState<AccountDashboardHref | null>(null);
 
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [accountType, setAccountType] = useState<AccountType>('dentist');
@@ -190,7 +190,7 @@ export default function LoginScreen() {
     }
   };
 
-  if (next) return <Redirect href={next as never} />;
+  if (next) return <Redirect href={next} />;
 
   return (
     <KeyboardAvoidingView

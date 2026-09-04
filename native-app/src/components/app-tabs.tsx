@@ -9,6 +9,14 @@ import { useI18n } from '@/lib/i18n';
 
 const ALL_NAMES = ['index', 'explore', 'favorites', 'orders', 'offers', 'account', 'more'] as const;
 
+/**
+ * Screens that live inside the tab navigator but are never rendered as a tab.
+ * Registering them here (with `href: null`) is what keeps the bottom tab bar
+ * visible on the vendor dashboards, which previously sat in the root Stack and
+ * therefore lost navigation entirely.
+ */
+const HIDDEN_NAMES = ['supplies-office', 'implants-office', 'labs-office', 'admin'] as const;
+
 const ICONS: Record<(typeof ALL_NAMES)[number], LucideIcon> = {
   index: Home,
   explore: Search,
@@ -78,6 +86,10 @@ export default function AppTabs() {
           />
         );
       })}
+
+      {HIDDEN_NAMES.map((name) => (
+        <Tabs.Screen key={name} name={name} options={{ href: null }} />
+      ))}
     </Tabs>
   );
 }

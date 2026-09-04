@@ -105,7 +105,7 @@ function CameraBody({ cam }: { cam: CameraApi }) {
       );
     if (hit) {
       setDone(true);
-      router.push({ pathname: '/product-detail/[productId]', params: { productId: hit.id } } as never);
+      router.push({ pathname: '/product-detail/[productId]', params: { productId: hit.id } });
     } else {
       toast.error(ar ? 'لم يتم العثور على منتج بهذا الرمز' : 'No product found for this code');
     }

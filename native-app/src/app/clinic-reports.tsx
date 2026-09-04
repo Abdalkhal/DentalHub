@@ -66,7 +66,7 @@ export default function ClinicReportsScreen() {
               <PressableRow
                 key={p.id}
                 title={p.name}
-                onPress={() => router.push({ pathname: '/patient/[patientId]', params: { patientId: p.id } } as never)}
+                onPress={() => router.push({ pathname: '/patient/[patientId]', params: { patientId: p.id } })}
               />
             ))}
           </View>

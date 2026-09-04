@@ -102,7 +102,7 @@ export default function SpecializedCategoryScreen() {
               <Pressable
                 key={p.id}
                 onPress={() =>
-                  router.push({ pathname: '/product-detail/[productId]', params: { productId: p.id } } as never)
+                  router.push({ pathname: '/product-detail/[productId]', params: { productId: p.id } })
                 }
                 className="w-[48.5%] overflow-hidden rounded-2xl border border-slate-200 bg-card shadow-sm"
               >

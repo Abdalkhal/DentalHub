@@ -80,7 +80,7 @@ export default function ExploreScreen() {
   if (!user) return <Redirect href="/login" />;
 
   const openProfile = (id: string) =>
-    router.push({ pathname: '/profile/[accountId]', params: { accountId: id } } as never);
+    router.push({ pathname: '/profile/[accountId]', params: { accountId: id } });
 
   return (
     <Screen>

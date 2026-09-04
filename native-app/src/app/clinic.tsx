@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Image, Modal, Pressable, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import {
   BarChart3,
   Calendar,
@@ -27,7 +27,7 @@ type Item = {
   color: string;
   title: string;
   chip?: { label: string; cls: string };
-  to: string;
+  to: Href;
 };
 
 export default function ClinicHomeScreen() {
@@ -108,7 +108,7 @@ export default function ClinicHomeScreen() {
   ];
 
   const renderItem = (it: Item) => (
-    <Pressable key={it.title} onPress={() => router.push(it.to as never)} className="w-[48.5%]">
+    <Pressable key={it.title} onPress={() => router.push(it.to)} className="w-[48.5%]">
       <View className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <View className={cn('mb-3 h-11 w-11 items-center justify-center rounded-2xl', it.tone)}>
           <it.icon size={20} color={it.color} strokeWidth={2.2} />

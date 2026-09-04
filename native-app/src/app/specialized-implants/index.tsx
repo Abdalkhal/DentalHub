@@ -89,7 +89,7 @@ export default function SpecializedImplantsIndex() {
               router.push({
                 pathname: '/specialized-implants/[category]',
                 params: { category: s.id },
-              } as never)
+              })
             }
             className="w-[48.5%] overflow-hidden rounded-2xl border border-slate-200 bg-card shadow-sm"
           >

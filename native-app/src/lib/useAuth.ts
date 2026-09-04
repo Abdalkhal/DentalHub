@@ -4,7 +4,19 @@ import { collection, query, where, getDocs, doc, getDoc } from "firebase/firesto
 import { auth, db } from "@/integrations/firebase/client";
 import type { UserRoleDoc, AppRole } from "@/integrations/firebase/types";
 
-export function getAccountDashboard(role: AppRole): string {
+/**
+ * The landing route for each account type. Returned as a literal union rather
+ * than `string` so call sites can pass it straight to expo-router's typed
+ * navigation without an `as never` escape hatch.
+ */
+export type AccountDashboardHref =
+  | "/"
+  | "/admin"
+  | "/supplies-office"
+  | "/implants-office"
+  | "/labs-office";
+
+export function getAccountDashboard(role: AppRole): AccountDashboardHref {
   switch (role) {
     case "admin":
       return "/admin";
@@ -70,6 +82,58 @@ export function useUserRole() {
   }, [user]);
 
   return { user, role, loading: authLoading || loading };
+}
+
+/** Lab staff roles issued as custom claims by the `inviteLabMember` function. */
+export type LabStaffRole = "ADMIN" | "DESIGNER" | "TECHNICIAN";
+
+export type LabStaffClaim = { labId: string; role: LabStaffRole } | null;
+
+/**
+ * Reads the lab-staff custom claims off the ID token.
+ *
+ * Invited staff get an Auth user plus a `lab_members` document, but no
+ * `user_roles` document — so `useUserRole` returns null for them and the app
+ * would otherwise render a roleless shell. The claim is the only signal that a
+ * signed-in user is a lab designer/technician.
+ */
+export function useLabStaffClaim() {
+  const { user, loading: authLoading } = useSession();
+  const [claim, setClaim] = useState<LabStaffClaim>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!user) {
+      setClaim(null);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    (async () => {
+      try {
+        const token = await user.getIdTokenResult();
+        const role = token.claims.role as LabStaffRole | undefined;
+        const labId = token.claims.labId as string | undefined;
+        if (!cancelled) {
+          setClaim(
+            role && labId && ["ADMIN", "DESIGNER", "TECHNICIAN"].includes(role)
+              ? { labId, role }
+              : null,
+          );
+        }
+      } catch {
+        if (!cancelled) setClaim(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  return { claim, loading: authLoading || loading };
 }
 
 export function useIsAdmin() {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, ScrollView, TextInput, View } from 'react-native';
-import { Redirect, router } from 'expo-router';
+import { Redirect, router, type Href } from 'expo-router';
 import {
   Bell,
   ClipboardList,
@@ -14,7 +14,7 @@ import {
 } from 'lucide-react-native';
 
 import { Screen, Card, Button, Spinner, Text } from '@/components/ui';
-import { useUserRole, useSession } from '@/lib/useAuth';
+import { getAccountDashboard, useLabStaffClaim, useUserRole, useSession } from '@/lib/useAuth';
 import { setPatientStoreUser } from '@/lib/patientsStore';
 import { setClinicStoreUser } from '@/lib/clinicStore';
 import { setAppointmentsStoreUser } from '@/lib/appointmentsStore';
@@ -80,6 +80,15 @@ function BrandMark({ image, name }: { image?: string; name: string }) {
   );
 }
 
+type CategoryTile = { to: Href; ar: string; en: string; img: number; border: string };
+
+const CATEGORY_TILES: CategoryTile[] = [
+  { to: '/implants', ar: 'زراعة الأسنان', en: 'Implants', img: require('../../../assets/home/dental-implant.png'), border: 'border-orange-200' },
+  { to: '/supplies', ar: 'مستلزمات طبية', en: 'Supplies', img: require('../../../assets/home/dental-supplies-icon.png'), border: 'border-teal-200' },
+  { to: '/labs', ar: 'المختبرات', en: 'Labs', img: require('../../../assets/home/dental-bridge.png'), border: 'border-blue-200' },
+  { to: '/clinic', ar: 'عيادتي', en: 'My Clinic', img: require('../../../assets/home/clinic-hero.jpg'), border: 'border-purple-200' },
+];
+
 function fmtOrderDate(ts: unknown): string {
   const d = (ts as { toDate?: () => Date })?.toDate?.();
   return d ? d.toLocaleDateString() : '—';
@@ -89,6 +98,7 @@ export default function HomeScreen() {
   const { lang, toggle } = useI18n();
   const ar = lang === 'ar';
   const { user, role, loading } = useUserRole();
+  const { claim: labStaff, loading: claimLoading } = useLabStaffClaim();
   useSession();
 
   const { data: products = [] } = useProducts();
@@ -138,8 +148,20 @@ export default function HomeScreen() {
     return sorted.slice(0, 3);
   }, [dentistOrders]);
 
-  if (loading) return <Spinner />;
+  if (loading || claimLoading) return <Spinner />;
   if (!user) return <Redirect href="/login" />;
+
+  // Invited lab staff have no `user_roles` document — only a custom claim — so
+  // route them from the claim before falling through to the account-type logic,
+  // otherwise they land on the dentist marketplace with no role at all.
+  if (labStaff?.role === 'DESIGNER') return <Redirect href="/designer" />;
+
+  // Match the web app: the Home tab takes each role to its own dashboard rather
+  // than to the dentist marketplace. `getAccountDashboard` returns '/' for
+  // dentists (and unknown roles), which is this screen — so guarding on that
+  // both preserves the dentist home and rules out a redirect loop.
+  const home = role?.role ? getAccountDashboard(role.role) : '/';
+  if (home !== '/') return <Redirect href={home} />;
 
   const isDentist = role?.accountType === 'dentist';
   const isSupply = role?.accountType === 'supply';
@@ -147,13 +169,13 @@ export default function HomeScreen() {
   const isLab = role?.accountType === 'lab';
 
   const openProduct = (id: string) =>
-    router.push({ pathname: '/product-detail/[productId]', params: { productId: id } } as never);
+    router.push({ pathname: '/product-detail/[productId]', params: { productId: id } });
 
-  const SectionHead = ({ title, seeAll }: { title: string; seeAll?: string }) => (
+  const SectionHead = ({ title, seeAll }: { title: string; seeAll?: Href }) => (
     <View className="mb-2.5 flex-row items-center justify-between">
       <Text className="text-base font-extrabold text-slate-800">{title}</Text>
       {seeAll ? (
-        <Pressable onPress={() => router.push(seeAll as never)}>
+        <Pressable onPress={() => router.push(seeAll)}>
           <Text className="text-xs font-bold text-primary">{ar ? 'عرض الكل ›' : 'See all ›'}</Text>
         </Pressable>
       ) : null}
@@ -300,13 +322,8 @@ export default function HomeScreen() {
           <View className="mt-6">
             <SectionHead title={ar ? 'تصفح حسب الفئة' : 'Browse by category'} />
             <View className="flex-row items-start justify-between">
-              {[
-                { to: '/implants', ar: 'زراعة الأسنان', en: 'Implants', img: require('../../../assets/home/dental-implant.png'), border: 'border-orange-200' },
-                { to: '/supplies', ar: 'مستلزمات طبية', en: 'Supplies', img: require('../../../assets/home/dental-supplies-icon.png'), border: 'border-teal-200' },
-                { to: '/labs', ar: 'المختبرات', en: 'Labs', img: require('../../../assets/home/dental-bridge.png'), border: 'border-blue-200' },
-                { to: '/clinic', ar: 'عيادتي', en: 'My Clinic', img: require('../../../assets/home/clinic-hero.jpg'), border: 'border-purple-200' },
-              ].map((c) => (
-                <Pressable key={c.to} onPress={() => router.push(c.to as never)} className="w-[23%] items-center">
+              {CATEGORY_TILES.map((c) => (
+                <Pressable key={c.en} onPress={() => router.push(c.to)} className="w-[23%] items-center">
                   <View className={cn('h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 bg-slate-50', c.border)}>
                     <Image source={c.img} className="h-full w-full" resizeMode="cover" />
                   </View>
@@ -324,7 +341,7 @@ export default function HomeScreen() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View className="flex-row gap-2.5 pb-1">
                 {BRANDS.slice(0, 8).map((b) => (
-                  <Pressable key={b.id} onPress={() => router.push('/brands' as never)} className="w-24">
+                  <Pressable key={b.id} onPress={() => router.push('/brands')} className="w-24">
                     <View className="items-center rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
                       <View className="mb-1.5 h-14 w-full items-center justify-center overflow-hidden rounded-xl bg-slate-50">
                         <BrandMark image={b.image} name={b.name} />

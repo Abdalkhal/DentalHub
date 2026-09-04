@@ -107,7 +107,7 @@ export default function SuppliesScreen() {
   const renderCard = ({ item }: { item: CardItem }) => (
     <Pressable
       onPress={() =>
-        router.push({ pathname: '/product-detail/[productId]', params: { productId: item.id } } as never)
+        router.push({ pathname: '/product-detail/[productId]', params: { productId: item.id } })
       }
       className="mb-3 w-[48.5%] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
     >
@@ -209,7 +209,7 @@ export default function SuppliesScreen() {
 
       {/* Specialized implants shortcut */}
       <Pressable
-        onPress={() => router.push('/specialized-implants/index')}
+        onPress={() => router.push('/specialized-implants')}
         className="mt-2 flex-row items-center gap-3 rounded-2xl border border-sky-100 bg-sky-50 p-3.5"
       >
         <View className="flex-1">

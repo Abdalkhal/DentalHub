@@ -87,7 +87,7 @@ export default function ProfileScreen() {
   const roleLabel = (ROLE_LABELS[type]?.[ar ? 'ar' : 'en'] ?? type);
 
   const openProduct = (id: string) =>
-    router.push({ pathname: '/product-detail/[productId]', params: { productId: id } } as never);
+    router.push({ pathname: '/product-detail/[productId]', params: { productId: id } });
 
   return (
     <Screen>
