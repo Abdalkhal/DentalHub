@@ -298,7 +298,7 @@ export default function LoginScreen() {
       </View>
 
       {/* Form */}
-      <ScrollView className="mt-4 max-h-[70%]" contentContainerClassName="rounded-2xl border border-slate-200 bg-card p-4 shadow-sm gap-3">
+      <View className="mt-4 gap-3 rounded-2xl border border-slate-200 bg-card p-4 shadow-sm">
         {mode === 'signup' && (
           <>
             <Input
@@ -453,7 +453,7 @@ export default function LoginScreen() {
               : 'The first account created becomes the system admin automatically.'}
           </Text>
         )}
-      </ScrollView>
+      </View>
       </Screen>
     </KeyboardAvoidingView>
   );
