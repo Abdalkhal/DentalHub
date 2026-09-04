@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Linking, Pressable, View } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
-import * as DocumentPicker from 'expo-document-picker';
 import { doc, setDoc } from 'firebase/firestore';
 import { FileBox, Hash, Stethoscope, Upload, User } from 'lucide-react-native';
 
@@ -12,6 +11,25 @@ import { uploadCaseFile } from '@/lib/storagePipeline';
 import type { OrderAttachment } from '@/lib/ordersStore';
 import { useSession } from '@/lib/useAuth';
 import { useI18n } from '@/lib/i18n';
+import { hasNativeModule } from '@/lib/nativeModules';
+import { toast } from '@/lib/toast';
+
+type PickerApi = {
+  getDocumentAsync: (o: {
+    multiple?: boolean;
+    copyToCacheDirectory?: boolean;
+    type?: string;
+  }) => Promise<{ canceled: boolean; assets: { uri: string; name?: string }[] }>;
+};
+
+function loadDocumentPicker(): PickerApi | null {
+  if (!hasNativeModule('ExpoDocumentPicker')) return null;
+  try {
+    return require('expo-document-picker') as PickerApi;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Native counterpart of the web app's `DesignerCaseDetail`. Shows the Rx and the
@@ -58,7 +76,12 @@ export default function DesignerCaseScreen() {
 
   const handleUpload = async () => {
     setError(null);
-    const picked = await DocumentPicker.getDocumentAsync({
+    const Picker = loadDocumentPicker();
+    if (!Picker) {
+      setError(ar ? 'اختيار الملفات يتطلب أحدث إصدار من التطبيق' : 'File picking needs the latest app build');
+      return;
+    }
+    const picked = await Picker.getDocumentAsync({
       multiple: true,
       copyToCacheDirectory: true,
       // STL/PLY/OBJ have no reliable MIME type across platforms, so accept any
@@ -76,12 +99,12 @@ export default function DesignerCaseScreen() {
           labId,
           caseId: order.id,
           file: blob,
-          fileName: asset.name,
+          fileName: asset.name ?? 'design.stl',
           dentistId: order.dentistId ?? '',
           designerId: user.uid,
           kind: 'design',
         });
-        uploaded.push({ name: asset.name, url: res.url, type: 'stl' });
+        uploaded.push({ name: asset.name ?? 'design.stl', url: res.url, type: 'stl' });
       }
       await setDoc(
         doc(db, 'lab_orders', labId, 'cases', order.id),
