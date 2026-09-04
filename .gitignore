@@ -31,3 +31,11 @@ dist-ssr
 *.sln
 *.sw?
 .env
+# Personal / unrelated files
+photo/نظري/
+
+# Firebase local tooling
+.firebase/
+
+# Windows shortcuts
+*.lnk
