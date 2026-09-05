@@ -23,6 +23,7 @@ import { markCaseRead, type CaseMessageSenderRole } from "@/lib/caseMessages";
 import type { Order } from "@/lib/ordersStore";
 import archUpper from "@/assets/arch-upper.png";
 import archLower from "@/assets/arch-lower.png";
+import { CaseFileLink } from "@/components/CaseFileLink";
 
 type WorkTypeKey = "crown" | "bridge" | "veneer" | "inlay";
 
@@ -332,16 +333,8 @@ export function IncomingOrderRxModal({
             ) : (
               <ul className="space-y-2">
                 {(order.attachments ?? []).map((f, i) => (
-                  <li key={i} className="flex items-center gap-2 text-xs">
-                    <Paperclip className="size-4 text-sky-500 shrink-0" />
-                    <a
-                      href={f.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-sky-600 underline truncate"
-                    >
-                      {f.name}
-                    </a>
+                  <li key={i}>
+                    <CaseFileLink name={f.name} path={f.path} url={f.url} />
                   </li>
                 ))}
               </ul>

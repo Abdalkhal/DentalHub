@@ -49,47 +49,54 @@ export default function AppTabs() {
   const { data: dentistOrders = [] } = useDentistOrders(user?.uid);
   const { data: supplierOrders = [] } = useOrders(user?.uid);
 
-  if (loading) return null;
-  if (!user) return <Redirect href="/login" />;
-
   const isDentist = role?.accountType === 'dentist';
   const visible = isDentist ? DENTIST_TABS : VENDOR_TABS;
   const ordersCount = isDentist ? dentistOrders.length : supplierOrders.length;
 
+  // This component *is* the (tabs) layout route, so it must always render its
+  // navigator. Returning `null` or a bare <Redirect> here unmounts the Tabs
+  // navigator while expo-router is still mounting the tab screens beneath it,
+  // which leaves them without navigation context —
+  // "Couldn't find a navigation context. Have you wrapped your app with
+  // 'NavigationContainer'?" — thrown on every render of the child route.
+  // Render the redirect *alongside* the navigator instead of in place of it.
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: '#3B82F6',
-        tabBarInactiveTintColor: '#64748B',
-        tabBarStyle: { borderTopColor: '#E2E8F0' },
-      }}
-    >
-      {ALL_NAMES.map((name) => {
-        const shown = visible.includes(name);
-        const Icon = ICONS[name];
-        const label = LABELS[name];
-        return (
-          <Tabs.Screen
-            key={name}
-            name={name}
-            options={
-              shown
-                ? {
-                    title: ar ? label.ar : label.en,
-                    headerShown: name !== 'index',
-                    tabBarIcon: ({ color, size }) => <Icon color={color} size={size} strokeWidth={2.2} />,
-                    tabBarBadge: name === 'orders' && ordersCount > 0 ? ordersCount : undefined,
-                    tabBarBadgeStyle: { backgroundColor: '#EF4444', color: '#FFFFFF', fontSize: 10 },
-                  }
-                : { href: null }
-            }
-          />
-        );
-      })}
+    <>
+      {!loading && !user ? <Redirect href="/login" /> : null}
+      <Tabs
+        screenOptions={{
+          tabBarActiveTintColor: '#3B82F6',
+          tabBarInactiveTintColor: '#64748B',
+          tabBarStyle: { borderTopColor: '#E2E8F0' },
+        }}
+      >
+        {ALL_NAMES.map((name) => {
+          const shown = visible.includes(name);
+          const Icon = ICONS[name];
+          const label = LABELS[name];
+          return (
+            <Tabs.Screen
+              key={name}
+              name={name}
+              options={
+                shown
+                  ? {
+                      title: ar ? label.ar : label.en,
+                      headerShown: name !== 'index',
+                      tabBarIcon: ({ color, size }) => <Icon color={color} size={size} strokeWidth={2.2} />,
+                      tabBarBadge: name === 'orders' && ordersCount > 0 ? ordersCount : undefined,
+                      tabBarBadgeStyle: { backgroundColor: '#EF4444', color: '#FFFFFF', fontSize: 10 },
+                    }
+                  : { href: null }
+              }
+            />
+          );
+        })}
 
-      {HIDDEN_NAMES.map((name) => (
-        <Tabs.Screen key={name} name={name} options={{ href: null }} />
-      ))}
-    </Tabs>
+        {HIDDEN_NAMES.map((name) => (
+          <Tabs.Screen key={name} name={name} options={{ href: null }} />
+        ))}
+      </Tabs>
+    </>
   );
 }

@@ -12,7 +12,7 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:rules": "firebase emulators:exec --only firestore \"node --test scripts/firestore.rules.test.js\"",
+    "test:rules": "firebase emulators:exec --only firestore,storage \"node --test scripts/firestore.rules.test.js scripts/storage.rules.test.js\"",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

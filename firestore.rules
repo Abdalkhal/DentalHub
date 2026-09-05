@@ -57,8 +57,13 @@ service cloud.firestore {
     // Financial fields must never be modified by non-owner staff. This also
     // guards the transition period before financial data is fully migrated to
     // the private/finance subcollection.
+    // Read through `get` with a default. The finance migration moved these
+    // fields out of the case document into `private/finance`, so on a migrated
+    // case they are absent — and indexing a missing key raises an evaluation
+    // error, which denied every designer update including harmless ones like
+    // advancing `currentStage`.
     function isUnchanged(field) {
-      return request.resource.data[field] == resource.data[field];
+      return request.resource.data.get(field, null) == resource.data.get(field, null);
     }
 
     function noFinanceChanges() {

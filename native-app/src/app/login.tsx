@@ -245,9 +245,9 @@ export default function LoginScreen() {
                 }}
                 style={active ? { transform: [{ scale: 1.02 }] } : undefined}
                 className={cn(
-                  'w-[48.5%] flex-col items-center gap-2 rounded-2xl border-2 px-2 py-4',
+                  'w-[48.5%] flex-col items-center gap-2 rounded-2xl border-2 px-2 py-4 shadow-md',
                   active
-                    ? cn(opt.activeBg, opt.activeRing, 'shadow-md')
+                    ? cn(opt.activeBg, opt.activeRing)
                     : 'border-transparent bg-slate-50',
                 )}
               >
@@ -284,9 +284,10 @@ export default function LoginScreen() {
                 setMode(m);
                 setError('');
               }}
+              // shadow-md stays on both branches: see note in labs-office.tsx.
               className={cn(
-                'h-11 flex-1 items-center justify-center rounded-xl',
-                activeTab ? 'bg-white shadow-md' : 'bg-transparent',
+                'h-11 flex-1 items-center justify-center rounded-xl shadow-md',
+                activeTab ? 'bg-white' : 'bg-transparent',
               )}
             >
               <Text className={cn('text-sm font-bold', activeTab ? 'text-slate-900' : 'text-slate-500')}>
@@ -427,8 +428,8 @@ export default function LoginScreen() {
           onPress={submit}
           disabled={busy}
           className={cn(
-            'h-12 flex-row items-center justify-center gap-2 rounded-xl',
-            busy ? 'bg-slate-300' : 'bg-[#2563EB] shadow-lg active:scale-[0.98]',
+            'h-12 flex-row items-center justify-center gap-2 rounded-xl shadow-lg',
+            busy ? 'bg-slate-300' : 'bg-[#2563EB] active:scale-[0.98]',
           )}
         >
           {busy ? (

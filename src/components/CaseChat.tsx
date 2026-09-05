@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Send, Image as ImageIcon, Loader2 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { CaseImage } from "@/components/CaseImage";
 import { toast } from "sonner";
 import {
   useCaseMessages,
@@ -47,16 +48,15 @@ export function CaseChat({ labId, caseId, currentUserId, senderRole, senderName 
   const handlePickFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     setUploading(true);
-    const urls: string[] = [];
+    const paths: string[] = [];
     for (const file of Array.from(files)) {
       try {
-        const url = await uploadChatAttachment(labId, caseId, file);
-        urls.push(url);
+        paths.push(await uploadChatAttachment(labId, caseId, file));
       } catch (err) {
         console.error("Chat attachment upload failed:", err);
       }
     }
-    setAttachments((prev) => [...prev, ...urls]);
+    setAttachments((prev) => [...prev, ...paths]);
     setUploading(false);
   };
 
@@ -131,14 +131,13 @@ export function CaseChat({ labId, caseId, currentUserId, senderRole, senderName 
                   </div>
                   {m.attachments && m.attachments.length > 0 && (
                     <div className={cn("flex flex-wrap gap-1.5", mine && "justify-end")}>
-                      {m.attachments.map((url, i) => (
-                        <a key={i} href={url} target="_blank" rel="noreferrer">
-                          <img
-                            src={url}
-                            alt="attachment"
-                            className="size-16 rounded-xl object-cover border border-slate-200"
-                          />
-                        </a>
+                      {m.attachments.map((att, i) => (
+                        <CaseImage
+                          key={i}
+                          path={att}
+                          alt="attachment"
+                          className="size-16 rounded-xl object-cover border border-slate-200"
+                        />
                       ))}
                     </div>
                   )}
@@ -152,9 +151,13 @@ export function CaseChat({ labId, caseId, currentUserId, senderRole, senderName 
       {/* Attachments preview */}
       {attachments.length > 0 && (
         <div className="px-3 pb-1 flex flex-wrap gap-1.5">
-          {attachments.map((url, i) => (
+          {attachments.map((att, i) => (
             <div key={i} className="relative">
-              <img src={url} alt="preview" className="size-14 rounded-lg object-cover border border-slate-200" />
+              <CaseImage
+                path={att}
+                alt="preview"
+                className="size-14 rounded-lg object-cover border border-slate-200"
+              />
               <button
                 onClick={() => setAttachments((prev) => prev.filter((_, x) => x !== i))}
                 className="absolute -top-1 -end-1 size-4 rounded-full bg-slate-700 text-white text-[9px] flex items-center justify-center"

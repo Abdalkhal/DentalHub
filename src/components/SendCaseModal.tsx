@@ -115,7 +115,7 @@ export function SendCaseModal({ labId, labName, open, onClose }: SendCaseModalPr
       });
       attachments.push({
         name: file.name,
-        url: res.url,
+        path: res.path,
         type: file.name.split(".").pop()?.toLowerCase() ?? "stl",
       });
     }

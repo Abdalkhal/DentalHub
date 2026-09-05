@@ -400,14 +400,15 @@ export function LabRxFormModal({
       });
 
       if (scanFile) {
-        const { url, path } = await uploadOrderFile({
+        const { path } = await uploadOrderFile({
           orderId: order.id,
+          labId,
+          dentistId: user?.uid ?? "",
           file: scanFile,
           fileName: scanFile.name,
           onProgress: (pct) => setUploadProgress(pct),
         });
         await attachOrderFile(labId, order.id, {
-          url,
           name: scanFile.name,
           path,
         });

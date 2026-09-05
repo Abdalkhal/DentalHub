@@ -31,6 +31,7 @@ import {
   classifyShade,
 } from "@/lib/dentalConfig";
 import { deriveOrderLines, cleanDoctorNotes, resolveOrderTotal } from "@/lib/orderLines";
+import { CaseFileLink } from "@/components/CaseFileLink";
 
 type Props = {
   order: Order;
@@ -700,19 +701,12 @@ export function OrderInvoiceModal({ order, labName, labAddress, labPhone, onClos
                               {att.type || "file"}
                             </p>
                           </div>
-                          <a
-                            href={att.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            download={att.name}
-                            className="shrink-0 h-9 px-3 rounded-lg text-white font-bold text-xs flex items-center gap-1.5 transition hover:opacity-90"
-                            style={{ background: stl ? C.deepBlue : "#64748B" }}
-                          >
-                            <Download className="size-3.5" />
-                            {stl
-                              ? ar ? "تحميل ملف المسح الضوئي STL / 3D" : "Download STL / 3D Scan"
-                              : ar ? "تحميل" : "Download"}
-                          </a>
+                          <CaseFileLink
+                            name={att.name}
+                            path={att.path}
+                            url={att.url}
+                            className="shrink-0 h-9 px-3 rounded-lg font-bold no-underline"
+                          />
                         </li>
                       );
                     })}

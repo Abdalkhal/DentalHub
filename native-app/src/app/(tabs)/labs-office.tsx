@@ -71,7 +71,13 @@ export default function LabsOfficeScreen() {
           <Pressable
             key={t}
             onPress={() => setTab(t)}
-            className={cn('h-10 flex-1 items-center justify-center rounded-xl', tab === t ? 'bg-white shadow-sm' : '')}
+            // NativeWind 4.2.6 + RN 0.86: toggling a shadow-* class on and off
+            // crashes with a bogus "Couldn't find a navigation context" error, so
+            // the shadow stays applied on both branches and only colour changes.
+            className={cn(
+              'h-10 flex-1 items-center justify-center rounded-xl shadow-sm',
+              tab === t ? 'bg-white' : 'bg-transparent',
+            )}
           >
             <Text className={cn('text-xs font-bold', tab === t ? 'text-slate-900' : 'text-slate-500')}>
               {t === 'cases' ? (ar ? 'الحالات' : 'Cases') : ar ? 'الفريق' : 'Team'}
@@ -89,8 +95,8 @@ export default function LabsOfficeScreen() {
                 key={s}
                 onPress={() => setFilter(filter === s ? 'all' : s)}
                 className={cn(
-                  'flex-1 rounded-2xl border p-2.5 text-center',
-                  filter === s ? 'border-transparent bg-white shadow-sm' : 'border-slate-200 bg-white',
+                  'flex-1 rounded-2xl border bg-white p-2.5 text-center shadow-sm',
+                  filter === s ? 'border-transparent' : 'border-slate-200',
                 )}
               >
                 <Text className={cn('text-center text-lg font-extrabold', STATUS_TONE[s].split(' ')[1])}>

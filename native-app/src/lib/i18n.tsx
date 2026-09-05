@@ -201,6 +201,33 @@ export const dict = {
   overdue: { ar: "متأخر", en: "Overdue" },
   no_invoices: { ar: "لا توجد فواتير بعد", en: "No invoices yet" },
   no_expenses: { ar: "لا توجد مصروفات مسجلة", en: "No expenses recorded" },
+  // Navigation header titles (see app/_layout.tsx). Kept in their own
+  // namespace so renaming a screen header cannot disturb unrelated copy.
+  screen_supplies: { ar: "المستلزمات الطبية", en: "Medical Supplies" },
+  screen_product: { ar: "المنتج", en: "Product" },
+  screen_cart: { ar: "السلة", en: "Cart" },
+  screen_patients: { ar: "المرضى", en: "Patients" },
+  screen_patient: { ar: "المريض", en: "Patient" },
+  screen_clinic: { ar: "عيادتي", en: "My Clinic" },
+  screen_appointments: { ar: "المواعيد", en: "Appointments" },
+  screen_finance: { ar: "المالية", en: "Finance" },
+  screen_rx: { ar: "الوصفة", en: "Prescription" },
+  screen_notifications: { ar: "الإشعارات", en: "Notifications" },
+  screen_labs: { ar: "المختبرات", en: "Labs" },
+  screen_implants: { ar: "الزرعات", en: "Implants" },
+  screen_brands: { ar: "البراندات", en: "Brands" },
+  screen_profile: { ar: "الملف", en: "Profile" },
+  screen_specialized_implants: { ar: "الزرعات المتخصصة", en: "Specialized Implants" },
+  screen_bone_grafts: { ar: "البون كرافت", en: "Bone Grafts" },
+  screen_track_cases: { ar: "تتبع الحالات", en: "Track Cases" },
+  screen_surgical_guide: { ar: "الدليل الجراحي", en: "Surgical Guide" },
+  screen_messages: { ar: "الرسائل", en: "Messages" },
+  screen_doctor_invoices: { ar: "فواتير الأطباء", en: "Doctor Invoices" },
+  screen_help: { ar: "المساعدة", en: "Help" },
+  screen_reports: { ar: "التقارير", en: "Reports" },
+  screen_doctors: { ar: "الأطباء", en: "Doctors" },
+  screen_designer_cases: { ar: "حالاتي كمصمم", en: "My Design Cases" },
+  screen_case_details: { ar: "تفاصيل الحالة", en: "Case Details" },
 } satisfies Dict;
 
 export type DictKey = keyof typeof dict;

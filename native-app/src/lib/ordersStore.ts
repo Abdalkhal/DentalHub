@@ -20,8 +20,18 @@ export type ProdStageId = "impression" | "design" | "printing" | "ceramic" | "qc
 
 export type OrderAttachment = {
   name: string;
-  url: string;
+  /**
+   * Storage path. Resolved on demand through `resolveCaseFileUri`, which goes
+   * via `getBlob` so Storage Rules are evaluated against the caller.
+   */
+  path: string;
   type: string;
+  /**
+   * @deprecated Permanent `getDownloadURL` token from before paths were used.
+   * These bypass Storage Rules entirely and cannot be revoked. Read-only
+   * fallback for pre-existing cases; never set this on new attachments.
+   */
+  url?: string;
 };
 
 export type PricingItem = {

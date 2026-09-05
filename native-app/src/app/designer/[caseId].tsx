@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Linking, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { doc, setDoc } from 'firebase/firestore';
 import { FileBox, Hash, Stethoscope, Upload, User } from 'lucide-react-native';
@@ -7,7 +7,8 @@ import { FileBox, Hash, Stethoscope, Upload, User } from 'lucide-react-native';
 import { Button, Card, Screen, Spinner, Text } from '@/components/ui';
 import { db } from '@/integrations/firebase/client';
 import { useDesignerCase, useDesignerCases } from '@/lib/designerStore';
-import { uploadCaseFile } from '@/lib/storagePipeline';
+import { resolveCaseFileUri, uploadCaseFile } from '@/lib/storagePipeline';
+import * as Sharing from 'expo-sharing';
 import type { OrderAttachment } from '@/lib/ordersStore';
 import { useSession } from '@/lib/useAuth';
 import { useI18n } from '@/lib/i18n';
@@ -51,6 +52,7 @@ export default function DesignerCaseScreen() {
   const { order, loading } = useDesignerCase(labId, caseId ?? '');
 
   const [uploading, setUploading] = useState(false);
+  const [opening, setOpening] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   if (authLoading) return <Spinner />;
@@ -73,6 +75,26 @@ export default function DesignerCaseScreen() {
       </Screen>
     );
   }
+
+  // Files are fetched through the SDK (rules-enforced) and written to the app
+  // cache before being handed to the OS share sheet — there is no public URL to
+  // open, by design.
+  const openFile = async (f: { name: string; path?: string; url?: string }) => {
+    if (!f.path) {
+      setError(ar ? 'هذا المرفق قديم وغير مدعوم' : 'Legacy attachment, not supported');
+      return;
+    }
+    setError(null);
+    setOpening(f.path);
+    try {
+      const uri = await resolveCaseFileUri(f.path, f.name);
+      if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri);
+    } catch {
+      setError(ar ? 'تعذر فتح الملف' : 'Could not open file');
+    } finally {
+      setOpening(null);
+    }
+  };
 
   const handleUpload = async () => {
     setError(null);
@@ -104,7 +126,7 @@ export default function DesignerCaseScreen() {
           designerId: user.uid,
           kind: 'design',
         });
-        uploaded.push({ name: asset.name ?? 'design.stl', url: res.url, type: 'stl' });
+        uploaded.push({ name: asset.name ?? 'design.stl', path: res.path, type: 'stl' });
       }
       await setDoc(
         doc(db, 'lab_orders', labId, 'cases', order.id),
@@ -170,13 +192,19 @@ export default function DesignerCaseScreen() {
             {files.map((f, i) => (
               <Pressable
                 key={i}
-                onPress={() => Linking.openURL(f.url)}
+                onPress={() => openFile(f)}
+                disabled={opening === f.path}
                 className="flex-row items-center gap-2"
               >
                 <FileBox size={16} color="#0EA5E9" />
                 <Text className="flex-1 text-xs text-sky-600 underline" numberOfLines={1}>
                   {f.name}
                 </Text>
+                {opening === f.path ? (
+                  <Text className="text-[10px] text-slate-400">
+                    {ar ? 'جارٍ التحميل...' : 'Loading...'}
+                  </Text>
+                ) : null}
               </Pressable>
             ))}
           </View>

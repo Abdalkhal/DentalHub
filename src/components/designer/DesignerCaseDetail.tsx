@@ -10,7 +10,8 @@ import { useDesignerCases, useDesignerCase } from "@/lib/designerStore";
 import { uploadCaseFile } from "@/lib/storagePipeline";
 import type { OrderAttachment } from "@/lib/ordersStore";
 import { cn } from "@/lib/utils";
-import { Loader2, Upload, FileBox, User, Stethoscope, Hash } from "lucide-react";
+import { Loader2, Upload, User, Stethoscope, Hash } from "lucide-react";
+import { CaseFileLink } from "@/components/CaseFileLink";
 
 export function DesignerCaseDetail({ caseId }: { caseId: string }) {
   const { lang } = useI18n();
@@ -45,7 +46,7 @@ export function DesignerCaseDetail({ caseId }: { caseId: string }) {
           designerId: user.uid,
           kind: "design",
         });
-        newDesigns.push({ name: file.name, url: res.url, type: "stl" });
+        newDesigns.push({ name: file.name, path: res.path, type: "stl" });
       }
       const merged = [...(order.designs ?? []), ...newDesigns];
       await setDoc(
@@ -146,16 +147,8 @@ export function DesignerCaseDetail({ caseId }: { caseId: string }) {
           ) : (
             <ul className="space-y-2">
               {stlFiles.map((f, i) => (
-                <li key={i} className="flex items-center gap-2 text-xs">
-                  <FileBox className="size-4 text-sky-500 shrink-0" />
-                  <a
-                    href={f.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-sky-600 underline truncate"
-                  >
-                    {f.name}
-                  </a>
+                <li key={i}>
+                  <CaseFileLink name={f.name} path={f.path} url={f.url} />
                 </li>
               ))}
             </ul>

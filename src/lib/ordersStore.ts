@@ -20,8 +20,19 @@ export type ProdStageId = "impression" | "design" | "printing" | "ceramic" | "qc
 
 export type OrderAttachment = {
   name: string;
-  url: string;
+  /**
+   * Storage path. Resolved on demand through `resolveCaseFileUrl`, which goes
+   * via `getBlob` so Storage Rules are evaluated against the caller.
+   */
+  path: string;
   type: string;
+  /**
+   * @deprecated Permanent `getDownloadURL` token from before paths were used.
+   * These bypass Storage Rules entirely and cannot be revoked short of
+   * rewriting the object. Read-only fallback for pre-existing cases; never set
+   * this on new attachments. See the migration note in storage.rules.
+   */
+  url?: string;
 };
 
 export type PricingItem = {
@@ -501,10 +512,12 @@ async function cleanupOrderFile(
 export async function attachOrderFile(
   labId: string,
   orderId: string,
-  file: { url: string; name: string; path: string },
+  file: { name: string; path: string },
 ): Promise<void> {
+  // `fileUrl` is deliberately not written: a stored download URL would be a
+  // permanent, rules-bypassing handle on a patient scan. Consumers resolve
+  // `filePath` on demand instead.
   await updateDoc(caseDocRef(labId, orderId), {
-    fileUrl: file.url,
     fileName: file.name,
     filePath: file.path,
     fileStatus: "uploaded",

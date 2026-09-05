@@ -1,8 +1,36 @@
-import { ref, uploadBytes, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytes, uploadBytesResumable, getBlob } from "firebase/storage";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { storage, db } from "@/integrations/firebase/client";
 
 const PREVIEW_MAX_BYTES = 200 * 1024;
+
+/**
+ * Case files are addressed by storage *path*, never by download URL.
+ *
+ * `getDownloadURL()` mints a permanent, unauthenticated token that bypasses
+ * Storage Rules entirely. Persisting one on a case document means anybody who
+ * ever sees it — including a designer removed from the lab months ago, or
+ * anyone they forwarded it to — keeps working access forever. Paths carry no
+ * such authority: resolving one goes through `getBlob`, which the rules
+ * evaluate on every request against the caller's identity and case assignment.
+ */
+export async function fetchCaseFile(path: string): Promise<Blob> {
+  return getBlob(ref(storage, path));
+}
+
+/**
+ * Resolves a stored case-file path to a temporary in-memory object URL.
+ *
+ * The caller owns the returned URL and must pass it to `releaseCaseFileUrl`
+ * when finished, otherwise the blob is retained for the lifetime of the page.
+ */
+export async function resolveCaseFileUrl(path: string): Promise<string> {
+  return URL.createObjectURL(await fetchCaseFile(path));
+}
+
+export function releaseCaseFileUrl(url: string): void {
+  if (url.startsWith("blob:")) URL.revokeObjectURL(url);
+}
 
 /** Computes a SHA-256 hex digest of a file (Web Crypto, runs in the browser). */
 export async function sha256Hex(blob: Blob): Promise<string> {
@@ -13,29 +41,40 @@ export async function sha256Hex(blob: Blob): Promise<string> {
     .join("");
 }
 
-/** Gzip-compresses a blob using the native CompressionStream API. */
-export async function compressGzip(blob: Blob): Promise<Blob> {
-  if (typeof CompressionStream === "undefined") return blob;
+/**
+ * Gzip-compresses a blob using the CompressionStream API, reporting whether
+ * compression actually happened.
+ *
+ * The caller MUST set `contentEncoding: "gzip"` on the upload when `compressed`
+ * is true. Without it the bucket stores gzip bytes and serves them verbatim
+ * under the original content type, so a designer downloads a file named `.stl`
+ * whose contents are a gzip archive — unopenable in any CAD package. Equally,
+ * setting the header when compression was skipped (React Native has no
+ * CompressionStream) corrupts the download in the opposite direction, which is
+ * why this returns a flag rather than just a blob.
+ */
+export async function compressGzip(blob: Blob): Promise<{ blob: Blob; compressed: boolean }> {
+  if (typeof CompressionStream === "undefined") return { blob, compressed: false };
   const stream = blob.stream().pipeThrough(new CompressionStream("gzip"));
-  return new Response(stream).blob();
+  return { blob: await new Response(stream).blob(), compressed: true };
 }
 
 function hashDocRef(labId: string, hash: string) {
   return doc(db, "storage_hashes", `${labId}_${hash}`);
 }
 
-/** PHASE 5 — dedup: returns the existing download URL if this exact hash is already stored. */
+/** PHASE 5 — dedup: returns the existing storage path if this exact hash is already stored. */
 export async function findExistingByHash(labId: string, hash: string): Promise<string | null> {
   const snap = await getDoc(hashDocRef(labId, hash));
   if (!snap.exists()) return null;
-  return (snap.data() as { url?: string }).url ?? null;
+  return (snap.data() as { path?: string }).path ?? null;
 }
 
 /** Registers a hash → URL mapping after a successful upload. */
 export async function registerHash(
   labId: string,
   hash: string,
-  entry: { url: string; path: string; caseId: string; previewUrl?: string; dentistId?: string },
+  entry: { path: string; caseId: string; previewPath?: string; dentistId?: string },
 ): Promise<void> {
   await setDoc(hashDocRef(labId, hash), {
     labId,
@@ -98,8 +137,9 @@ export async function generatePreviewMesh(
 }
 
 export type CaseUploadResult = {
-  url: string;
-  previewUrl?: string;
+  /** Storage path — the canonical reference persisted on the case document. */
+  path: string;
+  previewPath?: string;
   hash: string;
   deduplicated: boolean;
 };
@@ -129,71 +169,72 @@ export async function uploadCaseFile(opts: CaseUploadOptions): Promise<CaseUploa
   const hash = await sha256Hex(file);
   const existing = await findExistingByHash(labId, hash);
   if (existing) {
-    return { url: existing, hash, deduplicated: true };
+    return { path: existing, hash, deduplicated: true };
   }
 
   const folder = kind === "design" ? "case_designs" : "case_scans";
-  const compressed = await compressGzip(file);
+  const path = `${folder}/${labId}/${caseId}/${fileName}`;
   const preview = await generatePreviewMesh(file);
 
-  const customMetadata: Record<string, string> = {
-    dentistId,
-    caseId,
-    hash,
-  };
+  // Required by the storage rules, which reject any case upload that does not
+  // identify its dentist and case.
+  const customMetadata: Record<string, string> = { dentistId, caseId, hash };
   if (designerId) customMetadata.designerId = designerId;
 
-  const baseMetadata = {
-    cacheControl: "private, max-age=86400",
-    contentType: (file as File).type || "model/stl",
-    customMetadata,
+  const upload = async (blob: Blob, at: string, opts?: { gzip?: boolean }) => {
+    await uploadBytes(ref(storage, at), blob, {
+      cacheControl: "private, max-age=86400",
+      contentType: (file as File).type || "model/stl",
+      // Only claim gzip when the bytes really are gzipped, so the bucket's
+      // decompressive transcoding hands back the original STL on download.
+      ...(opts?.gzip ? { contentEncoding: "gzip" } : {}),
+      customMetadata,
+    });
   };
 
-  const upload = async (blob: Blob, path: string) => {
-    const fileRef = ref(storage, path);
-    await uploadBytes(fileRef, blob, baseMetadata);
-    return getDownloadURL(fileRef);
-  };
+  const master = await compressGzip(file);
+  await upload(master.blob, path, { gzip: master.compressed });
 
-  const url = await upload(compressed, `${folder}/${labId}/${caseId}/${fileName}`);
-
-  let previewUrl: string | undefined;
+  let previewPath: string | undefined;
   if (preview && preview !== file) {
-    previewUrl = await upload(preview, `previews/${labId}/${caseId}/preview_${fileName}`);
+    previewPath = `previews/${labId}/${caseId}/preview_${fileName}`;
+    const previewGz = await compressGzip(preview);
+    await upload(previewGz.blob, previewPath, { gzip: previewGz.compressed });
   }
 
-  await registerHash(labId, hash, {
-    url,
-    path: `${folder}/${labId}/${caseId}/${fileName}`,
-    caseId,
-    previewUrl,
-    dentistId,
-  }).catch(() => {
+  await registerHash(labId, hash, { path, caseId, previewPath, dentistId }).catch(() => {
     /* hash bookkeeping is non-critical */
   });
 
-  return { url, previewUrl, hash, deduplicated: false };
+  return { path, previewPath, hash, deduplicated: false };
 }
 
 /**
  * Uploads a dentist's raw scanner file (STL/ZIP) to `orders_files/{orderId}/{fileName}`
- * with a progress callback. Returns the download URL and storage path so the
- * caller can persist `fileUrl` / `filePath` on the order document.
+ * with a progress callback. Returns the storage path to persist on the order.
+ *
+ * `labId` and `dentistId` are stamped as metadata because this path carries no
+ * lab segment — the rules read the owning lab from the object itself, and rely
+ * on these objects being immutable so the stamp cannot be forged later by
+ * overwriting someone else's file.
  */
 export async function uploadOrderFile(opts: {
   orderId: string;
+  labId: string;
+  dentistId: string;
   file: File;
   fileName: string;
   onProgress?: (pct: number) => void;
-}): Promise<{ url: string; path: string }> {
-  const { orderId, file, fileName, onProgress } = opts;
+}): Promise<{ path: string }> {
+  const { orderId, labId, dentistId, file, fileName, onProgress } = opts;
   const path = `orders_files/${orderId}/${fileName}`;
   const fileRef = ref(storage, path);
 
-  const url = await new Promise<string>((resolve, reject) => {
+  await new Promise<void>((resolve, reject) => {
     const task = uploadBytesResumable(fileRef, file, {
       contentType: file.type || "application/octet-stream",
       cacheControl: "private, max-age=86400",
+      customMetadata: { labId, dentistId, orderId },
     });
     task.on(
       "state_changed",
@@ -204,15 +245,9 @@ export async function uploadOrderFile(opts: {
         onProgress?.(pct);
       },
       (err) => reject(err),
-      async () => {
-        try {
-          resolve(await getDownloadURL(fileRef));
-        } catch (err) {
-          reject(err);
-        }
-      },
+      () => resolve(),
     );
   });
 
-  return { url, path };
+  return { path };
 }

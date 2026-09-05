@@ -8,7 +8,7 @@ import {
   serverTimestamp,
   type Timestamp,
 } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytes } from "firebase/storage";
 import { db, storage } from "@/integrations/firebase/client";
 
 export type CaseMessageSenderRole = "doctor" | "lab";
@@ -83,12 +83,25 @@ export async function sendCaseMessage(labId: string, caseId: string, data: SendM
   await addDoc(messagesCollection(labId, caseId), messageData);
 }
 
-/** Uploads a chat image and returns its public download URL. */
-export async function uploadChatAttachment(labId: string, caseId: string, file: File): Promise<string> {
+/**
+ * Uploads a chat image and returns its storage *path*.
+ *
+ * Not a download URL: those are permanent unauthenticated handles on patient
+ * imagery. Consumers resolve the path through `resolveCaseFileUrl`, which is
+ * checked against Storage Rules on every fetch.
+ */
+export async function uploadChatAttachment(
+  labId: string,
+  caseId: string,
+  file: File,
+): Promise<string> {
   const safeName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-  const fileRef = ref(storage, `case_messages/${labId}/${caseId}/${safeName}`);
-  await uploadBytes(fileRef, file, { contentType: file.type || "image/jpeg" });
-  return getDownloadURL(fileRef);
+  const path = `case_messages/${labId}/${caseId}/${safeName}`;
+  await uploadBytes(ref(storage, path), file, {
+    contentType: file.type || "image/jpeg",
+    cacheControl: "private, max-age=86400",
+  });
+  return path;
 }
 
 /* ── Unread tracking (localStorage-backed read markers) ───────────── */

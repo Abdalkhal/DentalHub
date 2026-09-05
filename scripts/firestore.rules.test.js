@@ -11,15 +11,18 @@
  *   - Only the referring dentist or lab owner may create a case.
  */
 
-const test = require("node:test");
-const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
-const {
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import {
   initializeTestEnvironment,
   assertFails,
   assertSucceeds,
-} = require("@firebase/rules-unit-testing");
+} from "@firebase/rules-unit-testing";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const PROJECT_ID = "demo-dentalhub";
 const RULES = fs.readFileSync(path.join(__dirname, "..", "firestore.rules"), "utf8");
@@ -29,7 +32,7 @@ let env;
 test.before(async () => {
   env = await initializeTestEnvironment({
     projectId: PROJECT_ID,
-    firestore: { rules: RULES, host: "127.0.0.1", port: 8080 },
+    firestore: { rules: RULES, host: "127.0.0.1", port: 8111 },
   });
 });
 
