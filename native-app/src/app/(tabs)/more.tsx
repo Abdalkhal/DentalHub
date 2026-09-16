@@ -1,31 +1,30 @@
-﻿import { Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { router } from 'expo-router';
-import { signOut } from 'firebase/auth';
 import {
   Bell,
   ChevronLeft,
+  Cog,
   Crown,
   FileText,
   FlaskConical,
-  HelpCircle,
+  Globe,
   Heart,
+  LifeBuoy,
   ListChecks,
+  Megaphone,
   MessageSquare,
-  Package,
   PenTool,
   Shield,
   ShoppingBag,
   ShoppingCart,
   Store,
   Stethoscope,
-  Syringe,
   Users,
 } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 
 import { Screen, Text } from '@/components/ui';
-import { useLabStaffClaim, useUserRole } from '@/lib/useAuth';
-import { auth } from '@/integrations/firebase/client';
+import { useIsAdmin, useLabStaffClaim, useUserRole } from '@/lib/useAuth';
 import { useI18n } from '@/lib/i18n';
 
 const ROLE_AR: Record<string, string> = {
@@ -34,6 +33,13 @@ const ROLE_AR: Record<string, string> = {
   lab: 'مختبر طبي',
   implant: 'شركة زرعات',
   admin: 'مدير النظام',
+};
+const ROLE_EN: Record<string, string> = {
+  dentist: 'Dentist',
+  supply: 'Supply Office',
+  lab: 'Lab',
+  implant: 'Implant Company',
+  admin: 'Admin',
 };
 
 type Item = { icon: LucideIcon; ar: string; en: string; to: string };
@@ -46,17 +52,21 @@ const ITEMS: Record<string, Item[]> = {
     { icon: Heart, ar: 'المفضلة', en: 'Favorites', to: '/favorites' },
     { icon: Crown, ar: 'البراندات', en: 'Brands', to: '/brands' },
     { icon: ShoppingBag, ar: 'المستلزمات', en: 'Supplies', to: '/supplies' },
+    { icon: Megaphone, ar: 'إعلاناتي', en: 'My Ads', to: '/my-ads' },
+    { icon: MessageSquare, ar: 'الرسائل', en: 'Messages', to: '/messages' },
     { icon: Bell, ar: 'الإشعارات', en: 'Notifications', to: '/notifications' },
-    { icon: HelpCircle, ar: 'المساعدة', en: 'Help', to: '/help' },
+    { icon: Cog, ar: 'الإعدادات', en: 'Settings', to: '/settings' },
+    { icon: LifeBuoy, ar: 'المساعدة', en: 'Help', to: '/help' },
     { icon: ShoppingCart, ar: 'السلة', en: 'Cart', to: '/cart' },
   ],
   supply: [
     { icon: Store, ar: 'لوحة المورد', en: 'Supplier Dashboard', to: '/supplies-office' },
-    { icon: ShoppingBag, ar: 'المستلزمات', en: 'Supplies', to: '/supplies' },
     { icon: FileText, ar: 'فواتير الأطباء', en: 'Doctor Invoices', to: '/doctor-invoices' },
+    { icon: Megaphone, ar: 'إعلاناتي', en: 'My Ads', to: '/my-ads' },
     { icon: MessageSquare, ar: 'الرسائل', en: 'Messages', to: '/messages' },
     { icon: Bell, ar: 'الإشعارات', en: 'Notifications', to: '/notifications' },
-    { icon: HelpCircle, ar: 'المساعدة', en: 'Help', to: '/help' },
+    { icon: Cog, ar: 'الإعدادات', en: 'Settings', to: '/settings' },
+    { icon: LifeBuoy, ar: 'المساعدة', en: 'Help', to: '/help' },
   ],
   // Web parity: labs get their dashboard, doctors, invoices and messages —
   // previously this menu had only two entries, leaving most of the lab's own
@@ -66,23 +76,26 @@ const ITEMS: Record<string, Item[]> = {
     { icon: PenTool, ar: 'حالات التصميم', en: 'Design Cases', to: '/designer' },
     { icon: Stethoscope, ar: 'الأطباء', en: 'Doctors', to: '/doctors' },
     { icon: FileText, ar: 'فواتير الأطباء', en: 'Doctor Invoices', to: '/doctor-invoices' },
+    { icon: Megaphone, ar: 'إعلاناتي', en: 'My Ads', to: '/my-ads' },
     { icon: MessageSquare, ar: 'الرسائل', en: 'Messages', to: '/messages' },
     { icon: Bell, ar: 'الإشعارات', en: 'Notifications', to: '/notifications' },
-    { icon: HelpCircle, ar: 'المساعدة', en: 'Help', to: '/help' },
+    { icon: Cog, ar: 'الإعدادات', en: 'Settings', to: '/settings' },
+    { icon: LifeBuoy, ar: 'المساعدة', en: 'Help', to: '/help' },
   ],
   implant: [
-    { icon: Syringe, ar: 'لوحة الزرعات', en: 'Implant Dashboard', to: '/implants-office' },
-    { icon: Package, ar: 'الزرعات', en: 'Implants', to: '/implants' },
+    { icon: FlaskConical, ar: 'لوحة الزرعات', en: 'Implant Dashboard', to: '/implants-office' },
+    { icon: Megaphone, ar: 'إعلاناتي', en: 'My Ads', to: '/my-ads' },
     { icon: MessageSquare, ar: 'الرسائل', en: 'Messages', to: '/messages' },
     { icon: Bell, ar: 'الإشعارات', en: 'Notifications', to: '/notifications' },
-    { icon: HelpCircle, ar: 'المساعدة', en: 'Help', to: '/help' },
+    { icon: Cog, ar: 'الإعدادات', en: 'Settings', to: '/settings' },
+    { icon: LifeBuoy, ar: 'المساعدة', en: 'Help', to: '/help' },
   ],
   // Invited lab staff (custom claim, no user_roles doc). A designer must never
   // see lab dashboards — finance lives behind them.
   designer: [
     { icon: PenTool, ar: 'حالاتي كمصمم', en: 'My Design Cases', to: '/designer' },
     { icon: Bell, ar: 'الإشعارات', en: 'Notifications', to: '/notifications' },
-    { icon: HelpCircle, ar: 'المساعدة', en: 'Help', to: '/help' },
+    { icon: LifeBuoy, ar: 'المساعدة', en: 'Help', to: '/help' },
   ],
   admin: [
     { icon: Shield, ar: 'لوحة الإدارة', en: 'Admin Panel', to: '/admin' },
@@ -95,36 +108,27 @@ export default function MoreScreen() {
   const ar = lang === 'ar';
   const { role } = useUserRole();
   const { claim: labStaff } = useLabStaffClaim();
+  const { isAdmin } = useIsAdmin();
 
   // Invited staff have a claim but no user_roles doc — key the menu off that.
   const type = labStaff?.role === 'DESIGNER' ? 'designer' : (role?.accountType ?? 'dentist');
-  const items = ITEMS[type] ?? ITEMS.dentist;
-  const roleAr = ROLE_AR[type] ?? type;
-
-  const fullName = [role?.name, role?.surname].filter(Boolean).join(' ').trim() || 'DentalHub';
+  // `isAdmin` reflects the real `role: 'admin'` auth claim, independent of
+  // `accountType` (an admin is usually still a real dentist/etc. account
+  // underneath) — so the admin link is added on top of the normal menu
+  // instead of replacing it.
+  const items = isAdmin ? [ITEMS.admin[0], ...(ITEMS[type] ?? ITEMS.dentist)] : ITEMS[type] ?? ITEMS.dentist;
+  const roleLabel = (ar ? (ROLE_AR[type] ?? type) : (ROLE_EN[type] ?? type)) + (isAdmin ? (ar ? ' · مدير' : ' · Admin') : '');
 
   return (
     <Screen>
-      {/* Profile */}
-      <View className="flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-card p-4 shadow-sm">
-        <View className="h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-          <Text className="text-lg font-extrabold text-primary">{fullName.charAt(0)}</Text>
-        </View>
-        <View className="min-w-0 flex-1">
-          <Text className="text-base font-extrabold text-slate-900" numberOfLines={1}>
-            {fullName}
-          </Text>
-          <Text className="text-xs font-semibold text-primary">{roleAr}</Text>
-          {!!role?.email && (
-            <Text className="text-[11px] text-slate-400" numberOfLines={1}>
-              {role.email}
-            </Text>
-          )}
+      <View className="flex-row items-center gap-2 px-1">
+        <Text className="text-xs font-bold text-slate-500">{ar ? 'الحساب:' : 'Account:'}</Text>
+        <View className="rounded-full bg-sky-50 px-2.5 py-1">
+          <Text className="text-xs font-bold text-sky-700">{roleLabel}</Text>
         </View>
       </View>
 
-      {/* Menu card */}
-      <View className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-card shadow-sm">
+      <View className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-card shadow-sm">
         {items.map((it, i) => {
           const Icon = it.icon;
           return (
@@ -133,11 +137,11 @@ export default function MoreScreen() {
                 onPress={() => router.push(it.to as never)}
                 className="flex-row items-center gap-3 px-4 py-3.5"
               >
-                <View className="h-10 w-10 items-center justify-center rounded-full bg-slate-100">
-                  <Icon size={19} color="#334155" strokeWidth={2.1} />
+                <View className="h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50">
+                  <Icon size={19} color="#334155" strokeWidth={2} />
                 </View>
-                <Text className="flex-1 text-sm font-bold text-slate-800">{ar ? it.ar : it.en}</Text>
-                <ChevronLeft size={18} color="#CBD5E1" />
+                <Text className="flex-1 text-sm font-bold text-slate-700">{ar ? it.ar : it.en}</Text>
+                <ChevronLeft size={16} color="#CBD5E1" />
               </Pressable>
               {i < items.length - 1 && <View className="ml-16 mr-4 h-px bg-slate-100" />}
             </View>
@@ -145,38 +149,18 @@ export default function MoreScreen() {
         })}
       </View>
 
-      {/* Language */}
-      <View className="mt-5 flex-row items-center justify-between rounded-2xl border border-slate-200 bg-card px-4 py-3.5 shadow-sm">
-        <Text className="text-sm font-bold text-slate-800">{ar ? 'اللغة' : 'Language'}</Text>
-        <PressablePill
-          label={lang === 'ar' ? 'English' : 'العربية'}
-          onPress={toggle}
-        />
-      </View>
-
-      {/* Sign out */}
-      <View className="mt-6">
-        <PressableBlue
-          label={ar ? 'تسجيل الخروج' : 'Sign out'}
-          onPress={() => signOut(auth)}
-        />
-      </View>
+      <Pressable
+        onPress={toggle}
+        className="mt-4 flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-card px-4 py-3.5 shadow-sm"
+      >
+        <View className="h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50">
+          <Globe size={19} color="#334155" strokeWidth={2} />
+        </View>
+        <Text className="flex-1 text-sm font-bold text-slate-700">
+          {ar ? 'اللغة' : 'Language'} · {lang === 'ar' ? 'العربية' : 'English'}
+        </Text>
+        <Text className="text-xs font-bold text-primary">{lang === 'ar' ? 'EN' : 'AR'}</Text>
+      </Pressable>
     </Screen>
-  );
-}
-
-function PressablePill({ label, onPress }: { label: string; onPress: () => void }) {
-  return (
-    <Pressable onPress={onPress} className="h-9 items-center justify-center rounded-full bg-primary px-4">
-      <Text className="text-xs font-bold text-white">{label}</Text>
-    </Pressable>
-  );
-}
-
-function PressableBlue({ label, onPress }: { label: string; onPress: () => void }) {
-  return (
-    <Pressable onPress={onPress} className="h-12 items-center justify-center rounded-2xl bg-[#2563EB] shadow-lg">
-      <Text className="text-sm font-bold text-white">{label}</Text>
-    </Pressable>
   );
 }

@@ -6,6 +6,13 @@ export type PricingItem = {
   quantity: number;
   unitPrice: number;
   currency: "USD" | "IQD";
+  // Per-item material/work-type, so a case mixing several distinct work
+  // items (e.g. an Emax veneer + a Zirconia crown) keeps each item's own
+  // material instead of sharing the case-wide selection.
+  material?: string;
+  workType?: string;
+  manufacturingMethod?: string;
+  frameworkCreation?: string;
 };
 
 export type CombinedLabOrder = {
@@ -45,4 +52,9 @@ export type CombinedLabOrder = {
   designerName?: string;
   ceramistId?: string;
   ceramistName?: string;
+  // Set only when the lab picked a real registered dentist account while
+  // typing the doctor name (see new-lab-order.tsx's suggestion dropdown).
+  // Without it the case has no way to reach that doctor's "تتبع الحالات"
+  // screen, which filters strictly by this id.
+  dentistId?: string;
 };

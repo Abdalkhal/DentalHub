@@ -14,16 +14,25 @@ import {
 } from 'lucide-react-native';
 
 import { Screen, Card, Button, Spinner, Text } from '@/components/ui';
-import { getAccountDashboard, useLabStaffClaim, useUserRole, useSession } from '@/lib/useAuth';
+import { CartHeaderButton } from '@/components/CartHeaderButton';
+import { useUnreadNotificationsCount } from '@/lib/notifications';
+import { useLabStaffClaim, useUserRole, useSession } from '@/lib/useAuth';
+import SuppliesOfficeScreen from './supplies-office';
+import ImplantsOfficeScreen from './implants-office';
+import LabsOfficeScreen from './labs-office';
 import { setPatientStoreUser } from '@/lib/patientsStore';
 import { setClinicStoreUser } from '@/lib/clinicStore';
 import { setAppointmentsStoreUser } from '@/lib/appointmentsStore';
+import { setFavoritesStoreUser } from '@/lib/favoritesStore';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
-import { useProducts } from '@/lib/products';
-import { useQuickOrders } from '@/lib/quickOrders';
+import { useProducts, useSignedImageUrls } from '@/lib/products';
+import { useQuickOrders, setQuickOrdersStoreUser } from '@/lib/quickOrders';
 import { useImplantOffers } from '@/lib/implantOffers';
-import { useDentistOrders } from '@/lib/orders';
+import { useActiveAds, type Ad } from '@/lib/adsStore';
+import { AdDetailModal } from '@/components/AdDetailModal';
+import { useOrders } from '@/lib/ordersStore';
+import { useDentistCases, filterLegacyOrders } from '@/lib/caseTracking';
 import { BRANDS } from '@/data/brands';
 
 type Role = 'supply' | 'lab' | 'implant';
@@ -80,6 +89,27 @@ function BrandMark({ image, name }: { image?: string; name: string }) {
   );
 }
 
+// Hoisted out of HomeScreen: defining a component inline inside another
+// component's body gives it a brand-new function identity on every render,
+// so React treats it as a different component type and unmounts+remounts
+// its whole subtree each time HomeScreen re-renders (e.g. every time the
+// live case-count listener pushes an update) — including the "See all"
+// Pressable underneath it. A touch that lands mid-remount never completes,
+// so the button can end up looking permanently dead despite being wired
+// correctly. Taking `ar`/`title`/`seeAll` as props keeps this stable.
+function SectionHead({ title, seeAll, ar }: { title: string; seeAll?: Href; ar: boolean }) {
+  return (
+    <View className="mb-2.5 flex-row items-center justify-between">
+      <Text className="text-base font-extrabold text-slate-800">{title}</Text>
+      {seeAll ? (
+        <Pressable onPress={() => router.push(seeAll)} hitSlop={10} className="py-1">
+          <Text className="text-xs font-bold text-primary">{ar ? 'عرض الكل ›' : 'See all ›'}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
 type CategoryTile = { to: Href; ar: string; en: string; img: number; border: string };
 
 const CATEGORY_TILES: CategoryTile[] = [
@@ -89,15 +119,11 @@ const CATEGORY_TILES: CategoryTile[] = [
   { to: '/clinic', ar: 'عيادتي', en: 'My Clinic', img: require('../../../assets/home/clinic-hero.jpg'), border: 'border-purple-200' },
 ];
 
-function fmtOrderDate(ts: unknown): string {
-  const d = (ts as { toDate?: () => Date })?.toDate?.();
-  return d ? d.toLocaleDateString() : '—';
-}
-
 export default function HomeScreen() {
   const { lang, toggle } = useI18n();
   const ar = lang === 'ar';
   const { user, role, loading } = useUserRole();
+  const unreadCount = useUnreadNotificationsCount(user?.uid);
   const { claim: labStaff, loading: claimLoading } = useLabStaffClaim();
   useSession();
 
@@ -106,7 +132,6 @@ export default function HomeScreen() {
   const { offers: implantOffers = [] } = useImplantOffers();
 
   const [q, setQ] = useState('');
-  const [banners, setBanners] = useState<Banner[]>([]);
   const [idx, setIdx] = useState(0);
 
   // Scope local stores to the signed-in user (web parity).
@@ -115,11 +140,39 @@ export default function HomeScreen() {
     setPatientStoreUser(uid);
     setClinicStoreUser(uid);
     setAppointmentsStoreUser(uid);
+    setFavoritesStoreUser(uid);
+    setQuickOrdersStoreUser(uid);
   }, [user?.uid]);
 
-  useEffect(() => {
-    setBanners(loadBanners());
-  }, []);
+  const { data: activeAds = [] } = useActiveAds();
+  const adImagePaths = useMemo(
+    () => activeAds.map((a) => a.images[0]).filter((p): p is string => !!p),
+    [activeAds],
+  );
+  const { data: adImageUrls } = useSignedImageUrls(adImagePaths);
+
+  // Derived, not stateful: computing this in an effect + setState looped
+  // forever, because `useSignedImageUrls`'s `data` is `undefined` until the
+  // query resolves — defaulting it to a fresh `{}` on every render made the
+  // effect's dependency "change" every render too.
+  // `adsForBanner` mirrors `banners`' first N slots 1:1, so tapping the
+  // banner can open the full Ad (contact number, all images) behind
+  // whichever slot is currently showing — the legacy local-promo slots
+  // after it have no Ad behind them (and never had a detail view either).
+  const adsForBanner = useMemo(() => {
+    const urls = adImageUrls ?? {};
+    return activeAds.filter((a) => a.images[0] && urls[a.images[0]]);
+  }, [activeAds, adImageUrls]);
+
+  const banners: Banner[] = useMemo(() => {
+    const urls = adImageUrls ?? {};
+    const fromAds: Banner[] = adsForBanner.map((a) => ({
+      title: a.title,
+      subtitle: a.description,
+      image: urls[a.images[0]],
+    }));
+    return [...fromAds, ...loadBanners()];
+  }, [adsForBanner, adImageUrls]);
 
   // Auto-rotate banner carousel every 4s.
   useEffect(() => {
@@ -129,6 +182,8 @@ export default function HomeScreen() {
   }, [banners.length]);
 
   const banner = banners[idx] ?? banners[0];
+  const bannerAd = idx < adsForBanner.length ? adsForBanner[idx] : null;
+  const [viewingAd, setViewingAd] = useState<Ad | null>(null);
 
   const searchResults = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -138,30 +193,55 @@ export default function HomeScreen() {
       .slice(0, 8);
   }, [q, products]);
 
-  const { data: dentistOrders = [] } = useDentistOrders(user?.uid);
-  const recentOrders = useMemo(() => {
-    const sorted = [...dentistOrders].sort((a, b) => {
-      const ta = (a.createdAt as { toDate?: () => Date })?.toDate?.()?.getTime() ?? 0;
-      const tb = (b.createdAt as { toDate?: () => Date })?.toDate?.()?.getTime() ?? 0;
-      return tb - ta;
-    });
-    return sorted.slice(0, 3);
-  }, [dentistOrders]);
+  // Case tracking, ported from the web home ("Track Cases" banner + count):
+  // a case reaches the dentist either because they sent it themselves
+  // (dentistId set at send time) or because the lab linked it by matching
+  // name+clinic in "طلب جديد" (see new-lab-order.tsx) — `filterLegacyOrders`
+  // covers the older, unlinked local-store cases the same way web does.
+  const dentistNameForCases = role?.accountType === 'dentist' ? [role.name, role.surname].filter(Boolean).join(' ').trim() : '';
+  const localOrdersAll = useOrders();
+  const { cases: dentistCases } = useDentistCases(user?.uid ?? '');
+  const caseCount = useMemo(() => {
+    const remote = dentistCases.map((c) => c.order);
+    const remoteIds = new Set(remote.map((o) => o.id));
+    const legacy = filterLegacyOrders(localOrdersAll, remoteIds, dentistNameForCases);
+    const all = Array.from(new Map([...remote, ...legacy].map((o) => [o.id, o])).values());
+    return all.filter((o) => o.status !== 'completed').length;
+  }, [dentistCases, localOrdersAll, dentistNameForCases]);
 
   if (loading || claimLoading) return <Spinner />;
   if (!user) return <Redirect href="/login" />;
 
   // Invited lab staff have no `user_roles` document — only a custom claim — so
   // route them from the claim before falling through to the account-type logic,
-  // otherwise they land on the dentist marketplace with no role at all.
-  if (labStaff?.role === 'DESIGNER') return <Redirect href={'/designer' as never} />;
+  // otherwise they land on the dentist marketplace with no role at all. Both
+  // staff slots a lab can assign a case to (designer, ceramist/technician)
+  // share the same restricted case screen — see designerStore.ts, which
+  // matches on `designerId` OR `ceramistId`.
+  if (labStaff?.role === 'DESIGNER' || labStaff?.role === 'TECHNICIAN') {
+    return <Redirect href={'/designer' as never} />;
+  }
 
-  // Match the web app: the Home tab takes each role to its own dashboard rather
-  // than to the dentist marketplace. `getAccountDashboard` returns '/' for
-  // dentists (and unknown roles), which is this screen — so guarding on that
-  // both preserves the dentist home and rules out a redirect loop.
-  const home = role?.role ? getAccountDashboard(role.role) : '/';
-  if (home !== '/') return <Redirect href={home} />;
+  // Match the web app: the Home tab takes each role to its own dashboard
+  // rather than to the dentist marketplace. This renders that dashboard's
+  // component directly instead of navigating to it (previously a
+  // `<Redirect>` to the hidden `implants-office`/`supplies-office`/etc. tab).
+  // That redirect made the Home tab's *content* be a different tab's screen
+  // while Home stayed the technically-active route — switching away to
+  // another tab (e.g. Explore) from there reliably crashed Android/Fabric
+  // with "addViewAt: ... already has a parent", because react-native-screens
+  // was asked to detach a tab that both the Home and the target tab's
+  // Fragments thought they owned. Rendering the component inline keeps Home
+  // the one and only active tab, so no such handoff ever happens.
+  //
+  // Admin is deliberately NOT handled here — signing in with the admin
+  // account through the normal login screen now just lands on the regular
+  // marketplace home below (its accountType is 'dentist'). The admin panel
+  // is only reachable via the dedicated /admin-login deep link, which
+  // checks the signed-in ID token's custom claim itself — see admin-login.tsx.
+  if (role?.role === 'supply') return <SuppliesOfficeScreen />;
+  if (role?.role === 'implant') return <ImplantsOfficeScreen />;
+  if (role?.role === 'lab') return <LabsOfficeScreen />;
 
   const isDentist = role?.accountType === 'dentist';
   const isSupply = role?.accountType === 'supply';
@@ -171,18 +251,8 @@ export default function HomeScreen() {
   const openProduct = (id: string) =>
     router.push({ pathname: '/product-detail/[productId]', params: { productId: id } });
 
-  const SectionHead = ({ title, seeAll }: { title: string; seeAll?: Href }) => (
-    <View className="mb-2.5 flex-row items-center justify-between">
-      <Text className="text-base font-extrabold text-slate-800">{title}</Text>
-      {seeAll ? (
-        <Pressable onPress={() => router.push(seeAll)}>
-          <Text className="text-xs font-bold text-primary">{ar ? 'عرض الكل ›' : 'See all ›'}</Text>
-        </Pressable>
-      ) : null}
-    </View>
-  );
-
   return (
+    <>
     <Screen>
       {/* 1 — Header */}
       <View className="flex-row items-center justify-between">
@@ -199,11 +269,17 @@ export default function HomeScreen() {
         </Text>
 
         <View className="flex-row items-center gap-2">
+          {isDentist && <CartHeaderButton />}
           <Pressable
             onPress={() => router.push('/notifications')}
-            className="h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm"
+            className="relative h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm"
           >
             <Bell size={17} color="#334155" />
+            {unreadCount > 0 && (
+              <View className="absolute -end-1 -top-1 h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1">
+                <Text className="text-[9px] font-bold text-white">{unreadCount > 9 ? '9+' : unreadCount}</Text>
+              </View>
+            )}
           </Pressable>
           <Pressable
             onPress={toggle}
@@ -269,62 +345,80 @@ export default function HomeScreen() {
           {/* 3 — Hero carousel */}
           <View className="mt-4 overflow-hidden rounded-3xl">
             {banner ? (
-              <View className="relative overflow-hidden rounded-3xl bg-[#2563EB] p-5">
-                <View className="absolute -right-12 -top-14 h-40 w-40 rounded-full bg-white/15" />
-                <View className="absolute -bottom-16 -left-10 h-36 w-36 rounded-full bg-white/10" />
+              <Pressable
+                disabled={!bannerAd}
+                onPress={() => bannerAd && setViewingAd(bannerAd)}
+                className="relative min-h-[170px] justify-center overflow-hidden rounded-3xl bg-[#2563EB] p-6"
+              >
+                {!!banner.image && (
+                  <>
+                    <Image source={{ uri: banner.image }} resizeMode="cover" style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }} />
+                    <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(15,23,42,0.45)' }} />
+                  </>
+                )}
+                <View className="absolute -right-14 -top-16 h-48 w-48 rounded-full bg-white/15" />
+                <View className="absolute -bottom-20 -left-12 h-44 w-44 rounded-full bg-white/10" />
                 <View className="flex-row items-center gap-3">
                   <View className="min-w-0 flex-1">
-                    <Text className="text-lg font-extrabold leading-tight text-white">
+                    <Text className="text-xl font-extrabold leading-tight text-white">
                       {banner.title}
                     </Text>
                     {!!banner.subtitle && (
-                      <Text className="mt-1 text-xs leading-snug text-white/85">{banner.subtitle}</Text>
+                      <Text numberOfLines={2} className="mt-1.5 text-sm leading-snug text-white/85">{banner.subtitle}</Text>
                     )}
                     {!!banner.price && (
-                      <Text className="mt-1 text-base font-extrabold text-yellow-300">{banner.price}</Text>
+                      <Text className="mt-2 text-lg font-extrabold text-yellow-300">{banner.price}</Text>
                     )}
                   </View>
                 </View>
                 {banners.length > 1 && (
-                  <View className="absolute bottom-2 left-0 right-0 flex-row items-center justify-center gap-1.5">
+                  <View className="absolute bottom-3 left-0 right-0 flex-row items-center justify-center gap-1.5">
                     {banners.map((_, i) => (
                       <View key={i} className={cn('rounded-full', i === idx ? 'h-2 w-4 bg-white' : 'h-1.5 w-1.5 bg-white/50')} />
                     ))}
                   </View>
                 )}
-              </View>
+              </Pressable>
             ) : (
-              <View className="relative overflow-hidden rounded-3xl bg-[#2563EB] p-5">
-                <View className="absolute -right-12 -top-14 h-40 w-40 rounded-full bg-white/15" />
-                <View className="absolute -bottom-16 -left-10 h-36 w-36 rounded-full bg-white/10" />
+              <View className="relative min-h-[170px] justify-center overflow-hidden rounded-3xl bg-[#2563EB] p-6">
+                <View className="absolute -right-14 -top-16 h-48 w-48 rounded-full bg-white/15" />
+                <View className="absolute -bottom-20 -left-12 h-44 w-44 rounded-full bg-white/10" />
                 <Megaphone
-                  size={128}
+                  size={144}
                   color="rgba(255,255,255,0.15)"
                   strokeWidth={1.2}
-                  style={{ position: 'absolute', left: -10, bottom: -18 }}
+                  style={{ position: 'absolute', left: -10, bottom: -20 }}
                 />
-                <Text className="text-lg font-extrabold leading-tight text-white">
+                <Text className="text-xl font-extrabold leading-tight text-white">
                   {ar ? 'هل تريد زيادة مبيعاتك؟' : 'Want to increase your sales?'}
                 </Text>
-                <Text className="mt-1.5 text-xs leading-snug text-white/90">
+                <Text className="mt-1.5 text-sm leading-snug text-white/90">
                   {ar ? 'أعلن معنا ليصل منتجك لجميع أطباء الأسنان' : 'Advertise with us to reach all dentists'}
                 </Text>
-                <View className="mt-3 self-start rounded-full bg-white/20 px-4 py-2">
-                  <Text className="text-xs font-bold text-white">
+                <Pressable
+                  onPress={() => router.push('/my-ads')}
+                  className="mt-3.5 self-start rounded-full bg-white/20 px-5 py-2.5"
+                >
+                  <Text className="text-sm font-bold text-white">
                     {ar ? 'تواصل للإعلان' : 'Contact to advertise'}
                   </Text>
-                </View>
+                </Pressable>
               </View>
             )}
           </View>
 
-          {/* 4 — Category tiles */}
+          {/* 4 — Category tiles (framed cards, matching web's src/routes/index.tsx) */}
           <View className="mt-6">
-            <SectionHead title={ar ? 'تصفح حسب الفئة' : 'Browse by category'} />
-            <View className="flex-row items-start justify-between">
+            <SectionHead title={ar ? 'تصفح حسب الفئة' : 'Browse by category'} ar={ar} />
+            <View className="flex-row items-stretch gap-2">
               {CATEGORY_TILES.map((c) => (
-                <Pressable key={c.en} onPress={() => router.push(c.to)} className="w-[23%] items-center">
-                  <View className={cn('h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 bg-slate-50', c.border)}>
+                <Pressable
+                  key={c.en}
+                  onPress={() => router.push(c.to)}
+                  style={{ minHeight: 92 }}
+                  className="flex-1 items-center justify-between rounded-2xl border border-slate-200 bg-white p-2.5 shadow-sm"
+                >
+                  <View className={cn('h-12 w-12 items-center justify-center overflow-hidden rounded-full border-2 bg-slate-50', c.border)}>
                     <Image source={c.img} className="h-full w-full" resizeMode="cover" />
                   </View>
                   <Text className="mt-1.5 text-center text-[10px] font-bold leading-tight text-slate-700">
@@ -337,11 +431,15 @@ export default function HomeScreen() {
 
           {/* 5 — Brands strip */}
           <View className="mt-6">
-            <SectionHead title={ar ? 'البراندات' : 'Brands'} seeAll="/brands" />
+            <SectionHead title={ar ? 'البراندات' : 'Brands'} seeAll="/brands" ar={ar} />
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View className="flex-row gap-2.5 pb-1">
                 {BRANDS.slice(0, 8).map((b) => (
-                  <Pressable key={b.id} onPress={() => router.push('/brands')} className="w-24">
+                  <Pressable
+                    key={b.id}
+                    onPress={() => router.push({ pathname: '/brand/[brandId]', params: { brandId: b.id } })}
+                    className="w-24"
+                  >
                     <View className="items-center rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
                       <View className="mb-1.5 h-14 w-full items-center justify-center overflow-hidden rounded-xl bg-slate-50">
                         <BrandMark image={b.image} name={b.name} />
@@ -356,53 +454,31 @@ export default function HomeScreen() {
             </ScrollView>
           </View>
 
-          {/* 6 — Recent orders */}
+          {/* 6 — Track cases (moved here from the Recent-orders slot to match
+              web's home; "Recent orders" itself now lives only under
+              طلباتي/My Orders, not on Home). */}
           <View className="mt-6">
-            <SectionHead title={ar ? 'أحدث الطلبات' : 'Recent orders'} seeAll="/orders" />
-            {recentOrders.length === 0 ? (
-              <View className="rounded-2xl border border-slate-200 bg-card p-4 shadow-sm">
-                <Text className="text-center text-xs text-slate-400">
-                  {ar ? 'لا توجد طلبات بعد' : 'No orders yet'}
+            <Pressable
+              onPress={() => router.push('/track-cases')}
+              className="flex-row items-center gap-3 rounded-2xl border border-sky-100 bg-sky-50 p-3.5"
+            >
+              <View className="h-11 w-11 items-center justify-center rounded-2xl bg-sky-100" style={{ borderWidth: 1, borderColor: '#BAE6FD' }}>
+                <ClipboardList size={20} color="#0284C7" strokeWidth={2.2} />
+              </View>
+              <View className="min-w-0 flex-1">
+                <Text className="text-sm font-extrabold text-slate-800">{ar ? 'تتبع حالاتك' : 'Track your cases'}</Text>
+                <Text className="text-[11px] text-slate-500">
+                  {ar ? 'تابع حالة الطلبات من المختبر' : 'Follow your lab order status'}
+                </Text>
+                <Text className="mt-0.5 text-[11px] font-bold text-primary">
+                  {ar ? 'عرض جميع الحالات ›' : 'View all cases ›'}
                 </Text>
               </View>
-            ) : (
-              <View className="gap-2.5">
-                {recentOrders.map((o) => {
-                  const st = (o.status as string) ?? 'pending';
-                  const tone =
-                    st === 'delivered' || st === 'confirmed'
-                      ? 'bg-emerald-50 text-emerald-700'
-                      : st === 'rejected'
-                        ? 'bg-rose-50 text-rose-600'
-                        : 'bg-amber-50 text-amber-700';
-                  const label =
-                    st === 'delivered' ? (ar ? 'تم التسليم' : 'Delivered')
-                    : st === 'confirmed' ? (ar ? 'مؤكد' : 'Confirmed')
-                    : st === 'rejected' ? (ar ? 'مرفوض' : 'Cancelled')
-                    : ar ? 'قيد الانتظار' : 'Pending';
-                  return (
-                    <Pressable
-                      key={o.id}
-                      onPress={() => router.push('/orders')}
-                      className="flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-card p-3.5 shadow-sm"
-                    >
-                      <View className="h-10 w-10 items-center justify-center rounded-xl bg-violet-50">
-                        <ClipboardList size={18} color="#7C3AED" />
-                      </View>
-                      <View className="min-w-0 flex-1">
-                        <Text className="text-sm font-bold text-slate-800" numberOfLines={1}>
-                          {o.orderNumber || o.id.slice(0, 8)}
-                        </Text>
-                        <Text className="text-[11px] text-slate-400">{fmtOrderDate(o.createdAt)}</Text>
-                      </View>
-                      <View className={cn('shrink-0 rounded-full px-2.5 py-1', tone)}>
-                        <Text className="text-[10px] font-bold">{label}</Text>
-                      </View>
-                    </Pressable>
-                  );
-                })}
+              <View className="shrink-0 items-center rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+                <Text className="text-xl font-extrabold text-slate-800">{caseCount}</Text>
+                <Text className="text-[10px] text-slate-500">{ar ? 'حالات' : 'cases'}</Text>
               </View>
-            )}
+            </Pressable>
           </View>
 
           {/* 7 + 8 — Quick shortcuts */}
@@ -497,5 +573,7 @@ export default function HomeScreen() {
         </>
       )}
     </Screen>
+    {!!viewingAd && <AdDetailModal ad={viewingAd} ar={ar} onClose={() => setViewingAd(null)} />}
+    </>
   );
 }

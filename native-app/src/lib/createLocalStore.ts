@@ -10,6 +10,12 @@ export interface LocalStoreApi<T> {
   useStore: () => T;
   set: (val: T | Updater<T>) => void;
   reset: () => void;
+  /** Scope this store to a signed-in user, matching the pattern used by
+   * setClinicStoreUser/setPatientStoreUser/setAppointmentsStoreUser: each
+   * user gets their own AsyncStorage key instead of everyone on the device
+   * sharing one. Call with "" (or skip entirely) to stay on the plain,
+   * unscoped `key` — existing stores that never call this are unaffected. */
+  setUser: (uid: string) => void;
 }
 
 /**
@@ -28,11 +34,16 @@ export function createLocalStore<T>(
 ): LocalStoreApi<T> {
   let state: T = defaultValue;
   let initialized = false;
+  let userId: string | null = null;
   const listeners = new Set<() => void>();
+
+  function storageKey(): string {
+    return userId ? `${key}:${userId}` : key;
+  }
 
   async function load(): Promise<T> {
     try {
-      const raw = await AsyncStorage.getItem(key);
+      const raw = await AsyncStorage.getItem(storageKey());
       if (!raw) return defaultValue;
       const parsed = JSON.parse(raw);
       if (options?.migrate) return options.migrate(parsed);
@@ -47,7 +58,7 @@ export function createLocalStore<T>(
 
   async function persist() {
     try {
-      await AsyncStorage.setItem(key, JSON.stringify(state));
+      await AsyncStorage.setItem(storageKey(), JSON.stringify(state));
     } catch {
       /* best effort */
     }
@@ -97,5 +108,19 @@ export function createLocalStore<T>(
     emit();
   }
 
-  return { getSnapshot, getServerSnapshot, subscribe, useStore, set, reset };
+  function setUser(uid: string) {
+    const next = uid || null;
+    if (next === userId) return;
+    userId = next;
+    // Switch to the new user's own slice: drop whatever the previous user's
+    // data was out of memory immediately (so a mounted useStore() never
+    // shows it, even for the instant before the new key's data loads) and
+    // re-hydrate from their AsyncStorage key.
+    state = defaultValue;
+    initialized = false;
+    listeners.forEach((l) => l());
+    hydrate();
+  }
+
+  return { getSnapshot, getServerSnapshot, subscribe, useStore, set, reset, setUser };
 }

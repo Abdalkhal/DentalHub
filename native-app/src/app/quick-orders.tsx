@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Pressable, View } from 'react-native';
 import { router } from 'expo-router';
-import { ShoppingBag } from 'lucide-react-native';
+import { RotateCcw, ShoppingBag } from 'lucide-react-native';
 
 import { Screen, Text } from '@/components/ui';
 import { ProductImage } from '@/components/ProductImage';
@@ -112,7 +112,7 @@ export default function QuickOrdersScreen() {
               return (
                 <View
                   key={item.productId}
-                  className="flex-row items-start gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm"
+                  className="flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm"
                 >
                   <Pressable onPress={() => goToProduct(item)}>
                     <ProductImage uri={img} className="h-14 w-14 rounded-xl bg-slate-100" iconSize={22} />
@@ -140,27 +140,15 @@ export default function QuickOrdersScreen() {
                     </View>
                   </Pressable>
 
-                  <View className="shrink-0 items-end gap-1.5">
-                    <Pressable
-                      onPress={() => handleReorder(item)}
-                      className="h-8 items-center justify-center rounded-lg bg-primary/10 px-3"
-                    >
-                      <Text className="text-[10px] font-bold text-primary">
-                        {ar ? 'إعادة طلب' : 'Reorder'}
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => {
-                        handleReorder(item);
-                        router.push('/cart');
-                      }}
-                      className="h-8 items-center justify-center rounded-lg bg-[#2563EB] px-3"
-                    >
-                      <Text className="text-[10px] font-bold text-white">
-                        {ar ? 'شراء الآن' : 'Buy now'}
-                      </Text>
-                    </Pressable>
-                  </View>
+                  <Pressable
+                    onPress={() => handleReorder(item)}
+                    className="h-9 shrink-0 flex-row items-center gap-1.5 rounded-xl bg-primary px-3.5"
+                  >
+                    <RotateCcw size={13} color="#FFFFFF" />
+                    <Text className="text-xs font-bold text-primary-foreground">
+                      {ar ? 'إعادة طلب' : 'Reorder'}
+                    </Text>
+                  </Pressable>
                 </View>
               );
             })}

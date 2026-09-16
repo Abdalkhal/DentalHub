@@ -7,6 +7,9 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
   Cog,
   Eye,
   EyeOff,
@@ -22,7 +25,7 @@ import type { LucideIcon } from 'lucide-react-native';
 import { Screen, Text } from '@/components/ui';
 import { Input } from '@/components/ui/Input';
 import { auth, db } from '@/integrations/firebase/client';
-import { fetchUserRoleDoc, getAccountDashboard, type AccountDashboardHref } from '@/lib/useAuth';
+import { fetchUserRoleDoc, getAccountDashboard, type AccountDashboardHref, type LabStaffRole } from '@/lib/useAuth';
 import { CITIES } from '@/data/offices';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
@@ -142,6 +145,20 @@ export default function LoginScreen() {
         const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
         const roleDoc = await fetchUserRoleDoc(cred.user.uid);
         if (!roleDoc) {
+          // Invited lab staff (designers/technicians/admins added from "كادر
+          // المختبر") deliberately have no `user_roles` doc — only a custom
+          // claim set server-side by `inviteLabMember`. Check that before
+          // concluding there's no account at all.
+          const staffClaims = (await cred.user.getIdTokenResult()).claims as {
+            role?: LabStaffRole;
+            labId?: string;
+          };
+          const isLabStaff =
+            accountType === 'lab' && !!staffClaims.labId && ['ADMIN', 'DESIGNER', 'TECHNICIAN'].includes(staffClaims.role ?? '');
+          if (isLabStaff) {
+            go('/');
+            return;
+          }
           setError(
             ar
               ? 'لم يتم العثور على صلاحيات لهذا الحساب. يرجى التسجيل أولاً.'
@@ -207,8 +224,14 @@ export default function LoginScreen() {
     >
       <Screen>
       {/* Brand */}
-      <View className="mt-1 items-center">
-        <Text className="text-2xl font-extrabold tracking-tight">
+      <View className="mt-2 items-center">
+        <View
+          className="h-16 w-16 items-center justify-center rounded-3xl"
+          style={{ backgroundColor: '#2563EB', shadowColor: '#2563EB', shadowOpacity: 0.35, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 6 }}
+        >
+          <Stethoscope size={30} color="#FFFFFF" strokeWidth={2.2} />
+        </View>
+        <Text className="mt-3 text-2xl font-extrabold tracking-tight">
           <Text className="text-primary">Dental</Text>
           <Text className="text-slate-900">Hub</Text>
         </Text>
@@ -217,22 +240,12 @@ export default function LoginScreen() {
         </Text>
       </View>
 
-      {/* Info note */}
-      <View className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
-        <Text className="text-center text-xs leading-relaxed text-slate-600">
-          {ar
-            ? 'يمكنك تسجيل الدخول باستخدام رقم الهاتف أو البريد الإلكتروني'
-            : 'You can sign in using your phone number or email'}
-        </Text>
-      </View>
-
       {/* Account type */}
-      <View className="mt-5">
-        <View className="mb-3 flex-row items-center gap-1.5 px-1">
-          <View className="h-1.5 w-1.5 rounded-full bg-sky-400" />
-          <Text className="text-xs font-bold text-slate-500">{ar ? 'نوع الحساب' : 'Account type'}</Text>
-        </View>
-        <View className="flex-row flex-wrap justify-between gap-y-2.5">
+      <View className="mt-7">
+        <Text className="mb-3 px-1 text-xs font-bold uppercase tracking-wide text-slate-400">
+          {ar ? 'نوع الحساب' : 'Account type'}
+        </Text>
+        <View className="flex-row flex-wrap justify-between gap-y-3">
           {ROLES.map((opt) => {
             const active = accountType === opt.id;
             const Icon = opt.icon;
@@ -243,22 +256,25 @@ export default function LoginScreen() {
                   setAccountType(opt.id);
                   setError('');
                 }}
-                style={active ? { transform: [{ scale: 1.02 }] } : undefined}
                 className={cn(
-                  'w-[48.5%] flex-col items-center gap-2 rounded-2xl border-2 px-2 py-4 shadow-md',
-                  active
-                    ? cn(opt.activeBg, opt.activeRing)
-                    : 'border-transparent bg-slate-50',
+                  'w-[48.5%] flex-col items-center gap-2 rounded-3xl border-2 px-2 py-4',
+                  active ? cn(opt.activeBg, opt.activeRing) : 'border-transparent bg-slate-50',
                 )}
+                style={
+                  active
+                    ? { shadowColor: opt.iconHex, shadowOpacity: 0.18, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 3 }
+                    : undefined
+                }
               >
-                <View
-                  className={cn(
-                    'h-11 w-11 flex-row items-center justify-center rounded-xl',
-                    active
-                      ? cn(opt.activeBg, 'ring-2', 'ring-sky-500')
-                      : 'bg-white ring-1 ring-slate-200',
-                  )}
-                >
+                {active && (
+                  <View
+                    className="absolute -end-1.5 -top-1.5 h-5 w-5 items-center justify-center rounded-full border-2 border-white"
+                    style={{ backgroundColor: opt.iconHex }}
+                  >
+                    <Check size={11} color="#FFFFFF" strokeWidth={3} />
+                  </View>
+                )}
+                <View className="h-12 w-12 flex-row items-center justify-center rounded-2xl bg-white">
                   <Icon size={26} color={active ? opt.iconHex : '#94A3B8'} />
                 </View>
                 <Text className={cn('text-center text-xs font-bold leading-tight', active ? opt.activeText : 'text-slate-600')}>
@@ -274,7 +290,7 @@ export default function LoginScreen() {
       </View>
 
       {/* Sign in / Sign up tabs */}
-      <View className="mt-5 flex-row gap-1.5 rounded-2xl bg-slate-100/80 p-1.5">
+      <View className="mt-6 flex-row gap-1.5 rounded-full bg-slate-100/80 p-1.5">
         {(['signin', 'signup'] as const).map((m) => {
           const activeTab = mode === m;
           return (
@@ -284,13 +300,15 @@ export default function LoginScreen() {
                 setMode(m);
                 setError('');
               }}
-              // shadow-md stays on both branches: see note in labs-office.tsx.
-              className={cn(
-                'h-11 flex-1 items-center justify-center rounded-xl shadow-md',
-                activeTab ? 'bg-white' : 'bg-transparent',
-              )}
+              // No shadow at all — a transparent Pressable with elevation
+              // still paints a faint halo behind the inactive tab on Android.
+              // A solid fill marks the active tab instead (also sidesteps
+              // the NativeWind 4.2.6 + RN 0.86 crash from toggling shadow-*
+              // classes between renders — see labs-office.tsx).
+              className="h-11 flex-1 items-center justify-center rounded-full"
+              style={activeTab ? { backgroundColor: '#2563EB' } : undefined}
             >
-              <Text className={cn('text-sm font-bold', activeTab ? 'text-slate-900' : 'text-slate-500')}>
+              <Text className={cn('text-sm font-bold', activeTab ? 'text-white' : 'text-slate-500')}>
                 {m === 'signin' ? (ar ? 'تسجيل دخول' : 'Sign in') : ar ? 'إنشاء حساب' : 'Create account'}
               </Text>
             </Pressable>
@@ -299,7 +317,7 @@ export default function LoginScreen() {
       </View>
 
       {/* Form */}
-      <View className="mt-4 gap-3 rounded-2xl border border-slate-200 bg-card p-4 shadow-sm">
+      <View className="mt-4 gap-3 rounded-3xl border border-slate-100 bg-card p-4 shadow-sm">
         {mode === 'signup' && (
           <>
             <Input
@@ -410,9 +428,9 @@ export default function LoginScreen() {
           rightIcon={
             <Pressable onPress={() => setShowPassword((s) => !s)} hitSlop={10}>
               {showPassword ? (
-                <EyeOff size={18} color="#94A3B8" />
-              ) : (
                 <Eye size={18} color="#94A3B8" />
+              ) : (
+                <EyeOff size={18} color="#94A3B8" />
               )}
             </Pressable>
           }
@@ -428,32 +446,32 @@ export default function LoginScreen() {
           onPress={submit}
           disabled={busy}
           className={cn(
-            'h-12 flex-row items-center justify-center gap-2 rounded-xl shadow-lg',
+            'flex-row items-center justify-center gap-2 rounded-full shadow-lg',
             busy ? 'bg-slate-300' : 'bg-[#2563EB] active:scale-[0.98]',
           )}
+          style={{ height: 52 }}
         >
           {busy ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <Text className="text-sm font-bold text-white">
-              {mode === 'signin'
-                ? ar
-                  ? 'تسجيل الدخول'
-                  : 'Sign in'
-                : ar
-                  ? 'إنشاء حساب'
-                  : 'Sign up'}
-            </Text>
+            <>
+              <Text className="text-sm font-bold text-white">
+                {mode === 'signin'
+                  ? ar
+                    ? 'تسجيل الدخول'
+                    : 'Sign in'
+                  : ar
+                    ? 'إنشاء حساب'
+                    : 'Sign up'}
+              </Text>
+              {ar ? (
+                <ArrowLeft size={16} color="#FFFFFF" />
+              ) : (
+                <ArrowRight size={16} color="#FFFFFF" />
+              )}
+            </>
           )}
         </Pressable>
-
-        {mode === 'signup' && (
-          <Text className="text-center text-[11px] text-slate-400">
-            {ar
-              ? 'أول حساب يتم إنشاؤه يصبح مدير النظام تلقائياً.'
-              : 'The first account created becomes the system admin automatically.'}
-          </Text>
-        )}
       </View>
       </Screen>
     </KeyboardAvoidingView>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
-import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/integrations/firebase/client";
 import type { UserRoleDoc, AppRole } from "@/integrations/firebase/types";
 
@@ -57,28 +57,32 @@ export function useUserRole() {
   const [role, setRole] = useState<UserRoleDoc | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // A one-time `getDocs` here meant editing your profile (e.g. the name
+  // field in settings.tsx) never showed up anywhere else already mounted —
+  // every other screen's own `useUserRole()` call had fetched its `role`
+  // once and just kept it, with nothing to tell it the doc had changed. A
+  // live `onSnapshot`, matching every other Firestore read in this app,
+  // pushes the update to every mounted screen the moment the doc is saved.
   useEffect(() => {
-    let cancelled = false;
     if (!user) {
       setRole(null);
       setLoading(false);
-      return;
+      return () => {};
     }
     setLoading(true);
-    (async () => {
-      try {
-        const q = query(collection(db, "user_roles"), where("userId", "==", user.uid));
-        const snap = await getDocs(q);
-        if (!cancelled) setRole(snap.empty ? null : (snap.docs[0].data() as UserRoleDoc));
-      } catch {
-        if (!cancelled) setRole(null);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    const q = query(collection(db, "user_roles"), where("userId", "==", user.uid));
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setRole(snap.empty ? null : (snap.docs[0].data() as UserRoleDoc));
+        setLoading(false);
+      },
+      () => {
+        setRole(null);
+        setLoading(false);
+      },
+    );
+    return unsub;
   }, [user]);
 
   return { user, role, loading: authLoading || loading };

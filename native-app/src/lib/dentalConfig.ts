@@ -1,4 +1,4 @@
-﻿import { Gem, Diamond, Shield, Cog, Clock, Sparkles, Smile, Ruler } from "lucide-react-native";
+import { Gem, Diamond, Shield, Cog, Clock, Sparkles, Smile, Ruler } from "lucide-react-native";
 import type { LucideIcon } from "lucide-react-native";
 
 export type MaterialId =
@@ -63,44 +63,44 @@ export type FrameworkCreation = {
 };
 
 export const MATERIALS: Material[] = [
-  { id: "material.zirconia", ar: "Ø²Ø±ÙƒÙˆÙ†", en: "Zirconia", icon: Gem },
-  { id: "material.emax", ar: "Ø¥ÙŠÙ…Ø§ÙƒØ³", en: "E.max / Lithium Disilicate", icon: Diamond },
-  { id: "material.pfm", ar: "Ø³ÙŠØ±Ø§Ù…ÙŠÙƒ Ù…Ù„ØªØ­Ù… Ø¨Ø§Ù„Ù…Ø¹Ø¯Ù†", en: "PFM â€” Porcelain Fused to Metal", icon: Shield },
-  { id: "material.full_cast_metal", ar: "Ù…Ø¹Ø¯Ù† ÙƒØ§Ù…Ù„", en: "Full Cast Metal", icon: Cog },
-  { id: "material.pmma", ar: "ØªØ±ÙƒÙŠØ¨Ø§Øª Ù…Ø¤Ù‚ØªØ©", en: "PMMA (Temporary)", icon: Clock },
-  { id: "material.feldspathic", ar: "Ø³ÙŠØ±Ø§Ù…ÙŠÙƒ ØªØ¬Ù…ÙŠÙ„ÙŠ", en: "Feldspathic Ceramic", icon: Sparkles },
-  { id: "material.clear_aligner", ar: "ØªÙ‚ÙˆÙŠÙ… Ø´ÙØ§Ù", en: "Clear Aligner", icon: Smile },
-  { id: "material.titanium_bar", ar: "ØªÙŠØªØ§Ù†ÙŠÙˆÙ… Ø¨Ø§Ø±", en: "Titanium Bar", icon: Ruler },
+  { id: "material.zirconia", ar: "زركون", en: "Zirconia", icon: Gem },
+  { id: "material.emax", ar: "إيماكس", en: "E.max / Lithium Disilicate", icon: Diamond },
+  { id: "material.pfm", ar: "سيراميك ملتحم بالمعدن", en: "PFM — Porcelain Fused to Metal", icon: Shield },
+  { id: "material.full_cast_metal", ar: "معدن كامل", en: "Full Cast Metal", icon: Cog },
+  { id: "material.pmma", ar: "تركيبات مؤقتة", en: "PMMA (Temporary)", icon: Clock },
+  { id: "material.feldspathic", ar: "سيراميك تجميلي", en: "Feldspathic Ceramic", icon: Sparkles },
+  { id: "material.clear_aligner", ar: "تقويم شفاف", en: "Clear Aligner", icon: Smile },
+  { id: "material.titanium_bar", ar: "تيتانيوم بار", en: "Titanium Bar", icon: Ruler },
 ];
 
 export const WORK_TYPES: WorkType[] = [
-  { id: "crown", ar: "ØªØ§Ø¬", en: "Crown", category: "core" },
-  { id: "bridge", ar: "Ø¬Ø³Ø±", en: "Bridge", category: "core" },
-  { id: "implant_crown", ar: "ØªØ§Ø¬ ÙÙˆÙ‚ Ø²Ø±Ø¹Ø©", en: "Implant Crown", category: "core" },
-  { id: "implant_bridge", ar: "Ø¬Ø³Ø± ÙÙˆÙ‚ Ø§Ù„Ø²Ø±Ø¹Ø§Øª", en: "Implant Bridge", category: "core" },
-  { id: "full_arch", ar: "ØªØ±ÙƒÙŠØ¨Ø© ÙƒØ§Ù…Ù„Ø©", en: "Full-Arch Prosthesis", category: "core" },
-  { id: "veneer", ar: "ÙÙŠÙ†ÙŠØ±", en: "Veneer", category: "advanced" },
-  { id: "inlay", ar: "Ø¥Ù†Ù„Ø§ÙŠ", en: "Inlay", category: "advanced" },
-  { id: "onlay", ar: "Ø£ÙˆÙ†Ù„Ø§ÙŠ", en: "Onlay", category: "advanced" },
-  { id: "overlay", ar: "Ø£ÙˆÙØ±Ù„Ø§ÙŠ", en: "Overlay", category: "advanced" },
-  { id: "limited_bridge", ar: "Ø¬Ø³Ø± Ù…Ø­Ø¯ÙˆØ¯", en: "Limited Bridge" },
-  { id: "implant_temporary", ar: "ØªØ±Ù…ÙŠÙ… Ù…Ø¤Ù‚Øª ÙÙˆÙ‚ Ø²Ø±Ø¹Ø©", en: "Implant Temporary" },
+  { id: "crown", ar: "تاج", en: "Crown", category: "core" },
+  { id: "bridge", ar: "جسر", en: "Bridge", category: "core" },
+  { id: "implant_crown", ar: "تاج فوق زرعة", en: "Implant Crown", category: "core" },
+  { id: "implant_bridge", ar: "جسر فوق الزرعات", en: "Implant Bridge", category: "core" },
+  { id: "full_arch", ar: "تركيبة كاملة", en: "Full-Arch Prosthesis", category: "core" },
+  { id: "veneer", ar: "فينير", en: "Veneer", category: "advanced" },
+  { id: "inlay", ar: "إنلاي", en: "Inlay", category: "advanced" },
+  { id: "onlay", ar: "أونلاي", en: "Onlay", category: "advanced" },
+  { id: "overlay", ar: "أوفرلاي", en: "Overlay", category: "advanced" },
+  { id: "limited_bridge", ar: "جسر محدود", en: "Limited Bridge" },
+  { id: "implant_temporary", ar: "ترميم مؤقت فوق زرعة", en: "Implant Temporary" },
 ];
 
 export const MANUFACTURING_METHODS: ManufacturingMethod[] = [
-  { id: "monolithic", ar: "ØªØ´Ø±ÙŠØ­ ÙƒØ§Ù…Ù„ / Ù…ØªØ¬Ø§Ù†Ø³", en: "Full Anatomy / Monolithic" },
-  { id: "cutback_layering", ar: "Ù‚Øµ Ø®Ù„ÙÙŠ + Ø·Ø¨Ù‚Ø§Øª Ø¨ÙˆØ±Ø³Ù„Ø§Ù†", en: "Cut-Back + Porcelain Layering" },
-  { id: "cad_cam_milling", ar: "ØªÙØ±ÙŠØ² CAD/CAM", en: "CAD/CAM Milling" },
-  { id: "pressing", ar: "Ø¶ØºØ·", en: "Pressing" },
-  { id: "layering", ar: "ØªØ±Ø§ÙƒÙ… ÙŠØ¯ÙˆÙŠ", en: "Layering" },
-  { id: "metal_coping_layering", ar: "ÙƒÙˆØ¨ÙŠÙ†Øº Ù…Ø¹Ø¯Ù†ÙŠ + Ø·Ø¨Ù‚Ø§Øª Ø¨ÙˆØ±Ø³Ù„Ø§Ù†", en: "Metal Coping + Porcelain Layering" },
-  { id: "metal_framework_layering", ar: "Ù‡ÙŠÙƒÙ„ Ù…Ø¹Ø¯Ù†ÙŠ + Ø·Ø¨Ù‚Ø§Øª Ø¨ÙˆØ±Ø³Ù„Ø§Ù†", en: "Metal Framework + Porcelain Layering" },
-  { id: "casting", ar: "ØµØ¨", en: "Casting" },
+  { id: "monolithic", ar: "تشريح كامل / متجانس", en: "Full Anatomy / Monolithic" },
+  { id: "cutback_layering", ar: "قص خلفي + طبقات بورسلان", en: "Cut-Back + Porcelain Layering" },
+  { id: "cad_cam_milling", ar: "تفريز CAD/CAM", en: "CAD/CAM Milling" },
+  { id: "pressing", ar: "ضغط", en: "Pressing" },
+  { id: "layering", ar: "تراكم يدوي", en: "Layering" },
+  { id: "metal_coping_layering", ar: "كوبينغ معدني + طبقات بورسلان", en: "Metal Coping + Porcelain Layering" },
+  { id: "metal_framework_layering", ar: "هيكل معدني + طبقات بورسلان", en: "Metal Framework + Porcelain Layering" },
+  { id: "casting", ar: "صب", en: "Casting" },
 ];
 
 export const FRAMEWORK_CREATION: FrameworkCreation[] = [
-  { id: "conventional_casting", ar: "ØµØ¨ ØªÙ‚Ù„ÙŠØ¯ÙŠ", en: "Conventional Casting" },
-  { id: "cad_cam_metal", ar: "Ù…Ø¹Ø¯Ù† Ù…ÙØ±ÙˆØ² CAD/CAM", en: "CAD/CAM Milled Metal" },
+  { id: "conventional_casting", ar: "صب تقليدي", en: "Conventional Casting" },
+  { id: "cad_cam_metal", ar: "معدن مفروز CAD/CAM", en: "CAD/CAM Milled Metal" },
 ];
 
 export type MaterialRules = {
@@ -117,7 +117,7 @@ export const IMPLANT_WORK_TYPES: WorkTypeId[] = [
 ];
 
 /**
- * Strict material â†’ work type â†’ manufacturing method rules.
+ * Strict material → work type → manufacturing method rules.
  * Clear Aligner and Titanium Bar use specialized views (no standard work types).
  */
 export const RULES: Record<MaterialId, MaterialRules> = {
@@ -262,4 +262,3 @@ export function classifyShade(code: string): ShadeTab {
   if (VITA_BLEACH_SHADES.some((s) => s.code === code)) return "bleach";
   return "others";
 }
-

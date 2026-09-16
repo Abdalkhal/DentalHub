@@ -19,6 +19,14 @@ function notifications(): NotificationsApi {
   return require('expo-notifications') as NotificationsApi;
 }
 
+// expo-notifications' remote push isn't available at all inside Expo Go
+// (Expo dropped that support in SDK 53) — only a real dev/production build
+// has the native module. The UI uses this to avoid offering an "Enable"
+// button that can only ever fail there.
+export function isPushSupported(): boolean {
+  return hasNativeModule('ExpoPushTokenManager');
+}
+
 export async function setupAndroidChannel(): Promise<void> {
   if (Platform.OS !== 'android') return;
   if (!hasNativeModule('ExpoPushTokenManager')) return;
@@ -33,12 +41,18 @@ export async function setupAndroidChannel(): Promise<void> {
   }
 }
 
+export type RegisterPushResult = { token: string | null; reason?: string };
+
 /**
  * Asks for permission, obtains the Expo push token and stores it on the user
- * role doc (`pushTokens`). Returns the token or null when unavailable.
+ * role doc (`pushTokens`). The caller previously only got a token-or-null
+ * back, which meant every failure (no permission, no FCM credentials
+ * uploaded to EAS, network error) surfaced as the same generic message —
+ * making it impossible to tell "this device declined" from "this project
+ * isn't configured for push yet" apart. `reason` carries the real cause.
  */
-export async function registerPush(userId: string): Promise<string | null> {
-  if (!hasNativeModule('ExpoPushTokenManager')) return null;
+export async function registerPush(userId: string): Promise<RegisterPushResult> {
+  if (!hasNativeModule('ExpoPushTokenManager')) return { token: null, reason: 'unsupported-runtime' };
   try {
     const N = notifications();
     if (Platform.OS === 'android') {
@@ -53,13 +67,13 @@ export async function registerPush(userId: string): Promise<string | null> {
       const req = await N.requestPermissionsAsync();
       final = req.status;
     }
-    if (final !== 'granted') return null;
+    if (final !== 'granted') return { token: null, reason: 'permission-denied' };
     const token = (
       await N.getExpoPushTokenAsync({ projectId: 'e631dca8-3a36-4416-82d8-9389cd4ad63b' })
     ).data;
     await updateDoc(doc(db, 'user_roles', userId), { pushTokens: arrayUnion(token) }).catch(() => {});
-    return token;
-  } catch {
-    return null;
+    return { token };
+  } catch (e) {
+    return { token: null, reason: e instanceof Error ? e.message : String(e) };
   }
 }

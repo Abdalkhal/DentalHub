@@ -12,6 +12,7 @@ import { hydrateStorage } from '@/lib/storage';
 import { LanguageProvider, useI18n, type DictKey } from '@/lib/i18n';
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { ToastHost } from '@/components/ToastHost';
+import { CartHeaderButton } from '@/components/CartHeaderButton';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -24,9 +25,10 @@ const queryClient = new QueryClient();
  * to English left every header in Arabic. Driving them from the dictionary
  * means the header re-renders with the language, like the rest of the UI.
  */
-const TITLED_SCREENS: { name: string; title: DictKey }[] = [
-  { name: 'supplies', title: 'screen_supplies' },
-  { name: 'product-detail/[productId]', title: 'screen_product' },
+const TITLED_SCREENS: { name: string; title: DictKey; cart?: boolean }[] = [
+  { name: 'supplies', title: 'screen_supplies', cart: true },
+  { name: 'supplies-directory', title: 'screen_supplies_directory', cart: true },
+  { name: 'product-detail/[productId]', title: 'screen_product', cart: true },
   { name: 'cart', title: 'screen_cart' },
   { name: 'patients', title: 'screen_patients' },
   { name: 'patient/[patientId]', title: 'screen_patient' },
@@ -37,20 +39,33 @@ const TITLED_SCREENS: { name: string; title: DictKey }[] = [
   { name: 'notifications', title: 'screen_notifications' },
   { name: 'labs', title: 'screen_labs' },
   { name: 'implants', title: 'screen_implants' },
-  { name: 'brands', title: 'screen_brands' },
-  { name: 'profile/[accountId]', title: 'screen_profile' },
+  { name: 'implant-country/[country]', title: 'screen_implant_country', cart: true },
+  { name: 'brands', title: 'screen_brands', cart: true },
+  { name: 'brand/[brandId]', title: 'screen_brand', cart: true },
+  { name: 'profile/[accountId]', title: 'screen_profile', cart: true },
   { name: 'specialized-implants/index', title: 'screen_specialized_implants' },
   { name: 'specialized-implants/[category]', title: 'screen_specialized_implants' },
   { name: 'bone-grafts', title: 'screen_bone_grafts' },
   { name: 'track-cases', title: 'screen_track_cases' },
   { name: 'surgical-guide', title: 'screen_surgical_guide' },
   { name: 'messages', title: 'screen_messages' },
-  { name: 'doctor-invoices', title: 'screen_doctor_invoices' },
+  { name: 'doctor-invoices/index', title: 'screen_doctor_invoices' },
+  { name: 'invoices', title: 'screen_invoices' },
+  { name: 'doctor-invoices/[invoiceId]', title: 'screen_doctor_invoices' },
   { name: 'help', title: 'screen_help' },
   { name: 'clinic-reports', title: 'screen_reports' },
   { name: 'doctors', title: 'screen_doctors' },
+  { name: 'clinic-doctors', title: 'screen_clinic_doctors' },
+  { name: 'clinic-materials', title: 'screen_clinic_materials' },
   { name: 'designer/index', title: 'screen_designer_cases' },
   { name: 'designer/[caseId]', title: 'screen_case_details' },
+  { name: 'new-lab-order', title: 'screen_new_lab_order' },
+  { name: 'lab-finance', title: 'screen_lab_finance' },
+  { name: 'lab-reports', title: 'screen_lab_reports' },
+  { name: 'lab-services', title: 'screen_lab_services' },
+  { name: 'my-ads', title: 'screen_my_ads' },
+  { name: 'lab-doctors', title: 'screen_doctors' },
+  { name: 'lab-patients', title: 'screen_patients' },
 ];
 
 /**
@@ -68,8 +83,16 @@ function RootStack() {
           (tabs) group so vendor roles keep the bottom tab bar on their own
           dashboard. Their URLs are unchanged — route groups do not appear in
           the path. */}
-      {TITLED_SCREENS.map(({ name, title }) => (
-        <Stack.Screen key={name} name={name} options={{ headerShown: true, title: t(title) }} />
+      {TITLED_SCREENS.map(({ name, title, cart }) => (
+        <Stack.Screen
+          key={name}
+          name={name}
+          options={{
+            headerShown: true,
+            title: t(title),
+            headerRight: cart ? () => <CartHeaderButton /> : undefined,
+          }}
+        />
       ))}
     </Stack>
   );
@@ -106,6 +129,9 @@ export default function RootLayout() {
 
   if (!ready || (!fontsLoaded && !fontError)) return null;
 
+  // No <SafeAreaProvider> here: expo-router's ExpoRoot already wraps the
+  // whole app in one (see node_modules/expo-router/build/ExpoRoot.js), so
+  // adding a second one here would just be a redundant nested provider.
   return (
     <QueryClientProvider client={queryClient}>
       <LanguageProvider>

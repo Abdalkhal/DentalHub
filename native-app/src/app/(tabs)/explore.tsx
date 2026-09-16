@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react';
-import { Pressable, TextInput, View } from 'react-native';
+import { Image, Pressable, View } from 'react-native';
 import { Redirect, router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { collection, getDocs } from 'firebase/firestore';
 import { FlaskConical, MapPin, Package, Search, Stethoscope } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 
-import { Screen, Text, Spinner } from '@/components/ui';
+import { Screen, Text, Spinner, Input } from '@/components/ui';
 import { db } from '@/integrations/firebase/client';
 import { useSession } from '@/lib/useAuth';
 import { useI18n } from '@/lib/i18n';
@@ -32,12 +32,35 @@ type ResultItem = {
   name: string;
   category: Exclude<Category, 'all'>;
   location: string;
+  photoURL: string;
 };
+
+// A broken/expired photoURL would otherwise leave the row with a blank
+// square forever — fall back to the category icon on load failure, same
+// pattern as BrandMark on the home screen.
+function ResultAvatar({ photoURL, bg, Icon, color }: { photoURL: string; bg: string; Icon: LucideIcon; color: string }) {
+  const [failed, setFailed] = useState(false);
+  if (photoURL && !failed) {
+    return (
+      <Image
+        source={{ uri: photoURL }}
+        className={cn('h-12 w-12 rounded-2xl', bg)}
+        resizeMode="cover"
+        onError={() => setFailed(true)}
+      />
+    );
+  }
+  return (
+    <View className={cn('h-12 w-12 items-center justify-center rounded-2xl', bg)}>
+      <Icon size={22} color={color} strokeWidth={2.2} />
+    </View>
+  );
+}
 
 export default function ExploreScreen() {
   const { lang } = useI18n();
   const ar = lang === 'ar';
-  const { user } = useSession();
+  const { user, loading: sessionLoading } = useSession();
   const [searchQuery, setSearchQuery] = useState('');
   const [category, setCategory] = useState<Category>('all');
 
@@ -60,6 +83,7 @@ export default function ExploreScreen() {
           name,
           category: cat,
           location: String(u.city || u.address || ''),
+          photoURL: typeof u.photoURL === 'string' ? u.photoURL : '',
         });
       }
       return results.filter((r) => r.id);
@@ -77,6 +101,14 @@ export default function ExploreScreen() {
     });
   }, [items, category, searchQuery, user]);
 
+  // `user` starts out `null` until Firebase's onAuthStateChanged fires once —
+  // even for an already-logged-in session. Redirecting on that initial null
+  // (as this screen used to, ignoring `loading`) fired a spurious /login
+  // navigation the instant this tab mounted, racing the tab navigator's own
+  // focus transition and crashing Android/Fabric with "addViewAt: ... already
+  // has a parent". Every sibling screen (app-tabs.tsx, index.tsx) already
+  // gates its redirect on `loading` — this one just wasn't.
+  if (sessionLoading) return <Spinner />;
   if (!user) return <Redirect href="/login" />;
 
   const openProfile = (id: string) =>
@@ -87,13 +119,13 @@ export default function ExploreScreen() {
       <Text className="text-xl font-extrabold text-slate-800">{ar ? 'استكشاف' : 'Explore'}</Text>
 
       {/* Search */}
-      <View className="relative mt-3">
-        <TextInputStyled
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholder={ar ? 'ابحث عن مكتب أو مختبر…' : 'Search for office or lab…'}
-        />
-      </View>
+      <Input
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        placeholder={ar ? 'ابحث عن مكتب أو مختبر…' : 'Search for office or lab…'}
+        leftIcon={<Search size={16} color="#94A3B8" />}
+        className="mt-3"
+      />
 
       {/* Category chips */}
       <View className="mt-3 flex-row flex-wrap gap-1.5">
@@ -133,9 +165,7 @@ export default function ExploreScreen() {
                 onPress={() => openProfile(item.id)}
                 className="flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-card p-3.5 shadow-sm"
               >
-                <View className={cn('h-12 w-12 items-center justify-center rounded-2xl', meta.bg)}>
-                  <Icon size={22} color={meta.color} strokeWidth={2.2} />
-                </View>
+                <ResultAvatar photoURL={item.photoURL} bg={meta.bg} Icon={Icon} color={meta.color} />
                 <View className="min-w-0 flex-1">
                   <Text className="text-sm font-bold text-slate-800" numberOfLines={1}>
                     {item.name}
@@ -156,20 +186,5 @@ export default function ExploreScreen() {
         </View>
       )}
     </Screen>
-  );
-}
-
-function TextInputStyled(props: React.ComponentProps<typeof TextInput>) {
-  return (
-    <View className="relative">
-      <View className="absolute left-3.5 top-0 bottom-0 z-10 justify-center">
-        <Search size={17} color="#94A3B8" />
-      </View>
-      <TextInput
-        placeholderTextColor="#94A3B8"
-        className="h-11 w-full rounded-2xl border border-slate-200 bg-card pl-10 pr-4 text-sm text-slate-800"
-        {...props}
-      />
-    </View>
   );
 }

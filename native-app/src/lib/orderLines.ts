@@ -71,7 +71,11 @@ function toLine(
  * single line.
  */
 export function deriveOrderLines(order: Order): OrderLine[] {
-  const currency = order.currency ?? "USD";
+  // IQD, not USD: this app's cases are priced in Iraqi dinar by default (the
+  // "طلب جديد" currency toggle defaults to IQD), so a missing `currency` —
+  // e.g. a case doc read before its private finance record merges in — must
+  // not default to the wrong currency's symbol.
+  const currency = order.currency ?? "IQD";
 
   const priced = (order.pricingItems ?? []).filter((i) => i.name && String(i.name).trim() !== "");
   if (priced.length > 1) {
@@ -142,6 +146,85 @@ export function deriveOrderLines(order: Order): OrderLine[] {
       Number(order.unitPrice) || 0,
       currency,
     ),
+  ];
+}
+
+export type WorkDetailGroup = {
+  key: string;
+  material?: string;
+  workType?: string;
+  manufacturingMethod?: string;
+  frameworkCreation?: string;
+  titaniumFrameworkType?: string;
+  lineNames: string[];
+};
+
+/**
+ * Groups a case's material/work-type/manufacturing details so a case that
+ * mixes several distinct work items (e.g. an Emax veneer on one tooth and a
+ * Zirconia crown on another) shows one detail card per distinct combination
+ * instead of a single case-wide material. Falls back to one legacy group
+ * built from the case-level fields for orders that never carried per-item
+ * material data (every order created before this, and any "single" pricing
+ * case where per-item detail isn't meaningful).
+ */
+export function deriveWorkDetailGroups(order: Order): WorkDetailGroup[] {
+  const pricedWithMaterial = (order.pricingItems ?? []).filter(
+    (i) => i.name && String(i.name).trim() !== "" && ((i as { material?: string }).material || (i as { workType?: string }).workType),
+  );
+  if (order.pricingMode === "mixed" && pricedWithMaterial.length > 0) {
+    const map = new Map<string, WorkDetailGroup>();
+    pricedWithMaterial.forEach((i) => {
+      const it = i as OrderLine & {
+        material?: string;
+        workType?: string;
+        manufacturingMethod?: string;
+        frameworkCreation?: string;
+      };
+      const key = [it.material, it.workType, it.manufacturingMethod, it.frameworkCreation].join("|");
+      const g = map.get(key) ?? {
+        key,
+        material: it.material,
+        workType: it.workType,
+        manufacturingMethod: it.manufacturingMethod,
+        frameworkCreation: it.frameworkCreation,
+        lineNames: [],
+      };
+      g.lineNames.push(it.name);
+      map.set(key, g);
+    });
+    return [...map.values()];
+  }
+
+  const itemMaterial = (order.rxData?.itemMaterial as Record<string, string> | undefined) ?? {};
+  const itemWorkType = (order.rxData?.itemWorkType as Record<string, string> | undefined) ?? {};
+  const toothItems = (order.rxData?.toothItems as Record<string, string[]> | undefined) ?? {};
+  const labels = new Set<string>();
+  Object.values(toothItems).forEach((arr) => (Array.isArray(arr) ? arr : []).forEach((l) => labels.add(String(l))));
+  if (labels.size > 0 && (Object.keys(itemMaterial).length > 0 || Object.keys(itemWorkType).length > 0)) {
+    const map = new Map<string, WorkDetailGroup>();
+    labels.forEach((label) => {
+      const material = itemMaterial[label];
+      const workType = itemWorkType[label];
+      if (!material && !workType) return;
+      const key = `${material ?? ""}|${workType ?? ""}`;
+      const g = map.get(key) ?? { key, material, workType, lineNames: [] };
+      g.lineNames.push(label);
+      map.set(key, g);
+    });
+    if (map.size > 0) return [...map.values()];
+  }
+
+  return [
+    {
+      key: "legacy",
+      material: order.material,
+      workType: order.workTypeId,
+      manufacturingMethod: order.manufacturingMethod,
+      frameworkCreation: order.frameworkCreation,
+      titaniumFrameworkType: order.titaniumFrameworkType,
+      lineNames: [],
+    },
   ];
 }
 

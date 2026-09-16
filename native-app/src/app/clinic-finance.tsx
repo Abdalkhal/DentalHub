@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Modal, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Modal, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Trash2, TrendingDown, TrendingUp, Wallet, X } from 'lucide-react-native';
 
-import { Screen, Card, Button, Input, Text } from '@/components/ui';
+import { Screen, Select, Text } from '@/components/ui';
 import { useUserRole } from '@/lib/useAuth';
 import {
   setClinicStoreUser,
@@ -14,6 +15,33 @@ import {
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
+const SOURCES = [
+  { id: 'patient', ar: 'مريض', en: 'Patient' },
+  { id: 'lab', ar: 'مختبر', en: 'Lab' },
+  { id: 'supply', ar: 'مستلزمات', en: 'Supplies' },
+  { id: 'other', ar: 'أخرى', en: 'Other' },
+] as const;
+
+function fmtIQD(n: number) {
+  return `${n.toLocaleString()} د.ع`;
+}
+
+function StatCard({ label, value, tone }: { label: string; value: string; tone?: 'warn' | 'good' | 'bad' }) {
+  return (
+    <View className="flex-1 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+      <Text className="text-[11px] text-slate-500">{label}</Text>
+      <Text
+        className={cn(
+          'mt-0.5 text-lg font-extrabold',
+          tone === 'warn' ? 'text-amber-600' : tone === 'good' ? 'text-emerald-600' : tone === 'bad' ? 'text-rose-600' : 'text-slate-800',
+        )}
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
+
 export default function ClinicFinanceScreen() {
   const { lang } = useI18n();
   const ar = lang === 'ar';
@@ -23,58 +51,71 @@ export default function ClinicFinanceScreen() {
   }, [user?.uid]);
 
   const clinic = useClinic();
-  const totals = clinicTotals(clinic);
+  const { income, expense, net, dueOrders } = clinicTotals(clinic);
   const [showAdd, setShowAdd] = useState(false);
 
   return (
     <Screen>
-      <View className="flex-row items-center justify-between">
-        <Text className="text-xl font-extrabold text-slate-800">{ar ? 'المالية' : 'Finance'}</Text>
-        <Button size="sm" title={ar ? '+ معاملة' : '+ Add'} onPress={() => setShowAdd(true)} />
+      <View className="flex-row flex-wrap gap-2.5">
+        <StatCard label={ar ? 'الإيرادات' : 'Revenue'} value={fmtIQD(income)} tone="good" />
+        <StatCard label={ar ? 'المصاريف' : 'Expenses'} value={fmtIQD(expense)} tone="bad" />
+        <StatCard label={ar ? 'الصافي' : 'Net'} value={fmtIQD(net)} tone={net >= 0 ? 'good' : 'bad'} />
+        <StatCard label={ar ? 'متبقي للموردين' : 'Outstanding'} value={fmtIQD(dueOrders)} tone="warn" />
       </View>
 
-      <View className="mt-4 flex-row gap-2">
-        <View className="flex-1 rounded-2xl border border-slate-200 bg-card p-3 shadow-sm">
-          <Text className="text-[11px] font-bold text-slate-500">{ar ? 'الإيرادات' : 'Income'}</Text>
-          <Text className="mt-1 truncate text-base font-extrabold text-emerald-600">
-            {totals.income.toLocaleString()}
-          </Text>
-        </View>
-        <View className="flex-1 rounded-2xl border border-slate-200 bg-card p-3 shadow-sm">
-          <Text className="text-[11px] font-bold text-slate-500">{ar ? 'المصروفات' : 'Expenses'}</Text>
-          <Text className="mt-1 truncate text-base font-extrabold text-rose-500">
-            {totals.expense.toLocaleString()}
-          </Text>
-        </View>
-        <View className="flex-1 rounded-2xl border border-slate-200 bg-card p-3 shadow-sm">
-          <Text className="text-[11px] font-bold text-slate-500">{ar ? 'الصافي' : 'Net'}</Text>
-          <Text className="mt-1 truncate text-base font-extrabold text-primary">
-            {totals.net.toLocaleString()}
-          </Text>
-        </View>
-      </View>
-
-      <MonthlyBars transactions={clinic.transactions} ar={ar} />
+      <Pressable
+        onPress={() => setShowAdd(true)}
+        className="mt-3 h-12 flex-row items-center justify-center gap-2 rounded-2xl bg-primary shadow-lg"
+      >
+        <Text className="text-lg font-bold text-primary-foreground">+</Text>
+        <Text className="text-sm font-extrabold text-primary-foreground">
+          {ar ? 'إضافة حركة مالية' : 'Add transaction'}
+        </Text>
+      </Pressable>
 
       {clinic.transactions.length === 0 ? (
-        <Text className="mt-10 text-center text-slate-500">{ar ? 'لا توجد معاملات' : 'No transactions'}</Text>
+        <View className="mt-4 items-center rounded-2xl border border-dashed border-slate-200 bg-white p-8">
+          <Wallet size={32} color="#94A3B8" />
+          <Text className="mt-2 text-sm font-semibold text-slate-700">
+            {ar ? 'لا توجد حركات مالية' : 'No transactions'}
+          </Text>
+          <Text className="mt-1 text-center text-[11px] text-slate-400">
+            {ar ? 'سجّل أول دفعة أو مصروف' : 'Add your first entry'}
+          </Text>
+        </View>
       ) : (
-        <View className="mt-4 space-y-2">
-          {clinic.transactions.map((t) => (
-            <Card key={t.id} className="flex-row items-center gap-3">
-              <View className="flex-1">
-                <Text className="text-sm font-bold text-slate-800">{t.label}</Text>
-                <Text className="text-[11px] text-slate-400">
-                  {t.source || '—'} · {t.date}
+        <View className="mt-4 gap-2.5">
+          {clinic.transactions.map((t) => {
+            const src = SOURCES.find((s) => s.id === t.source);
+            return (
+              <View key={t.id} className="flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
+                <View
+                  className={cn(
+                    'h-10 w-10 shrink-0 items-center justify-center rounded-2xl',
+                    t.kind === 'income' ? 'bg-emerald-100' : 'bg-rose-100',
+                  )}
+                >
+                  <Text className={cn('text-sm font-extrabold', t.kind === 'income' ? 'text-emerald-700' : 'text-rose-700')}>
+                    {t.kind === 'income' ? '+' : '−'}
+                  </Text>
+                </View>
+                <View className="min-w-0 flex-1">
+                  <Text numberOfLines={1} className="text-sm font-extrabold text-slate-900">
+                    {t.label}
+                  </Text>
+                  <Text className="text-[11px] text-slate-400">
+                    {t.date} · {src ? (ar ? src.ar : src.en) : t.source || '—'}
+                  </Text>
+                </View>
+                <Text className={cn('text-sm font-extrabold', t.kind === 'income' ? 'text-emerald-600' : 'text-rose-600')}>
+                  {fmtIQD(t.amount)}
                 </Text>
+                <Pressable onPress={() => removeTransaction(t.id)} className="h-8 w-8 items-center justify-center rounded-full bg-slate-100">
+                  <Trash2 size={14} color="#64748B" />
+                </Pressable>
               </View>
-              <Text className={cn('text-sm font-extrabold', t.kind === 'income' ? 'text-emerald-600' : 'text-rose-500')}>
-                {t.kind === 'income' ? '+' : '−'}
-                {t.amount.toLocaleString()}
-              </Text>
-              <Button variant="ghost" title="✕" onPress={() => removeTransaction(t.id)} />
-            </Card>
-          ))}
+            );
+          })}
         </View>
       )}
 
@@ -83,136 +124,132 @@ export default function ClinicFinanceScreen() {
   );
 }
 
-function AddTxModal({
-  open,
-  onClose,
-  ar,
-}: {
-  open: boolean;
-  onClose: () => void;
-  ar: boolean;
-}) {
+function AddTxModal({ open, onClose, ar }: { open: boolean; onClose: () => void; ar: boolean }) {
   const [label, setLabel] = useState('');
   const [kind, setKind] = useState<TxKind>('income');
-  const [amount, setAmount] = useState('');
-  const [source, setSource] = useState('');
+  const [amountDisplay, setAmountDisplay] = useState('');
+  const [source, setSource] = useState<(typeof SOURCES)[number]['id']>('patient');
 
-  const save = () => {
-    if (!label.trim() || !amount) return;
+  const formatAmount = (raw: string) => {
+    const digits = raw.replace(/\D/g, '');
+    if (!digits) return '';
+    return Number(digits).toLocaleString('en-US');
+  };
+
+  const reset = () => {
+    setLabel('');
+    setKind('income');
+    setAmountDisplay('');
+    setSource('patient');
+  };
+
+  const submit = () => {
+    if (!label.trim()) return;
     addTransaction({
       label: label.trim(),
       kind,
-      amount: Number(amount) || 0,
-      source: source.trim(),
+      amount: Number(amountDisplay.replace(/,/g, '')) || 0,
+      source,
     });
-    setLabel('');
-    setAmount('');
-    setSource('');
+    reset();
     onClose();
   };
 
   return (
-    <Modal visible={open} transparent animationType="slide">
+    <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
       <View className="flex-1 justify-end bg-black/40">
-        <View className="rounded-t-3xl bg-white p-5 pb-8">
-          <Text className="text-lg font-extrabold">{ar ? 'إضافة معاملة' : 'Add transaction'}</Text>
-          <View className="mt-4 flex-row gap-1.5">
-            <Button size="sm" variant={kind === 'income' ? 'primary' : 'outline'} title={ar ? 'إيراد' : 'Income'} onPress={() => setKind('income')} className="flex-1" />
-            <Button size="sm" variant={kind === 'expense' ? 'primary' : 'outline'} title={ar ? 'مصروف' : 'Expense'} onPress={() => setKind('expense')} className="flex-1" />
+        <View className="rounded-t-3xl bg-white">
+          <View className="flex-row items-center justify-between border-b border-slate-100 px-4 pb-2.5 pt-4">
+            <Text className="text-base font-extrabold text-slate-900">
+              {ar ? 'إضافة حركة مالية' : 'Add transaction'}
+            </Text>
+            <Pressable onPress={onClose} className="h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-slate-50">
+              <X size={16} color="#334155" />
+            </Pressable>
           </View>
-          <View className="mt-4 space-y-3">
-            <Input value={label} onChangeText={setLabel} placeholder={ar ? 'البيان' : 'Label'} />
-            <Input value={amount} onChangeText={setAmount} placeholder={ar ? 'المبلغ' : 'Amount'} keyboardType="numeric" />
-            <Input value={source} onChangeText={setSource} placeholder={ar ? 'المصدر' : 'Source'} />
-          </View>
-          <View className="mt-4 flex-row gap-2">
-            <Button variant="outline" title={ar ? 'إلغاء' : 'Cancel'} onPress={onClose} className="flex-1" />
-            <Button title={ar ? 'حفظ' : 'Save'} onPress={save} className="flex-1" />
-          </View>
+
+          <ScrollView contentContainerClassName="gap-3 px-4 py-4">
+            {/* Income / Expense toggle */}
+            <View className="flex-row gap-2">
+              <Pressable
+                onPress={() => setKind('income')}
+                className={cn(
+                  'h-12 flex-1 flex-row items-center justify-center gap-2 rounded-xl border-2',
+                  kind === 'income' ? 'border-emerald-500 bg-emerald-500' : 'border-slate-200 bg-white',
+                )}
+              >
+                <TrendingUp size={16} color={kind === 'income' ? '#FFFFFF' : '#475569'} />
+                <Text className={cn('text-sm font-bold', kind === 'income' ? 'text-white' : 'text-slate-600')}>
+                  {ar ? 'إيراد' : 'Income'}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setKind('expense')}
+                className={cn(
+                  'h-12 flex-1 flex-row items-center justify-center gap-2 rounded-xl border-2',
+                  kind === 'expense' ? 'border-rose-500 bg-rose-500' : 'border-slate-200 bg-white',
+                )}
+              >
+                <TrendingDown size={16} color={kind === 'expense' ? '#FFFFFF' : '#475569'} />
+                <Text className={cn('text-sm font-bold', kind === 'expense' ? 'text-white' : 'text-slate-600')}>
+                  {ar ? 'مصروف' : 'Expense'}
+                </Text>
+              </Pressable>
+            </View>
+
+            <View>
+              <Text className="mb-1.5 text-[11px] font-bold text-slate-500">{ar ? 'البيان' : 'Description'}</Text>
+              <TextInput
+                value={label}
+                onChangeText={setLabel}
+                placeholder={ar ? 'مثال: دفعة مريض' : 'e.g., Patient payment'}
+                placeholderTextColor="#94A3B8"
+                className="h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-800"
+              />
+            </View>
+
+            <View>
+              <Text className="mb-1.5 text-[11px] font-bold text-slate-500">
+                {ar ? 'المبلغ' : 'Amount'} ({ar ? 'د.ع' : 'IQD'})
+              </Text>
+              <View className="relative">
+                <TextInput
+                  value={amountDisplay}
+                  onChangeText={(v) => setAmountDisplay(formatAmount(v))}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor="#94A3B8"
+                  className="h-11 rounded-xl border border-slate-200 bg-slate-50 pl-3 pr-12 text-right text-sm text-slate-800"
+                />
+                <View className="absolute bottom-0 right-3 top-0 justify-center">
+                  <Text className="text-xs font-bold text-slate-400">{ar ? 'د.ع' : 'IQD'}</Text>
+                </View>
+              </View>
+            </View>
+
+            <View>
+              <Text className="mb-1.5 text-[11px] font-bold text-slate-500">{ar ? 'المصدر' : 'Source'}</Text>
+              <Select
+                value={source}
+                onChange={(v) => setSource(v as (typeof SOURCES)[number]['id'])}
+                options={SOURCES.map((s) => ({ value: s.id, label: ar ? s.ar : s.en }))}
+              />
+            </View>
+
+            <Pressable
+              onPress={submit}
+              className={cn(
+                'mt-1 h-12 items-center justify-center rounded-2xl shadow-lg',
+                kind === 'income' ? 'bg-emerald-500' : 'bg-rose-500',
+              )}
+            >
+              <Text className="text-sm font-extrabold text-white">
+                {ar ? 'حفظ الحركة' : 'Save Transaction'}
+              </Text>
+            </Pressable>
+          </ScrollView>
         </View>
       </View>
     </Modal>
-  );
-}
-
-const SHORT_MONTHS: { ar: string[]; en: string[] } = {
-  ar: ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'],
-  en: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-};
-
-function monthKeyOf(date?: string): string | null {
-  if (!date) return null;
-  const m = /^(\d{4})-(\d{2})/.exec(date);
-  if (m) return `${m[1]}-${m[2]}`;
-  const d = new Date(date);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toISOString().slice(0, 7);
-}
-
-function MonthlyBars({
-  transactions,
-  ar,
-}: {
-  transactions: Array<{ kind: TxKind; amount: number; date?: string }>;
-  ar: boolean;
-}) {
-  const data = useMemo(() => {
-    const keys: string[] = [];
-    const now = new Date();
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      keys.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
-    }
-    const sums = keys.map((k) => ({ k, income: 0, expense: 0 }));
-    transactions.forEach((t) => {
-      const k = monthKeyOf(t.date);
-      if (!k) return;
-      const row = sums.find((s) => s.k === k);
-      if (!row) return;
-      if (t.kind === 'expense') row.expense += t.amount;
-      else row.income += t.amount;
-    });
-    return sums;
-  }, [transactions]);
-
-  if (transactions.length === 0) return null;
-  const max = Math.max(1, ...data.flatMap((d) => [d.income, d.expense]));
-
-  return (
-    <Card className="mt-4">
-      <View className="flex-row items-center justify-between">
-        <Text className="text-sm font-extrabold text-slate-800">
-          {ar ? 'الصافي الشهري' : 'Monthly finance'}
-        </Text>
-        <View className="flex-row items-center gap-3">
-          <View className="flex-row items-center gap-1">
-            <View className="h-2 w-2 rounded-full bg-emerald-500" />
-            <Text className="text-[10px] text-slate-500">{ar ? 'إيرادات' : 'Income'}</Text>
-          </View>
-          <View className="flex-row items-center gap-1">
-            <View className="h-2 w-2 rounded-full bg-rose-400" />
-            <Text className="text-[10px] text-slate-500">{ar ? 'مصروفات' : 'Expenses'}</Text>
-          </View>
-        </View>
-      </View>
-
-      <View className="mt-4 flex-row items-end justify-between">
-        {data.map((d) => {
-          const mon = Number(d.k.split('-')[1]);
-          const label = (ar ? SHORT_MONTHS.ar[mon - 1] : SHORT_MONTHS.en[mon - 1]) ?? d.k;
-          const ih = Math.max(2, Math.round((d.income / max) * 88));
-          const eh = Math.max(2, Math.round((d.expense / max) * 88));
-          return (
-            <View key={d.k} className="flex-1 items-center">
-              <View className="h-[104px] flex-row items-end justify-center gap-1">
-                <View className="w-3 rounded-t bg-emerald-500" style={{ height: ih }} />
-                <View className="w-3 rounded-t bg-rose-400" style={{ height: eh }} />
-              </View>
-              <Text className="mt-1 text-[9px] text-slate-400">{label}</Text>
-            </View>
-          );
-        })}
-      </View>
-    </Card>
   );
 }

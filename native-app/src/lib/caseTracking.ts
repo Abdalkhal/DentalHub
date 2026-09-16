@@ -1,12 +1,37 @@
 import { useEffect, useState } from "react";
+import { AppState } from "react-native";
 import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
 import { db } from "@/integrations/firebase/client";
 import { createNotification } from "@/lib/notifications";
 import type { Order } from "@/lib/ordersStore";
 
+// Bumps every time the app returns to the foreground after being
+// backgrounded — used to force a fresh onSnapshot subscription. Firestore's
+// web SDK can leave a listener silently dead after the app spends a long
+// stretch backgrounded: its ID token refresh timer is paused while no JS is
+// running, so on resume the stream can reconnect with a stale token and hit
+// a permission error; once onSnapshot's error callback fires, that listener
+// never recovers on its own — only a brand-new subscription does. Without
+// this, a case list that loaded fine can silently stay stuck at 0 after the
+// device sits idle for a while, with no visible error and no way to recover
+// short of a full app restart.
+export function useForegroundResumeTick(): number {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    let wasBackground = false;
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active" && wasBackground) setTick((t) => t + 1);
+      wasBackground = state !== "active";
+    });
+    return () => sub.remove();
+  }, []);
+  return tick;
+}
+
 export function useDentistCases(dentistId: string) {
   const [cases, setCases] = useState<{ labId: string; order: Order }[]>([]);
   const [loading, setLoading] = useState(true);
+  const resumeTick = useForegroundResumeTick();
 
   useEffect(() => {
     if (!dentistId) {
@@ -58,7 +83,7 @@ export function useDentistCases(dentistId: string) {
     });
 
     return () => unsubs.forEach((u) => u());
-  }, [dentistId]);
+  }, [dentistId, resumeTick]);
 
   return { cases, loading };
 }
@@ -107,6 +132,7 @@ export function isNewStatus(status: unknown): boolean {
 export function useLabCases(labId: string) {
   const [cases, setCases] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const resumeTick = useForegroundResumeTick();
 
   useEffect(() => {
     if (!labId) {
@@ -128,7 +154,7 @@ export function useLabCases(labId: string) {
     });
 
     return unsub;
-  }, [labId]);
+  }, [labId, resumeTick]);
 
   return { cases, loading };
 }

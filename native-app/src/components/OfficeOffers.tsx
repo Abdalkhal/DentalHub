@@ -64,12 +64,11 @@ export function OfficeOffers({ supplierId }: { supplierId: string }) {
         <Text className="text-sm font-bold text-slate-600">
           {ar ? 'عروضك' : 'Your offers'} ({offers.length})
         </Text>
-        <Button size="sm" title={ar ? '+ عرض' : '+ Offer'} onPress={() => setEditing('new')} />
       </View>
 
       {offers.length === 0 ? (
         <Text className="mt-4 text-center text-xs text-slate-400">
-          {ar ? 'لا توجد عروض بعد — أضف عرضاً ليظهر للجميع' : 'No offers yet — add one to show it publicly'}
+          {ar ? 'لا توجد عروض بعد' : 'No offers yet'}
         </Text>
       ) : (
         <View className="mt-3 gap-2.5">

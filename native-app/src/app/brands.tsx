@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
-import { Image, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Image, Pressable, ScrollView, View } from 'react-native';
 import { router } from 'expo-router';
 import { Search } from 'lucide-react-native';
 
-import { Screen, Text } from '@/components/ui';
+import { Screen, Text, Input } from '@/components/ui';
 import { BRANDS } from '@/data/brands';
 import { useI18n } from '@/lib/i18n';
 
@@ -55,25 +55,20 @@ export default function BrandsScreen() {
         {filtered.length} {ar ? 'علامة تجارية' : 'brands'}
       </Text>
 
-      <View className="relative mt-3">
-        <TextInput
-          value={q}
-          onChangeText={setQ}
-          placeholder={ar ? 'ابحث عن علامة تجارية…' : 'Search a brand…'}
-          placeholderTextColor="#94A3B8"
-          className="h-11 w-full rounded-2xl border border-slate-200 bg-white pl-4 pr-10 text-sm text-slate-700 shadow-sm"
-        />
-        <View className="absolute bottom-0 right-3 top-0 justify-center">
-          <Search size={17} color="#94A3B8" />
-        </View>
-      </View>
+      <Input
+        value={q}
+        onChangeText={setQ}
+        placeholder={ar ? 'ابحث عن علامة تجارية…' : 'Search a brand…'}
+        leftIcon={<Search size={16} color="#94A3B8" />}
+        className="mt-3"
+      />
 
       <ScrollView className="mt-4 flex-1">
         <View className="flex-row flex-wrap justify-between gap-y-3 pb-6">
           {filtered.map((b) => (
             <Pressable
               key={b.id}
-              onPress={() => router.push({ pathname: '/supplies', params: { brand: b.name } })}
+              onPress={() => router.push({ pathname: '/brand/[brandId]', params: { brandId: b.id } })}
               className="w-[31%]"
             >
               <BrandTile name={b.name} ar={ar ? b.ar : b.name} image={b.image} color={b.color} />

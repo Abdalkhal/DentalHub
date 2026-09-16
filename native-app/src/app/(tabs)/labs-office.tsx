@@ -1,8 +1,28 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Modal, Pressable, View } from 'react-native';
-import { Phone, Trash2, UserPlus } from 'lucide-react-native';
+import { Image, Pressable, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
+import {
+  AlertCircle,
+  BadgeCheck,
+  Bell,
+  CheckCircle2,
+  Clock,
+  FileText,
+  Layers,
+  Menu,
+  Phone,
+  Search,
+  TrendingDown,
+  TrendingUp,
+  UserCircle2,
+  Users,
+} from 'lucide-react-native';
+import type { LucideIcon } from 'lucide-react-native';
 
-import { Screen, Card, Button, Text } from '@/components/ui';
+import { Screen, Input, Button, Text } from '@/components/ui';
+import { LabSidebar } from '@/components/LabSidebar';
+import { CaseDetailModal, LAB_STATUS_AR as STATUS_AR, LAB_STATUS_EN as STATUS_EN } from '@/components/CaseDetailModal';
 import {
   useOrders,
   connectLabOrders,
@@ -12,31 +32,79 @@ import {
   type OrderStatus,
 } from '@/lib/ordersStore';
 import { getCaseProgress, getStageLabel } from '@/lib/caseTracking';
-import { useLabMembers, removeLabMember } from '@/lib/labMembersStore';
+import { LabStaffPanel } from '@/components/LabStaffPanel';
 import { useUserRole } from '@/lib/useAuth';
+import { useUnreadNotificationsCount } from '@/lib/notifications';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
-const STATUS_ORDER: OrderStatus[] = ['new', 'in_progress', 'completed', 'delayed'];
-const STATUS_AR: Record<OrderStatus, string> = { new: 'جديد', in_progress: 'قيد التنفيذ', completed: 'مكتمل', delayed: 'متأخر' };
-const STATUS_EN: Record<OrderStatus, string> = { new: 'New', in_progress: 'In Progress', completed: 'Completed', delayed: 'Delayed' };
 const STATUS_TONE: Record<OrderStatus, string> = {
   new: 'bg-sky-100 text-sky-700',
   in_progress: 'bg-amber-100 text-amber-700',
   completed: 'bg-emerald-100 text-emerald-700',
   delayed: 'bg-rose-100 text-rose-700',
 };
+// Same hex family as STAT_CARDS' `fg`, used for the case cards' accent border.
+const STATUS_ACCENT: Record<OrderStatus, string> = {
+  new: '#0369A1',
+  in_progress: '#B45309',
+  completed: '#047857',
+  delayed: '#B91C1C',
+};
+
+// Mirrors the 4-way breakdown on the web dashboard's home screen
+// (labs.dashboard.tsx: "إجمالي الطلبات" / "قيد التنفيذ" / "مكتملة" / "متأخرة"),
+// including its exact card colors, as large colored stat tiles instead of a
+// desktop data table — the web layout's sidebar + table chrome is
+// desktop-only chrome, not something to clone onto a phone screen.
+const STAT_CARDS: {
+  key: 'all' | OrderStatus;
+  ar: string;
+  en: string;
+  icon: LucideIcon;
+  bg: string;
+  fg: string;
+}[] = [
+  { key: 'all', ar: 'إجمالي الطلبات', en: 'Total Orders', icon: Layers, bg: '#E0F2FE', fg: '#0369A1' },
+  { key: 'in_progress', ar: 'قيد التنفيذ', en: 'In Production', icon: Clock, bg: '#FEF3C7', fg: '#B45309' },
+  { key: 'completed', ar: 'مكتملة', en: 'Completed', icon: CheckCircle2, bg: '#D1FAE5', fg: '#047857' },
+  { key: 'delayed', ar: 'متأخرة', en: 'Delayed', icon: AlertCircle, bg: '#FEE2E2', fg: '#B91C1C' },
+];
+
+// Below this many orders in the *previous* month, a percentage is noisy to
+// the point of being misleading (1 → 2 orders reads as "+100%"). Fall back to
+// a plain count difference until there's enough volume for a % to mean
+// anything.
+const MIN_TREND_SAMPLE = 5;
+
+function monthKey(d: Date): number {
+  return d.getFullYear() * 12 + d.getMonth();
+}
+
+function trendLabel(t: { cur: number; prev: number }, ar: boolean): { text: string; up: boolean } | null {
+  if (t.cur === 0 && t.prev === 0) return null;
+  const delta = t.cur - t.prev;
+  const sign = delta >= 0 ? '+' : '';
+  const suffix = ar ? 'عن الشهر الماضي' : 'vs last month';
+  if (t.prev >= MIN_TREND_SAMPLE) {
+    const pct = Math.round((delta / t.prev) * 100);
+    return { text: `${pct >= 0 ? '+' : ''}${pct}% ${suffix}`, up: pct >= 0 };
+  }
+  return { text: `${sign}${delta} ${suffix}`, up: delta >= 0 };
+}
 
 export default function LabsOfficeScreen() {
-  const { lang } = useI18n();
+  const { lang, toggle } = useI18n();
   const ar = lang === 'ar';
   const { user, role } = useUserRole();
+  const insets = useSafeAreaInsets();
+  const unreadCount = useUnreadNotificationsCount(user?.uid);
   const orders = useOrders();
   const [tab, setTab] = useState<'cases' | 'team'>('cases');
-  const [filter, setFilter] = useState<string>('all');
+  const [filter, setFilter] = useState<'all' | OrderStatus>('all');
+  const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Order | null>(null);
-
-  const { members = [] } = useLabMembers(user?.uid ?? '');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -47,10 +115,47 @@ export default function LabsOfficeScreen() {
   const counts: Record<string, number> = { all: orders.length };
   for (const o of orders) counts[o.status] = (counts[o.status] ?? 0) + 1;
 
-  const filtered = useMemo(
-    () => (filter === 'all' ? orders : orders.filter((o) => o.status === filter)),
-    [orders, filter],
-  );
+  // Real month-over-month counts (from each order's receivedDate), used to
+  // drive the stat cards' trend line below the count.
+  const trends = useMemo(() => {
+    const now = new Date();
+    const curKey = monthKey(now);
+    const prevKey = monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+
+    const result: Record<string, { cur: number; prev: number }> = {
+      all: { cur: 0, prev: 0 },
+      new: { cur: 0, prev: 0 },
+      in_progress: { cur: 0, prev: 0 },
+      completed: { cur: 0, prev: 0 },
+      delayed: { cur: 0, prev: 0 },
+    };
+
+    for (const o of orders) {
+      const d = new Date(o.receivedDate || o.dueDate || '');
+      if (isNaN(d.getTime())) continue;
+      const k = monthKey(d);
+      if (k !== curKey && k !== prevKey) continue;
+      const bucket = k === curKey ? 'cur' : 'prev';
+      result.all[bucket]++;
+      result[o.status][bucket]++;
+    }
+    return result;
+  }, [orders]);
+
+  const filtered = useMemo(() => {
+    let list = filter === 'all' ? orders : orders.filter((o) => o.status === filter);
+    const q = search.trim().toLowerCase();
+    if (q) {
+      list = list.filter(
+        (o) =>
+          (o.patient || '').toLowerCase().includes(q) ||
+          (o.doctor || '').toLowerCase().includes(q) ||
+          (o.orderNumber || '').toLowerCase().includes(q) ||
+          String(o.caseId || '').toLowerCase().includes(q),
+      );
+    }
+    return list;
+  }, [orders, filter, search]);
 
   const nextStatus = (s: OrderStatus): OrderStatus => {
     if (s === 'new' || s === 'delayed') return 'in_progress';
@@ -60,70 +165,217 @@ export default function LabsOfficeScreen() {
 
   return (
     <Screen>
-      <Text className="text-xl font-extrabold text-slate-800">
-        {ar ? 'لوحة المختبر' : 'Lab Dashboard'}
-      </Text>
-      <Text className="mt-0.5 text-sm text-slate-500">{role?.name ?? ''}</Text>
+      {/* Header — navy hero card matching implants-office.tsx's redesign:
+          decorative circles + a large faint watermark icon behind a
+          "مرحباً" greeting, lab name, tagline, phone chip, and a verified
+          avatar — instead of the old flat single-row teal bar. */}
+      <View
+        className="overflow-hidden rounded-3xl p-4"
+        style={{ backgroundColor: '#0F172A', marginTop: insets.top }}
+      >
+        <View
+          pointerEvents="none"
+          className="absolute -end-8 -top-12 h-40 w-40 rounded-full"
+          style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}
+        />
+        <View
+          pointerEvents="none"
+          className="absolute -start-10 -bottom-14 h-36 w-36 rounded-full"
+          style={{ backgroundColor: 'rgba(255,255,255,0.04)' }}
+        />
+        <View pointerEvents="none" className="absolute -end-2 -bottom-3.5">
+          <Layers size={104} color="rgba(255,255,255,0.06)" strokeWidth={1.2} />
+        </View>
+
+        <View className="flex-row items-center justify-between">
+          <View className="flex-row items-center gap-2">
+            <Pressable
+              onPress={() => setSidebarOpen(true)}
+              className="h-9 w-9 items-center justify-center rounded-xl border border-white/20 bg-white/10"
+            >
+              <Menu size={16} color="#FFFFFF" />
+            </Pressable>
+            <Pressable
+              onPress={toggle}
+              className="h-9 items-center justify-center rounded-xl border border-white/20 bg-white/10 px-3"
+            >
+              <Text className="text-xs font-bold text-white">{ar ? 'EN' : 'AR'}</Text>
+            </Pressable>
+          </View>
+          <Pressable
+            onPress={() => router.push('/notifications')}
+            className="relative h-9 w-9 items-center justify-center rounded-xl border border-white/20 bg-white/10"
+          >
+            <Bell size={16} color="#FFFFFF" />
+            {unreadCount > 0 && (
+              <View className="absolute -end-1 -top-1 h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1">
+                <Text className="text-[9px] font-bold text-white">{unreadCount > 9 ? '9+' : unreadCount}</Text>
+              </View>
+            )}
+          </Pressable>
+        </View>
+
+        <View className="mt-3 flex-row items-start justify-between">
+          <View className="min-w-0 flex-1 pe-3">
+            <Text className="text-[11px] font-bold" style={{ color: '#60A5FA' }}>
+              {ar ? 'مرحباً' : 'Welcome'}
+            </Text>
+            <Text numberOfLines={1} className="mt-0.5 text-xl font-extrabold text-white">
+              {role?.name || (ar ? 'المختبر' : 'Lab')}
+            </Text>
+            <View className="mt-1.5 flex-row items-center gap-1.5">
+              <View className="h-1 w-5 rounded-full" style={{ backgroundColor: '#3B82F6' }} />
+              <Text className="text-[11px]" style={{ color: 'rgba(255,255,255,0.6)' }}>
+                {ar ? 'شريكك لنجاح أفضل' : 'Your partner for better results'}
+              </Text>
+            </View>
+            {!!role?.phone && (
+              <View
+                className="mt-2.5 flex-row items-center gap-1.5 self-start rounded-full px-2.5 py-1"
+                style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}
+              >
+                <Phone size={11} color="rgba(255,255,255,0.75)" />
+                <Text className="text-[11px]" style={{ color: 'rgba(255,255,255,0.85)' }}>
+                  {role.phone}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          <Pressable onPress={() => router.push('/account')} className="relative">
+            <View
+              className="h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2"
+              style={{ backgroundColor: 'rgba(255,255,255,0.12)', borderColor: 'rgba(255,255,255,0.2)' }}
+            >
+              {role?.photoURL ? (
+                <Image source={{ uri: role.photoURL }} style={{ width: '100%', height: '100%' }} />
+              ) : (
+                <UserCircle2 size={28} color="rgba(255,255,255,0.8)" />
+              )}
+            </View>
+            <View
+              className="absolute -end-0.5 -bottom-0.5 h-5 w-5 items-center justify-center rounded-full border-2"
+              style={{ backgroundColor: '#3B82F6', borderColor: '#0F172A' }}
+            >
+              <BadgeCheck size={11} color="#FFFFFF" />
+            </View>
+          </Pressable>
+        </View>
+      </View>
+
+      <LabSidebar visible={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       {/* Tabs */}
-      <View className="mt-4 flex-row gap-1.5 rounded-2xl bg-slate-100 p-1.5">
-        {(['cases', 'team'] as const).map((t) => (
-          <Pressable
-            key={t}
-            onPress={() => setTab(t)}
-            // NativeWind 4.2.6 + RN 0.86: toggling a shadow-* class on and off
-            // crashes with a bogus "Couldn't find a navigation context" error, so
-            // the shadow stays applied on both branches and only colour changes.
-            className={cn(
-              'h-10 flex-1 items-center justify-center rounded-xl shadow-sm',
-              tab === t ? 'bg-white' : 'bg-transparent',
-            )}
-          >
-            <Text className={cn('text-xs font-bold', tab === t ? 'text-slate-900' : 'text-slate-500')}>
-              {t === 'cases' ? (ar ? 'الحالات' : 'Cases') : ar ? 'الفريق' : 'Team'}
-            </Text>
-          </Pressable>
-        ))}
+      <View className="mt-3 flex-row gap-1.5 rounded-2xl bg-slate-100 p-1.5">
+        {(['cases', 'team'] as const).map((t) => {
+          const TabIcon = t === 'cases' ? FileText : Users;
+          return (
+            <Pressable
+              key={t}
+              onPress={() => setTab(t)}
+              className="min-h-10 flex-1 flex-row items-center justify-center gap-1.5 rounded-xl py-2"
+              style={tab === t ? { backgroundColor: '#0F172A' } : undefined}
+            >
+              <TabIcon size={14} color={tab === t ? '#FFFFFF' : '#64748B'} />
+              <Text className={cn('text-center text-xs font-bold', tab === t ? 'text-white' : 'text-slate-500')}>
+                {t === 'cases' ? (ar ? 'الحالات' : 'Cases') : ar ? 'كادر المختبر' : 'Lab Staff'}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
 
       {tab === 'cases' ? (
         <>
-          {/* Stats */}
-          <View className="mt-4 flex-row gap-2">
-            {(['new', 'in_progress', 'completed', 'delayed'] as OrderStatus[]).map((s) => (
-              <Pressable
-                key={s}
-                onPress={() => setFilter(filter === s ? 'all' : s)}
-                className={cn(
-                  'flex-1 rounded-2xl border bg-white p-2.5 text-center shadow-sm',
-                  filter === s ? 'border-transparent' : 'border-slate-200',
-                )}
-              >
-                <Text className={cn('text-center text-lg font-extrabold', STATUS_TONE[s].split(' ')[1])}>
-                  {counts[s] ?? 0}
-                </Text>
-                <Text className="mt-0.5 text-center text-[9px] font-semibold text-slate-500">
-                  {ar ? STATUS_AR[s] : STATUS_EN[s]}
-                </Text>
-              </Pressable>
-            ))}
+          {/* Stat grid — tapping a card filters the list below it, same as
+              the equivalent cards on the web dashboard. */}
+          <View className="mt-4 flex-row flex-wrap justify-between gap-y-3">
+            {STAT_CARDS.map((c) => {
+              const active = filter === c.key;
+              const Icon = c.icon;
+              const trend = trendLabel(trends[c.key] ?? { cur: 0, prev: 0 }, ar);
+              return (
+                <Pressable
+                  key={c.key}
+                  onPress={() => setFilter(active ? 'all' : c.key)}
+                  className="w-[48.5%] overflow-hidden rounded-2xl p-4"
+                  style={{
+                    backgroundColor: c.bg,
+                    ...(active
+                      ? { shadowColor: c.fg, shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 4 }
+                      : null),
+                  }}
+                >
+                  <View pointerEvents="none" className="absolute -end-3 -bottom-3">
+                    <Icon size={64} color={c.fg} strokeWidth={1.2} style={{ opacity: 0.12 }} />
+                  </View>
+                  <View className="flex-row items-center justify-between">
+                    <Text className="text-[10px] font-bold uppercase tracking-wide" style={{ color: c.fg }}>
+                      {ar ? c.ar : c.en}
+                    </Text>
+                    <View className="h-8 w-8 items-center justify-center rounded-xl" style={{ backgroundColor: 'rgba(255,255,255,0.6)' }}>
+                      <Icon size={15} color={c.fg} />
+                    </View>
+                  </View>
+                  <Text className="mt-2 text-2xl font-extrabold" style={{ color: c.fg }}>
+                    {counts[c.key] ?? 0}
+                  </Text>
+                  {trend && (
+                    <View className="mt-1.5 flex-row items-center gap-1">
+                      {trend.up ? (
+                        <TrendingUp size={11} color={c.fg} />
+                      ) : (
+                        <TrendingDown size={11} color={c.fg} />
+                      )}
+                      <Text className="text-[10px] font-semibold" style={{ color: c.fg }} numberOfLines={1}>
+                        {trend.text}
+                      </Text>
+                    </View>
+                  )}
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <Input
+            value={search}
+            onChangeText={setSearch}
+            placeholder={ar ? 'ابحث عن حالة، طبيب أو مريض…' : 'Search case, doctor or patient…'}
+            leftIcon={<Search size={16} color="#94A3B8" />}
+            className="mt-4"
+          />
+
+          <View className="mt-4 flex-row items-center justify-between">
+            <View className="flex-row items-center gap-1.5">
+              <Clock size={14} color="#64748B" />
+              <Text className="text-sm font-extrabold text-slate-800">
+                {filter === 'all' ? (ar ? 'الحالات الأخيرة' : 'Recent Cases') : ar ? STATUS_AR[filter] : STATUS_EN[filter]}
+              </Text>
+            </View>
+            <View className="rounded-full bg-slate-100 px-2.5 py-1">
+              <Text className="text-[11px] font-bold text-slate-600">
+                {filtered.length} {ar ? 'حالة' : 'cases'}
+              </Text>
+            </View>
           </View>
 
           {filtered.length === 0 ? (
             <Text className="mt-12 text-center text-slate-500">{ar ? 'لا توجد حالات' : 'No cases'}</Text>
           ) : (
-            <View className="mt-4 gap-3 pb-4">
+            <View className="mt-3 gap-3 pb-4">
               {filtered.map((o) => (
                 <Pressable
                   key={o.id}
                   onPress={() => setSelected(o)}
-                  className="rounded-2xl border border-slate-200 border-l-4 bg-card p-3.5 shadow-sm"
-                  style={{ borderLeftColor: undefined }}
+                  className="rounded-2xl border border-slate-200 bg-card p-3.5 shadow-sm"
+                  style={{
+                    [ar ? 'borderRightWidth' : 'borderLeftWidth']: 3,
+                    [ar ? 'borderRightColor' : 'borderLeftColor']: STATUS_ACCENT[o.status],
+                  }}
                 >
                   <View className="flex-row items-center justify-between gap-2">
                     <Text className="min-w-0 flex-1 truncate text-sm font-extrabold text-slate-800">
                       {o.patient || '—'}
-                      {o.workType ? ` · ${o.workType}` : ''}
                     </Text>
                     <View className={cn('shrink-0 rounded-full px-2.5 py-1', STATUS_TONE[o.status])}>
                       <Text className="text-[10px] font-bold">
@@ -131,22 +383,27 @@ export default function LabsOfficeScreen() {
                       </Text>
                     </View>
                   </View>
-                  <View className="mt-2 flex-row flex-wrap items-center gap-3 text-[11px] text-slate-600">
-                    {!!o.orderNumber && <Text className="text-[11px] text-slate-500">{o.orderNumber}</Text>}
-                    {!!o.unitsCount && <Text className="text-[11px] text-slate-500">{o.unitsCount} {ar ? 'وحدة' : 'units'}</Text>}
-                    {!!o.dueDate && <Text className="text-[11px] text-slate-500">{o.dueDate}</Text>}
-                  </View>
-                  {o.currentStage && (
+                  <Text numberOfLines={1} className="mt-1 text-[11px] text-slate-500">
+                    {[o.workType, o.orderNumber, o.unitsCount ? `${o.unitsCount} ${ar ? 'وحدة' : 'units'}` : undefined]
+                      .filter(Boolean)
+                      .join(' · ') || (ar ? 'بلا تفاصيل' : 'No details')}
+                  </Text>
+                  {(o.currentStage || o.status === 'completed') && (
                     <View className="mt-2">
                       <View className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
                         <View
-                          className="h-full rounded-full bg-sky-400"
-                          style={{ width: `${Math.min(100, getCaseProgress(o.currentStage))}%` }}
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${o.status === 'completed' ? 100 : Math.min(100, getCaseProgress(o.currentStage))}%`,
+                            backgroundColor: STATUS_ACCENT[o.status],
+                          }}
                         />
                       </View>
-                      <Text className="mt-0.5 text-center text-[10px] text-slate-400">
-                        {getStageLabel(o.currentStage, lang)}
-                      </Text>
+                      {!!o.currentStage && (
+                        <Text className="mt-0.5 text-center text-[10px] text-slate-400">
+                          {o.status === 'completed' ? (ar ? 'مكتملة' : 'Completed') : getStageLabel(o.currentStage, lang)}
+                        </Text>
+                      )}
                     </View>
                   )}
                   <View className="mt-2.5 flex-row gap-1.5">
@@ -172,90 +429,12 @@ export default function LabsOfficeScreen() {
           )}
         </>
       ) : (
-        <>
-          <View className="mt-4 flex-row items-center justify-between">
-            <Text className="text-sm font-bold text-slate-600">
-              {ar ? 'أعضاء الفريق' : 'Team members'} ({members.length})
-            </Text>
-            <Text className="text-[11px] text-slate-400">
-              {ar ? 'تتم الإضافة من حساب رئيسي' : 'Managed from a main account'}
-            </Text>
-          </View>
-          {members.length === 0 ? (
-            <Text className="mt-12 text-center text-slate-500">
-              {ar ? 'لا يوجد أعضاء بعد' : 'No members yet'}
-            </Text>
-          ) : (
-            <View className="mt-3 gap-2.5">
-              {members.map((m) => (
-                <View key={m.id} className="flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-card p-3.5 shadow-sm">
-                  <View className="h-11 w-11 items-center justify-center rounded-xl bg-violet-100">
-                    <Text className="text-base font-extrabold text-violet-700">{m.name.charAt(0)}</Text>
-                  </View>
-                  <View className="min-w-0 flex-1">
-                    <Text className="text-sm font-bold text-slate-800">{m.name}</Text>
-                    <Text className="text-[11px] text-slate-400">{m.role}</Text>
-                  </View>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    title="✕"
-                    onPress={() =>
-                      Alert.alert(
-                        ar ? 'إزالة عضو' : 'Remove member',
-                        m.name,
-                        [
-                          { text: ar ? 'إلغاء' : 'Cancel', style: 'cancel' },
-                          { text: ar ? 'إزالة' : 'Remove', style: 'destructive', onPress: () => removeLabMember(m.id) },
-                        ],
-                      )
-                    }
-                  />
-                </View>
-              ))}
-            </View>
-          )}
-        </>
+        <View className="mt-4">
+          <LabStaffPanel labId={user?.uid ?? ''} ar={ar} />
+        </View>
       )}
 
-      {selected && <CaseDetailModal ar={ar} order={selected} onClose={() => setSelected(null)} />}
+      {selected && <CaseDetailModal ar={ar} order={selected} onClose={() => setSelected(null)} labName={role?.name} />}
     </Screen>
-  );
-}
-
-function CaseDetailModal({ ar, order: o, onClose }: { ar: boolean; order: Order; onClose: () => void }) {
-  const rows: { label: string; value?: string }[] = [
-    { label: ar ? 'المريض' : 'Patient', value: o.patient },
-    { label: ar ? 'الطبيب' : 'Doctor', value: o.doctor },
-    { label: ar ? 'العيادة' : 'Clinic', value: o.clinic },
-    { label: ar ? 'نوع العمل' : 'Work type', value: o.workType },
-    { label: ar ? 'المناديب' : 'Agent', value: o.agent },
-    { label: ar ? 'الوحدات' : 'Units', value: o.unitsCount ? String(o.unitsCount) : undefined },
-    { label: ar ? 'تاريخ التسليم' : 'Due date', value: o.dueDate },
-  ].filter((r) => !!r.value);
-
-  return (
-    <Modal visible transparent animationType="fade">
-      <View className="flex-1 justify-end bg-black/40">
-        <View className="w-full rounded-t-3xl bg-white p-5 pb-8">
-          <View className="flex-row items-center justify-between">
-            <Text className="text-lg font-extrabold text-slate-900">
-              {ar ? 'تفاصيل الحالة' : 'Case details'}
-            </Text>
-            <Pressable onPress={onClose} className="h-9 w-9 items-center justify-center rounded-xl bg-slate-100">
-              <Text className="text-slate-500">✕</Text>
-            </Pressable>
-          </View>
-          <View className="mt-4 gap-2">
-            {rows.map((r) => (
-              <View key={r.label} className="flex-row items-start justify-between rounded-xl bg-slate-50 px-3 py-2.5">
-                <Text className="text-xs font-bold text-slate-500">{r.label}</Text>
-                <Text className="max-w-[65%] text-end text-xs font-semibold text-slate-800">{r.value}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      </View>
-    </Modal>
   );
 }

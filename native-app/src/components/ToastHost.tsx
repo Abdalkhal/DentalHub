@@ -29,7 +29,11 @@ function Toast({ msg, onDone }: { msg: ToastMsg; onDone: () => void }) {
     <Animated.View
       pointerEvents="none"
       style={{ opacity, transform: [{ translateY }] }}
-      className="absolute top-12 left-4 right-4 z-[100] items-center"
+      // top-12 (48px) only clears the status bar — on screens that also have
+      // a native header (most of the app) that put the toast right over the
+      // header title. Mounted at the root, this component has no way to know
+      // whether the active screen has a header, so clear the taller case.
+      className="absolute top-24 left-4 right-4 z-[100] items-center"
     >
       <View className="flex-row items-center gap-2 rounded-full px-4 py-2.5 shadow-lg" style={{ backgroundColor: s.bg }}>
         <Text style={{ color: "#FFFFFF", fontSize: 12, fontWeight: "800" }}>{s.icon}</Text>

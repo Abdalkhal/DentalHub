@@ -1,8 +1,10 @@
-import { FlatList, Pressable, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, View } from 'react-native';
 import { Redirect, router } from 'expo-router';
-import { Layers, PenTool } from 'lucide-react-native';
+import { signOut } from 'firebase/auth';
+import { Layers, LogOut, PenTool } from 'lucide-react-native';
 
 import { Screen, Spinner, Text } from '@/components/ui';
+import { auth } from '@/integrations/firebase/client';
 import { useDesignerCases } from '@/lib/designerStore';
 import { getStatusColor, getStatusLabel } from '@/lib/caseTracking';
 import { useSession } from '@/lib/useAuth';
@@ -19,7 +21,7 @@ export default function DesignerIndexScreen() {
   const { lang } = useI18n();
   const ar = lang === 'ar';
   const { user, loading: authLoading } = useSession();
-  const { cases, loading } = useDesignerCases(user?.uid || '');
+  const { cases, loading, refetch } = useDesignerCases(user?.uid || '');
 
   if (authLoading) return <Spinner />;
   if (!user) return <Redirect href="/login" />;
@@ -27,11 +29,21 @@ export default function DesignerIndexScreen() {
 
   return (
     <Screen scroll={false}>
+      <View className="mb-3 flex-row items-center justify-end">
+        <Pressable
+          onPress={() => signOut(auth)}
+          className="flex-row items-center gap-1.5 rounded-xl bg-rose-50 px-3 py-2"
+        >
+          <LogOut size={14} color="#E11D48" />
+          <Text className="text-xs font-bold text-rose-600">{ar ? 'تسجيل الخروج' : 'Sign out'}</Text>
+        </Pressable>
+      </View>
       <FlatList
         data={cases}
         keyExtractor={({ order }) => order.id}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 24 }}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={refetch} />}
         renderItem={({ item: { order } }) => (
           <Pressable
             onPress={() =>

@@ -77,9 +77,44 @@ service cloud.firestore {
     // ============================================================
     // Existing collections
     // ============================================================
+    // SECURITY — `role` on this doc is the ONLY thing isAdmin() (and the
+    // native app's own "am I admin" check) trusts. The old rule let a user
+    // write every field of their own doc with no restriction, `role`
+    // included — any signed-in account could set role: 'admin' on itself
+    // and instantly pass every admin check in this file. Signup always
+    // writes role == accountType (see login.tsx) and never 'admin', so
+    // blocking 'admin' on create costs real signups nothing. Real admin
+    // status is only ever granted server-side, via the Admin SDK — which
+    // these rules don't apply to at all — in createInitialAdmin/setAdminRole
+    // (functions/index.js). accountStatus/subscriptionExpiry are similarly
+    // admin-controlled business fields (setAccountStatus/extendSubscription),
+    // not something the account holder should be able to grant themselves.
     match /user_roles/{userId} {
       allow read: if isAuthenticated();
-      allow create, update, delete: if isAuthenticated() && request.auth.uid == userId;
+
+      // Also blocks a "delete my doc, then create a fresh one" bypass of the
+      // update rule below: without this, a suspended account (or one an
+      // admin extended a subscription for) could self-delete and recreate
+      // its doc to reset accountStatus/subscriptionExpiry, since `create`
+      // otherwise has no opinion on them. Real signups (login.tsx) never set
+      // either field, so this costs nothing.
+      allow create: if isAuthenticated() && request.auth.uid == userId
+        && request.resource.data.role != 'admin'
+        && !('accountStatus' in request.resource.data)
+        && !('subscriptionExpiry' in request.resource.data);
+
+      // Admins manage OTHER accounts' status/subscription straight from the
+      // client (setAccountStatus/extendSubscription in adminPanel.ts), so
+      // they need write access to any doc, sensitive fields included — the
+      // non-admin branch is what stays restricted to "your own doc, minus
+      // the sensitive fields".
+      allow update: if isAdmin() || (
+        isAuthenticated() && request.auth.uid == userId
+        && !request.resource.data.diff(resource.data).affectedKeys()
+             .hasAny(['role', 'accountType', 'accountStatus', 'subscriptionExpiry'])
+      );
+
+      allow delete: if isAuthenticated() && request.auth.uid == userId;
     }
 
     match /products/{productId} {
@@ -101,8 +136,24 @@ service cloud.firestore {
 
     match /offers/{offerId} {
       allow read: if true;
-      allow create, update, delete: if isAuthenticated() &&
-        (resource == null || resource.data.supplierId == request.auth.uid);
+      // isAdmin() covers approveAd/deactivateAd (admin.tsx / adminPanel.ts),
+      // which moderate ads belonging to OTHER suppliers — without it those
+      // writes 403 the moment they're not on your own offer.
+      allow create, update, delete: if isAdmin() || (isAuthenticated() &&
+        (resource == null || resource.data.supplierId == request.auth.uid));
+    }
+
+    // General cross-account "إعلاناتي" ads (distinct from `offers`, which is
+    // dentist-facing only). Same read/write shape as `offers` — public read
+    // (the home banner only ever queries status=='active'), owner or admin
+    // write. New ads must start `pending`; only an admin flips that.
+    match /ads/{adId} {
+      allow read: if true;
+      allow create: if isAuthenticated()
+        && request.resource.data.accountId == request.auth.uid
+        && request.resource.data.status == 'pending';
+      allow update, delete: if isAdmin() || (isAuthenticated() &&
+        resource.data.accountId == request.auth.uid);
     }
 
     match /orders/{orderId} {
@@ -219,17 +270,43 @@ service cloud.firestore {
       );
     }
 
+    // A rule scoped to a fixed path (like `/lab_members/{memberId}` above)
+    // only authorizes reads/writes made through a normal `collection()`
+    // query at that exact path. `useLabMembers` queries via
+    // `collectionGroup(db, "lab_members")` (so it isn't tied to one known
+    // labId ahead of time) — Firestore requires a SEPARATE rule using the
+    // recursive `{path=**}` wildcard to authorize collection-group queries,
+    // even when, as here, the collection only ever exists at the root.
+    // Without this, the collectionGroup query was rejected outright with
+    // "Missing or insufficient permissions" regardless of how correct the
+    // rule above was.
+    match /{path=**}/lab_members/{memberId} {
+      allow read: if isAuthenticated() && (
+        resource.data.uid == request.auth.uid
+        || resource.data.labId == request.auth.uid
+        || isLabAdmin(resource.data.labId)
+      );
+    }
+
     // ============================================================
     // PHASE 0 + 3: lab cases
     // ============================================================
     match /lab_orders/{labId} {
       match /cases/{caseId} {
-        // Designers/technicians may only read cases assigned to them.
-        // Unassigned cases (designerId empty/missing) are invisible to staff.
+        // Designers/technicians may only read cases assigned to them — as
+        // either the designer or the ceramist (the two independent staff
+        // slots set in "طلب جديد"'s "تخصيص الكادر الفني"). Unassigned cases
+        // (both fields empty/missing) are invisible to staff.
         allow read: if isAuthenticated() && (
           isLabAdmin(labId)
           || resource.data.dentistId == request.auth.uid
-          || (isLabMember(labId) && resource.data.designerId == request.auth.uid)
+          || (
+            isLabMember(labId)
+            && (
+              resource.data.designerId == request.auth.uid
+              || resource.data.ceramistId == request.auth.uid
+            )
+          )
         );
 
         // PHASE 0: only the referring dentist or the lab owner may create a case.
@@ -238,15 +315,19 @@ service cloud.firestore {
           || isLabOwner(labId)
         );
 
-        // Staff cannot modify designerId (or any financial field); the owner and
-        // the referring dentist keep full update rights.
+        // Staff cannot modify designerId/ceramistId (or any financial field);
+        // the owner and the referring dentist keep full update rights.
         allow update: if isAuthenticated() && (
           isLabOwner(labId)
           || (resource.data.dentistId == request.auth.uid && noFinanceChanges())
           || (
             isLabMember(labId)
-            && resource.data.designerId == request.auth.uid
+            && (
+              resource.data.designerId == request.auth.uid
+              || resource.data.ceramistId == request.auth.uid
+            )
             && request.resource.data.designerId == resource.data.designerId
+            && request.resource.data.ceramistId == resource.data.ceramistId
             && request.resource.data.dentistId == resource.data.dentistId
             && request.resource.data.caseId == resource.data.caseId
             && noFinanceChanges()
@@ -282,6 +363,68 @@ service cloud.firestore {
             );
           allow update, delete: if isAdmin();
         }
+      }
+    }
+
+    // The `cases` and `private` rules above are scoped to the fixed path
+    // `lab_orders/{labId}/cases/...` — they authorize a lab owner's own
+    // `collection(db, "lab_orders", labId, "cases")` query fine, but NOT the
+    // `collectionGroup(db, "cases")` / `collectionGroup(db, "private")`
+    // queries this app also runs (a dentist listing their own cases across
+    // every lab by `dentistId`, a designer listing cases assigned to them by
+    // `designerId`, a lab reading its own case-finance docs by `labId`).
+    // Firestore requires a separate `{path=**}` rule to authorize
+    // collection-group queries even when, as here, the collection never
+    // exists anywhere else — without it these queries fail outright with
+    // "Missing or insufficient permissions", not a partial/filtered result.
+    match /{path=**}/cases/{caseId} {
+      allow read: if isAuthenticated() && (
+        resource.data.dentistId == request.auth.uid
+        || (
+          staffRole() in ['ADMIN', 'DESIGNER', 'TECHNICIAN']
+          && resource.data.designerId == request.auth.uid
+        )
+      );
+    }
+
+    match /{path=**}/private/{docId} {
+      allow read: if isAuthenticated() && resource.data.labId == request.auth.uid;
+    }
+
+    // ============================================================
+    // Direct messages: 1:1 chat between any two accounts, unrelated to any
+    // case/order. Thread id is the two participant uids sorted and joined
+    // with "_" (see dmThreadId in the app), so a `create` can verify the id
+    // matches the participants without an extra lookup.
+    // ============================================================
+    match /dm_threads/{threadId} {
+      allow read: if isAuthenticated() && request.auth.uid in resource.data.participants;
+
+      allow create: if isAuthenticated()
+        && request.auth.uid in request.resource.data.participants
+        && request.resource.data.participants.size() == 2
+        && threadId == (
+          request.resource.data.participants[0] < request.resource.data.participants[1]
+            ? request.resource.data.participants[0] + '_' + request.resource.data.participants[1]
+            : request.resource.data.participants[1] + '_' + request.resource.data.participants[0]
+        );
+
+      // Sending a message re-writes the thread doc (merge) to bump
+      // lastMessage/lastMessageAt — either participant may do that, but
+      // neither may change who the participants are.
+      allow update: if isAuthenticated()
+        && request.auth.uid in resource.data.participants
+        && request.resource.data.participants == resource.data.participants;
+
+      allow delete: if isAdmin();
+
+      match /messages/{messageId} {
+        allow read: if isAuthenticated()
+          && request.auth.uid in get(/databases/$(database)/documents/dm_threads/$(threadId)).data.participants;
+        allow create: if isAuthenticated()
+          && request.resource.data.senderId == request.auth.uid
+          && request.auth.uid in get(/databases/$(database)/documents/dm_threads/$(threadId)).data.participants;
+        allow update, delete: if isAdmin();
       }
     }
 

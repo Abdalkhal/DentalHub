@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Image, Modal, Pressable, View } from 'react-native';
+import { Image, Pressable, View } from 'react-native';
 import { router, type Href } from 'expo-router';
 import {
   BarChart3,
@@ -13,9 +13,11 @@ import {
 } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 
-import { Screen, Card, Button, Input, Text } from '@/components/ui';
+import { Screen, Text } from '@/components/ui';
+import { AddAppointmentModal } from '@/components/AddAppointmentModal';
+import { toDateStr } from '@/components/CalendarPickerModal';
 import { useUserRole } from '@/lib/useAuth';
-import { setAppointmentsStoreUser, useAppointments, addAppointment } from '@/lib/appointmentsStore';
+import { setAppointmentsStoreUser, useAppointments } from '@/lib/appointmentsStore';
 import { setClinicStoreUser, useClinic, clinicTotals } from '@/lib/clinicStore';
 import { usePatients } from '@/lib/patientsStore';
 import { useI18n } from '@/lib/i18n';
@@ -23,6 +25,11 @@ import { cn } from '@/lib/utils';
 
 type Item = {
   icon: LucideIcon;
+  // Lucide glyphs don't all fill their viewBox the same way — Package's
+  // outline reads noticeably smaller than a denser icon like ClipboardList
+  // at the same numeric size, so this lets a specific item nudge its size up
+  // to look visually consistent with the others in its row.
+  iconSize?: number;
   tone: string;
   color: string;
   title: string;
@@ -46,7 +53,11 @@ export default function ClinicHomeScreen() {
   const appointments = useAppointments();
   const clinic = useClinic();
   const totals = clinicTotals(clinic);
-  const today = new Date().toISOString().slice(0, 10);
+  // Local calendar day, not UTC — appointments store dates via `toDateStr`
+  // (local getFullYear/Month/Date), so comparing against a UTC-sliced ISO
+  // string undercounts "today" for any timezone ahead of UTC during the
+  // hours after local midnight but before UTC midnight (e.g. Iraq, UTC+3).
+  const today = toDateStr(new Date());
   const todayCount = appointments.filter((a) => a.date === today).length;
 
   const [showAdd, setShowAdd] = useState(false);
@@ -58,7 +69,7 @@ export default function ClinicHomeScreen() {
       color: '#059669',
       title: ar ? 'المالية والحسابات' : 'Finance & Accounts',
       chip: {
-        label: `${ar ? 'الإيرادات' : 'Revenue'} ${totals.income.toLocaleString()}`,
+        label: `${ar ? 'إيرادات اليوم' : "Today's revenue"} ${totals.income.toLocaleString()}`,
         cls: 'bg-emerald-50 text-emerald-600',
       },
       to: '/clinic-finance',
@@ -68,7 +79,7 @@ export default function ClinicHomeScreen() {
       tone: 'bg-sky-50',
       color: '#0284C7',
       title: ar ? 'المرضى والمواعيد' : 'Patients & Appointments',
-      chip: { label: `${patients.length} ${ar ? 'مريض' : 'patients'}`, cls: 'bg-sky-50 text-sky-600' },
+      chip: { label: `${ar ? 'مرضى' : 'Patients'} ${patients.length}`, cls: 'bg-sky-50 text-sky-600' },
       to: '/patients',
     },
   ];
@@ -78,15 +89,16 @@ export default function ClinicHomeScreen() {
       icon: ClipboardList,
       tone: 'bg-violet-50',
       color: '#7C3AED',
-      title: ar ? 'طلبيات العيادة' : 'Clinic Orders',
-      to: '/orders',
+      title: ar ? 'طلبيات العيادة والمختبرات' : 'Clinic & Lab Orders',
+      to: '/clinic-orders',
     },
     {
       icon: Package,
+      iconSize: 23,
       tone: 'bg-emerald-50',
       color: '#059669',
-      title: ar ? 'المستلزمات' : 'Supplies & Materials',
-      to: '/supplies',
+      title: ar ? 'مواد العيادة' : 'Clinic Materials',
+      to: '/clinic-materials',
     },
   ];
 
@@ -102,8 +114,8 @@ export default function ClinicHomeScreen() {
       icon: Stethoscope,
       tone: 'bg-rose-50',
       color: '#E11D48',
-      title: ar ? 'الأطباء' : 'Doctors',
-      to: '/doctors',
+      title: ar ? 'أطباء العيادة' : 'Clinic Doctors',
+      to: '/clinic-doctors',
     },
   ];
 
@@ -111,7 +123,7 @@ export default function ClinicHomeScreen() {
     <Pressable key={it.title} onPress={() => router.push(it.to)} className="w-[48.5%]">
       <View className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <View className={cn('mb-3 h-11 w-11 items-center justify-center rounded-2xl', it.tone)}>
-          <it.icon size={20} color={it.color} strokeWidth={2.2} />
+          <it.icon size={it.iconSize ?? 20} color={it.color} strokeWidth={2.2} />
         </View>
         <Text className="text-sm font-bold text-slate-800">{it.title}</Text>
         {it.chip ? (
@@ -147,7 +159,7 @@ export default function ClinicHomeScreen() {
           >
             <Plus size={14} color="#2563EB" />
             <Text className="text-[11px] font-bold text-[#2563EB]">
-              {ar ? '+ إضافة موعد' : '+ Add Appointment'}
+              {ar ? 'إضافة موعد' : 'Add Appointment'}
             </Text>
           </Pressable>
           <Pressable
@@ -175,54 +187,7 @@ export default function ClinicHomeScreen() {
         {renderSection(ar ? 'التقارير والإدارة' : 'Reports & Management', manage)}
       </View>
 
-      {showAdd && <AddAppointmentModal open={showAdd} onClose={() => setShowAdd(false)} ar={ar} />}
+      <AddAppointmentModal open={showAdd} onClose={() => setShowAdd(false)} />
     </Screen>
-  );
-}
-
-function AddAppointmentModal({ open, onClose, ar }: { open: boolean; onClose: () => void; ar: boolean }) {
-  const [patientName, setPatientName] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [time, setTime] = useState('');
-  const [treatment, setTreatment] = useState('');
-
-  const save = () => {
-    if (!patientName.trim()) return;
-    addAppointment({
-      patientName: patientName.trim(),
-      phone: '',
-      date,
-      time: time.trim(),
-      appointmentType: '',
-      clinicRoom: '',
-      doctor: '',
-      treatment: treatment.trim(),
-      notes: '',
-      reminder: false,
-    });
-    setPatientName('');
-    setTime('');
-    setTreatment('');
-    onClose();
-  };
-
-  return (
-    <Modal visible={open} transparent animationType="slide">
-      <View className="flex-1 justify-end bg-black/40">
-        <View className="rounded-t-3xl bg-white p-5 pb-8">
-          <Text className="text-lg font-extrabold">{ar ? 'إضافة موعد' : 'Add appointment'}</Text>
-          <View className="mt-4 space-y-3">
-            <Input value={patientName} onChangeText={setPatientName} placeholder={ar ? 'اسم المريض' : 'Patient name'} />
-            <Input value={date} onChangeText={setDate} placeholder={ar ? 'التاريخ (YYYY-MM-DD)' : 'Date (YYYY-MM-DD)'} />
-            <Input value={time} onChangeText={setTime} placeholder={ar ? 'الوقت' : 'Time'} />
-            <Input value={treatment} onChangeText={setTreatment} placeholder={ar ? 'العلاج' : 'Treatment'} />
-          </View>
-          <View className="mt-4 flex-row gap-2">
-            <Button variant="outline" title={ar ? 'إلغاء' : 'Cancel'} onPress={onClose} className="flex-1" />
-            <Button title={ar ? 'حفظ' : 'Save'} onPress={save} className="flex-1" />
-          </View>
-        </View>
-      </View>
-    </Modal>
   );
 }

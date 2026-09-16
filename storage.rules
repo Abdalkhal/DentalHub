@@ -97,6 +97,16 @@ service firebase.storage {
         && isImage();
     }
 
+    // "إعلاناتي" ad images (up to 4 per ad, enforced client-side — rules
+    // can't count sibling objects). Public read once approved; the ad's own
+    // Firestore doc gates which ones are actually shown.
+    match /ads/{ownerId}/{file} {
+      allow read: if true;
+      allow write: if isSignedIn() && uid() == ownerId
+        && request.resource.size < 10 * 1024 * 1024
+        && isImage();
+    }
+
     /* ── profile imagery ─────────────────────────────────────── */
 
     // Shown on public profile pages; only the owner may write their own.

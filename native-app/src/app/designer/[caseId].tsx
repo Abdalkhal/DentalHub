@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { doc, setDoc } from 'firebase/firestore';
-import { FileBox, Hash, Stethoscope, Upload, User } from 'lucide-react-native';
+import { FileBox, Hash, MessageCircle, Palette, PenTool, Stethoscope, Upload, User } from 'lucide-react-native';
 
 import { Button, Card, Screen, Spinner, Text } from '@/components/ui';
 import { db } from '@/integrations/firebase/client';
@@ -160,7 +160,46 @@ export default function DesignerCaseScreen() {
           <Hash size={16} color="#94A3B8" />
           <Text className="text-xs text-slate-500">{order.id}</Text>
         </View>
+        {!!order.dentistId && (
+          <Pressable
+            onPress={() =>
+              router.push({ pathname: '/messages', params: { with: order.dentistId, withName: order.doctor } } as never)
+            }
+            className="mt-1 flex-row items-center justify-center gap-2 rounded-xl bg-primary/10 py-2.5"
+          >
+            <MessageCircle size={15} color="#2563EB" />
+            <Text className="text-xs font-bold text-primary">
+              {ar ? 'مراسلة الطبيب' : 'Message the doctor'}
+            </Text>
+          </Pressable>
+        )}
       </Card>
+
+      {(!!order.designerName || !!order.ceramistName) && (
+        <Card className="mt-3 gap-2">
+          <Text className="mb-1 text-xs font-bold uppercase text-slate-500">
+            {ar ? 'الكادر المسند' : 'Assigned staff'}
+          </Text>
+          {!!order.designerName && (
+            <View className="flex-row items-center gap-2">
+              <PenTool size={15} color="#0EA5E9" />
+              <Text className="text-sm text-slate-700">
+                {ar ? 'المصمم: ' : 'Designer: '}
+                <Text className="font-bold text-slate-900">{order.designerName}</Text>
+              </Text>
+            </View>
+          )}
+          {!!order.ceramistName && (
+            <View className="flex-row items-center gap-2">
+              <Palette size={15} color="#EC4899" />
+              <Text className="text-sm text-slate-700">
+                {ar ? 'السراميست: ' : 'Ceramist: '}
+                <Text className="font-bold text-slate-900">{order.ceramistName}</Text>
+              </Text>
+            </View>
+          )}
+        </Card>
+      )}
 
       <Card className="mt-3">
         <Text className="mb-2 text-xs font-bold uppercase text-slate-500">

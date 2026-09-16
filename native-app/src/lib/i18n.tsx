@@ -33,7 +33,7 @@ export const dict = {
   account_sub: { ar: "الإعدادات والملف", en: "Settings & profile" },
   // Tabs
   tab_home: { ar: "الرئيسية", en: "Home" },
-  tab_orders: { ar: "طلباتي", en: "My Orders" },
+  tab_orders: { ar: "الطلبات", en: "My Orders" },
   tab_account: { ar: "حسابي", en: "Account" },
   tab_more: { ar: "المزيد", en: "More" },
   tab_favorites: { ar: "المفضلة", en: "Favorites" },
@@ -204,7 +204,8 @@ export const dict = {
   // Navigation header titles (see app/_layout.tsx). Kept in their own
   // namespace so renaming a screen header cannot disturb unrelated copy.
   screen_supplies: { ar: "المستلزمات الطبية", en: "Medical Supplies" },
-  screen_product: { ar: "المنتج", en: "Product" },
+  screen_supplies_directory: { ar: "المستلزمات الطبية", en: "Medical Supplies" },
+  screen_product: { ar: "تفاصيل المنتج", en: "Product Details" },
   screen_cart: { ar: "السلة", en: "Cart" },
   screen_patients: { ar: "المرضى", en: "Patients" },
   screen_patient: { ar: "المريض", en: "Patient" },
@@ -215,7 +216,9 @@ export const dict = {
   screen_notifications: { ar: "الإشعارات", en: "Notifications" },
   screen_labs: { ar: "المختبرات", en: "Labs" },
   screen_implants: { ar: "الزرعات", en: "Implants" },
+  screen_implant_country: { ar: "زرعات الدولة", en: "Country Implants" },
   screen_brands: { ar: "البراندات", en: "Brands" },
+  screen_brand: { ar: "البراند", en: "Brand" },
   screen_profile: { ar: "الملف", en: "Profile" },
   screen_specialized_implants: { ar: "الزرعات المتخصصة", en: "Specialized Implants" },
   screen_bone_grafts: { ar: "البون كرافت", en: "Bone Grafts" },
@@ -223,11 +226,19 @@ export const dict = {
   screen_surgical_guide: { ar: "الدليل الجراحي", en: "Surgical Guide" },
   screen_messages: { ar: "الرسائل", en: "Messages" },
   screen_doctor_invoices: { ar: "فواتير الأطباء", en: "Doctor Invoices" },
+  screen_invoices: { ar: "الفواتير", en: "Invoices" },
   screen_help: { ar: "المساعدة", en: "Help" },
   screen_reports: { ar: "التقارير", en: "Reports" },
   screen_doctors: { ar: "الأطباء", en: "Doctors" },
-  screen_designer_cases: { ar: "حالاتي كمصمم", en: "My Design Cases" },
+  screen_clinic_doctors: { ar: "أطباء العيادة", en: "Clinic Doctors" },
+  screen_clinic_materials: { ar: "مواد العيادة", en: "Clinic Materials" },
+  screen_designer_cases: { ar: "حالاتي", en: "My Cases" },
   screen_case_details: { ar: "تفاصيل الحالة", en: "Case Details" },
+  screen_new_lab_order: { ar: "طلب جديد", en: "New Order" },
+  screen_lab_finance: { ar: "الحسابات", en: "Accounts" },
+  screen_lab_reports: { ar: "التقارير", en: "Reports" },
+  screen_lab_services: { ar: "خدمات المختبر", en: "Lab Services" },
+  screen_my_ads: { ar: "إعلاناتي", en: "My Ads" },
 } satisfies Dict;
 
 export type DictKey = keyof typeof dict;

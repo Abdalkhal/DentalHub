@@ -19,8 +19,13 @@ export function Button({
   disabled,
   ...props
 }: ButtonProps) {
+  // `min-h-*` + vertical padding instead of a fixed `h-*`: a longer label
+  // squeezed into a narrow flex-1 slot (e.g. two side-by-side sm buttons)
+  // can wrap to a second line, and RN clips a child that overflows a fixed
+  // height — the second line just silently disappears instead of the
+  // button growing to fit it.
   const base =
-    size === "md" ? "h-12 rounded-2xl px-4" : "h-9 rounded-xl px-3";
+    size === "md" ? "min-h-12 rounded-2xl px-4 py-3" : "min-h-9 rounded-xl px-3 py-2";
   const variants = {
     primary: "bg-primary active:opacity-90",
     outline: "border border-primary bg-transparent",
@@ -48,7 +53,7 @@ export function Button({
         <ActivityIndicator color={variant === "primary" ? "#FFFFFF" : "#3B82F6"} />
       ) : null}
       {title ? (
-        <Text className={cn("font-bold text-sm", labelColor)}>{title}</Text>
+        <Text className={cn("text-center font-bold text-sm", labelColor)}>{title}</Text>
       ) : (
         children
       )}

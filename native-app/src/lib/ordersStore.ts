@@ -43,6 +43,12 @@ export type PricingItem = {
   price?: number;
   totalPrice?: number;
   total?: number;
+  // Per-item material/work-type detail, set when a case mixes several
+  // distinct work items (see lib/orderLines.ts's deriveWorkDetailGroups).
+  material?: string;
+  workType?: string;
+  manufacturingMethod?: string;
+  frameworkCreation?: string;
 };
 
 export type Order = {
@@ -279,20 +285,29 @@ export function connectLabOrders(labId: string) {
   _financeByCase = {};
 
   const rebuildFromFirestore = () => {
+    // The public `cases` doc and the private `finance` doc are written by two
+    // separate awaited calls (see syncToFirestore) and land through two
+    // independent onSnapshot listeners, so the `cases` listener routinely
+    // fires first — right after creating an order, `_financeByCase` can be
+    // momentarily empty for it. Falling back to the previous in-memory order
+    // (which addOrder/updateOrder already populated with full data) instead
+    // of straight to the stripped raw doc keeps price/currency from visibly
+    // flashing wrong (e.g. IQD showing as $) during that window.
+    const prevById = new Map(orders.map((o) => [o.id, o]));
     orders = _firestoreCases.map((c) => {
+      const prev = prevById.get(c.id);
       const fin = _financeByCase[c.id];
-      if (!fin) return c;
       return {
         ...c,
-        price: fin.price ?? 0,
-        currency: fin.currency ?? c.currency,
-        unitPrice: fin.unitPrice ?? 0,
-        discount: fin.discount ?? 0,
-        pricingMode: fin.pricingMode ?? c.pricingMode,
-        pricingItems: fin.pricingItems ?? c.pricingItems,
-        subtotalIQD: fin.subtotalIQD ?? c.subtotalIQD,
-        discountAmountIQD: fin.discountAmountIQD ?? c.discountAmountIQD,
-        finalTotalUSD: fin.finalTotalUSD ?? c.finalTotalUSD,
+        price: fin?.price ?? prev?.price ?? 0,
+        currency: fin?.currency ?? prev?.currency ?? c.currency,
+        unitPrice: fin?.unitPrice ?? prev?.unitPrice ?? 0,
+        discount: fin?.discount ?? prev?.discount ?? 0,
+        pricingMode: fin?.pricingMode ?? prev?.pricingMode ?? c.pricingMode,
+        pricingItems: fin?.pricingItems ?? prev?.pricingItems ?? c.pricingItems,
+        subtotalIQD: fin?.subtotalIQD ?? prev?.subtotalIQD ?? c.subtotalIQD,
+        discountAmountIQD: fin?.discountAmountIQD ?? prev?.discountAmountIQD ?? c.discountAmountIQD,
+        finalTotalUSD: fin?.finalTotalUSD ?? prev?.finalTotalUSD ?? c.finalTotalUSD,
       } as Order;
     });
     if (orders.length > 0) {
@@ -405,6 +420,10 @@ export function buildInternalOrder(
           quantity: Number(it.quantity) || 0,
           unitPrice: Number(it.unitPrice) || 0,
           currency: it.currency,
+          material: it.material,
+          workType: it.workType,
+          manufacturingMethod: it.manufacturingMethod,
+          frameworkCreation: it.frameworkCreation,
         }))
       : [
           {
@@ -467,6 +486,7 @@ export function buildInternalOrder(
     designerName: o.designerName,
     ceramistId: o.ceramistId,
     ceramistName: o.ceramistName,
+    dentistId: o.dentistId,
     status,
     agent: "",
   };
@@ -511,10 +531,12 @@ async function cleanupOrderFile(
 export async function attachOrderFile(
   labId: string,
   orderId: string,
-  file: { url: string; name: string; path: string },
+  file: { name: string; path: string },
 ): Promise<void> {
+  // `fileUrl` is deliberately not written: a stored download URL would be a
+  // permanent, rules-bypassing handle on a patient scan. Consumers resolve
+  // `filePath` on demand instead.
   await updateDoc(caseDocRef(labId, orderId), {
-    fileUrl: file.url,
     fileName: file.name,
     filePath: file.path,
     fileStatus: "uploaded",

@@ -157,29 +157,10 @@ export async function placeCartOrder(
     created++;
   }
 
-  // Decrement stock for every ordered product so the new quantity is reflected
-  // automatically on both the dentist and the supplier sides. Best-effort:
-  // a failure here must never block the order itself.
-  const byProduct = new Map<string, number>();
-  for (const item of items) {
-    const id = item.productId || item.id;
-    if (!id) continue;
-    byProduct.set(id, (byProduct.get(id) ?? 0) + (item.quantity || 1));
-  }
-  for (const [productId, qty] of byProduct) {
-    try {
-      const pRef = doc(db, "products", productId);
-      const pSnap = await getDoc(pRef);
-      if (!pSnap.exists()) continue;
-      const current = Number((pSnap.data() as Record<string, unknown>).stock);
-      if (!Number.isFinite(current) || current <= 0) continue;
-      const next = Math.max(0, current - qty);
-      await updateDoc(pRef, { stock: next, inStock: next > 0 });
-    } catch {
-      // ignore — the order is already placed
-    }
-  }
-
+  // Stock is decremented on confirmation (confirmOrder), not here: at this
+  // point the office hasn't reviewed the order yet, so an item can still end
+  // up rejected or marked unavailable — decrementing this early would wrongly
+  // reduce stock for something that may never actually ship.
   clearCart();
   return { count: created, orderId: firstOrderId };
 }
@@ -235,6 +216,29 @@ export async function confirmOrder(order: OrderDoc): Promise<string> {
     deliveredAt: null,
     rejectedAt: null,
   });
+
+  // Decrement stock now that the office has actually confirmed the order —
+  // only for the items that made it into the invoice (an item marked
+  // "not_available" above must never touch stock). Best-effort: a failure
+  // here must never block the confirmation itself.
+  const byProduct = new Map<string, number>();
+  for (const item of availableItems) {
+    if (!item.productId) continue;
+    byProduct.set(item.productId, (byProduct.get(item.productId) ?? 0) + (item.quantity || 1));
+  }
+  for (const [productId, qty] of byProduct) {
+    try {
+      const pRef = doc(db, "products", productId);
+      const pSnap = await getDoc(pRef);
+      if (!pSnap.exists()) continue;
+      const current = Number((pSnap.data() as Record<string, unknown>).stock);
+      if (!Number.isFinite(current) || current <= 0) continue;
+      const next = Math.max(0, current - qty);
+      await updateDoc(pRef, { stock: next, inStock: next > 0 });
+    } catch {
+      // ignore — the invoice is already created
+    }
+  }
 
   // Notify the dentist about products that could not be provided.
   if (unavailableItems.length > 0 && latest.dentistId) {

@@ -1,6 +1,8 @@
 ﻿import { createLocalStore } from "./createLocalStore";
 import { toast } from "@/lib/toast";
 
+export type FavKind = "brand" | "product" | "implant" | "office";
+
 export type FavItem = {
   id: string;
   title: string;
@@ -9,6 +11,9 @@ export type FavItem = {
   currency: "USD" | "IQD";
   imageUrl?: string;
   addedAt: string;
+  /** What `id` refers to, so the favorites screen knows where tapping it
+   * should navigate. Optional/omitted on older saved entries (brand). */
+  kind?: FavKind;
 };
 
 const favorites = createLocalStore<FavItem[]>("dh:favorites", [], {
@@ -17,6 +22,15 @@ const favorites = createLocalStore<FavItem[]>("dh:favorites", [], {
 
 export function useFavorites() {
   return favorites.useStore();
+}
+
+/** Scopes favorites to the signed-in user — see index.tsx, which calls this
+ * (alongside setPatientStoreUser/setClinicStoreUser/setAppointmentsStoreUser)
+ * whenever the signed-in user changes. Without it every account on the
+ * device shared one "dh:favorites" key, so a dentist's favorited products
+ * showed up unchanged after switching to a supply/implant/lab account. */
+export function setFavoritesStoreUser(uid: string): void {
+  favorites.setUser(uid);
 }
 
 export function isFavorited(id: string): boolean {
@@ -33,11 +47,11 @@ export function toggleFavorite(item: FavItem, lang?: string): boolean {
   const ar = lang === "ar";
   if (exists >= 0) {
     favorites.set(list.filter((i) => i.id !== item.id));
-    toast.success(ar ? "ØªÙ…Øª Ø¥Ø²Ø§Ù„Ø© Ø§Ù„Ø¹Ù†ØµØ± Ù…Ù† Ø§Ù„Ù…ÙØ¶Ù„Ø©" : "Removed from favorites");
+    toast.success(ar ? "تمت إزالة العنصر من المفضلة" : "Removed from favorites");
     return false;
   }
   favorites.set([...list, item]);
-  toast.success(ar ? "ØªÙ…Øª Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ø¹Ù†ØµØ± Ø¥Ù„Ù‰ Ø§Ù„Ù…ÙØ¶Ù„Ø©" : "Added to favorites");
+  toast.success(ar ? "تمت إضافة العنصر إلى المفضلة" : "Added to favorites");
   return true;
 }
 
@@ -45,6 +59,6 @@ export function removeFavorite(id: string, lang?: string): void {
   const list = favorites.getSnapshot();
   const ar = lang === "ar";
   favorites.set(list.filter((i) => i.id !== id));
-  toast.success(ar ? "ØªÙ…Øª Ø¥Ø²Ø§Ù„Ø© Ø§Ù„Ø¹Ù†ØµØ±" : "Removed from favorites");
+  toast.success(ar ? "تمت إزالة العنصر" : "Removed from favorites");
 }
 

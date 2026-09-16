@@ -105,6 +105,34 @@ export async function deactivateAd(offerId: string, adminName: string) {
   await logAction("deactivate_ad", "تم إيقاف إعلان نشط", adminName);
 }
 
+// General "إعلاناتي" ads (`ads` collection) — separate from the
+// dentist-facing `offers` above; kept as their own functions since the
+// status values and collection differ (no "expired" state — a stopped ad
+// just goes back to "rejected" so it stops showing but stays out of the
+// pending queue).
+export async function approveGeneralAd(adId: string, expiryDate: string, adminName: string) {
+  await setDoc(
+    doc(db, "ads", adId),
+    { status: "active", expiryDate, rejectReason: null },
+    { merge: true },
+  );
+  await logAction("approve_general_ad", `تمت الموافقة على إعلان حتى ${expiryDate}`, adminName);
+}
+
+export async function rejectGeneralAd(adId: string, reason: string, adminName: string) {
+  await setDoc(doc(db, "ads", adId), { status: "rejected", rejectReason: reason }, { merge: true });
+  await logAction("reject_general_ad", `تم رفض إعلان - ${reason}`, adminName);
+}
+
+export async function deactivateGeneralAd(adId: string, adminName: string) {
+  await setDoc(
+    doc(db, "ads", adId),
+    { status: "rejected", rejectReason: "أُوقف من قبل الإدارة" },
+    { merge: true },
+  );
+  await logAction("deactivate_general_ad", "تم إيقاف إعلان نشط", adminName);
+}
+
 export async function setAccountStatus(
   userId: string,
   status: "active" | "suspended" | "expired",

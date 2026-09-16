@@ -1,7 +1,7 @@
 import { Image, Pressable, View } from 'react-native';
 import { router } from 'expo-router';
 import { signOut } from 'firebase/auth';
-import { Bell, ChevronRight, FileText, Globe, Heart, LifeBuoy, LogOut, Megaphone, MessageCircle, Package, User } from 'lucide-react-native';
+import { Bell, ChevronRight, FileText, Globe, Heart, LifeBuoy, LogOut, Megaphone, MessageCircle, User } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 
 import { Screen, Text } from '@/components/ui';
@@ -111,27 +111,31 @@ export default function AccountScreen() {
           label={ar ? 'المفضلة' : 'Favorites'}
           onPress={() => router.push('/favorites')}
         />
-        <Row
-          icon={Megaphone}
-          tone="bg-emerald-100"
-          color="#059669"
-          label={ar ? 'العروض' : 'Offers'}
-          onPress={() => router.push('/offers')}
-        />
-        <Row
-          icon={Package}
-          tone="bg-amber-100"
-          color="#D97706"
-          label={ar ? 'الطلبات السريعة' : 'Quick Orders'}
-          onPress={() => router.push('/quick-orders')}
-        />
+        {type !== 'implant' && type !== 'lab' && (
+          <Row
+            icon={Megaphone}
+            tone="bg-emerald-100"
+            color="#059669"
+            label={ar ? 'العروض' : 'Offers'}
+            onPress={() => router.push('/offers')}
+          />
+        )}
         {(type === 'supply' || type === 'implant') && (
           <Row
             icon={FileText}
             tone="bg-slate-100"
             color="#334155"
             label={ar ? 'فواتير الأطباء' : 'Doctor Invoices'}
-            onPress={() => router.push('/doctor-invoices')}
+            onPress={() => router.push('/doctor-invoices' as never)}
+          />
+        )}
+        {type === 'dentist' && (
+          <Row
+            icon={FileText}
+            tone="bg-violet-100"
+            color="#7C3AED"
+            label={ar ? 'الفواتير' : 'Invoices'}
+            onPress={() => router.push('/invoices')}
           />
         )}
         <Row
