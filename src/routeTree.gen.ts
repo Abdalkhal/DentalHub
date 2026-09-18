@@ -14,6 +14,7 @@ import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as QuickOrdersRouteImport } from './routes/quick-orders'
 import { Route as ProductionRouteImport } from './routes/production'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as OffersRouteImport } from './routes/offers'
@@ -99,6 +100,11 @@ const QuickOrdersRoute = QuickOrdersRouteImport.update({
 const ProductionRoute = ProductionRouteImport.update({
   id: '/production',
   path: '/production',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PricingRoute = PricingRouteImport.update({
@@ -427,6 +433,7 @@ export interface FileRoutesByFullPath {
   '/offers': typeof OffersRoute
   '/orders': typeof OrdersRoute
   '/pricing': typeof PricingRoute
+  '/privacy': typeof PrivacyRoute
   '/production': typeof ProductionRoute
   '/quick-orders': typeof QuickOrdersRoute
   '/register': typeof RegisterRoute
@@ -495,6 +502,7 @@ export interface FileRoutesByTo {
   '/offers': typeof OffersRoute
   '/orders': typeof OrdersRoute
   '/pricing': typeof PricingRoute
+  '/privacy': typeof PrivacyRoute
   '/production': typeof ProductionRoute
   '/quick-orders': typeof QuickOrdersRoute
   '/register': typeof RegisterRoute
@@ -564,6 +572,7 @@ export interface FileRoutesById {
   '/offers': typeof OffersRoute
   '/orders': typeof OrdersRoute
   '/pricing': typeof PricingRoute
+  '/privacy': typeof PrivacyRoute
   '/production': typeof ProductionRoute
   '/quick-orders': typeof QuickOrdersRoute
   '/register': typeof RegisterRoute
@@ -634,6 +643,7 @@ export interface FileRouteTypes {
     | '/offers'
     | '/orders'
     | '/pricing'
+    | '/privacy'
     | '/production'
     | '/quick-orders'
     | '/register'
@@ -702,6 +712,7 @@ export interface FileRouteTypes {
     | '/offers'
     | '/orders'
     | '/pricing'
+    | '/privacy'
     | '/production'
     | '/quick-orders'
     | '/register'
@@ -770,6 +781,7 @@ export interface FileRouteTypes {
     | '/offers'
     | '/orders'
     | '/pricing'
+    | '/privacy'
     | '/production'
     | '/quick-orders'
     | '/register'
@@ -839,6 +851,7 @@ export interface RootRouteChildren {
   OffersRoute: typeof OffersRoute
   OrdersRoute: typeof OrdersRoute
   PricingRoute: typeof PricingRoute
+  PrivacyRoute: typeof PrivacyRoute
   ProductionRoute: typeof ProductionRoute
   QuickOrdersRoute: typeof QuickOrdersRoute
   RegisterRoute: typeof RegisterRoute
@@ -921,6 +934,13 @@ declare module '@tanstack/react-router' {
       path: '/production'
       fullPath: '/production'
       preLoaderRoute: typeof ProductionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pricing': {
@@ -1410,6 +1430,7 @@ const rootRouteChildren: RootRouteChildren = {
   OffersRoute: OffersRoute,
   OrdersRoute: OrdersRoute,
   PricingRoute: PricingRoute,
+  PrivacyRoute: PrivacyRoute,
   ProductionRoute: ProductionRoute,
   QuickOrdersRoute: QuickOrdersRoute,
   RegisterRoute: RegisterRoute,

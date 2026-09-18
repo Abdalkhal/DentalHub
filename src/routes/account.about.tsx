@@ -11,7 +11,7 @@ export const Route = createFileRoute("/account/about")({
   component: AboutPage,
 });
 
-type Section = { title: { ar: string; en: string }; body: { ar: string; en: string } };
+export type Section = { title: { ar: string; en: string }; body: { ar: string; en: string } };
 
 const TERMS_SECTIONS: Section[] = [
   {
@@ -65,7 +65,7 @@ const TERMS_SECTIONS: Section[] = [
   },
 ];
 
-const PRIVACY_SECTIONS: Section[] = [
+export const PRIVACY_SECTIONS: Section[] = [
   {
     title: { ar: "البيانات التي نجمعها", en: "Data we collect" },
     body: {
