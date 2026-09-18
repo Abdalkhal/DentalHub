@@ -9,12 +9,12 @@
     "userInterfaceStyle": "light",
     "ios": {
       "icon": "./assets/expo.icon",
-      "bundleIdentifier": "com.khazer.dentalhub",
+      "bundleIdentifier": "com.khazer.denthub",
       "supportsTablet": false,
       "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
-      "package": "com.khazer.dentalhub",
+      "package": "com.khazer.denthub",
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#2563EB",
