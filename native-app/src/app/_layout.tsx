@@ -64,6 +64,7 @@ const TITLED_SCREENS: { name: string; title: DictKey; cart?: boolean }[] = [
   { name: 'lab-reports', title: 'screen_lab_reports' },
   { name: 'lab-services', title: 'screen_lab_services' },
   { name: 'my-ads', title: 'screen_my_ads' },
+  { name: 'privacy', title: 'screen_privacy' },
   { name: 'lab-doctors', title: 'screen_doctors' },
   { name: 'lab-patients', title: 'screen_patients' },
 ];

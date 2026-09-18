@@ -113,9 +113,9 @@ function SectionHead({ title, seeAll, ar }: { title: string; seeAll?: Href; ar: 
 type CategoryTile = { to: Href; ar: string; en: string; img: number; border: string };
 
 const CATEGORY_TILES: CategoryTile[] = [
-  { to: '/implants', ar: 'زراعة الأسنان', en: 'Implants', img: require('../../../assets/home/dental-implant.png'), border: 'border-orange-200' },
-  { to: '/supplies', ar: 'مستلزمات طبية', en: 'Supplies', img: require('../../../assets/home/dental-supplies-icon.png'), border: 'border-teal-200' },
-  { to: '/labs', ar: 'المختبرات', en: 'Labs', img: require('../../../assets/home/dental-bridge.png'), border: 'border-blue-200' },
+  { to: '/implants', ar: 'زراعة الأسنان', en: 'Implants', img: require('../../../assets/home/dental-implant.jpg'), border: 'border-orange-200' },
+  { to: '/supplies', ar: 'مستلزمات طبية', en: 'Supplies', img: require('../../../assets/home/dental-supplies-icon.jpg'), border: 'border-teal-200' },
+  { to: '/labs', ar: 'المختبرات', en: 'Labs', img: require('../../../assets/home/dental-bridge.jpg'), border: 'border-blue-200' },
   { to: '/clinic', ar: 'عيادتي', en: 'My Clinic', img: require('../../../assets/home/clinic-hero.jpg'), border: 'border-purple-200' },
 ];
 

@@ -15,6 +15,7 @@ import {
   MessageSquare,
   PenTool,
   Shield,
+  ShieldCheck,
   ShoppingBag,
   ShoppingCart,
   Store,
@@ -57,6 +58,7 @@ const ITEMS: Record<string, Item[]> = {
     { icon: Bell, ar: 'الإشعارات', en: 'Notifications', to: '/notifications' },
     { icon: Cog, ar: 'الإعدادات', en: 'Settings', to: '/settings' },
     { icon: LifeBuoy, ar: 'المساعدة', en: 'Help', to: '/help' },
+    { icon: ShieldCheck, ar: 'سياسة الخصوصية', en: 'Privacy Policy', to: '/privacy' },
     { icon: ShoppingCart, ar: 'السلة', en: 'Cart', to: '/cart' },
   ],
   supply: [
@@ -67,6 +69,7 @@ const ITEMS: Record<string, Item[]> = {
     { icon: Bell, ar: 'الإشعارات', en: 'Notifications', to: '/notifications' },
     { icon: Cog, ar: 'الإعدادات', en: 'Settings', to: '/settings' },
     { icon: LifeBuoy, ar: 'المساعدة', en: 'Help', to: '/help' },
+    { icon: ShieldCheck, ar: 'سياسة الخصوصية', en: 'Privacy Policy', to: '/privacy' },
   ],
   // Web parity: labs get their dashboard, doctors, invoices and messages —
   // previously this menu had only two entries, leaving most of the lab's own
@@ -81,6 +84,7 @@ const ITEMS: Record<string, Item[]> = {
     { icon: Bell, ar: 'الإشعارات', en: 'Notifications', to: '/notifications' },
     { icon: Cog, ar: 'الإعدادات', en: 'Settings', to: '/settings' },
     { icon: LifeBuoy, ar: 'المساعدة', en: 'Help', to: '/help' },
+    { icon: ShieldCheck, ar: 'سياسة الخصوصية', en: 'Privacy Policy', to: '/privacy' },
   ],
   implant: [
     { icon: FlaskConical, ar: 'لوحة الزرعات', en: 'Implant Dashboard', to: '/implants-office' },
@@ -89,6 +93,7 @@ const ITEMS: Record<string, Item[]> = {
     { icon: Bell, ar: 'الإشعارات', en: 'Notifications', to: '/notifications' },
     { icon: Cog, ar: 'الإعدادات', en: 'Settings', to: '/settings' },
     { icon: LifeBuoy, ar: 'المساعدة', en: 'Help', to: '/help' },
+    { icon: ShieldCheck, ar: 'سياسة الخصوصية', en: 'Privacy Policy', to: '/privacy' },
   ],
   // Invited lab staff (custom claim, no user_roles doc). A designer must never
   // see lab dashboards — finance lives behind them.
@@ -96,6 +101,7 @@ const ITEMS: Record<string, Item[]> = {
     { icon: PenTool, ar: 'حالاتي كمصمم', en: 'My Design Cases', to: '/designer' },
     { icon: Bell, ar: 'الإشعارات', en: 'Notifications', to: '/notifications' },
     { icon: LifeBuoy, ar: 'المساعدة', en: 'Help', to: '/help' },
+    { icon: ShieldCheck, ar: 'سياسة الخصوصية', en: 'Privacy Policy', to: '/privacy' },
   ],
   admin: [
     { icon: Shield, ar: 'لوحة الإدارة', en: 'Admin Panel', to: '/admin' },
