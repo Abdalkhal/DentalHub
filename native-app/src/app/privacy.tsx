@@ -75,8 +75,8 @@ export default function PrivacyScreen() {
       <Card className="mt-4">
         <Text className="text-xs leading-relaxed text-slate-600">
           {ar
-            ? 'تطبيق "دينتال هب" يساعد عيادات الأسنان والمكاتب وشركات الزرعات والمختبرات على التواصل وتصفّح المنتجات وإدارة الحالات.'
-            : 'DentalHub ("the App") helps dental clinics, suppliers, implant companies and laboratories communicate, browse products and manage cases.'}
+            ? 'تطبيق "دنت هب" يساعد عيادات الأسنان والمكاتب وشركات الزرعات والمختبرات على التواصل وتصفّح المنتجات وإدارة الحالات.'
+            : 'Dent Hub ("the App") helps dental clinics, suppliers, implant companies and laboratories communicate, browse products and manage cases.'}
         </Text>
       </Card>
 
@@ -106,7 +106,7 @@ export default function PrivacyScreen() {
           <Text className="mt-2 text-xs leading-relaxed text-slate-600">
             {ar
               ? 'دعم التطبيق من قسم المساعدة أو رابط واتساب الظاهر داخل التطبيق.'
-              : "DentalHub support (via the app's Help section or WhatsApp link shown in-app)."}
+              : "Dent Hub support (via the app's Help section or WhatsApp link shown in-app)."}
           </Text>
         </Card>
       </View>

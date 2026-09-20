@@ -264,8 +264,8 @@ export default function HomeScreen() {
         </Pressable>
 
         <Text className="text-xl font-extrabold tracking-tight">
-          <Text className="text-primary">Dental</Text>
-          <Text className="text-slate-900">Hub</Text>
+          <Text className="text-primary">Dent</Text>
+          <Text className="text-slate-900"> Hub</Text>
         </Text>
 
         <View className="flex-row items-center gap-2">

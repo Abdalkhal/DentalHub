@@ -232,8 +232,8 @@ export default function LoginScreen() {
           <Stethoscope size={30} color="#FFFFFF" strokeWidth={2.2} />
         </View>
         <Text className="mt-3 text-2xl font-extrabold tracking-tight">
-          <Text className="text-primary">Dental</Text>
-          <Text className="text-slate-900">Hub</Text>
+          <Text className="text-primary">Dent</Text>
+          <Text className="text-slate-900"> Hub</Text>
         </Text>
         <Text className="mt-1 text-xs text-slate-400">
           {ar ? 'منصة الأطباء والمكاتب والمختبرات' : 'Platform for dentists, offices & labs'}

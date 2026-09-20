@@ -51,7 +51,7 @@ export default function AccountScreen() {
   const ar = lang === 'ar';
   const { role } = useUserRole();
 
-  const name = [role?.name, role?.surname].filter(Boolean).join(' ').trim() || 'DentalHub';
+  const name = [role?.name, role?.surname].filter(Boolean).join(' ').trim() || 'Dent Hub';
   const type = role?.accountType ?? 'dentist';
   const roleLabel = ROLE_LABELS[type]?.[ar ? 'ar' : 'en'] ?? type;
   const photo = role?.photoURL ?? '';

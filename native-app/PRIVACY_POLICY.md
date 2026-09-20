@@ -1,10 +1,10 @@
-# DentalHub — Privacy Policy / سياسة الخصوصية
+# Dent Hub — Privacy Policy / سياسة الخصوصية
 
 _Last updated / آخر تحديث: September 2026_
 
 ## English
 
-DentalHub ("the App") helps dental clinics, suppliers, implant companies and
+Dent Hub ("the App") helps dental clinics, suppliers, implant companies and
 laboratories in Iraq communicate, browse products and manage cases.
 
 **Data we collect**
@@ -28,14 +28,14 @@ laboratories in Iraq communicate, browse products and manage cases.
   contacting support.
 - Push notifications are optional (turn off in device settings / the app).
 
-**Contact** — DentalHub support (via the app's Help section or WhatsApp link
+**Contact** — Dent Hub support (via the app's Help section or WhatsApp link
 shown in-app).
 
 ---
 
 ## العربية
 
-تطبيق "دينتال هب" يساعد عيادات الأسنان والمكاتب وشركات الزرعات والمختبرات على
+تطبيق "دنت هب" يساعد عيادات الأسنان والمكاتب وشركات الزرعات والمختبرات على
 التواصل وتصفّح المنتجات وإدارة الحالات.
 
 **البيانات التي نجمعها**

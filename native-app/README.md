@@ -1,6 +1,6 @@
-# DentalHub — mobile app
+# Dent Hub — mobile app
 
-React Native (Expo) client for DentalHub. The web app lives in the repository
+React Native (Expo) client for Dent Hub. The web app lives in the repository
 root; this directory is a separate Expo project with its own dependencies.
 
 ## Setup

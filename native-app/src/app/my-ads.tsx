@@ -45,7 +45,7 @@ function statusLabel(status: Ad['status'], ar: boolean): string {
 
 function whatsappLink(accountName: string, title: string): string {
   const text = encodeURIComponent(
-    `مرحباً، أرسلت للتو إعلاناً جديداً على DentalHub.\nالحساب: ${accountName}\nعنوان الإعلان: ${title}`,
+    `مرحباً، أرسلت للتو إعلاناً جديداً على Dent Hub.\nالحساب: ${accountName}\nعنوان الإعلان: ${title}`,
   );
   return `https://wa.me/${ADS_WHATSAPP_NUMBER}?text=${text}`;
 }

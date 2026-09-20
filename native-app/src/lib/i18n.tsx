@@ -20,7 +20,7 @@ function applyDirection(l: Lang) {
 type Dict = Record<string, { ar: string; en: string }>;
 
 export const dict = {
-  app_name: { ar: "DentalHub", en: "DentalHub" },
+  app_name: { ar: "Dent Hub", en: "Dent Hub" },
   search_placeholder: { ar: "ابحث عن مواد، مكاتب…", en: "Search materials, offices…" },
   // Sections
   supplies: { ar: "المستلزمات الطبية", en: "Medical Supplies" },

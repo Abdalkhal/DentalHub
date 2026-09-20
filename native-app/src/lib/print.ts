@@ -82,7 +82,7 @@ const SHELL = (body: string, ar: boolean) => `
   .note{margin-top:14px;padding:10px 12px;background:#f8fafc;border-radius:8px;font-size:12px;color:#334155}
   .note b{color:#64748b;font-size:10px;display:block;margin-bottom:2px}
 </style></head><body>
-<div class="brand">Dental<span style="color:#0f172a">Hub</span></div>
+<div class="brand">Dent<span style="color:#0f172a"> Hub</span></div>
 ${body}
 </body></html>`;
 

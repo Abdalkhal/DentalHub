@@ -182,7 +182,7 @@ export function CaseDetailModal({
   const shadeHex = selectedShade ? SHADE_HEX[selectedShade] : undefined;
   const shadeSystemLabel = shadeTab && shadeTab !== 'others' ? (ar ? SHADE_SYSTEMS[shadeTab].ar : SHADE_SYSTEMS[shadeTab].en) : null;
 
-  const labTitle = labName || (ar ? 'مختبر دنتال هب' : 'Dental Hub Lab');
+  const labTitle = labName || (ar ? 'مختبر دنت هب' : 'Dent Hub Lab');
   const items = deriveOrderLines(order);
   const finalAmount = resolveOrderTotal(order);
   const orderCurrency: 'USD' | 'IQD' = order.currency === 'USD' ? 'USD' : 'IQD';

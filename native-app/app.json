@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "DentalHub",
+    "name": "Dent Hub",
     "slug": "native-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -8,7 +8,7 @@
     "scheme": "dentalhub",
     "userInterfaceStyle": "light",
     "ios": {
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/images/icon.png",
       "bundleIdentifier": "com.khazer.denthub",
       "supportsTablet": false,
       "googleServicesFile": "./GoogleService-Info.plist"
@@ -61,7 +61,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow DentalHub to use the camera to scan product barcodes."
+          "cameraPermission": "Allow Dent Hub to use the camera to scan product barcodes."
         }
       ],
       "expo-notifications",
