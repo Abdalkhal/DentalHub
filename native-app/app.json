@@ -38,6 +38,10 @@
             "DEFAULT"
           ]
         }
+      ],
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -77,6 +81,12 @@
         "projectId": "e631dca8-3a36-4416-82d8-9389cd4ad63b"
       }
     },
-    "owner": "khaliqedan"
+    "owner": "khaliqedan",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/e631dca8-3a36-4416-82d8-9389cd4ad63b"
+    }
   }
 }
