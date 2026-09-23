@@ -81,13 +81,38 @@ service firebase.storage {
     /* ── public catalogue imagery ────────────────────────────── */
 
     // Product images are shown to signed-out visitors, so read stays open.
-    // Ownership cannot be checked from the path (it is keyed by productId, not
-    // by company), so writes remain restricted only by auth, type and size.
+    // The path is keyed by productId, so ownership is read from the product
+    // doc: any signed-in account could otherwise overwrite another company's
+    // images. Uploads for a product that doesn't exist yet (new product form,
+    // offer images reuse this prefix with their own id) are still allowed.
+    function productDoc(productId) {
+      return /databases/(default)/documents/products/$(productId);
+    }
+
+    function isStorageAdmin() {
+      return isSignedIn() && firestore.get(
+        /databases/(default)/documents/user_roles/$(uid())).data.get('role', '') == 'admin';
+    }
+
+    function ownsOrNewProduct(productId) {
+      return !firestore.exists(productDoc(productId))
+        || firestore.get(productDoc(productId)).data.get('companyId', '') == uid()
+        || isStorageAdmin();
+    }
+
     match /products/{productId}/{file} {
       allow read: if true;
-      allow write: if isSignedIn()
+      allow create, update: if isSignedIn()
         && request.resource.size < 10 * 1024 * 1024
-        && isImage();
+        && isImage()
+        && ownsOrNewProduct(productId);
+      // No "new product" branch here: offer images live under this prefix
+      // with no product doc, and that branch would let anyone delete them.
+      allow delete: if isSignedIn() && (
+        (firestore.exists(productDoc(productId))
+          && firestore.get(productDoc(productId)).data.get('companyId', '') == uid())
+        || isStorageAdmin()
+      );
     }
 
     match /surgical-guides/{ownerId}/{file} {
