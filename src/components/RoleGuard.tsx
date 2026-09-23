@@ -30,8 +30,8 @@ export function RoleGuard({ allowedRoles, children }: Props) {
 
   if (loading) {
     return (
-      <MobileShell>
-        <TopBar title="" />
+      <MobileShell wide>
+        <TopBar title="" wide />
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="size-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
@@ -66,8 +66,8 @@ export function RoleGuard({ allowedRoles, children }: Props) {
   };
 
   return (
-    <MobileShell hideBottomNav>
-      <TopBar title="" showBack />
+    <MobileShell hideBottomNav wide>
+      <TopBar title="" showBack wide />
       <div className="flex flex-col items-center justify-center min-h-[70vh] px-6 text-center">
         <div className="size-20 rounded-full bg-rose-100 flex items-center justify-center mb-6">
           <ShieldAlert className="size-10 text-rose-500" />

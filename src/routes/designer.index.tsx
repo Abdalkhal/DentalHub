@@ -20,9 +20,9 @@ function DesignerIndex() {
   const { cases, loading } = useDesignerCases(user?.uid || "");
 
   return (
-    <MobileShell>
-      <TopBar title={ar ? "حالاتي" : "My Cases"} />
-      <div className="px-4 pt-2 pb-8">
+    <MobileShell wide>
+      <TopBar title={ar ? "حالاتي" : "My Cases"} wide maxW="6xl" />
+      <div className="px-4 pt-2 pb-8 md:px-6 md:pt-8 lg:px-8 lg:max-w-6xl lg:mx-auto">
         <div className="flex justify-end mb-3">
           <button
             onClick={() => auth.signOut()}

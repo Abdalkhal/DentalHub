@@ -65,8 +65,8 @@ export function DesignerCaseDetail({ caseId }: { caseId: string }) {
 
   if (loading) {
     return (
-      <MobileShell>
-        <TopBar title={ar ? "تفاصيل الحالة" : "Case details"} showBack />
+      <MobileShell wide>
+        <TopBar title={ar ? "تفاصيل الحالة" : "Case details"} showBack wide maxW="4xl" />
         <div className="flex justify-center py-20">
           <Loader2 className="size-8 animate-spin text-primary" />
         </div>
@@ -76,8 +76,8 @@ export function DesignerCaseDetail({ caseId }: { caseId: string }) {
 
   if (!order) {
     return (
-      <MobileShell>
-        <TopBar title={ar ? "تفاصيل الحالة" : "Case details"} showBack />
+      <MobileShell wide>
+        <TopBar title={ar ? "تفاصيل الحالة" : "Case details"} showBack wide maxW="4xl" />
         <div className="p-6 text-center text-slate-400">
           <p className="font-semibold">
             {ar ? "الحالة غير موجودة أو غير مسندة إليك" : "Case not found or not assigned to you"}
@@ -93,10 +93,10 @@ export function DesignerCaseDetail({ caseId }: { caseId: string }) {
   const stlFiles = [...(order.attachments ?? []), ...(order.designs ?? [])];
 
   return (
-    <MobileShell>
-      <TopBar title={`${ar ? "الحالة" : "Case"} #${order.caseId || order.orderNumber}`} showBack />
+    <MobileShell wide>
+      <TopBar title={`${ar ? "الحالة" : "Case"} #${order.caseId || order.orderNumber}`} showBack wide maxW="4xl" />
 
-      <div className="px-4 pt-4 pb-8 space-y-4">
+      <div className="px-4 pt-4 pb-8 space-y-4 md:px-6 md:pt-8 lg:px-8 lg:max-w-4xl lg:mx-auto">
         {/* Patient / doctor / case id */}
         <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-2.5">
           <div className="flex items-center gap-2 text-sm">

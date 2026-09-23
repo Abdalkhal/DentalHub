@@ -39,8 +39,8 @@ function AdminPage() {
 
   if (loading || !user) {
     return (
-      <MobileShell>
-        <TopBar title={lang === "ar" ? "لوحة الإدارة" : "Admin panel"} showBack />
+      <MobileShell wide>
+        <TopBar title={lang === "ar" ? "لوحة الإدارة" : "Admin panel"} showBack wide maxW="6xl" />
         <div className="p-8 text-center text-sm text-muted-foreground">…</div>
       </MobileShell>
     );
@@ -48,8 +48,8 @@ function AdminPage() {
 
   if (!isAdmin) {
     return (
-      <MobileShell>
-        <TopBar title={lang === "ar" ? "لوحة الإدارة" : "Admin panel"} showBack />
+      <MobileShell wide>
+        <TopBar title={lang === "ar" ? "لوحة الإدارة" : "Admin panel"} showBack wide maxW="6xl" />
         <div className="p-6 text-center space-y-3">
           <ShieldAlert className="size-10 text-destructive mx-auto" />
           <p className="font-display font-bold">
@@ -69,9 +69,9 @@ function AdminPage() {
   }
 
   return (
-    <MobileShell>
-      <TopBar title={lang === "ar" ? "لوحة الإدارة" : "Admin panel"} showBack />
-      <div className="px-4 pt-4 pb-6">
+    <MobileShell wide>
+      <TopBar title={lang === "ar" ? "لوحة الإدارة" : "Admin panel"} showBack wide maxW="6xl" />
+      <div className="px-4 pt-4 pb-6 md:px-6 md:pt-8 lg:px-8 lg:max-w-6xl lg:mx-auto">
         <div className="flex items-center justify-between mb-3">
           <p className="text-xs text-muted-foreground inline-flex items-center gap-1.5">
             <Settings2 className="size-3.5" />

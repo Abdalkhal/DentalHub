@@ -23,9 +23,9 @@ function PrivacyPage() {
   const ar = lang === "ar";
 
   return (
-    <MobileShell>
-      <TopBar title={ar ? "سياسة الخصوصية" : "Privacy Policy"} showBack />
-      <div className="px-4 pt-4 pb-8 space-y-4">
+    <MobileShell wide>
+      <TopBar title={ar ? "سياسة الخصوصية" : "Privacy Policy"} showBack wide maxW="3xl" />
+      <div className="px-4 pt-4 pb-8 space-y-4 md:px-6 md:pt-8 lg:px-8 lg:max-w-3xl lg:mx-auto">
         <p className="text-xs text-muted-foreground">
           {ar ? "آخر تحديث: سبتمبر 2026" : "Last updated: September 2026"}
         </p>

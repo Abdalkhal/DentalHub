@@ -2378,7 +2378,9 @@ function ImplantDashboard() {
   const mapsUrl = getMapsUrl(role ?? {});
 
   return (
-    <MobileShell hideBottomNav>
+    <MobileShell hideBottomNav wide>
+      {/* Capped column at lg:+ so the dashboard doesn't stretch edge to edge. */}
+      <div className="w-full md:pt-4 lg:max-w-6xl lg:mx-auto lg:px-4">
       {/* Header — mirrors SupplyDashboard layout */}
       <div className="px-4 pt-4 pb-2">
         <div
@@ -2492,6 +2494,7 @@ function ImplantDashboard() {
         {activeTab === "products" && <ImplantProductsPanel />}
         {activeTab === "offers" && <OffersPanel supplierId={companyId} />}
         {activeTab === "orders" && <OrdersPanel supplierId={companyId} />}
+      </div>
       </div>
     </MobileShell>
   );

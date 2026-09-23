@@ -371,23 +371,23 @@ export function AuthPage() {
   };
 
   return (
-    <MobileShell hideBottomNav>
-      <TopBar title={ar ? "تسجيل الدخول" : "Sign in"} showBack />
-      <div className="px-4 pt-2">
+    <MobileShell hideBottomNav wide>
+      <TopBar title={ar ? "تسجيل الدخول" : "Sign in"} showBack wide maxW="3xl" />
+      <div className="px-4 pt-2 md:px-6 md:pt-8 lg:px-8 lg:max-w-3xl lg:mx-auto">
         <p className="text-xs text-muted-foreground text-center leading-relaxed bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3">
           {ar
             ? "يمكنك تسجيل الدخول باستخدام رقم الهاتف أو البريد الإلكتروني"
             : "You can sign in using your phone number or email"}
         </p>
       </div>
-      <div className="px-4 pt-4 pb-8 space-y-5">
+      <div className="px-4 pt-4 pb-8 space-y-5 md:px-6 md:pb-12 lg:px-8 lg:max-w-3xl lg:mx-auto">
         {/* Account type selector — 4 cards */}
         <div>
           <p className="text-xs font-bold text-muted-foreground mb-3 px-1 flex items-center gap-1.5">
             <span className="size-1.5 rounded-full bg-sky-400" />
             {ar ? "نوع الحساب" : "Account type"}
           </p>
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
             {ACCOUNT_OPTIONS.map((opt) => {
               const active = accountType === opt.id;
               const c = COLOR_MAP[opt.color];

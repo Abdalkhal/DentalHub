@@ -281,9 +281,9 @@ function LabOrders() {
   }, [statusFilter, search, orders]);
 
   return (
-    <MobileShell>
-      <TopBar title={ar ? "الطلبات الواردة" : "Incoming Orders"} showBack />
-      <div className="px-4 pt-4 pb-6 space-y-4">
+    <MobileShell wide>
+      <TopBar title={ar ? "الطلبات الواردة" : "Incoming Orders"} showBack wide maxW="6xl" />
+      <div className="px-4 pt-4 pb-6 space-y-4 md:px-6 md:pt-8 lg:px-8 lg:max-w-6xl lg:mx-auto">
         <div className="relative">
           <Search className="size-4 absolute top-1/2 -translate-y-1/2 start-3 text-muted-foreground pointer-events-none" />
           <input
@@ -317,9 +317,9 @@ function LabOrders() {
           {filteredOrders.length !== 1 ? (ar ? "ات" : "s") : ""}
         </p>
 
-        <div className="space-y-2">
+        <div className="space-y-2 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-3">
           {filteredOrders.length === 0 ? (
-            <div className="text-center py-16 text-sm text-muted-foreground">
+            <div className="text-center py-16 text-sm text-muted-foreground lg:col-span-2">
               {ar ? "لا توجد حالات واردة من الأطباء" : "No incoming doctor cases"}
             </div>
           ) : (
