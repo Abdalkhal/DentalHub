@@ -16,10 +16,16 @@ import {
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
+// Plain color values instead of NativeWind bg-*/text-* classes: this badge
+// re-renders every time `cycleStatus` fires (many at once in a long patient
+// list), which hits a known react-native-css-interop class-application race
+// on this RN/Android setup — the label can end up silently clipped to its
+// first couple of words after a re-render and never recovers. See the same
+// workaround already used for shadowSm/shadowMd in patient/[patientId].tsx.
 const STATUS_META: Record<PatientStatus, { ar: string; en: string; bg: string; text: string }> = {
-  new: { ar: 'مريض جديد', en: 'New', bg: 'bg-blue-100', text: 'text-blue-700' },
-  in_treatment: { ar: 'علاج قيد الإنجاز', en: 'In treatment', bg: 'bg-amber-100', text: 'text-amber-700' },
-  completed: { ar: 'مكتمل', en: 'Completed', bg: 'bg-emerald-100', text: 'text-emerald-700' },
+  new: { ar: 'مريض جديد', en: 'New', bg: '#DBEAFE', text: '#1D4ED8' },
+  in_treatment: { ar: 'علاج قيد الإنجاز', en: 'In treatment', bg: '#FEF3C7', text: '#B45309' },
+  completed: { ar: 'مكتمل', en: 'Completed', bg: '#D1FAE5', text: '#047857' },
 };
 
 const STATUS_CYCLE: PatientStatus[] = ['new', 'in_treatment', 'completed'];
@@ -54,8 +60,11 @@ function PatientCard({ p, ar }: { p: Patient; ar: boolean }) {
             <Text numberOfLines={1} className="flex-shrink text-sm font-extrabold text-slate-900">
               {p.name}
             </Text>
-            <Pressable onPress={cycleStatus} className={cn('shrink-0 rounded-full px-2.5 py-1', meta.bg)}>
-              <Text className={cn('text-[10px] font-bold', meta.text)}>{ar ? meta.ar : meta.en}</Text>
+            <Pressable
+              onPress={cycleStatus}
+              style={{ flexShrink: 0, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: meta.bg }}
+            >
+              <Text className="font-bold" style={{ fontSize: 10, color: meta.text }}>{ar ? meta.ar : meta.en}</Text>
             </Pressable>
           </View>
           <View className="mt-0.5 flex-row flex-wrap items-center gap-1.5">
@@ -141,12 +150,19 @@ export default function PatientsScreen() {
             <Pressable
               key={s}
               onPress={() => setStatus(s)}
-              className={cn(
-                'h-8 items-center justify-center rounded-full border px-3',
-                active ? 'border-primary bg-primary' : 'border-slate-200 bg-white',
-              )}
+              style={{
+                flexShrink: 0,
+                height: 32,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 999,
+                borderWidth: 1,
+                paddingHorizontal: 12,
+                borderColor: active ? '#3B82F6' : '#E2E8F0',
+                backgroundColor: active ? '#3B82F6' : '#FFFFFF',
+              }}
             >
-              <Text className={cn('text-[11px] font-bold', active ? 'text-primary-foreground' : 'text-slate-500')}>
+              <Text className="font-bold" style={{ fontSize: 11, color: active ? '#FFFFFF' : '#64748B' }}>
                 {s === 'all' ? (ar ? 'الكل' : 'All') : ar ? STATUS_META[s].ar : STATUS_META[s].en}
               </Text>
             </Pressable>
@@ -223,8 +239,8 @@ function AddPatientModal({ open, onClose, ar }: { open: boolean; onClose: () => 
   if (!open) return null;
 
   return (
-    <View className="absolute inset-0 justify-end bg-black/40">
-      <View className="max-h-[88%] rounded-t-3xl bg-white">
+    <View className="absolute inset-0 items-center justify-center bg-black/40 p-5">
+      <View className="max-h-[85%] w-full max-w-md overflow-hidden rounded-3xl bg-white">
         <View className="flex-row items-center justify-between border-b border-slate-100 px-4 pb-2.5 pt-4">
           <Text className="text-base font-extrabold text-slate-900">
             {ar ? 'إضافة مريض جديد' : 'Add new patient'}

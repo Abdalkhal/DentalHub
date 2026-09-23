@@ -157,9 +157,9 @@ function SurgicalGuideCreate() {
   };
 
   return (
-    <MobileShell>
-      <TopBar title={ar ? "إضافة شركة دليل جراحي" : "Add Surgical Guide Company"} showBack />
-      <div className="px-4 pt-4 pb-10 space-y-4">
+    <MobileShell wide>
+      <TopBar title={ar ? "إضافة شركة دليل جراحي" : "Add Surgical Guide Company"} showBack wide maxW="3xl" />
+      <div className="px-4 pt-4 pb-10 space-y-4 md:px-6 md:pt-8 md:pb-16 md:space-y-5 lg:px-8 lg:max-w-3xl lg:mx-auto">
         {/* Section 1: Basic Information */}
         <section className={cardCls}>
           <p className={sectionTitleCls}>

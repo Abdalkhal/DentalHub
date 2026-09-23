@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Clock, Phone, Plus, Stethoscope, Trash2, X } from 'lucide-react-native';
 
 import { Screen, Select, Text } from '@/components/ui';
@@ -95,6 +96,7 @@ export default function ClinicDoctorsScreen() {
 }
 
 function AddDoctorSheet({ ar, onClose }: { ar: boolean; onClose: () => void }) {
+  const insets = useSafeAreaInsets();
   const [name, setName] = useState('');
   const [specialty, setSpecialty] = useState('');
   const [licenseNumber, setLicenseNumber] = useState('');
@@ -131,9 +133,10 @@ function AddDoctorSheet({ ar, onClose }: { ar: boolean; onClose: () => void }) {
   };
 
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <View className="flex-1 justify-end bg-black/40">
-        <View className="max-h-[92%] rounded-t-3xl bg-white">
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+      <View className="flex-1 justify-start bg-black/40">
+        <View className="max-h-[92%] rounded-b-3xl bg-white" style={{ paddingTop: insets.top }}>
           <View className="flex-row items-center justify-between border-b border-slate-100 px-4 pb-2.5 pt-4">
             <Text className="text-base font-extrabold text-slate-900">{ar ? 'إضافة طبيب' : 'Add doctor'}</Text>
             <Pressable onPress={onClose} className="h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-slate-50">
@@ -287,6 +290,7 @@ function AddDoctorSheet({ ar, onClose }: { ar: boolean; onClose: () => void }) {
           </ScrollView>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

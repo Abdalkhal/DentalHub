@@ -388,19 +388,19 @@ export function SpecializedImplantForm({
   };
 
   return (
-    <div className="fixed inset-0 z-[70]">
+    <div className="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:p-6">
       <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} />
       <div
-        className="absolute inset-x-0 bottom-0 top-6 mx-auto w-full max-w-md flex flex-col rounded-t-3xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom"
+        className="relative w-full max-w-md max-h-[92vh] flex flex-col rounded-t-3xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom md:max-w-2xl md:max-h-[88vh] md:rounded-3xl lg:max-w-3xl"
         style={{ background: "linear-gradient(to bottom, #F7FCFF, #EAE4FF, #D6CDFF)" }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 pt-4 pb-3 shrink-0 border-b border-white/70">
+        <div className="flex items-center justify-between px-4 pt-4 pb-3 shrink-0 border-b border-white/70 md:px-6 md:pt-5 md:pb-4">
           <div>
-            <h2 className="font-display font-extrabold text-base text-slate-900">
+            <h2 className="font-display font-extrabold text-base text-slate-900 lg:text-xl">
               {ar ? "إضافة زرعة متخصصة" : "Add Specialized Implant"}
             </h2>
-            <p className="text-[11px] text-slate-500 mt-0.5">
+            <p className="text-[11px] text-slate-500 mt-0.5 lg:text-xs">
               {ar
                 ? "حلول متقدمة للحالات المعقدة وفقدان العظم الشديد"
                 : "Advanced solutions for complex cases"}
@@ -415,9 +415,9 @@ export function SpecializedImplantForm({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 pt-4 pb-6 space-y-4">
+        <div className="flex-1 overflow-y-auto px-4 pt-4 pb-6 space-y-4 md:px-6 md:pt-6 md:grid md:grid-cols-2 md:gap-4 md:space-y-0 md:items-start">
           {/* Category selector */}
-          <div>
+          <div className="md:col-span-2">
             <label className={labelCls}>
               {ar ? "فئة الزرعة المتخصصة" : "Specialized Category"}
             </label>
@@ -622,12 +622,12 @@ export function SpecializedImplantForm({
           </div>
 
           {/* Clinical cases images */}
-          <div className={cardCls}>
+          <div className={cn(cardCls, "md:col-span-2")}>
             <p className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
               <span className="size-1.5 rounded-full bg-indigo-500" />
               {ar ? "رفع صور حالات العمل" : "Clinical Cases Images"}
             </p>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-2 md:grid-cols-6">
               {existingClinical.map((path) => (
                 <div
                   key={path}
@@ -689,19 +689,19 @@ export function SpecializedImplantForm({
           </div>
 
           {error && (
-            <p className="text-xs font-semibold text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
+            <p className="text-xs font-semibold text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 md:col-span-2">
               {error}
             </p>
           )}
         </div>
 
         {/* Footer */}
-        <div className="shrink-0 border-t border-white/70 bg-white/95 backdrop-blur p-4">
+        <div className="shrink-0 border-t border-white/70 bg-white/95 backdrop-blur p-4 md:px-6 md:py-4">
           <button
             type="button"
             onClick={submit}
             disabled={busy}
-            className="w-full h-13 min-h-12 rounded-2xl bg-indigo-600 text-white font-display font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg transition hover:bg-indigo-700 disabled:opacity-60"
+            className="w-full h-13 min-h-12 rounded-2xl bg-indigo-600 text-white font-display font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg transition hover:bg-indigo-700 disabled:opacity-60 md:max-w-xs md:mx-auto md:h-11"
           >
             {busy ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
             {busy

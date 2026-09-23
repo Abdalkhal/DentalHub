@@ -29,7 +29,7 @@ import {
   type MaterialRules,
   type ShadeTab,
 } from "@/lib/dentalConfig";
-import { useStaff } from "@/lib/staffStore";
+import { useLabMembers } from "@/lib/labMembersStore";
 import { useLabCatalog, saveLabCatalog, type LabCatalog } from "@/lib/catalogStore";
 import { toast } from "sonner";
 
@@ -147,7 +147,7 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
   // Technical staff assignment
   const [designerId, setDesignerId] = useState("");
   const [ceramistId, setCeramistId] = useState("");
-  const staff = useStaff();
+  const { members: staff } = useLabMembers(labId ?? "");
 
   const [editMode, setEditMode] = useState(false);
   const [draft, setDraft] = useState<LabCatalog | null>(null);
@@ -172,7 +172,9 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
     setSingleQuantity("1");
     setSingleUnitPrice("0");
     setSingleCurrency("IQD");
-    setPricingItems([{ id: crypto.randomUUID(), name: "", quantity: 1, unitPrice: 0, currency: "IQD" }]);
+    setPricingItems([
+      { id: crypto.randomUUID(), name: "", quantity: 1, unitPrice: 0, currency: "IQD" },
+    ]);
     setShade("");
     setShadeTab("classical");
     setCustomShade("");
@@ -222,7 +224,7 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
       const wt =
         p.workType && rule?.allowedWorkTypes.includes(p.workType as WorkTypeId)
           ? (p.workType as WorkTypeId)
-          : rule?.allowedWorkTypes[0] ?? (catalog.workTypes[0]?.id as WorkTypeId | undefined);
+          : (rule?.allowedWorkTypes[0] ?? (catalog.workTypes[0]?.id as WorkTypeId | undefined));
       if (wt) {
         setSelectedWorkType(wt);
         setSelectedManufacturingMethod(rule?.manufacturingRules[wt]?.[0] ?? "");
@@ -296,9 +298,17 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
       if (!prev) return prev;
       const item =
         addingSection === "workTypes"
-          ? { id, ar: newAr.trim(), en: newEn.trim() || newAr.trim(), category: "advanced" as const }
+          ? {
+              id,
+              ar: newAr.trim(),
+              en: newEn.trim() || newAr.trim(),
+              category: "advanced" as const,
+            }
           : { id, ar: newAr.trim(), en: newEn.trim() || newAr.trim() };
-      return { ...prev, [addingSection]: [...(prev[addingSection] as { id: string }[]), item] } as LabCatalog;
+      return {
+        ...prev,
+        [addingSection]: [...(prev[addingSection] as { id: string }[]), item],
+      } as LabCatalog;
     });
     setNewAr("");
     setNewEn("");
@@ -309,7 +319,9 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
   const allowedWorkTypes = rulesEntry
     ? rulesEntry.allowedWorkTypes
     : (displayCatalog.workTypes.map((w) => w.id) as WorkTypeId[]);
-  const workTypes = displayCatalog.workTypes.filter((wt) => allowedWorkTypes.includes(wt.id as WorkTypeId));
+  const workTypes = displayCatalog.workTypes.filter((wt) =>
+    allowedWorkTypes.includes(wt.id as WorkTypeId),
+  );
   const allowedMethods = rulesEntry
     ? (rulesEntry.manufacturingRules[selectedWorkType as WorkTypeId] ?? [])
     : (displayCatalog.manufacturingMethods.map((m) => m.id) as ManufacturingMethodId[]);
@@ -317,11 +329,14 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
     allowedMethods.includes(mm.id as ManufacturingMethodId),
   );
 
-  const isImplantCase = isTitaniumBar || IMPLANT_WORK_TYPES.includes(selectedWorkType as WorkTypeId);
+  const isImplantCase =
+    isTitaniumBar || IMPLANT_WORK_TYPES.includes(selectedWorkType as WorkTypeId);
 
   const USD_RATE = 1480;
   const itemTotalIQD = (it: PricingItem) =>
-    (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0) * (it.currency === "IQD" ? 1 : USD_RATE);
+    (Number(it.quantity) || 0) *
+    (Number(it.unitPrice) || 0) *
+    (it.currency === "IQD" ? 1 : USD_RATE);
 
   const singleUnits = Number(singleQuantity) || 0;
   const singlePriceIQD = (Number(singleUnitPrice) || 0) * (singleCurrency === "IQD" ? 1 : USD_RATE);
@@ -372,7 +387,9 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
     const firstWorkType = rule?.allowedWorkTypes[0] ?? displayCatalog.workTypes[0]?.id;
     if (firstWorkType) {
       setSelectedWorkType(firstWorkType as WorkTypeId);
-      setSelectedManufacturingMethod(rule?.manufacturingRules[firstWorkType as WorkTypeId]?.[0] ?? "");
+      setSelectedManufacturingMethod(
+        rule?.manufacturingRules[firstWorkType as WorkTypeId]?.[0] ?? "",
+      );
     } else {
       setSelectedWorkType("");
       setSelectedManufacturingMethod("");
@@ -469,9 +486,17 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
         active ? "border-blue-600 bg-blue-50/30" : "border-slate-300 bg-white hover:border-blue-300"
       }`}
     >
-      <button type="button" onClick={onClick} className="flex-1 min-w-0 px-3.5 py-2 text-right flex flex-col gap-0.5">
-        <span className={`text-xs font-bold ${active ? "text-blue-900" : "text-gray-700"}`}>{wt.ar}</span>
-        <span className="text-[10px] text-gray-500" dir="ltr">{wt.en}</span>
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex-1 min-w-0 px-3.5 py-2 text-right flex flex-col gap-0.5"
+      >
+        <span className={`text-xs font-bold ${active ? "text-blue-900" : "text-gray-700"}`}>
+          {wt.ar}
+        </span>
+        <span className="text-[10px] text-gray-500" dir="ltr">
+          {wt.en}
+        </span>
       </button>
       {editable && (
         <button
@@ -495,12 +520,22 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
     <div
       key={mm.id}
       className={`flex items-stretch rounded-xl border shadow-sm overflow-hidden transition ${
-        active ? "border-emerald-600 bg-emerald-50/40" : "border-slate-300 bg-white hover:border-emerald-300"
+        active
+          ? "border-emerald-600 bg-emerald-50/40"
+          : "border-slate-300 bg-white hover:border-emerald-300"
       }`}
     >
-      <button type="button" onClick={onClick} className="flex-1 min-w-0 px-3.5 py-2 text-right flex flex-col gap-0.5">
-        <span className={`text-xs font-bold ${active ? "text-emerald-900" : "text-gray-700"}`}>{mm.ar}</span>
-        <span className="text-[10px] text-gray-500" dir="ltr">{mm.en}</span>
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex-1 min-w-0 px-3.5 py-2 text-right flex flex-col gap-0.5"
+      >
+        <span className={`text-xs font-bold ${active ? "text-emerald-900" : "text-gray-700"}`}>
+          {mm.ar}
+        </span>
+        <span className="text-[10px] text-gray-500" dir="ltr">
+          {mm.en}
+        </span>
       </button>
       {editable && (
         <button
@@ -515,7 +550,10 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 text-right" dir="rtl">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 text-right"
+      dir="rtl"
+    >
       <div className="bg-white w-full max-w-6xl rounded-2xl shadow-2xl overflow-hidden border border-gray-100 max-h-[95vh] flex flex-col">
         {/* Header */}
         <div className="px-8 py-4 border-b border-gray-100 bg-white flex items-center justify-between sticky top-0 z-20">
@@ -525,7 +563,9 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
             </div>
             <div>
               <h2 className="text-xl font-bold text-gray-900">إضافة طلب جديد للمختبر</h2>
-              <p className="text-xs text-gray-500">قم بتسعير حالتك واختيار تفاصيل المواد والتصنيع بدقة عالية</p>
+              <p className="text-xs text-gray-500">
+                قم بتسعير حالتك واختيار تفاصيل المواد والتصنيع بدقة عالية
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -568,11 +608,14 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
         <div className="p-6 overflow-y-auto space-y-6 flex-1 bg-gray-50/50">
           {/* Section 1: Basic order data */}
           <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4">
-            <h3 className="text-sm font-bold text-gray-800 border-b pb-2">1. بيانات الطلب الأساسية</h3>
+            <h3 className="text-sm font-bold text-gray-800 border-b pb-2">
+              1. بيانات الطلب الأساسية
+            </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
-                  <User className="w-4 h-4 text-blue-600" /> اسم المريض <span className="text-red-500">*</span>
+                  <User className="w-4 h-4 text-blue-600" /> اسم المريض{" "}
+                  <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -585,7 +628,8 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
-                  <Stethoscope className="w-4 h-4 text-blue-600" /> اسم الطبيب <span className="text-red-500">*</span>
+                  <Stethoscope className="w-4 h-4 text-blue-600" /> اسم الطبيب{" "}
+                  <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -611,7 +655,8 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
-                  <Calendar className="w-4 h-4 text-blue-600" /> تاريخ الإخراج المتوقع <span className="text-red-500">*</span>
+                  <Calendar className="w-4 h-4 text-blue-600" /> تاريخ الإخراج المتوقع{" "}
+                  <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="date"
@@ -625,7 +670,9 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
 
           {/* Section 2: Material + manufacturing */}
           <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-6">
-            <h3 className="text-sm font-bold text-gray-800 border-b pb-2">2. اختيار المادة والتصنيع</h3>
+            <h3 className="text-sm font-bold text-gray-800 border-b pb-2">
+              2. اختيار المادة والتصنيع
+            </h3>
 
             {/* Step 1: Material */}
             <div className="space-y-3">
@@ -634,7 +681,11 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
                 {editMode && (
                   <button
                     type="button"
-                    onClick={() => { setAddingSection("materials"); setNewAr(""); setNewEn(""); }}
+                    onClick={() => {
+                      setAddingSection("materials");
+                      setNewAr("");
+                      setNewEn("");
+                    }}
                     className="text-[11px] font-bold text-blue-600 flex items-center gap-1"
                   >
                     <Plus className="w-3.5 h-3.5" /> إضافة مادة
@@ -649,7 +700,9 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
                     <div
                       key={m.id}
                       className={`flex items-stretch rounded-xl border shadow-sm overflow-hidden transition ${
-                        active ? "border-blue-600 bg-blue-50/30" : "border-slate-300 bg-white hover:border-blue-300"
+                        active
+                          ? "border-blue-600 bg-blue-50/30"
+                          : "border-slate-300 bg-white hover:border-blue-300"
                       }`}
                     >
                       <button
@@ -657,10 +710,18 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
                         onClick={() => !editMode && selectMaterial(m.id as MaterialId)}
                         className="flex-1 min-w-0 p-3 text-right flex items-center gap-2"
                       >
-                        <Icon className={`w-5 h-5 shrink-0 ${active ? "text-blue-600" : "text-gray-400"}`} />
+                        <Icon
+                          className={`w-5 h-5 shrink-0 ${active ? "text-blue-600" : "text-gray-400"}`}
+                        />
                         <div className="min-w-0 flex-1">
-                          <span className={`text-xs font-bold block truncate ${active ? "text-blue-900" : "text-gray-700"}`}>{m.ar}</span>
-                          <span className="text-[10px] text-gray-500 block truncate" dir="ltr">{m.en}</span>
+                          <span
+                            className={`text-xs font-bold block truncate ${active ? "text-blue-900" : "text-gray-700"}`}
+                          >
+                            {m.ar}
+                          </span>
+                          <span className="text-[10px] text-gray-500 block truncate" dir="ltr">
+                            {m.en}
+                          </span>
                         </div>
                       </button>
                       {editMode && (
@@ -696,7 +757,11 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold text-gray-600">نوع العلاج</label>
-                    <select value={alignerTreatmentType} onChange={(e) => setAlignerTreatmentType(e.target.value)} className="w-full text-xs bg-white border rounded-xl p-2.5">
+                    <select
+                      value={alignerTreatmentType}
+                      onChange={(e) => setAlignerTreatmentType(e.target.value)}
+                      className="w-full text-xs bg-white border rounded-xl p-2.5"
+                    >
                       <option value="comprehensive">شامل (Comprehensive)</option>
                       <option value="express">سريع (Express)</option>
                       <option value="retention">مثبّت (Retention)</option>
@@ -704,7 +769,11 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold text-gray-600">القوس</label>
-                    <select value={alignerArch} onChange={(e) => setAlignerArch(e.target.value)} className="w-full text-xs bg-white border rounded-xl p-2.5">
+                    <select
+                      value={alignerArch}
+                      onChange={(e) => setAlignerArch(e.target.value)}
+                      className="w-full text-xs bg-white border rounded-xl p-2.5"
+                    >
                       <option value="upper">علوي (Upper)</option>
                       <option value="lower">سفلي (Lower)</option>
                       <option value="both">كلاهما (Both)</option>
@@ -712,15 +781,30 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold text-gray-600">المسحات</label>
-                    <input type="text" value={alignerScans} onChange={(e) => setAlignerScans(e.target.value)} placeholder="STL / Intraoral Scan" className="w-full text-xs bg-white border rounded-xl p-2.5" />
+                    <input
+                      type="text"
+                      value={alignerScans}
+                      onChange={(e) => setAlignerScans(e.target.value)}
+                      placeholder="STL / Intraoral Scan"
+                      className="w-full text-xs bg-white border rounded-xl p-2.5"
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold text-gray-600">عدد التقويمات</label>
-                    <input type="number" value={alignerCount} onChange={(e) => setAlignerCount(e.target.value)} className="w-full text-xs bg-white border rounded-xl p-2.5" />
+                    <input
+                      type="number"
+                      value={alignerCount}
+                      onChange={(e) => setAlignerCount(e.target.value)}
+                      className="w-full text-xs bg-white border rounded-xl p-2.5"
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold text-gray-600">بروتوكول الارتداء</label>
-                    <select value={alignerWearProtocol} onChange={(e) => setAlignerWearProtocol(e.target.value)} className="w-full text-xs bg-white border rounded-xl p-2.5">
+                    <select
+                      value={alignerWearProtocol}
+                      onChange={(e) => setAlignerWearProtocol(e.target.value)}
+                      className="w-full text-xs bg-white border rounded-xl p-2.5"
+                    >
                       <option value="7days">كل 7 أيام</option>
                       <option value="10days">كل 10 أيام</option>
                       <option value="14days">كل 14 يوماً</option>
@@ -737,21 +821,29 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
                     type="button"
                     onClick={() => setTitaniumFrameworkType("removable_overdenture")}
                     className={`p-4 rounded-xl border-2 text-right transition-all ${
-                      titaniumFrameworkType === "removable_overdenture" ? "border-blue-600 bg-white" : "border-gray-200 bg-white/60"
+                      titaniumFrameworkType === "removable_overdenture"
+                        ? "border-blue-600 bg-white"
+                        : "border-gray-200 bg-white/60"
                     }`}
                   >
                     <p className="text-xs font-bold text-gray-800">طقم قابل للإزالة</p>
-                    <p className="text-[10px] text-gray-400" dir="ltr">Removable Overdenture</p>
+                    <p className="text-[10px] text-gray-400" dir="ltr">
+                      Removable Overdenture
+                    </p>
                   </button>
                   <button
                     type="button"
                     onClick={() => setTitaniumFrameworkType("fixed_framework")}
                     className={`p-4 rounded-xl border-2 text-right transition-all ${
-                      titaniumFrameworkType === "fixed_framework" ? "border-blue-600 bg-white" : "border-gray-200 bg-white/60"
+                      titaniumFrameworkType === "fixed_framework"
+                        ? "border-blue-600 bg-white"
+                        : "border-gray-200 bg-white/60"
                     }`}
                   >
                     <p className="text-xs font-bold text-gray-800">هيكل ثابت</p>
-                    <p className="text-[10px] text-gray-400" dir="ltr">Fixed Framework</p>
+                    <p className="text-[10px] text-gray-400" dir="ltr">
+                      Fixed Framework
+                    </p>
                   </button>
                 </div>
               </div>
@@ -764,7 +856,11 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
                     {editMode && (
                       <button
                         type="button"
-                        onClick={() => { setAddingSection("workTypes"); setNewAr(""); setNewEn(""); }}
+                        onClick={() => {
+                          setAddingSection("workTypes");
+                          setNewAr("");
+                          setNewEn("");
+                        }}
                         className="text-[11px] font-bold text-blue-600 flex items-center gap-1"
                       >
                         <Plus className="w-3.5 h-3.5" /> إضافة نوع عمل
@@ -774,26 +870,52 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
                   {isZirconia ? (
                     <div className="space-y-3">
                       <div className="space-y-2">
-                        <p className="text-[10px] font-semibold text-gray-400">أنواع العمل الأساسية</p>
+                        <p className="text-[10px] font-semibold text-gray-400">
+                          أنواع العمل الأساسية
+                        </p>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                          {workTypes.filter((wt) => wt.category === "core").map((wt) =>
-                            workTypeChip(wt, selectedWorkType === wt.id, () => !editMode && selectWorkType(wt.id as WorkTypeId), editMode, () => removeCatalogItem("workTypes", wt.id)),
-                          )}
+                          {workTypes
+                            .filter((wt) => wt.category === "core")
+                            .map((wt) =>
+                              workTypeChip(
+                                wt,
+                                selectedWorkType === wt.id,
+                                () => !editMode && selectWorkType(wt.id as WorkTypeId),
+                                editMode,
+                                () => removeCatalogItem("workTypes", wt.id),
+                              ),
+                            )}
                         </div>
                       </div>
                       <div className="space-y-2">
-                        <p className="text-[10px] font-semibold text-gray-400">أنواع العمل المتقدمة</p>
+                        <p className="text-[10px] font-semibold text-gray-400">
+                          أنواع العمل المتقدمة
+                        </p>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                          {workTypes.filter((wt) => wt.category === "advanced").map((wt) =>
-                            workTypeChip(wt, selectedWorkType === wt.id, () => !editMode && selectWorkType(wt.id as WorkTypeId), editMode, () => removeCatalogItem("workTypes", wt.id)),
-                          )}
+                          {workTypes
+                            .filter((wt) => wt.category === "advanced")
+                            .map((wt) =>
+                              workTypeChip(
+                                wt,
+                                selectedWorkType === wt.id,
+                                () => !editMode && selectWorkType(wt.id as WorkTypeId),
+                                editMode,
+                                () => removeCatalogItem("workTypes", wt.id),
+                              ),
+                            )}
                         </div>
                       </div>
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                       {workTypes.map((wt) =>
-                        workTypeChip(wt, selectedWorkType === wt.id, () => !editMode && selectWorkType(wt.id as WorkTypeId), editMode, () => removeCatalogItem("workTypes", wt.id)),
+                        workTypeChip(
+                          wt,
+                          selectedWorkType === wt.id,
+                          () => !editMode && selectWorkType(wt.id as WorkTypeId),
+                          editMode,
+                          () => removeCatalogItem("workTypes", wt.id),
+                        ),
                       )}
                     </div>
                   )}
@@ -817,7 +939,11 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
                     {editMode && (
                       <button
                         type="button"
-                        onClick={() => { setAddingSection("manufacturingMethods"); setNewAr(""); setNewEn(""); }}
+                        onClick={() => {
+                          setAddingSection("manufacturingMethods");
+                          setNewAr("");
+                          setNewEn("");
+                        }}
                         className="text-[11px] font-bold text-blue-600 flex items-center gap-1"
                       >
                         <Plus className="w-3.5 h-3.5" /> إضافة طريقة تصنيع
@@ -826,7 +952,13 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     {manufacturingMethods.map((mm) =>
-                      methodChip(mm, selectedManufacturingMethod === mm.id, () => !editMode && setSelectedManufacturingMethod(mm.id), editMode, () => removeCatalogItem("manufacturingMethods", mm.id)),
+                      methodChip(
+                        mm,
+                        selectedManufacturingMethod === mm.id,
+                        () => !editMode && setSelectedManufacturingMethod(mm.id),
+                        editMode,
+                        () => removeCatalogItem("manufacturingMethods", mm.id),
+                      ),
                     )}
                   </div>
                   {editMode && addingSection === "manufacturingMethods" && (
@@ -855,11 +987,19 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
                             type="button"
                             onClick={() => setFrameworkCreation(fc.id)}
                             className={`px-3.5 py-2 rounded-xl border-2 text-right transition-all flex flex-col gap-0.5 ${
-                              active ? "border-amber-600 bg-amber-50/40" : "border-gray-200 bg-white hover:border-amber-200"
+                              active
+                                ? "border-amber-600 bg-amber-50/40"
+                                : "border-gray-200 bg-white hover:border-amber-200"
                             }`}
                           >
-                            <span className={`text-xs font-bold ${active ? "text-amber-900" : "text-gray-700"}`}>{fc.ar}</span>
-                            <span className="text-[10px] text-gray-400" dir="ltr">{fc.en}</span>
+                            <span
+                              className={`text-xs font-bold ${active ? "text-amber-900" : "text-gray-700"}`}
+                            >
+                              {fc.ar}
+                            </span>
+                            <span className="text-[10px] text-gray-400" dir="ltr">
+                              {fc.en}
+                            </span>
                           </button>
                         );
                       })}
@@ -876,15 +1016,33 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold text-gray-600">شركة الزرعة</label>
-                    <input type="text" value={implantCompany} onChange={(e) => setImplantCompany(e.target.value)} placeholder="Straumann, Nobel, ..." className="w-full text-xs bg-white border rounded-xl p-2.5" />
+                    <input
+                      type="text"
+                      value={implantCompany}
+                      onChange={(e) => setImplantCompany(e.target.value)}
+                      placeholder="Straumann, Nobel, ..."
+                      className="w-full text-xs bg-white border rounded-xl p-2.5"
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold text-gray-600">نظام الزرعة</label>
-                    <input type="text" value={implantSystem} onChange={(e) => setImplantSystem(e.target.value)} placeholder="نظام الزرعة" className="w-full text-xs bg-white border rounded-xl p-2.5" />
+                    <input
+                      type="text"
+                      value={implantSystem}
+                      onChange={(e) => setImplantSystem(e.target.value)}
+                      placeholder="نظام الزرعة"
+                      className="w-full text-xs bg-white border rounded-xl p-2.5"
+                    />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-gray-600">الربط (Connection)</label>
-                    <select value={implantConnection} onChange={(e) => setImplantConnection(e.target.value)} className="w-full text-xs bg-white border rounded-xl p-2.5">
+                    <label className="text-[11px] font-bold text-gray-600">
+                      الربط (Connection)
+                    </label>
+                    <select
+                      value={implantConnection}
+                      onChange={(e) => setImplantConnection(e.target.value)}
+                      className="w-full text-xs bg-white border rounded-xl p-2.5"
+                    >
                       <option value="">اختر نوع الربط</option>
                       <option value="internal_hex">سداسي داخلي (Internal Hex)</option>
                       <option value="external_hex">سداسي خارجي (External Hex)</option>
@@ -895,11 +1053,23 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold text-gray-600">المنصة (Platform)</label>
-                    <input type="text" value={implantPlatform} onChange={(e) => setImplantPlatform(e.target.value)} placeholder="3.5 / 4.3" className="w-full text-xs bg-white border rounded-xl p-2.5" />
+                    <input
+                      type="text"
+                      value={implantPlatform}
+                      onChange={(e) => setImplantPlatform(e.target.value)}
+                      placeholder="3.5 / 4.3"
+                      className="w-full text-xs bg-white border rounded-xl p-2.5"
+                    />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-gray-600">Scan Body (اختياري)</label>
-                    <select value={implantScanBody} onChange={(e) => setImplantScanBody(e.target.value)} className="w-full text-xs bg-white border rounded-xl p-2.5">
+                    <label className="text-[11px] font-bold text-gray-600">
+                      Scan Body (اختياري)
+                    </label>
+                    <select
+                      value={implantScanBody}
+                      onChange={(e) => setImplantScanBody(e.target.value)}
+                      className="w-full text-xs bg-white border rounded-xl p-2.5"
+                    >
                       <option value="">بدون</option>
                       <option value="dess">DESS</option>
                       <option value="straumann">Straumann</option>
@@ -909,7 +1079,11 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold text-gray-600">المستوى</label>
-                    <select value={implantLevel} onChange={(e) => setImplantLevel(e.target.value)} className="w-full text-xs bg-white border rounded-xl p-2.5">
+                    <select
+                      value={implantLevel}
+                      onChange={(e) => setImplantLevel(e.target.value)}
+                      className="w-full text-xs bg-white border rounded-xl p-2.5"
+                    >
                       <option value="implant">مستوى الزرعة (Implant Level)</option>
                       <option value="multi_unit">مستوى مالتي يونيت (Multi-Unit)</option>
                     </select>
@@ -924,19 +1098,29 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
                       type="button"
                       onClick={() => setImplantRetention("screw")}
                       className={`px-3 py-2 rounded-xl border-2 text-xs font-bold transition ${
-                        implantRetention === "screw" ? "border-blue-600 bg-white text-blue-800" : "border-gray-200 bg-white/60 text-gray-500"
+                        implantRetention === "screw"
+                          ? "border-blue-600 bg-white text-blue-800"
+                          : "border-gray-200 bg-white/60 text-gray-500"
                       }`}
                     >
-                      تثبيت بالبرغي <span className="block text-[10px] font-normal text-gray-400" dir="ltr">Screw-Retained</span>
+                      تثبيت بالبرغي{" "}
+                      <span className="block text-[10px] font-normal text-gray-400" dir="ltr">
+                        Screw-Retained
+                      </span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setImplantRetention("cement")}
                       className={`px-3 py-2 rounded-xl border-2 text-xs font-bold transition ${
-                        implantRetention === "cement" ? "border-blue-600 bg-white text-blue-800" : "border-gray-200 bg-white/60 text-gray-500"
+                        implantRetention === "cement"
+                          ? "border-blue-600 bg-white text-blue-800"
+                          : "border-gray-200 bg-white/60 text-gray-500"
                       }`}
                     >
-                      تثبيت بالإسمنت <span className="block text-[10px] font-normal text-gray-400" dir="ltr">Cement-Retained</span>
+                      تثبيت بالإسمنت{" "}
+                      <span className="block text-[10px] font-normal text-gray-400" dir="ltr">
+                        Cement-Retained
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -945,17 +1129,21 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
           </div>
 
           {/* Shade selection */}
-          <div className={`bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-3 ${editMode ? "pointer-events-none opacity-40 select-none" : ""}`}>
+          <div
+            className={`bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-3 ${editMode ? "pointer-events-none opacity-40 select-none" : ""}`}
+          >
             <h3 className="text-sm font-bold text-gray-800 border-b pb-2">درجة اللون (Shade)</h3>
 
             {/* Shade system tabs */}
             <div className="flex gap-1.5 overflow-x-auto pb-1">
-              {([
-                ["classical", "VITA كلاسيكي"],
-                ["3d", "VITA 3D-Master"],
-                ["bleach", "Bleach"],
-                ["others", "أخرى"],
-              ] as [ShadeTab, string][]).map(([k, label]) => (
+              {(
+                [
+                  ["classical", "VITA كلاسيكي"],
+                  ["3d", "VITA 3D-Master"],
+                  ["bleach", "Bleach"],
+                  ["others", "أخرى"],
+                ] as [ShadeTab, string][]
+              ).map(([k, label]) => (
                 <button
                   key={k}
                   type="button"
@@ -980,16 +1168,26 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
               />
             ) : (
               <div className="grid grid-cols-8 gap-1.5">
-                {(shadeTab === "classical" ? VITA_SHADES : shadeTab === "3d" ? VITA_3D_SHADES : VITA_BLEACH_SHADES).map((s) => (
+                {(shadeTab === "classical"
+                  ? VITA_SHADES
+                  : shadeTab === "3d"
+                    ? VITA_3D_SHADES
+                    : VITA_BLEACH_SHADES
+                ).map((s) => (
                   <button
                     key={s.code}
                     type="button"
                     onClick={() => setShade(shade === s.code ? "" : s.code)}
                     className={`relative aspect-square rounded-xl border-2 transition-all flex flex-col items-center justify-center ${
-                      shade === s.code ? "border-blue-600 scale-110 shadow-md z-10 ring-2 ring-blue-500/20" : "border-slate-200 hover:border-slate-400"
+                      shade === s.code
+                        ? "border-blue-600 scale-110 shadow-md z-10 ring-2 ring-blue-500/20"
+                        : "border-slate-200 hover:border-slate-400"
                     }`}
                   >
-                    <span className="size-5 rounded-full border border-slate-300" style={{ background: s.hex }} />
+                    <span
+                      className="size-5 rounded-full border border-slate-300"
+                      style={{ background: s.hex }}
+                    />
                     <span className="text-[9px] font-bold text-slate-600 mt-0.5">{s.code}</span>
                   </button>
                 ))}
@@ -998,7 +1196,9 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
           </div>
 
           {/* Section 3: Pricing */}
-          <div className={`bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4 ${editMode ? "pointer-events-none opacity-40 select-none" : ""}`}>
+          <div
+            className={`bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4 ${editMode ? "pointer-events-none opacity-40 select-none" : ""}`}
+          >
             <h3 className="text-sm font-bold text-gray-800 border-b pb-2">3. التسعير والإجمالي</h3>
 
             {/* Pricing mode toggle */}
@@ -1007,21 +1207,33 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
                 type="button"
                 onClick={() => setPricingMode("single")}
                 className={`p-3 rounded-xl border-2 text-right transition-all ${
-                  pricingMode === "single" ? "border-blue-600 bg-blue-50/30" : "border-gray-200 bg-white hover:border-blue-200"
+                  pricingMode === "single"
+                    ? "border-blue-600 bg-blue-50/30"
+                    : "border-gray-200 bg-white hover:border-blue-200"
                 }`}
               >
-                <span className="text-xs font-bold text-gray-800 block">تسعير حالة واحدة (وحدة واحدة)</span>
-                <span className="text-[10px] text-gray-400 block" dir="ltr">Single Unit Pricing</span>
+                <span className="text-xs font-bold text-gray-800 block">
+                  تسعير حالة واحدة (وحدة واحدة)
+                </span>
+                <span className="text-[10px] text-gray-400 block" dir="ltr">
+                  Single Unit Pricing
+                </span>
               </button>
               <button
                 type="button"
                 onClick={() => setPricingMode("mixed")}
                 className={`p-3 rounded-xl border-2 text-right transition-all ${
-                  pricingMode === "mixed" ? "border-blue-600 bg-blue-50/30" : "border-gray-200 bg-white hover:border-blue-200"
+                  pricingMode === "mixed"
+                    ? "border-blue-600 bg-blue-50/30"
+                    : "border-gray-200 bg-white hover:border-blue-200"
                 }`}
               >
-                <span className="text-xs font-bold text-gray-800 block">تسعير حالة متعددة (Mixed)</span>
-                <span className="text-[10px] text-gray-400 block" dir="ltr">Multi-Item Matrix</span>
+                <span className="text-xs font-bold text-gray-800 block">
+                  تسعير حالة متعددة (Mixed)
+                </span>
+                <span className="text-[10px] text-gray-400 block" dir="ltr">
+                  Multi-Item Matrix
+                </span>
               </button>
             </div>
 
@@ -1054,13 +1266,28 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-gray-600">العملة</label>
                   <div className="flex rounded-lg border overflow-hidden">
-                    <button type="button" onClick={() => setSingleCurrency("USD")} className={`flex-1 py-2.5 text-xs font-bold transition ${singleCurrency === "USD" ? "bg-blue-600 text-white" : "bg-white text-gray-500"}`}>$</button>
-                    <button type="button" onClick={() => setSingleCurrency("IQD")} className={`flex-1 py-2.5 text-xs font-bold transition ${singleCurrency === "IQD" ? "bg-blue-600 text-white" : "bg-white text-gray-500"}`}>IQD</button>
+                    <button
+                      type="button"
+                      onClick={() => setSingleCurrency("USD")}
+                      className={`flex-1 py-2.5 text-xs font-bold transition ${singleCurrency === "USD" ? "bg-blue-600 text-white" : "bg-white text-gray-500"}`}
+                    >
+                      $
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSingleCurrency("IQD")}
+                      className={`flex-1 py-2.5 text-xs font-bold transition ${singleCurrency === "IQD" ? "bg-blue-600 text-white" : "bg-white text-gray-500"}`}
+                    >
+                      IQD
+                    </button>
                   </div>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-gray-600">الإجمالي</label>
-                  <div className="w-full text-xs p-2.5 rounded-lg bg-gray-100 border text-center font-bold text-blue-700" dir="ltr">
+                  <div
+                    className="w-full text-xs p-2.5 rounded-lg bg-gray-100 border text-center font-bold text-blue-700"
+                    dir="ltr"
+                  >
                     {singleTotalLabel}
                   </div>
                 </div>
@@ -1079,7 +1306,10 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
                 {pricingItems.map((it) => {
                   const rowTotal = itemTotalIQD(it);
                   return (
-                    <div key={it.id} className="grid grid-cols-[1.4fr_64px_96px_72px_96px_32px] gap-2 items-center">
+                    <div
+                      key={it.id}
+                      className="grid grid-cols-[1.4fr_64px_96px_72px_96px_32px] gap-2 items-center"
+                    >
                       <input
                         type="text"
                         value={it.name}
@@ -1091,7 +1321,9 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
                         type="number"
                         min="0"
                         value={it.quantity}
-                        onChange={(e) => updatePricingItem(it.id, { quantity: Number(e.target.value) || 0 })}
+                        onChange={(e) =>
+                          updatePricingItem(it.id, { quantity: Number(e.target.value) || 0 })
+                        }
                         className="w-full text-xs p-2 border rounded-lg bg-white text-center"
                         dir="ltr"
                       />
@@ -1099,20 +1331,28 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
                         type="text"
                         inputMode="numeric"
                         value={it.unitPrice ? fmtNum(it.unitPrice) : ""}
-                        onChange={(e) => updatePricingItem(it.id, { unitPrice: Number(e.target.value.replace(/[^\d]/g, "")) || 0 })}
+                        onChange={(e) =>
+                          updatePricingItem(it.id, {
+                            unitPrice: Number(e.target.value.replace(/[^\d]/g, "")) || 0,
+                          })
+                        }
                         onFocus={(e) => e.target.select()}
                         className="w-full text-xs p-2 border rounded-lg bg-white text-center"
                         dir="ltr"
                       />
                       <select
                         value={it.currency}
-                        onChange={(e) => updatePricingItem(it.id, { currency: e.target.value as "USD" | "IQD" })}
+                        onChange={(e) =>
+                          updatePricingItem(it.id, { currency: e.target.value as "USD" | "IQD" })
+                        }
                         className="w-full text-xs p-2 border rounded-lg bg-white"
                       >
                         <option value="IQD">IQD</option>
                         <option value="USD">$</option>
                       </select>
-                      <span className="text-xs font-bold text-center text-gray-700" dir="ltr">{rowTotal.toLocaleString()}</span>
+                      <span className="text-xs font-bold text-center text-gray-700" dir="ltr">
+                        {rowTotal.toLocaleString()}
+                      </span>
                       <button
                         type="button"
                         onClick={() => removePricingItem(it.id)}
@@ -1135,14 +1375,26 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
                 </button>
 
                 <div className="p-3 rounded-xl bg-gray-50 border flex items-center justify-between flex-wrap gap-2">
-                  <span className="text-xs font-bold text-gray-600">إجمالي الوحدات: <span className="text-blue-600" dir="ltr">{units}</span></span>
-                  <span className="text-xs font-bold text-gray-600">الإجمالي الكلي: <span className="text-blue-600" dir="ltr">{subtotalIQD.toLocaleString()} IQD</span></span>
+                  <span className="text-xs font-bold text-gray-600">
+                    إجمالي الوحدات:{" "}
+                    <span className="text-blue-600" dir="ltr">
+                      {units}
+                    </span>
+                  </span>
+                  <span className="text-xs font-bold text-gray-600">
+                    الإجمالي الكلي:{" "}
+                    <span className="text-blue-600" dir="ltr">
+                      {subtotalIQD.toLocaleString()} IQD
+                    </span>
+                  </span>
                 </div>
               </div>
             )}
 
             <div className="space-y-1.5 pt-2">
-              <label className="text-xs font-bold text-gray-700">ملاحظات إضافية للمختبر (اختياري)</label>
+              <label className="text-xs font-bold text-gray-700">
+                ملاحظات إضافية للمختبر (اختياري)
+              </label>
               <textarea
                 rows={2}
                 placeholder="أدخل أي ملاحظات خاصة بتصميم ألوان السن أو الملاحظات الطبية..."
@@ -1154,7 +1406,9 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
 
             <div className="p-4 bg-blue-50/50 rounded-xl border border-blue-100 flex items-center justify-between">
               <p className="text-xs text-gray-500">الإجمالي النهائي</p>
-              <p className="text-lg font-bold text-blue-600" dir="ltr">{grandTotalLabel}</p>
+              <p className="text-lg font-bold text-blue-600" dir="ltr">
+                {grandTotalLabel}
+              </p>
             </div>
           </div>
 
@@ -1210,7 +1464,10 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
         <div className="px-8 py-4 border-t border-gray-100 bg-white flex items-center justify-end gap-3 sticky bottom-0">
           {editMode ? (
             <>
-              <button onClick={cancelEditMode} className="px-5 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50">
+              <button
+                onClick={cancelEditMode}
+                className="px-5 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50"
+              >
                 إلغاء التعديل
               </button>
               <button
@@ -1224,10 +1481,16 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
             </>
           ) : (
             <>
-              <button onClick={handleClose} className="px-5 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50">
+              <button
+                onClick={handleClose}
+                className="px-5 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50"
+              >
                 إلغاء
               </button>
-              <button onClick={handleSubmit} className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20">
+              <button
+                onClick={handleSubmit}
+                className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20"
+              >
                 حفظ وإضافة الطلب
               </button>
             </>
@@ -1284,7 +1547,11 @@ function AddCatalogRow({
       >
         <Check className="w-3.5 h-3.5" /> إضافة
       </button>
-      <button type="button" onClick={onCancel} className="px-2 py-2 rounded-lg text-gray-400 hover:bg-gray-100">
+      <button
+        type="button"
+        onClick={onCancel}
+        className="px-2 py-2 rounded-lg text-gray-400 hover:bg-gray-100"
+      >
         <X className="w-4 h-4" />
       </button>
     </div>

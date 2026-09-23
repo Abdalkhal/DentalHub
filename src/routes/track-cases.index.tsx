@@ -156,9 +156,9 @@ function TrackCases() {
       : allCases.filter((c) => canonicalStatus(c.order.status) === filter);
 
   return (
-    <MobileShell>
-      <TopBar title={ar ? "تتبع حالاتك" : "Track your cases"} showBack />
-      <div className="px-3 pt-4 pb-6">
+    <MobileShell wide>
+      <TopBar title={ar ? "تتبع حالاتك" : "Track your cases"} showBack wide />
+      <div className="px-3 pt-4 pb-6 md:px-6 md:pt-6 md:pb-12 lg:px-8 lg:max-w-5xl lg:mx-auto">
         {/* Status count cards */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
@@ -170,7 +170,7 @@ function TrackCases() {
             )}
           </div>
         </div>
-        <div className="grid grid-cols-5 gap-2 mb-5">
+        <div className="grid grid-cols-5 gap-2 mb-5 md:gap-4 md:mb-8">
           {statuses.map((s) => {
             const st = STATUS[s.id as keyof typeof STATUS];
             const active = filter === s.id;
@@ -179,16 +179,16 @@ function TrackCases() {
                 key={s.id}
                 onClick={() => setFilter(s.id)}
                 className={cn(
-                  "rounded-2xl p-3 text-center transition-all duration-200 border-2",
+                  "rounded-2xl p-3 text-center transition-all duration-200 border-2 md:p-5",
                   active
                     ? `${st.bg} ${st.border} ring-2 ring-offset-1 ${st.border.replace("200", "300")}`
                     : "bg-white border-slate-200 hover:bg-slate-50",
                 )}
               >
-                <p className={cn("font-extrabold text-xl", active ? st.text : "text-slate-700")}>
+                <p className={cn("font-extrabold text-xl md:text-4xl", active ? st.text : "text-slate-700")}>
                   {counts[s.id]}
                 </p>
-                <p className={cn("text-[10px] font-semibold mt-0.5", active ? st.text : "text-slate-500")}>
+                <p className={cn("text-[10px] font-semibold mt-0.5 md:text-sm md:mt-1.5", active ? st.text : "text-slate-500")}>
                   {ar ? s.ar : s.en}
                 </p>
               </button>
@@ -198,7 +198,7 @@ function TrackCases() {
 
         {/* Case list */}
         {filtered.length === 0 ? (
-          <div className="py-16 flex flex-col items-center text-center">
+          <div className="py-16 flex flex-col items-center text-center md:py-24 md:rounded-3xl md:border md:border-dashed md:border-slate-200 md:bg-white">
             <div className="size-20 rounded-full bg-slate-100 flex items-center justify-center mb-4">
               <ClipboardList className="size-9 text-slate-300" />
             </div>
@@ -210,7 +210,7 @@ function TrackCases() {
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-5 xl:grid-cols-3 md:items-start">
             {filtered.map((c) => {
               const o = c.order;
               const st = STATUS[canonicalStatus(o.status)];

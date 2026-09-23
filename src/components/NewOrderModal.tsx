@@ -133,7 +133,7 @@ export function NewOrderModal({ open, onClose, onSubmit }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-6"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -141,12 +141,12 @@ export function NewOrderModal({ open, onClose, onSubmit }: Props) {
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
       <div
         className={cn(
-          "relative w-full max-w-lg bg-background rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[92svh] flex flex-col animate-in slide-in-from-bottom duration-300",
+          "relative w-full max-w-lg bg-background rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[92svh] flex flex-col animate-in slide-in-from-bottom duration-300 md:max-w-2xl",
           submitted && "pointer-events-none",
         )}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-border shrink-0">
+        <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-border shrink-0 md:px-7 md:pt-6 md:pb-4">
           <div className="flex items-center gap-2.5">
             <span className="size-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
               <Wrench className="size-4" />

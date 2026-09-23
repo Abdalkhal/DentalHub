@@ -84,12 +84,12 @@ function QuickOrdersPage() {
   };
 
   return (
-    <MobileShell>
-      <TopBar title={ar ? "الطلبات السريعة" : "Quick Orders"} showBack />
-      <div className="px-3 pt-4 pb-24">
+    <MobileShell wide>
+      <TopBar title={ar ? "الطلبات السريعة" : "Quick Orders"} showBack wide />
+      <div className="px-3 pt-4 pb-24 md:px-6 md:pt-6 md:pb-12 lg:px-8 lg:max-w-5xl lg:mx-auto">
         {items.length === 0 ? (
-          <div className="py-20 text-center text-slate-400">
-            <div className="size-20 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
+          <div className="py-20 text-center text-slate-400 md:py-24 md:rounded-3xl md:border md:border-dashed md:border-slate-200 md:bg-white">
+            <div className="size-20 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4 md:size-24 md:mb-6">
               <ShoppingBag className="size-9 text-slate-300" />
             </div>
             <p className="font-bold text-lg text-slate-500">
@@ -101,7 +101,7 @@ function QuickOrdersPage() {
             <div className="flex gap-2 mt-4 justify-center">
               <Link
                 to="/supplies"
-                className="h-10 px-4 rounded-xl bg-primary text-primary-foreground text-xs font-bold flex items-center gap-1.5"
+                className="h-10 px-4 rounded-xl bg-primary text-primary-foreground text-xs font-bold flex items-center gap-1.5 md:h-12 md:px-7 md:text-sm md:rounded-full"
               >
                 <Package className="size-4" />
                 {ar ? "المستلزمات الطبية" : "Medical Supplies"}
@@ -109,9 +109,9 @@ function QuickOrdersPage() {
             </div>
           </div>
         ) : (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between mb-1">
-              <h2 className="font-bold text-sm text-slate-500">
+          <div className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-5 xl:grid-cols-3 md:items-start">
+            <div className="flex items-center justify-between mb-1 md:col-span-full md:mb-3">
+              <h2 className="font-bold text-sm text-slate-500 md:text-2xl md:text-slate-800">
                 {ar ? "الأكثر طلباً" : "Most Ordered"}
               </h2>
               <span className="text-xs text-slate-400">
@@ -124,7 +124,7 @@ function QuickOrdersPage() {
               return (
                 <div
                   key={item.productId}
-                  className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm flex items-start gap-3"
+                  className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm flex items-start gap-3 md:h-full md:p-5 md:shadow-none md:hover:shadow-lg md:hover:border-primary/30 md:transition"
                 >
                   <button type="button" onClick={() => goToProduct(item)} className="shrink-0">
                     {img ? (

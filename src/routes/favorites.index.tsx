@@ -14,28 +14,28 @@ function FavoritesPage() {
   const items = useFavorites();
 
   return (
-    <MobileShell>
-      <div className="px-3 pt-4 pb-24">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="font-display font-extrabold text-lg">{ar ? "المفضلة" : "Favorites"}</h1>
-          <span className="text-xs text-slate-500">{items.length} {ar ? "عنصر" : "items"}</span>
+    <MobileShell wide>
+      <div className="px-3 pt-4 pb-24 md:px-6 md:pt-8 lg:px-8 lg:max-w-6xl lg:mx-auto">
+        <div className="flex items-center justify-between mb-4 md:mb-7 md:pb-5 md:border-b md:border-slate-200">
+          <h1 className="font-display font-extrabold text-lg md:text-3xl">{ar ? "المفضلة" : "Favorites"}</h1>
+          <span className="text-xs text-slate-500 md:text-sm md:font-semibold md:bg-slate-100 md:px-3 md:py-1.5 md:rounded-full">{items.length} {ar ? "عنصر" : "items"}</span>
         </div>
         {items.length === 0 ? (
-          <div className="py-20 text-center text-slate-400">
-            <Heart className="size-16 mx-auto mb-4 text-slate-300" />
+          <div className="py-20 text-center text-slate-400 md:py-28 md:rounded-3xl md:border md:border-dashed md:border-slate-200 md:bg-white">
+            <Heart className="size-16 mx-auto mb-4 text-slate-300 md:size-20 md:mb-6" />
             <p className="font-semibold text-lg">{ar ? "قائمة المفضلة فارغة حالياً" : "Your favorites list is empty"}</p>
             <p className="text-sm mt-1">{ar ? "تصفح المنتجات وأضف ما يعجبك" : "Browse products and add what you like"}</p>
-            <Link to="/supplies" className="mt-4 inline-flex h-10 px-5 rounded-xl bg-primary text-primary-foreground text-sm font-bold items-center gap-1.5"><Package className="size-4" />{ar ? "تصفح المنتجات" : "Browse Products"}</Link>
+            <Link to="/supplies" className="mt-4 inline-flex h-10 px-5 rounded-xl bg-primary text-primary-foreground text-sm font-bold items-center gap-1.5 md:mt-7 md:h-12 md:px-7 md:rounded-full"><Package className="size-4" />{ar ? "تصفح المنتجات" : "Browse Products"}</Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-5 xl:grid-cols-3">
             {items.map((item: FavItem) => (
-              <div key={item.id} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-start gap-3">
-                <span className="size-12 shrink-0 rounded-xl bg-slate-50 flex items-center justify-center overflow-hidden">{item.imageUrl ? <img src={item.imageUrl} alt="" className="size-full object-cover" /> : <Package className="size-5 text-slate-400" />}</span>
+              <div key={item.id} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-start gap-3 md:p-5 md:shadow-none md:hover:shadow-lg md:hover:border-primary/30 md:transition">
+                <span className="size-12 shrink-0 rounded-xl bg-slate-50 flex items-center justify-center overflow-hidden md:size-16 md:rounded-2xl">{item.imageUrl ? <img src={item.imageUrl} alt="" className="size-full object-cover" /> : <Package className="size-5 text-slate-400" />}</span>
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold text-sm truncate">{item.title}</p>
+                  <p className="font-bold text-sm truncate md:text-base">{item.title}</p>
                   <p className="text-[11px] text-slate-500 mt-0.5">{item.vendor}</p>
-                  <p className="font-extrabold text-sm text-primary mt-1">{item.currency === "IQD" ? `${item.price.toLocaleString()} د.ع` : `$${item.price.toFixed(2)}`}</p>
+                  <p className="font-extrabold text-sm text-primary mt-1 md:text-lg md:mt-2">{item.currency === "IQD" ? `${item.price.toLocaleString()} د.ع` : `$${item.price.toFixed(2)}`}</p>
                 </div>
                 <button onClick={() => removeFavorite(item.id, lang)} className="size-8 rounded-lg bg-rose-50 text-rose-500 flex items-center justify-center hover:bg-rose-100 shrink-0"><Trash2 className="size-3.5" /></button>
               </div>

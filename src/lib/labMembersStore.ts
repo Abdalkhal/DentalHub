@@ -1,13 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  collectionGroup,
-  query,
-  where,
-  onSnapshot,
-  doc,
-  setDoc,
-  deleteDoc,
-} from "firebase/firestore";
+import { doc, setDoc, deleteDoc } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { app } from "@/integrations/firebase/config";
 import { db } from "@/integrations/firebase/client";
@@ -40,34 +32,50 @@ function memberRef(memberId: string) {
   return doc(db, "lab_members", memberId);
 }
 
-/** Realtime listener for all members of a lab. */
+const functions = getFunctions(app);
+
+// Fetched through the `listLabMembers` Cloud Function (Admin SDK) rather
+// than a client-side `collectionGroup` query + `onSnapshot`: Firestore
+// requires a security rule declared with the recursive `{path=**}` wildcard
+// to authorize a `collectionGroup()` read, separately from the ordinary
+// rule that already covers a normal `collection()`/`doc()` read at that
+// same path — easy to get wrong, and the failure mode looks identical to
+// "no members" with no visible error (a flat "Missing or insufficient
+// permissions" from the listener, silently caught). Routing the read
+// through the same trusted server path as `inviteLabMember` sidesteps that
+// class of bug for a list that was never realtime-critical to begin with.
 export function useLabMembers(labId: string) {
   const [members, setMembers] = useState<LabMember[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const refetch = async () => {
     if (!labId) {
       setMembers([]);
       setLoading(false);
-      return () => {};
+      return;
     }
     setLoading(true);
-    const q = query(collectionGroup(db, "lab_members"), where("labId", "==", labId));
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        setMembers(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<LabMember, "id">) })));
-        setLoading(false);
-      },
-      () => {
-        setMembers([]);
-        setLoading(false);
-      },
-    );
-    return unsub;
+    try {
+      const call = httpsCallable<{ labId: string }, { members: LabMember[] }>(
+        functions,
+        "listLabMembers",
+      );
+      const res = await call({ labId });
+      setMembers(res.data.members);
+    } catch (err) {
+      console.warn("Failed to fetch lab members:", err);
+      setMembers([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void refetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [labId]);
 
-  return { members, loading };
+  return { members, loading, refetch };
 }
 
 export type InviteLabMemberInput = {
@@ -76,6 +84,8 @@ export type InviteLabMemberInput = {
   phone?: string;
   role: LabRole;
   department: StaffDepartment;
+  /** Chosen by the lab owner and relayed to the member directly — there is no email/SMS delivery. */
+  password: string;
 };
 
 /**
@@ -83,13 +93,16 @@ export type InviteLabMemberInput = {
  * Firebase Auth account, sets custom claims (`role`, `labId`) and writes the
  * `lab_members` document server-side.
  */
-export async function inviteLabMember(labId: string, input: InviteLabMemberInput): Promise<void> {
-  const functions = getFunctions(app);
-  const call = httpsCallable<{ labId: string } & InviteLabMemberInput, { memberId: string }>(
-    functions,
-    "inviteLabMember",
-  );
-  await call({ labId, ...input });
+export async function inviteLabMember(
+  labId: string,
+  input: InviteLabMemberInput,
+): Promise<{ uid: string; created: boolean }> {
+  const call = httpsCallable<
+    { labId: string } & InviteLabMemberInput,
+    { memberId: string; uid: string; created: boolean }
+  >(functions, "inviteLabMember");
+  const res = await call({ labId, ...input });
+  return { uid: res.data.uid, created: res.data.created };
 }
 
 /** Updates a member's role/department/contact info (owner or lab admin only). */

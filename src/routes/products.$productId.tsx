@@ -65,8 +65,8 @@ function ProductDetailsPage() {
 
   if (isLoading) {
     return (
-      <MobileShell>
-        <TopBar title={ar ? "المنتج" : "Product"} showBack />
+      <MobileShell wide>
+        <TopBar title={ar ? "المنتج" : "Product"} showBack wide maxW="4xl" />
         <div className="flex justify-center py-20">
           <Loader2 className="size-8 animate-spin text-primary" />
         </div>
@@ -76,8 +76,8 @@ function ProductDetailsPage() {
 
   if (!product) {
     return (
-      <MobileShell>
-        <TopBar title={ar ? "المنتج" : "Product"} showBack />
+      <MobileShell wide>
+        <TopBar title={ar ? "المنتج" : "Product"} showBack wide maxW="4xl" />
         <div className="py-20 text-center text-muted-foreground">
           <Package className="size-12 mx-auto mb-3 text-muted-foreground/40" />
           <p className="text-sm font-semibold">{ar ? "المنتج غير موجود" : "Product not found"}</p>
@@ -93,8 +93,8 @@ function ProductDetailsPage() {
       : `$${product.price.toFixed(2)}`;
 
   return (
-    <MobileShell>
-      <TopBar title={name} showBack />
+    <MobileShell wide>
+      <TopBar title={name} showBack wide maxW="4xl" />
       <div className="pb-8">
         {/* Carousel */}
         {urls.length > 0 ? (
@@ -110,7 +110,7 @@ function ProductDetailsPage() {
           </div>
         )}
 
-        <div className="px-4 pt-4 space-y-4">
+        <div className="px-4 pt-4 space-y-4 md:px-6 md:pt-8 md:pb-14 md:space-y-6 lg:px-8 lg:max-w-4xl lg:mx-auto">
           {/* Name + brand */}
           <div>
             <h1 className="font-display font-extrabold text-lg leading-tight">{name}</h1>

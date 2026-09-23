@@ -9,8 +9,8 @@ import { helpTopics } from "@/data/help-topics";
 export const Route = createFileRoute("/account/help/topic/$slug")({
   component: TopicPage,
   notFoundComponent: () => (
-    <MobileShell>
-      <TopBar title="—" showBack />
+    <MobileShell wide>
+      <TopBar title="—" showBack wide maxW="3xl" />
       <div className="px-4 pt-6 text-sm text-muted-foreground">Not found</div>
     </MobileShell>
   ),
@@ -30,9 +30,9 @@ function TopicPage() {
   const Icon = topic.icon;
 
   return (
-    <MobileShell>
-      <TopBar title={ar ? topic.title.ar : topic.title.en} showBack />
-      <div className="px-4 pt-4 space-y-4">
+    <MobileShell wide>
+      <TopBar title={ar ? topic.title.ar : topic.title.en} showBack wide maxW="3xl" />
+      <div className="px-4 pt-4 space-y-4 md:px-6 md:pt-8 md:pb-12 lg:px-8 lg:max-w-3xl lg:mx-auto">
         <div className="bg-card border border-border rounded-2xl p-4 shadow-soft flex items-start gap-3">
           <span className={`size-11 rounded-xl flex items-center justify-center ${topic.tone}`}>
             <Icon className="size-5" />

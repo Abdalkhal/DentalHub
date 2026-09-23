@@ -60,8 +60,11 @@ export default function AccountScreen() {
 
   return (
     <Screen>
-      {/* Profile card */}
-      <View className="flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-card p-4 shadow-sm">
+      {/* Profile card — opens Settings, where name/phone/location/etc. are editable. */}
+      <Pressable
+        onPress={() => router.push('/settings')}
+        className="flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-card p-4 shadow-sm"
+      >
         {photo ? (
           <Image source={{ uri: photo }} className="h-16 w-16 rounded-2xl bg-slate-100" />
         ) : (
@@ -78,7 +81,8 @@ export default function AccountScreen() {
             {email || city}
           </Text>
         </View>
-      </View>
+        <ChevronRight size={18} color="#CBD5E1" />
+      </Pressable>
 
       {/* Menu */}
       <View className="mt-5 gap-2.5">

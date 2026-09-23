@@ -49,9 +49,9 @@ function SurgicalGuideDirectory() {
   const { data: galleryUrlMap = {} } = useSignedImageUrls(selectedGalleryPaths);
 
   return (
-    <MobileShell>
-      <TopBar title={ar ? "الدليل الجراحي" : "Surgical Guide"} showBack />
-      <div className="px-4 pt-4 pb-6 space-y-4">
+    <MobileShell wide>
+      <TopBar title={ar ? "الدليل الجراحي" : "Surgical Guide"} showBack wide maxW="6xl" />
+      <div className="px-4 pt-4 pb-6 space-y-4 md:px-6 md:pt-6 md:pb-14 md:space-y-6 lg:px-8 lg:max-w-6xl lg:mx-auto">
         <Link
           to="/surgical-guide/create"
           className="w-full h-14 rounded-2xl bg-primary text-primary-foreground font-display font-bold flex items-center justify-center gap-2 hover:opacity-90 transition shadow-card"
@@ -81,7 +81,7 @@ function SurgicalGuideDirectory() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-5 lg:grid-cols-3 xl:grid-cols-4">
             {companies.map((c) => {
               const logo = c.logoUrl ? logoUrlMap[c.logoUrl] : undefined;
               return (

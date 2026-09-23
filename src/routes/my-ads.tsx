@@ -10,7 +10,7 @@ export const Route = createFileRoute("/my-ads")({
 function MyAdsPage() {
   return (
     <RoleGuard allowedRoles={["dentist", "supply", "implant", "lab"]}>
-      <MobileShell>
+      <MobileShell wide>
         <AdsDashboard />
       </MobileShell>
     </RoleGuard>

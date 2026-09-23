@@ -25,7 +25,6 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { updateProfile } from "firebase/auth";
 import { storage } from "@/integrations/firebase/client";
 import { doc, updateDoc } from "firebase/firestore";
-import { cn } from "@/lib/utils";
 
 function getMapsUrl(role: {
   latitude?: number | null;
@@ -54,7 +53,7 @@ const roleLabels: Record<string, { ar: string; en: string }> = {
 
 function Account() {
   const { t, lang, dir } = useI18n();
-  const { role, loading } = useUserRole();
+  const { role } = useUserRole();
   const navigate = useNavigate();
   const Chevron = dir === "rtl" ? ChevronLeft : ChevronRight;
   const fileRef = useRef<HTMLInputElement>(null);
@@ -168,77 +167,90 @@ function Account() {
   };
 
   return (
-    <MobileShell>
-      <TopBar title={t("tab_account")} />
-      <div className="px-4 pt-4">
-        <div className="bg-card border border-border rounded-2xl p-4 shadow-soft flex items-center gap-4">
-          <button
-            type="button"
-            onClick={() => fileRef.current?.click()}
-            disabled={uploading}
-            className="relative size-14 rounded-2xl bg-primary text-primary-foreground font-display font-extrabold text-xl flex items-center justify-center overflow-hidden shrink-0 cursor-pointer hover:opacity-90 transition group"
-          >
-            {photoURL ? (
-              <img src={photoURL} alt="" className="size-full object-cover" />
-            ) : (
-              displayInitial
-            )}
-            <span className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
-              {uploading ? (
-                <Loader2 className="size-5 text-white animate-spin" />
+    <MobileShell wide>
+      <TopBar title={t("tab_account")} wide maxW="4xl" />
+      <div className="px-4 pt-4 md:px-6 md:pt-8 md:grid md:grid-cols-[260px_1fr] md:gap-5 md:items-start lg:max-w-4xl lg:mx-auto lg:pt-10 lg:px-0 lg:grid-cols-[300px_1fr] lg:gap-6">
+        <div className="md:sticky md:top-6 lg:top-20">
+          <div className="bg-card border border-border rounded-2xl p-4 shadow-soft flex items-center gap-4 md:flex-col md:text-center md:p-6 md:gap-3">
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              className="relative size-14 rounded-2xl bg-primary text-primary-foreground font-display font-extrabold text-xl flex items-center justify-center overflow-hidden shrink-0 cursor-pointer hover:opacity-90 transition group md:size-20 md:text-3xl"
+            >
+              {photoURL ? (
+                <img src={photoURL} alt="" className="size-full object-cover" />
               ) : (
-                <Camera className="size-5 text-white" />
+                displayInitial
               )}
-            </span>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              className="hidden"
-              onChange={(e) => handlePhotoUpload(e.target.files)}
-            />
-          </button>
-          <div className="min-w-0">
-            <p className="font-display font-bold">{displayName}</p>
-            <p className="text-xs text-muted-foreground">{displayRole}</p>
-            <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-1">
-              <Phone className="size-3 shrink-0" />
-              {displayPhone || (lang === "ar" ? "لم يتم إضافة رقم هاتف" : "No phone number added")}
-            </p>
-            <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
-              <MapPin className="size-3 shrink-0" />
-              {displayAddress ||
-                (lang === "ar" ? "لم يتم تحديد العنوان بعد" : "No address set yet")}
-            </p>
+              <span className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                {uploading ? (
+                  <Loader2 className="size-5 text-white animate-spin" />
+                ) : (
+                  <Camera className="size-5 text-white" />
+                )}
+              </span>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={(e) => handlePhotoUpload(e.target.files)}
+              />
+            </button>
+            <div className="min-w-0 md:w-full">
+              <p className="font-display font-bold md:text-lg">{displayName}</p>
+              <p className="text-xs text-muted-foreground md:text-sm md:mt-0.5">{displayRole}</p>
+              <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-1 md:justify-center md:mt-2.5">
+                <Phone className="size-3 shrink-0" />
+                {displayPhone || (lang === "ar" ? "لم يتم إضافة رقم هاتف" : "No phone number added")}
+              </p>
+              <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5 md:justify-center">
+                <MapPin className="size-3 shrink-0" />
+                {displayAddress ||
+                  (lang === "ar" ? "لم يتم تحديد العنوان بعد" : "No address set yet")}
+              </p>
+            </div>
           </div>
+
+          <button
+            onClick={async () => {
+              await signOut(auth);
+              navigate({ to: "/auth" });
+            }}
+            className="mt-4 w-full h-11 rounded-xl border border-destructive/30 text-destructive font-display font-bold inline-flex items-center justify-center gap-2"
+          >
+            <LogOut className="size-4" />
+            {t("logout")}
+          </button>
         </div>
 
-        <ul className="mt-4 bg-card border border-border rounded-2xl divide-y divide-border overflow-hidden shadow-soft">
+        <ul className="mt-4 md:mt-0 bg-card border border-border rounded-2xl divide-y divide-border overflow-hidden shadow-soft md:bg-transparent md:border-0 md:divide-y-0 md:shadow-none md:grid md:grid-cols-2 md:gap-3">
           {rows.map((r, i) => {
             const inner = (
               <>
                 <span
-                  className={`size-10 rounded-2xl ring-1 shadow-sm flex items-center justify-center ${r.tone}`}
+                  className={`size-10 rounded-2xl ring-1 shadow-sm flex items-center justify-center ${r.tone} md:size-12`}
                 >
-                  <r.icon className="size-5 drop-shadow-sm" strokeWidth={2.2} />
+                  <r.icon className="size-5 drop-shadow-sm md:size-6" strokeWidth={2.2} />
                 </span>
-                <span className="flex-1 text-sm font-semibold">{r.label}</span>
-                <Chevron className="size-4 text-muted-foreground" />
+                <span className="flex-1 text-sm font-semibold md:flex-none md:text-center md:text-base">{r.label}</span>
+                <Chevron className="size-4 text-muted-foreground md:hidden" />
               </>
             );
             return (
-              <li key={i}>
+              <li key={i} className="md:bg-card md:border md:border-border md:rounded-2xl md:shadow-soft md:overflow-hidden">
                 {r.to ? (
                   <Link
                     to={r.to}
-                    className="w-full flex items-center gap-3 px-4 py-3.5 text-start hover:bg-accent transition-colors"
+                    className="w-full flex items-center gap-3 px-4 py-3.5 text-start hover:bg-accent transition-colors md:flex-col md:justify-center md:gap-2.5 md:py-6 md:text-center"
                   >
                     {inner}
                   </Link>
                 ) : (
                   <button
                     onClick={r.onClick}
-                    className="w-full flex items-center gap-3 px-4 py-3.5 text-start hover:bg-accent transition-colors"
+                    className="w-full flex items-center gap-3 px-4 py-3.5 text-start hover:bg-accent transition-colors md:flex-col md:justify-center md:gap-2.5 md:py-6 md:text-center"
                   >
                     {inner}
                   </button>
@@ -247,31 +259,20 @@ function Account() {
             );
           })}
         </ul>
-
-        <button
-          onClick={async () => {
-            await signOut(auth);
-            navigate({ to: "/login" });
-          }}
-          className="mt-4 w-full h-11 rounded-xl border border-destructive/30 text-destructive font-display font-bold inline-flex items-center justify-center gap-2"
-        >
-          <LogOut className="size-4" />
-          {t("logout")}
-        </button>
       </div>
 
       {/* Contact Modal */}
       {showContact && (
         <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 sm:p-6"
           onClick={() => setShowContact(false)}
         >
           <div
-            className="bg-card w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl space-y-4 animate-in slide-in-from-bottom"
+            className="bg-card w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl space-y-4 animate-in slide-in-from-bottom md:max-w-lg md:p-8"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
-              <h3 className="font-display font-bold text-lg">
+              <h3 className="font-display font-bold text-lg md:text-2xl">
                 {lang === "ar" ? "تواصل معنا" : "Contact us"}
               </h3>
               <button

@@ -12,9 +12,9 @@ export const Route = createFileRoute("/labs/cases")({
 function CasesPage() {
   const { t, lang } = useI18n();
   return (
-    <MobileShell>
-      <TopBar title={t("track_cases")} showBack />
-      <div className="px-4 pt-4">
+    <MobileShell wide>
+      <TopBar title={t("track_cases")} showBack wide maxW="6xl" />
+      <div className="px-4 pt-4 md:px-6 md:pt-6 md:pb-12 lg:px-8 lg:max-w-6xl lg:mx-auto">
         {CASES.length === 0 ? (
           <div className="py-12 flex flex-col items-center text-center text-muted-foreground">
             <p className="text-sm">{lang === "ar" ? "لا توجد حالات بعد" : "No cases yet"}</p>
@@ -25,7 +25,7 @@ function CasesPage() {
             </p>
           </div>
         ) : (
-          <ul className="space-y-3">
+          <ul className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-5 xl:grid-cols-3 md:items-start">
             {CASES.map((c) => {
               const lab = LABS.find((l) => l.id === c.labId);
               return (

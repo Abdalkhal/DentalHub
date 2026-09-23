@@ -199,8 +199,8 @@ function ProfilePage() {
 
   if (isLoading) {
     return (
-      <MobileShell>
-        <TopBar title={ar ? "جاري التحميل..." : "Loading..."} showBack />
+      <MobileShell wide>
+        <TopBar title={ar ? "جاري التحميل..." : "Loading..."} showBack wide />
         <div className="flex items-center justify-center min-h-[50vh]">
           <div className="size-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
@@ -210,8 +210,8 @@ function ProfilePage() {
 
   if (!account) {
     return (
-      <MobileShell>
-        <TopBar title={ar ? "غير موجود" : "Not found"} showBack />
+      <MobileShell wide>
+        <TopBar title={ar ? "غير موجود" : "Not found"} showBack wide />
         <div className="p-6 text-center text-sm text-muted-foreground">
           {ar ? "الحساب غير موجود" : "Account not found"}
         </div>
@@ -251,9 +251,9 @@ function ProfilePage() {
   };
 
   return (
-    <MobileShell>
-      <TopBar title={ar ? "الملف الشخصي" : "Profile"} showBack />
-      <div className="px-4 pt-4 space-y-4 pb-6">
+    <MobileShell wide>
+      <TopBar title={ar ? "الملف الشخصي" : "Profile"} showBack wide maxW="6xl" />
+      <div className="px-4 pt-4 space-y-4 pb-6 md:px-6 md:pt-8 md:pb-14 md:space-y-6 lg:px-8 lg:max-w-6xl lg:mx-auto">
         {/* ── Profile Header ─────────────────────── */}
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50/30 border border-blue-100 rounded-3xl p-5 shadow-soft">
           <div className="flex items-start gap-4">
@@ -328,7 +328,7 @@ function ProfilePage() {
               {offers.map((offer) => (
                 <div
                   key={offer.id}
-                  className="snap-start shrink-0 w-[78%] rounded-2xl p-3.5 text-white shadow-card space-y-2"
+                  className="snap-start shrink-0 w-[78%] rounded-2xl p-3.5 text-white shadow-card space-y-2 md:w-[32%] md:p-5"
                   style={{
                     backgroundImage: "linear-gradient(135deg,#1d4ed8,#0ea5e9)",
                   }}
@@ -392,7 +392,7 @@ function ProfilePage() {
 
                 {/* Products grid */}
                 {filteredProducts.length > 0 ? (
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-4 md:gap-5 lg:grid-cols-4">
                     {filteredProducts.map((p) => {
                       const urls = p.images.map((path) => filterUrls[path]).filter(Boolean);
                       return (
@@ -426,7 +426,7 @@ function ProfilePage() {
                   <Package className="size-4 text-primary" />
                   {ar ? "فروع طب الأسنان" : "Dental Specialties"}
                 </h2>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 md:gap-4 lg:grid-cols-6">
                   {branchOptions.map((b) => {
                     const Badge = BRANCH_BADGE[b.value] ?? Package;
                     const image = BRANCH_IMAGES[b.value];
@@ -474,7 +474,7 @@ function ProfilePage() {
               <Package className="size-4 text-primary" />
               {ar ? "المنتجات" : "Products"}
             </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4">
               {products.slice(0, 6).map((p) => {
                 const urls = p.images.map((path) => filterUrls[path]).filter(Boolean);
                 return (

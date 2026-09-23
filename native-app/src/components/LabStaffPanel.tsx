@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View } from 'react-native';
 import {
   Building2,
   Mail,
@@ -283,6 +283,7 @@ function MemberFormModal({
 
   return (
     <Modal visible transparent animationType="fade">
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
       <View className="flex-1 justify-end bg-black/40">
         <ScrollView className="max-h-[90%] rounded-t-3xl bg-white p-5" contentContainerClassName="gap-3 pb-8">
           <View className="flex-row items-center justify-between">
@@ -363,6 +364,7 @@ function MemberFormModal({
           />
         </ScrollView>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

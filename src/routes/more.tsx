@@ -243,15 +243,15 @@ function More() {
   const links = allLinks.filter((l) => l.roles.some((r) => isRole(r)));
 
   return (
-    <MobileShell>
-      <TopBar title={t("tab_more")} />
-      <div className="px-4 pt-4 pb-4 space-y-4">
+    <MobileShell wide>
+      <TopBar title={t("tab_more")} wide />
+      <div className="px-4 pt-4 pb-4 space-y-4 md:px-6 md:pt-8 lg:px-0 lg:max-w-5xl lg:mx-auto lg:pt-10">
         {/* Role badge */}
         <div className="flex items-center gap-2 px-1">
-          <span className="text-xs font-bold text-slate-500">
+          <span className="text-xs font-bold text-slate-500 lg:text-sm">
             {ar ? "الحساب:" : "Account:"}
           </span>
-          <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-sky-50 text-sky-700">
+          <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-sky-50 text-sky-700 lg:text-sm">
             {isAdmin
               ? ar ? "مدير النظام" : "Admin"
               : accountType === "dentist" ? (ar ? "طبيب أسنان" : "Dentist")
@@ -262,18 +262,18 @@ function More() {
           </span>
         </div>
 
-        <ul className="bg-card border border-border rounded-2xl divide-y divide-border overflow-hidden shadow-soft">
+        <ul className="bg-card border border-border rounded-2xl divide-y divide-border overflow-hidden shadow-soft md:bg-transparent md:border-0 md:divide-y-0 md:shadow-none md:grid md:grid-cols-3 md:gap-3 lg:grid-cols-4">
           {links.map((l) => (
-            <li key={l.to}>
+            <li key={l.to} className="md:bg-card md:border md:border-border md:rounded-2xl md:shadow-soft md:overflow-hidden">
               <Link
                 to={l.to}
-                className="flex items-center gap-3 px-4 py-3.5 hover:bg-accent transition-colors"
+                className="flex items-center gap-3 px-4 py-3.5 hover:bg-accent transition-colors md:flex-col md:justify-center md:gap-2.5 md:py-6 md:text-center"
               >
-                <span className="size-10 rounded-2xl ring-1 shadow-sm flex items-center justify-center shrink-0" style={{ backgroundColor: "oklch(0.98 0.01 240)" }}>
-                  <l.icon className="size-5 drop-shadow-sm" strokeWidth={2} />
+                <span className="size-10 rounded-2xl ring-1 shadow-sm flex items-center justify-center shrink-0 md:size-12" style={{ backgroundColor: "oklch(0.98 0.01 240)" }}>
+                  <l.icon className="size-5 drop-shadow-sm md:size-6" strokeWidth={2} />
                 </span>
-                <span className="flex-1 text-sm font-semibold text-slate-700">{l.label}</span>
-                <ChevronRight className="size-4 text-slate-300" />
+                <span className="flex-1 text-sm font-semibold text-slate-700 md:flex-none md:text-base">{l.label}</span>
+                <ChevronRight className="size-4 text-slate-300 md:hidden" />
               </Link>
             </li>
           ))}
@@ -281,7 +281,7 @@ function More() {
 
         <button
           onClick={toggle}
-          className="w-full flex items-center gap-3 bg-card border border-border rounded-2xl px-4 py-3.5 shadow-soft hover:bg-accent transition-colors"
+          className="w-full flex items-center gap-3 bg-card border border-border rounded-2xl px-4 py-3.5 shadow-soft hover:bg-accent transition-colors md:max-w-sm"
         >
           <span className="size-10 rounded-2xl ring-1 shadow-sm flex items-center justify-center bg-emerald-50 ring-emerald-200 text-emerald-600">
             <Globe className="size-5 drop-shadow-sm" strokeWidth={2} />

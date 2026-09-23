@@ -153,9 +153,9 @@ function AboutPage() {
   };
 
   return (
-    <MobileShell>
-      <TopBar title={ar ? "عن التطبيق" : "About"} showBack />
-      <div className="px-4 pt-4 space-y-4">
+    <MobileShell wide>
+      <TopBar title={ar ? "عن التطبيق" : "About"} showBack wide maxW="3xl" />
+      <div className="px-4 pt-4 space-y-4 md:px-6 md:pt-8 md:pb-12 md:space-y-6 lg:px-8 lg:max-w-3xl lg:mx-auto">
         <div className="bg-card border border-border rounded-2xl p-5 shadow-soft text-center">
           <div className="mx-auto size-16 rounded-2xl bg-primary text-primary-foreground font-display font-extrabold text-2xl flex items-center justify-center">
             DH

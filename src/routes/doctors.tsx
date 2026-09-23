@@ -4,7 +4,7 @@ import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { ChevronDown, ChevronUp, Stethoscope, FileText, Clock, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Stethoscope } from "lucide-react";
 
 const ORDERS_KEY = "dental_hub_orders";
 
@@ -81,7 +81,7 @@ export const Route = createFileRoute("/doctors")({
 });
 
 function DoctorsPage() {
-  const { lang, dir } = useI18n();
+  const { lang } = useI18n();
   const ar = lang === "ar";
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<DoctorEntry | null>(null);
@@ -99,9 +99,9 @@ function DoctorsPage() {
 
   if (selected) {
     return (
-      <MobileShell>
-        <TopBar title={selected.name} showBack />
-        <div className="px-4 pt-4 space-y-3">
+      <MobileShell wide>
+        <TopBar title={selected.name} showBack wide maxW="5xl" />
+        <div className="px-4 pt-4 space-y-3 md:px-6 md:pt-6 md:pb-12 md:space-y-5 lg:px-8 lg:max-w-5xl lg:mx-auto">
           <div className="bg-card border border-border rounded-2xl p-4 shadow-soft flex items-center gap-3">
             <span className="size-12 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0 text-blue-600 font-display font-extrabold text-lg">
               {selected.name.charAt(0)}
@@ -163,16 +163,18 @@ function DoctorsPage() {
   }
 
   return (
-    <MobileShell>
+    <MobileShell wide>
       <TopBar
         title={ar ? "الأطباء" : "Doctors & Clinics"}
         showBack
+        wide
+        maxW="6xl"
         showSearch
         searchValue={search}
         onSearchChange={setSearch}
         searchPlaceholder={ar ? "ابحث عن طبيب…" : "Search by doctor…"}
       />
-      <div className="px-4 pt-4">
+      <div className="px-4 pt-4 md:px-6 md:pt-6 md:pb-12 lg:px-8 lg:max-w-6xl lg:mx-auto">
         {filtered.length === 0 ? (
           <div className="py-16 flex flex-col items-center text-center text-muted-foreground">
             <Stethoscope className="size-10 mb-3 text-muted-foreground/40" />
@@ -182,7 +184,7 @@ function DoctorsPage() {
             </p>
           </div>
         ) : (
-          <ul className="space-y-3">
+          <ul className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-5 xl:grid-cols-3 md:items-start">
             {filtered.map((d) => (
               <li key={d.name}>
                 <button

@@ -2,11 +2,12 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
+import { auth } from "@/integrations/firebase/client";
 import { useSession } from "@/lib/useAuth";
 import { useDesignerCases } from "@/lib/designerStore";
 import { getStatusLabel, getStatusColor } from "@/lib/caseTracking";
 import { cn } from "@/lib/utils";
-import { Loader2, Layers, PenTool } from "lucide-react";
+import { Loader2, Layers, PenTool, LogOut } from "lucide-react";
 
 export const Route = createFileRoute("/designer/")({
   component: DesignerIndex,
@@ -20,8 +21,17 @@ function DesignerIndex() {
 
   return (
     <MobileShell>
-      <TopBar title={ar ? "حالاتي كمصمم" : "My Design Cases"} showBack />
-      <div className="px-4 pt-4 pb-8">
+      <TopBar title={ar ? "حالاتي" : "My Cases"} />
+      <div className="px-4 pt-2 pb-8">
+        <div className="flex justify-end mb-3">
+          <button
+            onClick={() => auth.signOut()}
+            className="flex items-center gap-1.5 h-9 px-3 rounded-full bg-rose-50 text-rose-600 text-xs font-bold hover:bg-rose-100"
+          >
+            <LogOut className="size-3.5" />
+            {ar ? "تسجيل الخروج" : "Sign out"}
+          </button>
+        </div>
         {loading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="size-8 animate-spin text-primary" />

@@ -85,10 +85,8 @@ import {
   UserCircle2,
   LogOut,
   Phone,
-  FileText,
   Download,
   Link2,
-  Cpu,
   BookOpen,
   Shield,
   Wrench,
@@ -197,8 +195,8 @@ function SuppliesIndex() {
 
   if (roleLoading) {
     return (
-      <MobileShell>
-        <TopBar title="" />
+      <MobileShell wide>
+        <TopBar title="" wide />
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="size-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
@@ -237,6 +235,14 @@ function getMapsUrl(role: {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`;
 }
 
+// Horizontal rhythm shared by the supply dashboard's header, tab rail and
+// panel body, so all three sit on the same grid at every breakpoint. Phone
+// values are exactly what was there before (`px-4`); md:+ widens the gutters
+// and lg:+ caps the content column and centers it.
+// `relative` keeps these sections painting above the decorative tint layer
+// below; with no inset it changes nothing about the layout itself.
+const shellCls = "relative px-4 md:px-6 lg:px-8 lg:max-w-7xl lg:mx-auto";
+
 function SupplyDashboard() {
   const { lang, toggle } = useI18n();
   const ar = lang === "ar";
@@ -256,46 +262,71 @@ function SupplyDashboard() {
     : { ar: "", en: "" };
 
   return (
-    <MobileShell hideBottomNav>
+    <MobileShell hideBottomNav wide className="md:bg-[#F7F9FA]">
+      {/* A flat grey canvas looked unfinished, so the top of the page carries
+          a soft wash in the account's own accent that fades into the neutral
+          background — the supply equivalent of the implants' icy blue.
+          md:+ only; the phone keeps its existing background untouched. */}
+      <div
+        aria-hidden
+        className="hidden md:block absolute inset-x-0 top-0 h-80 pointer-events-none bg-gradient-to-b from-[#0E6E66]/[0.10] via-[#0E6E66]/[0.035] to-transparent"
+      />
+
       {/* Profile Header */}
-      <div className="px-4 pt-4 pb-2">
+      <div className={shellCls + " pt-4 pb-2 md:pt-7"}>
         <div
-          className="rounded-3xl shadow-lg text-white"
-          style={{ background: "linear-gradient(135deg, #0F172A, #1E40AF)" }}
+          className={cn(
+            "relative rounded-3xl shadow-lg text-white",
+            // md:+ the store identity reads as a light card on a neutral
+            // canvas instead of a dark hero strip.
+            "md:rounded-2xl md:bg-white md:text-slate-900 md:border md:border-slate-200 md:shadow-none",
+          )}
         >
-          <div className="p-4 space-y-3">
-            <div className="flex items-center justify-between gap-3">
+          {/* The phone gradient lives on its own layer so the md:+ light card
+              can simply reveal itself; the phone result is byte-identical. */}
+          <div
+            className="absolute inset-0 rounded-3xl md:hidden"
+            style={{ background: "linear-gradient(135deg, #0F172A, #1E40AF)" }}
+          />
+          <div className="relative p-4 space-y-3 md:p-6 md:flex md:items-center md:justify-between md:gap-6 md:space-y-0">
+            <div className="flex items-center justify-between gap-3 md:contents">
               <Link
                 to="/account"
-                className="flex items-center gap-3 min-w-0 cursor-pointer hover:opacity-80 transition"
+                className="flex items-center gap-3 min-w-0 cursor-pointer hover:opacity-80 transition md:gap-4"
               >
-                <div className="size-12 rounded-full bg-white/10 ring-2 ring-white/25 flex items-center justify-center overflow-hidden shrink-0">
+                <div className="size-12 rounded-full bg-white/10 ring-2 ring-white/25 flex items-center justify-center overflow-hidden shrink-0 md:size-16 md:bg-[#0E6E66]/10 md:ring-4 md:ring-[#0E6E66]/15">
                   {role?.photoURL ? (
                     <img src={role.photoURL} alt="" className="size-full object-cover" />
                   ) : (
-                    <UserCircle2 className="size-7 text-white/80" />
+                    <UserCircle2 className="size-7 text-white/80 md:size-9 md:text-[#0E6E66]" />
                   )}
                 </div>
                 <div className="min-w-0">
-                  <p className="font-display font-bold text-sm text-white truncate">
-                    {role?.name || (ar ? "المستخدم" : "User")}
-                  </p>
-                  <p className="text-[11px] text-white/70 truncate">
-                    {ar ? storeLabel?.ar : storeLabel?.en}
-                  </p>
-                  <p className="text-[11px] text-white/70 flex items-center gap-1 mt-0.5 truncate">
-                    <Phone className="size-3 shrink-0" />
+                  <div className="md:flex md:items-center md:gap-2.5">
+                    <p className="font-display font-bold text-sm text-white truncate md:text-2xl md:text-slate-900">
+                      {role?.name || (ar ? "المستخدم" : "User")}
+                    </p>
+                    <p className="text-[11px] text-white/70 truncate md:shrink-0 md:px-2.5 md:py-1 md:rounded-full md:bg-[#0E6E66]/10 md:text-[#0E6E66] md:font-bold">
+                      {ar ? storeLabel?.ar : storeLabel?.en}
+                    </p>
+                  </div>
+                  <p className="text-[11px] text-white/70 flex items-center gap-1 mt-0.5 truncate md:text-sm md:text-slate-500 md:mt-2 md:gap-1.5">
+                    <Phone className="size-3 shrink-0 md:size-3.5" />
                     {role?.phone || (ar ? "لم يتم إضافة رقم هاتف" : "No phone number added")}
                   </p>
                 </div>
               </Link>
 
-              <div className="flex items-center gap-2 shrink-0">
-                <NotificationBell userId={supplierId} dark />
+              <div className="flex items-center gap-2 shrink-0 md:order-last">
+                <NotificationBell
+                  userId={supplierId}
+                  dark
+                  className="md:bg-slate-100 md:border-slate-200 md:text-slate-600 md:hover:bg-slate-200"
+                />
                 <button
                   type="button"
                   onClick={toggle}
-                  className="px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-white/90 hover:bg-white/20 text-xs font-bold transition"
+                  className="px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-white/90 hover:bg-white/20 text-xs font-bold transition md:bg-slate-100 md:border-slate-200 md:text-slate-600 md:hover:bg-slate-200 md:h-10"
                 >
                   {lang === "ar" ? "EN" : "AR"}
                 </button>
@@ -309,14 +340,14 @@ function SupplyDashboard() {
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className="text-[11px] text-white/70 flex items-center gap-1 ps-[60px] pt-3 border-t border-white/15 hover:text-white transition-colors cursor-pointer z-50 pointer-events-auto"
+                className="text-[11px] text-white/70 flex items-center gap-1 ps-[60px] pt-3 border-t border-white/15 hover:text-white transition-colors cursor-pointer z-50 pointer-events-auto md:ps-0 md:pt-0 md:border-t-0 md:shrink-0 md:max-w-xs md:text-xs md:text-slate-600 md:hover:text-[#0E6E66] md:bg-slate-50 md:border md:border-slate-200 md:rounded-xl md:px-3.5 md:py-2.5 md:gap-2"
               >
-                <MapPin className="size-3 shrink-0" />
+                <MapPin className="size-3 shrink-0 md:size-3.5 md:text-[#0E6E66]" />
                 {role?.address || (ar ? "عرض الموقع على الخريطة" : "View on map")}
               </a>
             ) : (
-              <p className="text-[11px] text-white/70 flex items-center gap-1 ps-[60px] pt-3 border-t border-white/15">
-                <MapPin className="size-3 shrink-0" />
+              <p className="text-[11px] text-white/70 flex items-center gap-1 ps-[60px] pt-3 border-t border-white/15 md:ps-0 md:pt-0 md:border-t-0 md:shrink-0 md:text-xs md:text-slate-400">
+                <MapPin className="size-3 shrink-0 md:size-3.5" />
                 {ar ? "لم يتم تحديد العنوان بعد" : "No address set yet"}
               </p>
             )}
@@ -325,8 +356,8 @@ function SupplyDashboard() {
       </div>
 
       {/* Tab navigation */}
-      <div className="px-4">
-        <div className="flex bg-slate-100 rounded-2xl p-1 mt-2">
+      <div className={shellCls}>
+        <div className="flex bg-slate-100 rounded-2xl p-1 mt-2 md:bg-transparent md:rounded-none md:p-0 md:mt-7 md:gap-7 md:border-b md:border-slate-200">
           {[
             { key: "products" as const, ar: "المنتجات", en: "Products", icon: Package },
             { key: "implants" as const, ar: "الزرعات", en: "Implants", icon: Bone },
@@ -339,12 +370,14 @@ function SupplyDashboard() {
               onClick={() => setActiveTab(tab.key)}
               className={cn(
                 "flex-1 h-11 rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 transition-all border",
+                // md:+ a quiet underline rail reads better than a pill switcher
+                "md:flex-none md:h-auto md:rounded-none md:pb-3 md:border-0 md:border-b-2 md:gap-2",
                 activeTab === tab.key
-                  ? "bg-white text-slate-900 shadow-sm border-slate-300"
-                  : "text-slate-500 hover:text-slate-700 border-slate-200",
+                  ? "bg-white text-slate-900 shadow-sm border-slate-300 md:bg-transparent md:shadow-none md:text-[#0E6E66] md:border-[#0E6E66]"
+                  : "text-slate-500 hover:text-slate-700 border-slate-200 md:border-transparent md:hover:text-slate-800",
               )}
             >
-              <tab.icon className="size-4" />
+              <tab.icon className="size-4 md:size-4.5" />
               {ar ? tab.ar : tab.en}
             </button>
           ))}
@@ -352,7 +385,7 @@ function SupplyDashboard() {
       </div>
 
       {/* Tab content */}
-      <div className="px-4 pt-4 pb-6">
+      <div className={shellCls + " pt-4 pb-6 md:pt-6 md:pb-12"}>
         {activeTab === "products" && <ProductsPanel />}
         {activeTab === "implants" && <ImplantsBoneGraftPanel />}
         {activeTab === "offers" && <OffersPanel supplierId={supplierId} />}
@@ -924,32 +957,45 @@ function ProductsPanel() {
       {!showForm && (
         <button
           onClick={openAdd}
-          className="w-full h-14 rounded-2xl text-white font-display font-bold flex items-center justify-center gap-2 hover:opacity-95 transition shadow-lg"
-          style={{ background: "linear-gradient(to right, #2AA6D1, #4FC3E8)" }}
+          className="relative w-full h-14 rounded-2xl text-white font-display font-bold flex items-center justify-center gap-2 hover:opacity-95 transition shadow-lg md:w-auto md:h-11 md:px-5 md:text-sm md:rounded-xl md:bg-[#0E6E66] md:hover:bg-[#0B5952] md:hover:opacity-100 md:shadow-sm md:shadow-[#0E6E66]/25"
         >
-          <Plus className="size-5" />
-          {ar ? "إضافة منتج جديد" : "Add new product"}
+          {/* Phone keeps its sky gradient; md:+ switches to the flat accent.
+              The gradient sits on its own layer because an inline style would
+              otherwise win over any breakpoint class. */}
+          <span
+            className="absolute inset-0 rounded-2xl md:hidden"
+            style={{ background: "linear-gradient(to right, #2AA6D1, #4FC3E8)" }}
+          />
+          <span className="relative flex items-center justify-center gap-2">
+            <Plus className="size-5 md:size-4" />
+            {ar ? "إضافة منتج جديد" : "Add new product"}
+          </span>
         </button>
       )}
 
       {/* ── Add / Edit Product Modal (Mobile Sheet) ── */}
       {showForm && (
-        <div className="fixed inset-0 z-[70]">
+        <div className="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:p-6">
           <div
             className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
             onClick={() => setShowForm(false)}
           />
-          <div
-            className="absolute inset-x-0 bottom-0 top-6 mx-auto w-full max-w-md flex flex-col rounded-t-3xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom"
-            style={{ background: "linear-gradient(to bottom, #F7FCFF, #DCEEFB, #BFE1F7)" }}
-          >
+          {/* Phone: a full-height bottom sheet, exactly as before (the flex
+              parent + h-calc reproduce the old inset-x-0/bottom-0/top-6 box).
+              md:+ : a centered, roomier dialog. */}
+          <div className="relative w-full max-w-md h-[calc(100%-1.5rem)] flex flex-col rounded-t-3xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom md:h-auto md:max-h-[88vh] md:max-w-4xl md:rounded-3xl md:bg-white">
+            <span
+              aria-hidden
+              className="absolute inset-0 md:hidden"
+              style={{ background: "linear-gradient(to bottom, #F7FCFF, #DCEEFB, #BFE1F7)" }}
+            />
             {/* Header */}
-            <div className="flex items-center justify-between px-4 pt-4 pb-3 shrink-0 border-b border-white/70">
+            <div className="relative flex items-center justify-between px-4 pt-4 pb-3 shrink-0 border-b border-white/70 md:px-6 md:pt-5 md:pb-4 md:border-slate-200">
               <div>
-                <h3 className="font-display font-extrabold text-base text-[#17324A]">
+                <h3 className="font-display font-extrabold text-base text-[#17324A] md:text-xl md:text-slate-900">
                   {editing ? (ar ? "تعديل منتج" : "Edit Product") : ar ? "منتج جديد" : "New Product"}
                 </h3>
-                <p className="text-[11px] text-[#7A94A8] mt-0.5">
+                <p className="text-[11px] text-[#7A94A8] mt-0.5 md:text-xs md:text-slate-500">
                   {ar ? "أدخل تفاصيل المنتج للحفظ" : "Enter product details to save"}
                 </p>
               </div>
@@ -962,8 +1008,10 @@ function ProductsPanel() {
               </button>
             </div>
 
-            {/* Scrollable body */}
-            <div className="flex-1 overflow-y-auto px-4 pt-4 pb-36 space-y-4">
+            {/* Scrollable body — a single column on phones; md:+ the sections
+                auto-flow into two columns by DOM order, with the wide ones
+                opting back out via md:col-span-2. */}
+            <div className="relative flex-1 overflow-y-auto px-4 pt-4 pb-36 space-y-4 md:px-6 md:pt-6 md:pb-6 md:grid md:grid-cols-2 md:gap-4 md:space-y-0 md:items-start md:content-start">
               {/* Basic Info */}
               <section className={cardCls}>
                 <p className={sectionTitleCls}>
@@ -991,7 +1039,7 @@ function ProductsPanel() {
               </section>
 
               {/* Product Images */}
-              <section className={cardCls}>
+              <section className={cn(cardCls, "md:col-span-2")}>
                 <p className={sectionTitleCls}>
                   <span className="size-1.5 rounded-full bg-emerald-500" />
                   {ar ? "صور المنتج" : "Product Images"}
@@ -1198,7 +1246,7 @@ function ProductsPanel() {
               {/* Dynamic Technical Specs */}
               {isStrictBranch ? (
                 visibleStrictIds.length > 0 && (
-                  <section className={cardCls}>
+                  <section className={cn(cardCls, "md:col-span-2")}>
                     <p className={sectionTitleCls}>
                       <span className="size-1.5 rounded-full bg-emerald-500" />
                       {ar ? "المواصفات الفنية" : "Technical Specifications"}
@@ -1209,7 +1257,7 @@ function ProductsPanel() {
                   </section>
                 )
               ) : activeGroups.length > 0 ? (
-                <section className={cardCls}>
+                <section className={cn(cardCls, "md:col-span-2")}>
                   <p className={sectionTitleCls}>
                     <span className="size-1.5 rounded-full bg-emerald-500" />
                     {ar ? "المواصفات الفنية" : "Technical Specifications"}
@@ -1229,7 +1277,7 @@ function ProductsPanel() {
               ) : null}
 
               {/* Pricing, Volume & Inventory */}
-              <section className={cardCls}>
+              <section className={cn(cardCls, "md:col-span-2")}>
                 <div className="flex items-center justify-between">
                   <p className={sectionTitleCls}>
                     <span className="size-1.5 rounded-full bg-emerald-500" />
@@ -1352,7 +1400,7 @@ function ProductsPanel() {
               </section>
 
               {/* Quantity Discount */}
-              <section className={cardCls}>
+              <section className={cn(cardCls, "md:col-span-2")}>
                 <div className="flex items-center justify-between">
                   <p className={sectionTitleCls}>
                     <span className="size-1.5 rounded-full bg-emerald-500" />
@@ -1438,7 +1486,9 @@ function ProductsPanel() {
             </div>
 
             {/* Footer */}
-            <div className="absolute inset-x-0 bottom-0 bg-white/95 backdrop-blur border-t border-slate-200 p-4 pb-5">
+            {/* Phone: floats over the scroll area (hence the body's pb-36).
+                md:+ : becomes a normal flex row at the dialog's foot. */}
+            <div className="absolute inset-x-0 bottom-0 bg-white/95 backdrop-blur border-t border-slate-200 p-4 pb-5 md:static md:shrink-0 md:px-6 md:py-4">
               {formError && (
                 <p className="text-xs font-semibold text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 mb-3 text-center">
                   {formError}
@@ -1448,7 +1498,7 @@ function ProductsPanel() {
                 type="button"
                 onClick={submit}
                 disabled={busy}
-                className="w-full h-14 rounded-2xl text-white font-display font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg transition hover:opacity-95 disabled:opacity-60"
+                className="w-full h-14 rounded-2xl text-white font-display font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg transition hover:opacity-95 disabled:opacity-60 md:h-11 md:max-w-xs md:mx-auto md:rounded-xl md:shadow-sm"
                 style={{ background: "linear-gradient(to right, #10B981, #059669)" }}
               >
                 {busy ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
@@ -1535,10 +1585,10 @@ function ProductsPanel() {
 
           {!activeBranchName && (
             <>
-              <h2 className="font-display font-bold text-sm text-muted-foreground">
+              <h2 className="font-display font-bold text-sm text-muted-foreground md:text-base md:text-slate-800 md:mb-1">
                 {ar ? "فروع طب الأسنان" : "Dental Specialties"}
               </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 md:gap-4 lg:grid-cols-5 xl:grid-cols-6">
                 {branchOptions.map((b) => {
                   const Badge = BRANCH_BADGE[b.value] ?? Package;
                   const image = BRANCH_IMAGES[b.value];
@@ -1552,9 +1602,9 @@ function ProductsPanel() {
                         setBranchFilter(b.value);
                         setSubFilter("");
                       }}
-                      className="group text-start bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-200 active:scale-[0.98]"
+                      className="group text-start bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-200 active:scale-[0.98] md:shadow-none md:hover:border-[#0E6E66]/40 md:hover:shadow-md md:hover:-translate-y-0.5"
                     >
-                      <div className="relative h-24 bg-gradient-to-b from-slate-50 to-white flex items-center justify-center overflow-hidden">
+                      <div className="relative h-24 bg-gradient-to-b from-slate-50 to-white flex items-center justify-center overflow-hidden md:h-32">
                         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent" />
                         {image ? (
                           <img src={image} alt="" loading="lazy" className="h-20 w-auto object-contain relative z-10 group-hover:scale-110 transition-transform duration-300" />
@@ -1564,12 +1614,12 @@ function ProductsPanel() {
                           </span>
                         )}
                       </div>
-                      <div className="p-2.5 border-t border-slate-100">
-                        <p className="font-display font-bold text-xs leading-tight text-slate-800">
+                      <div className="p-2.5 border-t border-slate-100 md:p-3.5">
+                        <p className="font-display font-bold text-xs leading-tight text-slate-800 md:text-sm">
                           {ar ? b.ar : b.en}
                         </p>
-                        <div className="flex items-center gap-1 mt-1">
-                          <span className="text-[10px] font-semibold text-primary bg-primary/10 rounded-full px-1.5 py-0.5">
+                        <div className="flex items-center gap-1 mt-1 md:mt-2">
+                          <span className="text-[10px] font-semibold text-primary bg-primary/10 rounded-full px-1.5 py-0.5 md:text-[11px] md:text-[#0E6E66] md:bg-[#0E6E66]/10 md:px-2 md:py-1">
                             {count} {ar ? "صنف" : "items"}
                           </span>
                         </div>
@@ -1604,14 +1654,14 @@ function ProductsPanel() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-3 md:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
           {myProducts.map((p) => {
             const isOut = (p.stock ?? 0) === 0;
             return (
               <div
                 key={p.id}
                 onClick={() => setSelectedProduct(p)}
-                className="bg-card border border-border rounded-2xl p-3 shadow-soft hover:shadow-card transition relative overflow-hidden group cursor-pointer"
+                className="bg-card border border-border rounded-2xl p-3 shadow-soft hover:shadow-card transition relative overflow-hidden group cursor-pointer md:flex md:flex-col md:shadow-none md:hover:shadow-md md:hover:border-[#0E6E66]/40 md:hover:-translate-y-0.5"
               >
                 {/* Out badge */}
                 {isOut && (
@@ -1637,7 +1687,7 @@ function ProductsPanel() {
                 </p>
 
                 {/* Price */}
-                <p className="mt-1.5 font-display font-extrabold text-base text-primary">
+                <p className="mt-1.5 font-display font-extrabold text-base text-primary md:text-lg md:text-[#0E6E66]">
                   {fmtPrice(p)}
                 </p>
 
@@ -1651,7 +1701,7 @@ function ProductsPanel() {
 
                 {/* Actions */}
                 <div
-                  className="flex gap-1.5 mt-2.5 pt-2.5 border-t border-border"
+                  className="flex gap-1.5 mt-2.5 pt-2.5 border-t border-border md:mt-auto"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <button
@@ -1785,37 +1835,39 @@ function ImplantsBoneGraftPanel() {
 
   return (
     <div className="space-y-4">
-      {/* Header + Add buttons */}
-      <div className="space-y-3">
-        <div>
-          <h2 className="font-display font-bold text-sm text-foreground">
+      {/* Header + Add buttons — stacked on phones; md:+ the three actions sit
+          on one row beside the title as quieter tinted outline buttons, which
+          reads better than three saturated blocks at desktop width. */}
+      <div className="space-y-3 md:flex md:flex-wrap md:items-center md:gap-3 md:space-y-0">
+        <div className="md:me-auto">
+          <h2 className="font-display font-bold text-sm text-foreground md:text-lg">
             {ar ? "الزرعات والبون كرافت" : "Implants & Bone Graft"}
           </h2>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-[11px] text-muted-foreground md:text-xs md:mt-0.5">
             {grafts.length} {ar ? "منتج" : "products"}
           </p>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 md:contents">
           <button
             onClick={() => setShowImplant(true)}
-            className="h-12 rounded-2xl bg-sky-600 text-white font-display font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition shadow-card px-2"
+            className="h-12 rounded-2xl bg-sky-600 text-white font-display font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition shadow-card px-2 md:h-10 md:w-auto md:px-4 md:text-[13px] md:rounded-xl md:shadow-none md:bg-white md:text-sky-700 md:border md:border-sky-200 md:hover:bg-sky-50 md:hover:opacity-100"
           >
-            <Plus className="size-5 shrink-0" />
+            <Plus className="size-5 shrink-0 md:size-4" />
             {ar ? "إضافة زرعة جديدة" : "Add New Implant"}
           </button>
           <button
             onClick={() => setShowBoneGraft(true)}
-            className="h-12 rounded-2xl bg-emerald-600 text-white font-display font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition shadow-card px-2"
+            className="h-12 rounded-2xl bg-emerald-600 text-white font-display font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition shadow-card px-2 md:h-10 md:w-auto md:px-4 md:text-[13px] md:rounded-xl md:shadow-none md:bg-white md:text-emerald-700 md:border md:border-emerald-200 md:hover:bg-emerald-50 md:hover:opacity-100"
           >
-            <Plus className="size-5 shrink-0" />
+            <Plus className="size-5 shrink-0 md:size-4" />
             {ar ? "إضافة بون كرافت" : "Add Bone Graft"}
           </button>
         </div>
         <button
           onClick={() => setShowSpecialized(true)}
-          className="w-full h-12 rounded-2xl bg-indigo-600 text-white font-display font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition shadow-card"
+          className="w-full h-12 rounded-2xl bg-indigo-600 text-white font-display font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition shadow-card md:h-10 md:w-auto md:px-4 md:text-[13px] md:rounded-xl md:shadow-none md:bg-white md:text-indigo-700 md:border md:border-indigo-200 md:hover:bg-indigo-50 md:hover:opacity-100"
         >
-          <Plus className="size-5 shrink-0" />
+          <Plus className="size-5 shrink-0 md:size-4" />
           {ar ? "إضافة زرعة متخصصة" : "Add Specialized Implant"}
         </button>
       </div>
@@ -1837,14 +1889,14 @@ function ImplantsBoneGraftPanel() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-3 md:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
           {grafts.map((p) => {
             const isOut = (p.stock ?? 0) === 0;
             return (
               <div
                 key={p.id}
                 onClick={() => setSelectedProduct(p)}
-                className="bg-card border border-border rounded-2xl p-3 shadow-soft hover:shadow-card transition relative overflow-hidden group cursor-pointer"
+                className="bg-card border border-border rounded-2xl p-3 shadow-soft hover:shadow-card transition relative overflow-hidden group cursor-pointer md:flex md:flex-col md:shadow-none md:hover:shadow-md md:hover:border-[#0E6E66]/40 md:hover:-translate-y-0.5"
               >
                 {isOut && (
                   <span className="absolute top-2 end-2 text-[10px] font-bold bg-rose-100 text-rose-600 px-2 py-0.5 rounded-full z-10">
@@ -1863,7 +1915,7 @@ function ImplantsBoneGraftPanel() {
                 <p className="font-display font-bold text-sm leading-snug line-clamp-2 min-h-[2.25rem]">
                   {ar ? p.ar || p.en : p.en || p.ar}
                 </p>
-                <p className="mt-1.5 font-display font-extrabold text-base text-primary">
+                <p className="mt-1.5 font-display font-extrabold text-base text-primary md:text-lg md:text-[#0E6E66]">
                   {fmtPrice(p)}
                 </p>
                 <div className="flex items-center gap-1.5 mt-1">
@@ -1873,7 +1925,7 @@ function ImplantsBoneGraftPanel() {
                   </span>
                 </div>
                 <div
-                  className="flex gap-1.5 mt-2.5 pt-2.5 border-t border-border"
+                  className="flex gap-1.5 mt-2.5 pt-2.5 border-t border-border md:mt-auto"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <button
@@ -1935,7 +1987,6 @@ function OffersPanel({ supplierId }: { supplierId: string }) {
   const { data: offers = [], isLoading } = useOffers(supplierId);
   const upsertOffer = useUpsertOffer();
   const deleteOffer = useDeleteOffer();
-  const { user } = useUserRole();
 
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Offer | null>(null);
@@ -2023,17 +2074,22 @@ function OffersPanel({ supplierId }: { supplierId: string }) {
       {!showForm && (
         <button
           onClick={openAdd}
-          className="w-full h-14 rounded-2xl text-white font-display font-bold flex items-center justify-center gap-2 hover:opacity-95 transition shadow-lg"
-          style={{ background: "linear-gradient(to right, #2AA6D1, #4FC3E8)" }}
+          className="relative w-full h-14 rounded-2xl text-white font-display font-bold flex items-center justify-center gap-2 hover:opacity-95 transition shadow-lg md:w-auto md:h-11 md:px-5 md:text-sm md:rounded-xl md:bg-[#0E6E66] md:hover:bg-[#0B5952] md:hover:opacity-100 md:shadow-sm md:shadow-[#0E6E66]/25"
         >
-          <Plus className="size-5" />
-          <Megaphone className="size-5" />
-          {ar ? "إضافة عرض / إعلان" : "Add Offer / Ad"}
+          <span
+            className="absolute inset-0 rounded-2xl md:hidden"
+            style={{ background: "linear-gradient(to right, #2AA6D1, #4FC3E8)" }}
+          />
+          <span className="relative flex items-center justify-center gap-2">
+            <Plus className="size-5 md:size-4" />
+            <Megaphone className="size-5 md:size-4" />
+            {ar ? "إضافة عرض / إعلان" : "Add Offer / Ad"}
+          </span>
         </button>
       )}
 
       {showForm && (
-        <div className="bg-white border border-[#D3E8F7] rounded-3xl p-5 shadow-card space-y-4">
+        <div className="bg-white border border-[#D3E8F7] rounded-3xl p-5 shadow-card space-y-4 md:max-w-xl md:p-6 md:rounded-2xl md:border-slate-200 md:shadow-none">
           <div className="flex items-center justify-between">
             <h3 className="font-display font-bold text-lg text-[#1C6FB5] flex items-center gap-1.5">
               <span className="size-1.5 rounded-full bg-[#1C6FB5]" />
@@ -2178,14 +2234,14 @@ function OffersPanel({ supplierId }: { supplierId: string }) {
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-4 lg:grid-cols-3">
           {offers.map((offer) => (
             <div
               key={offer.id}
-              className="bg-card border border-border rounded-2xl p-3.5 shadow-soft"
+              className="bg-card border border-border rounded-2xl p-3.5 shadow-soft md:flex md:flex-col md:p-4 md:shadow-none md:hover:shadow-md md:hover:border-[#0E6E66]/40 md:transition"
             >
-              <div className="flex gap-3">
-                <div className="size-16 rounded-xl bg-slate-100 overflow-hidden shrink-0">
+              <div className="flex gap-3 md:flex-col md:gap-0">
+                <div className="size-16 rounded-xl bg-slate-100 overflow-hidden shrink-0 md:w-full md:h-auto md:aspect-[16/9] md:mb-3.5">
                   {offer.imageUrl && urlMap[offer.imageUrl] ? (
                     <img src={urlMap[offer.imageUrl]} alt="" className="size-full object-cover" />
                   ) : (
@@ -2195,7 +2251,7 @@ function OffersPanel({ supplierId }: { supplierId: string }) {
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-display font-bold text-sm">{offer.title}</p>
+                  <p className="font-display font-bold text-sm md:text-base">{offer.title}</p>
                   {offer.description && (
                     <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
                       {offer.description}
@@ -2209,7 +2265,7 @@ function OffersPanel({ supplierId }: { supplierId: string }) {
                   )}
                 </div>
               </div>
-              <div className="flex gap-1 mt-2.5 pt-2.5 border-t border-border">
+              <div className="flex gap-1 mt-2.5 pt-2.5 border-t border-border md:mt-auto">
                 <button
                   type="button"
                   onClick={() => handleDelete(offer)}
@@ -2249,13 +2305,13 @@ function OrdersPanel({ supplierId }: { supplierId: string }) {
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-4 lg:grid-cols-3">
       {isLoading ? (
-        <div className="flex justify-center py-20">
+        <div className="flex justify-center py-20 md:col-span-full">
           <Loader2 className="size-6 text-primary animate-spin" />
         </div>
       ) : orders.length === 0 ? (
-        <div className="py-20 flex flex-col items-center text-center text-muted-foreground">
+        <div className="py-20 flex flex-col items-center text-center text-muted-foreground md:col-span-full">
           <ClipboardList className="size-14 mb-4 opacity-20" />
           <p className="font-display font-bold text-lg text-slate-400">
             {ar ? "لا توجد طلبات بعد" : "No orders yet"}
@@ -2272,7 +2328,7 @@ function OrdersPanel({ supplierId }: { supplierId: string }) {
             <div
               key={o.id}
               onClick={() => setSelectedOrder(o)}
-              className="bg-card border border-border rounded-2xl p-4 shadow-soft cursor-pointer hover:shadow-card transition"
+              className="bg-card border border-border rounded-2xl p-4 shadow-soft cursor-pointer hover:shadow-card transition md:flex md:flex-col md:shadow-none md:hover:shadow-md md:hover:border-[#0E6E66]/40"
             >
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -2292,11 +2348,11 @@ function OrdersPanel({ supplierId }: { supplierId: string }) {
                   {ar ? meta.ar : meta.en}
                 </span>
               </div>
-              <div className="flex items-center justify-between text-xs text-slate-500">
+              <div className="flex items-center justify-between text-xs text-slate-500 md:mt-auto md:pt-3 md:border-t md:border-slate-100">
                 <span>
                   {itemCount} {ar ? "منتجات" : "products"}
                 </span>
-                <span className="font-display font-extrabold text-sm text-foreground">
+                <span className="font-display font-extrabold text-sm text-foreground md:text-base md:text-[#0E6E66]">
                   {fmtOrderTotal(o)}
                 </span>
               </div>
@@ -3265,47 +3321,10 @@ function getCityName(cityId: string, ar: boolean): string {
 function BrowseSupplies() {
   const { t, lang, dir } = useI18n();
   const Chevron = dir === "rtl" ? ChevronLeft : ChevronRight;
-  const { offices: OFFICES, branches: BRANCHES } = useAdminStore();
-  const { data: PRODUCTS = [] } = useProducts();
+  const { offices: OFFICES } = useAdminStore();
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<"default" | "rating" | "items">("default");
   const [city, setCity] = useState<string>("all");
-
-  const { data: implantCompanies = [] } = useQuery({
-    queryKey: ["supplies-implant-companies"],
-    queryFn: async (): Promise<CompanyItem[]> => {
-      try {
-        const snap = await getDocs(collection(db, "user_roles"));
-        const results: CompanyItem[] = [];
-        for (const d of snap.docs) {
-          const u = d.data() as UserRoleDoc;
-          const matchesImplant =
-            u.accountType === "implant" || (u.accountType as string) === "dental_implants";
-          if (!matchesImplant) continue;
-
-          if (!u.city) {
-            updateDoc(d.ref, { city: DEFAULT_CITY }).catch(() => {});
-          }
-
-          results.push({
-            id: u.userId,
-            name: { ar: u.name || "", en: u.name || "" },
-            category: "implants" as CompanyCategory,
-            cityId: resolveCityId(u.city || DEFAULT_CITY),
-            rating: 0,
-            itemsCount: 0,
-            area: { ar: "", en: "" },
-            route: "/profile/$accountId",
-            params: { accountId: u.userId },
-          });
-        }
-        return results;
-      } catch {
-        return [];
-      }
-    },
-    staleTime: 30000,
-  });
 
   const { data: firestoreSupplies = [] } = useQuery({
     queryKey: ["supplies-firestore-supplies"],
@@ -3388,17 +3407,18 @@ function BrowseSupplies() {
   ];
 
   return (
-    <MobileShell>
+    <MobileShell wide>
       <TopBar
         title={t("supplies")}
         showBack
+        wide
         showSearch
         searchValue={q}
         onSearchChange={setQ}
         searchPlaceholder={lang === "ar" ? "ابحث عن شركة أو مدينة…" : "Search company or city…"}
       />
-      <div className="px-4 pt-4">
-        <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 mb-2">
+      <div className="px-4 pt-4 md:px-6 md:pt-8 md:pb-12 lg:px-8 lg:max-w-5xl lg:mx-auto">
+        <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 mb-2 md:flex-wrap md:overflow-visible md:gap-2.5 md:mb-4">
           <button
             onClick={() => setCity("all")}
             className={`shrink-0 h-8 px-3 rounded-full text-xs font-semibold border transition ${
@@ -3427,7 +3447,7 @@ function BrowseSupplies() {
           })}
         </div>
 
-        <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 mb-1">
+        <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 mb-1 md:flex-wrap md:overflow-visible md:gap-2.5">
           {chips.map((c) => (
             <button
               key={c.key}
@@ -3443,29 +3463,29 @@ function BrowseSupplies() {
           ))}
         </div>
 
-        <h2 className="font-display font-bold text-base mb-3">{t("offices_title")}</h2>
+        <h2 className="font-display font-bold text-base mb-3 md:text-2xl md:mt-7 md:mb-5">{t("offices_title")}</h2>
         {filtered.length === 0 ? (
-          <div className="py-12 flex flex-col items-center text-center text-muted-foreground">
-            <SearchX className="size-8 mb-2" />
+          <div className="py-12 flex flex-col items-center text-center text-muted-foreground md:py-24 md:rounded-2xl md:border md:border-dashed md:border-border md:bg-card">
+            <SearchX className="size-8 mb-2 md:size-12 md:mb-4" />
             <p className="text-sm">{lang === "ar" ? "لا توجد نتائج" : "No results"}</p>
           </div>
         ) : (
-          <ul className="space-y-3">
+          <ul className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-4 xl:grid-cols-3">
             {filtered.map((item) => (
-              <li key={`${item.category}-${item.id}`}>
+              <li key={`${item.category}-${item.id}`} className="md:h-full">
                 <Link
                   to={item.route}
                   params={item.params}
-                  className="flex items-center gap-3 bg-card border border-border rounded-2xl p-3.5 shadow-soft hover:shadow-card transition"
+                  className="flex items-center gap-3 bg-card border border-border rounded-2xl p-3.5 shadow-soft hover:shadow-card transition md:h-full md:flex-col md:items-center md:text-center md:gap-3 md:p-6 md:shadow-none md:hover:shadow-lg md:hover:border-primary/30 md:hover:-translate-y-0.5"
                 >
-                  <span className="size-12 rounded-2xl bg-primary-soft text-primary font-display font-extrabold flex items-center justify-center text-lg">
+                  <span className="size-12 rounded-2xl bg-primary-soft text-primary font-display font-extrabold flex items-center justify-center text-lg shrink-0 md:size-16 md:text-2xl md:rounded-3xl">
                     {(lang === "ar" ? item.name.ar : item.name.en).slice(0, 1)}
                   </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-display font-bold text-foreground truncate">
+                  <div className="flex-1 min-w-0 md:flex-none md:w-full">
+                    <p className="font-display font-bold text-foreground truncate md:text-lg">
                       {lang === "ar" ? item.name.ar : item.name.en}
                     </p>
-                    <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground md:justify-center md:flex-wrap md:mt-2 md:text-sm">
                       <span className="inline-flex items-center gap-1">
                         <MapPin className="size-3" />
                         {item.area.ar
@@ -3485,7 +3505,7 @@ function BrowseSupplies() {
                       )}
                     </div>
                   </div>
-                  <Chevron className="size-4 text-muted-foreground" />
+                  <Chevron className="size-4 text-muted-foreground md:hidden" />
                 </Link>
               </li>
             ))}

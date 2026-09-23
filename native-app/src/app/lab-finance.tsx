@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import {
@@ -347,6 +347,7 @@ export default function LabFinanceScreen() {
       </View>
 
       <Modal visible={showPaymentModal} transparent animationType="fade">
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View className="flex-1 justify-end bg-black/40">
           <View className="w-full gap-4 rounded-t-3xl bg-white p-5 pb-8">
             <View className="flex-row items-center justify-between">
@@ -404,6 +405,7 @@ export default function LabFinanceScreen() {
             <Button title={ar ? 'حفظ الدفعة' : 'Save payment'} loading={saveMutation.isPending} onPress={handleAddPayment} />
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal visible={!!detailClinic} transparent animationType="fade" onRequestClose={() => setDetailClinic(null)}>

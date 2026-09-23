@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Bell, Calendar, Check, ChevronDown, Clock, Phone, User, X } from 'lucide-react-native';
 
 import { Text } from '@/components/ui';
@@ -106,6 +107,7 @@ export function AddAppointmentModal({ open, onClose }: { open: boolean; onClose:
   const ar = lang === 'ar';
   const { role } = useUserRole();
   const clinic = useClinic();
+  const insets = useSafeAreaInsets();
 
   const mainDoctor = role?.name || (ar ? 'الطبيب الرئيسي' : 'Main Doctor');
   const doctorOptions = useMemo(() => {
@@ -179,9 +181,10 @@ export function AddAppointmentModal({ open, onClose }: { open: boolean; onClose:
     : dateObj.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
 
   return (
-    <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
-      <View className="flex-1 justify-end bg-black/45">
-        <View className="max-h-[92%] overflow-hidden rounded-t-3xl">
+    <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+      <View className="flex-1 justify-start bg-black/45">
+        <View className="max-h-[92%] overflow-hidden rounded-b-3xl" style={{ paddingTop: insets.top }}>
           <GradientFill colors={SHEET_GRADIENT} />
           <View className="flex-row items-center justify-between border-b border-white/40 px-4 pb-2.5 pt-4">
             <Text className="text-base font-extrabold text-slate-900">
@@ -374,11 +377,13 @@ export function AddAppointmentModal({ open, onClose }: { open: boolean; onClose:
           </View>
         </View>
       </View>
+      </KeyboardAvoidingView>
 
       <CalendarPickerModal
         visible={showCalendar}
         onClose={() => setShowCalendar(false)}
         selectedDate={date}
+        minDate={toDateStr(new Date())}
         onSelect={(ds) => {
           setDate(ds);
           setShowCalendar(false);

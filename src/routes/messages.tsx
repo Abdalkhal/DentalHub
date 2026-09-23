@@ -122,15 +122,15 @@ function Messages() {
   const BackIcon = dir === "rtl" ? ChevronRight : ChevronLeft;
 
   return (
-    <MobileShell hideBottomNav>
-      <div className="flex h-svh flex-col">
-        <TopBar title={ar ? "الرسائل" : "Messages"} />
+    <MobileShell wide hideBottomNav>
+      <div className="flex h-svh flex-col lg:h-[calc(100svh-4rem)] lg:max-w-7xl lg:mx-auto lg:w-full">
+        <TopBar title={ar ? "الرسائل" : "Messages"} wide maxW="7xl" />
 
         <div className="flex flex-1 overflow-hidden">
           {/* Conversation list — hidden on mobile when a chat is selected */}
           <div
             className={cn(
-              "flex flex-col w-full md:w-80 md:border-e md:border-border shrink-0",
+              "flex flex-col w-full md:w-80 lg:w-96 md:border-e md:border-border shrink-0",
               selected && "hidden md:flex",
             )}
           >
@@ -181,7 +181,7 @@ function Messages() {
             {selected ? (
               <>
                 {/* Chat header */}
-                <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-card/60">
+                <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-card/60 lg:px-8 lg:py-4">
                   <button
                     onClick={() => setSelectedId(null)}
                     className="md:hidden size-9 rounded-full bg-card border border-border flex items-center justify-center text-foreground hover:bg-accent"
@@ -201,7 +201,7 @@ function Messages() {
                 </div>
 
                 {/* Messages */}
-                <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+                <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 lg:px-8 lg:py-5 lg:space-y-4">
                   {selected.messages.map((msg) => {
                     const isMe = msg.senderId === "me";
                     return (
@@ -211,7 +211,7 @@ function Messages() {
                       >
                         <div
                           className={cn(
-                            "max-w-[85%] md:max-w-[70%] rounded-2xl px-4 py-2.5 shadow-sm",
+                            "max-w-[85%] md:max-w-[70%] lg:max-w-[52%] rounded-2xl px-4 py-2.5 shadow-sm",
                             isMe
                               ? "bg-primary text-primary-foreground rounded-br-md"
                               : "bg-card border border-border rounded-bl-md",

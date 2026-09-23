@@ -36,7 +36,18 @@ const TYPE_ICONS: Record<string, typeof Package> = {
   message: CheckCircle2,
 };
 
-export function NotificationBell({ userId, dark = false }: { userId: string; dark?: boolean }) {
+export function NotificationBell({
+  userId,
+  dark = false,
+  className,
+}: {
+  userId: string;
+  dark?: boolean;
+  // Extra classes merged onto the trigger button. Used by pages whose header
+  // is dark on phones but light at md:+, so the `dark` styling can be undone
+  // at the wider breakpoints without changing it anywhere else.
+  className?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const ref = useRef<HTMLDivElement>(null);
@@ -107,6 +118,7 @@ export function NotificationBell({ userId, dark = false }: { userId: string; dar
           dark
             ? "bg-white/10 border border-white/20 text-white hover:bg-white/20"
             : "border border-slate-200 bg-white shadow-sm hover:bg-slate-100 text-slate-500",
+          className,
         )}
       >
         <Bell className="size-5" />

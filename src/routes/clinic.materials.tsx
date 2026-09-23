@@ -71,10 +71,10 @@ function MaterialsPage() {
   };
 
   return (
-    <MobileShell>
-      <TopBar title={ar ? "مواد العيادة" : "Clinic Materials"} showBack />
-      <div className="px-3 pt-3 pb-6">
-        <div className="grid grid-cols-2 gap-2.5">
+    <MobileShell wide>
+      <TopBar title={ar ? "مواد العيادة" : "Clinic Materials"} showBack wide />
+      <div className="px-3 pt-3 pb-6 md:px-6 md:pt-6 md:pb-12 lg:px-8 lg:max-w-5xl lg:mx-auto">
+        <div className="grid grid-cols-2 gap-2.5 md:gap-5">
           <Stat label={ar ? "أصناف المخزون" : "Items"} value={String(materials.length)} />
           <Stat label={ar ? "قاربت على النفاد" : "Low stock"} value={String(low)} tone="warn" />
         </div>
@@ -125,7 +125,8 @@ function MaterialsPage() {
         )}
 
 
-        <div className="mt-3 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+        <div className="md:mt-7 md:flex md:items-center md:justify-between md:gap-5">
+        <div className="mt-3 flex items-center gap-1.5 overflow-x-auto no-scrollbar md:mt-0 md:flex-wrap md:overflow-visible md:gap-2">
           {[{ id: "all", ar: "الكل", en: "All" }, ...CATS].map((c) => (
             <button
               key={c.id}
@@ -142,13 +143,14 @@ function MaterialsPage() {
 
         <button
           onClick={() => setOpen(true)}
-          className="mt-3 w-full h-12 rounded-2xl bg-primary text-primary-foreground font-display font-extrabold text-sm shadow-card flex items-center justify-center gap-2"
+          className="mt-3 w-full h-12 rounded-2xl bg-primary md:w-auto md:h-11 md:px-6 md:rounded-xl md:mt-0 md:shrink-0 text-primary-foreground font-display font-extrabold text-sm shadow-card flex items-center justify-center gap-2"
         >
           <Plus className="size-4" strokeWidth={3} />
           {ar ? "إضافة مادة" : "Add material"}
         </button>
+        </div>
 
-        <ul className="mt-3 space-y-2.5">
+        <ul className="mt-3 space-y-2.5 md:mt-6 md:space-y-0 md:grid md:grid-cols-2 md:gap-4 xl:grid-cols-3 md:items-start">
           {list.length === 0 ? (
             <EmptyState icon={Boxes} title={ar ? "لا توجد مواد بعد" : "No materials yet"} sub={ar ? "أضف أول مادة لبدء تتبع المخزون" : "Add your first material"} />
           ) : (
@@ -273,11 +275,11 @@ function MaterialModal({ ar, onClose }: { ar: boolean; onClose: () => void }) {
 
 export function Stat({ label, value, tone }: { label: string; value: string; tone?: "warn" | "good" | "bad" }) {
   return (
-    <div className="rounded-2xl bg-card border border-border p-3 shadow-soft">
-      <p className="text-[11px] text-muted-foreground">{label}</p>
+    <div className="rounded-2xl bg-card border border-border p-3 shadow-soft md:p-5 md:shadow-none">
+      <p className="text-[11px] text-muted-foreground md:text-sm">{label}</p>
       <p
         className={cn(
-          "font-display font-extrabold text-lg mt-0.5",
+          "font-display font-extrabold text-lg mt-0.5 md:text-3xl md:mt-1.5",
           tone === "warn" && "text-amber-600",
           tone === "good" && "text-emerald-600",
           tone === "bad" && "text-destructive"
@@ -291,10 +293,10 @@ export function Stat({ label, value, tone }: { label: string; value: string; ton
 
 export function EmptyState({ icon: Icon, title, sub }: { icon: React.ElementType; title: string; sub: string }) {
   return (
-    <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center">
-      <Icon className="size-8 mx-auto text-muted-foreground/50" />
-      <p className="mt-2 text-sm font-semibold">{title}</p>
-      <p className="text-[11px] text-muted-foreground mt-1">{sub}</p>
+    <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center md:col-span-full md:py-20">
+      <Icon className="size-8 mx-auto text-muted-foreground/50 md:size-14" />
+      <p className="mt-2 text-sm font-semibold md:mt-5 md:text-lg">{title}</p>
+      <p className="text-[11px] text-muted-foreground mt-1 md:text-sm md:mt-2">{sub}</p>
     </div>
   );
 }

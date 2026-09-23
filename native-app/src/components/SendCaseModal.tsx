@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Modal, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import {
   AtSign,
   Calendar,
@@ -519,6 +519,7 @@ export function SendCaseModal({ labId, labName, labPhone, labAddress, labInstagr
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={handleClose}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
       <View className="flex-1 justify-end bg-black/40">
         <View className="max-h-[92%] rounded-t-3xl bg-[#EBF3FA]">
           <View className="flex-row items-center justify-between border-b border-slate-200 px-4 pb-2.5 pt-4">
@@ -940,6 +941,7 @@ export function SendCaseModal({ labId, labName, labPhone, labAddress, labInstagr
           </View>
         </View>
       </View>
+      </KeyboardAvoidingView>
 
       <CalendarPickerModal
         visible={showReceivedCal}

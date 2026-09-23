@@ -66,9 +66,9 @@ function HelpPage() {
   }, [allFaqs, query]);
 
   return (
-    <MobileShell>
-      <TopBar title={ar ? "مركز المساعدة" : "Help center"} showBack />
-      <div className="px-4 pt-4 space-y-4">
+    <MobileShell wide>
+      <TopBar title={ar ? "مركز المساعدة" : "Help center"} showBack wide />
+      <div className="px-4 pt-4 space-y-4 md:px-6 md:pt-8 md:pb-12 md:space-y-6 lg:px-8 lg:max-w-5xl lg:mx-auto">
         <div className="relative">
           <Search className="size-4 absolute top-1/2 -translate-y-1/2 start-3.5 text-muted-foreground pointer-events-none" />
           <input
@@ -115,7 +115,7 @@ function HelpPage() {
               {ar ? "لا توجد نتائج" : "No results"}
             </p>
           ) : (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-5">
               {filteredTopics.map((t) => (
                 <Link
                   key={t.slug}

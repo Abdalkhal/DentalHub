@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { doc, setDoc, getDoc, onSnapshot } from "firebase/firestore";
+import { doc, setDoc, onSnapshot } from "firebase/firestore";
 import { db } from "@/integrations/firebase/client";
 import {
   BRANCHES as DEFAULT_BRANCHES,
@@ -52,23 +52,6 @@ function loadLocal(): AdminState | null {
       offices: parsed.offices ?? DEFAULT_STATE.offices,
       labs: parsed.labs ?? DEFAULT_STATE.labs,
     };
-  } catch {
-    return null;
-  }
-}
-
-async function loadFirestore(): Promise<AdminState | null> {
-  try {
-    const snap = await getDoc(doc(db, FIRESTORE_DOC));
-    if (snap.exists()) {
-      const data = snap.data() as AdminState;
-      return {
-        branches: data.branches ?? DEFAULT_STATE.branches,
-        offices: data.offices ?? DEFAULT_STATE.offices,
-        labs: data.labs ?? DEFAULT_STATE.labs,
-      };
-    }
-    return null;
   } catch {
     return null;
   }

@@ -125,9 +125,9 @@ function StatementPage() {
   const title = lang === "ar" ? "كشف حساب المختبر" : "Lab Statement & Ledger";
 
   return (
-    <MobileShell>
-      <TopBar title={title} showBack />
-      <div className="px-3 pt-3 pb-4 space-y-3">
+    <MobileShell wide>
+      <TopBar title={title} showBack wide maxW="5xl" />
+      <div className="px-3 pt-3 pb-4 space-y-3 md:px-6 md:pt-6 md:pb-10 md:space-y-5 lg:px-8 lg:max-w-5xl lg:mx-auto">
         {/* Header banner */}
         <div className="rounded-2xl bg-gradient-to-l from-primary to-[oklch(0.45_0.18_256)] text-primary-foreground p-4 shadow-card">
           <p className="text-[11px] font-semibold opacity-80">
@@ -142,7 +142,7 @@ function StatementPage() {
         </div>
 
         {/* Summary cards */}
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-4">
           <SummaryCard
             label={lang === "ar" ? "الإجمالي الفرعي" : "Subtotal"}
             value={`${fmt(subtotal)}`}
@@ -171,7 +171,7 @@ function StatementPage() {
 
         {/* Date range */}
         <div className="rounded-2xl bg-primary text-primary-foreground p-3 shadow-card">
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-4">
             <DateField
               label={lang === "ar" ? "من الفترة" : "From Date"}
               value={fromDate}

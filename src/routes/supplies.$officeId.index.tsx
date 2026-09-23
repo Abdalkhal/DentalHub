@@ -177,8 +177,8 @@ function OfficePage() {
 
   if (!office) {
     return (
-      <MobileShell>
-        <TopBar title={lang === "ar" ? "غير موجود" : "Not found"} showBack />
+      <MobileShell wide>
+        <TopBar title={lang === "ar" ? "غير موجود" : "Not found"} showBack wide maxW="6xl" />
         <div className="p-6 text-center text-sm text-muted-foreground">
           {lang === "ar" ? "المكتب غير موجود" : "Office not found"}
         </div>
@@ -187,10 +187,12 @@ function OfficePage() {
   }
 
   return (
-    <MobileShell>
+    <MobileShell wide>
       <TopBar
         title={lang === "ar" ? office.ar : office.en}
         showBack
+        wide
+        maxW="6xl"
         showSearch
         searchValue={q}
         onSearchChange={setQ}
@@ -204,7 +206,7 @@ function OfficePage() {
             : "Read-only mode — you cannot edit or add content"}
         </div>
       )}
-      <div className="px-4 pt-4">
+      <div className="px-4 pt-4 md:px-6 md:pt-8 md:pb-12 lg:px-8 lg:max-w-6xl lg:mx-auto">
         <p className="text-xs text-muted-foreground mb-4">
           {lang === "ar" ? office.area?.ar ?? "" : office.area?.en ?? ""}
         </p>
@@ -244,7 +246,7 @@ function OfficePage() {
             <h2 className="font-display font-bold text-base mb-3">
               {lang === "ar" ? "فروع طب الأسنان" : "Dental Specialties"}
             </h2>
-            <ul className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <ul className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6 md:gap-5 md:mb-9 lg:grid-cols-6">
               {BRANCHES.map((b) => {
                 const Badge = BRANCH_BADGE[b.slug] ?? Package;
                 const image = BRANCH_IMAGES[b.slug];
@@ -328,14 +330,14 @@ function OfficePage() {
               </span>
             </h2>
             {filteredProducts.length === 0 ? (
-              <div className="py-10 flex flex-col items-center text-center text-muted-foreground">
+              <div className="py-10 flex flex-col items-center text-center text-muted-foreground md:col-span-full md:py-24 md:rounded-2xl md:border md:border-dashed md:border-border md:bg-card">
                 <SearchX className="size-8 mb-2" />
                 <p className="text-sm">
                   {lang === "ar" ? "لا توجد منتجات مطابقة" : "No matching products"}
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-3 md:gap-5 lg:grid-cols-4 xl:grid-cols-5">
                 {filteredProducts.map((p) => {
                   const urls = p.images.map((path) => matchUrls[path]).filter(Boolean);
                   return (

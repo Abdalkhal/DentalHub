@@ -83,8 +83,8 @@ export const Route = createFileRoute("/brands/$brandId")({
     };
   },
   notFoundComponent: () => (
-    <MobileShell>
-      <TopBar title="Brand" showBack />
+    <MobileShell wide>
+      <TopBar title="Brand" showBack wide maxW="6xl" />
       <p className="p-6 text-sm text-muted-foreground text-center">هذا البراند غير موجود.</p>
     </MobileShell>
   ),
@@ -177,12 +177,12 @@ function BrandDetail() {
   const activeGovLabel = tabs.find((t) => t.id === gov)?.ar ?? "";
 
   return (
-    <MobileShell>
-      <TopBar title={lang === "ar" ? brand.ar : brand.name} showBack />
+    <MobileShell wide>
+      <TopBar title={lang === "ar" ? brand.ar : brand.name} showBack wide maxW="6xl" />
 
-      <div className="px-4 pt-4 pb-8">
+      <div className="px-4 pt-4 pb-8 md:px-6 md:pt-8 md:pb-14 lg:px-8 lg:max-w-6xl lg:mx-auto">
         {/* Banner */}
-        <section className="relative rounded-3xl bg-gradient-to-br from-primary to-[oklch(0.45_0.14_255)] text-primary-foreground p-4 shadow-card">
+        <section className="relative rounded-3xl bg-gradient-to-br from-primary to-[oklch(0.45_0.14_255)] text-primary-foreground p-4 shadow-card md:p-8 lg:rounded-[32px]">
           <FavoriteButton
             className="absolute top-3 end-3 z-10"
             size="sm"
@@ -196,19 +196,19 @@ function BrandDetail() {
               addedAt: new Date().toISOString(),
             }}
           />
-          <div className="flex items-center gap-3">
-            <span className="size-20 rounded-2xl bg-card flex items-center justify-center shadow-sm shrink-0 p-2">
+          <div className="flex items-center gap-3 md:gap-7">
+            <span className="size-20 rounded-2xl bg-card flex items-center justify-center shadow-sm shrink-0 p-2 md:size-32 md:rounded-3xl md:p-4">
               <BrandLogo brand={brand} className="w-full h-full" />
             </span>
             <div className="min-w-0">
-              <h1 className="font-display font-extrabold text-lg leading-tight">
+              <h1 className="font-display font-extrabold text-lg leading-tight md:text-4xl">
                 {lang === "ar" ? brand.ar : brand.name}
               </h1>
-              <p className="text-[12px] opacity-90 flex items-center gap-1 mt-1">
+              <p className="text-[12px] opacity-90 flex items-center gap-1 mt-1 md:text-base md:mt-2.5 md:gap-1.5">
                 <MapPin className="size-3.5" />
                 {lang === "ar" ? brand.countryAr : brand.countryEn}
               </p>
-              <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-card/95 text-foreground px-2.5 py-1 text-[11px] font-bold">
+              <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-card/95 text-foreground px-2.5 py-1 text-[11px] font-bold md:mt-4 md:text-sm md:px-4 md:py-2">
                 <BadgeCheck className="size-3.5 text-primary" />
                 {lang === "ar"
                   ? `${brand.distributors} وكيل معتمد`
@@ -219,8 +219,8 @@ function BrandDetail() {
         </section>
 
         {/* Governorate tabs */}
-        <div className="mt-4 -mx-4 px-4 overflow-x-auto">
-          <div className="flex gap-2 w-max">
+        <div className="mt-4 -mx-4 px-4 overflow-x-auto md:mt-8 md:mx-0 md:px-0 md:overflow-visible">
+          <div className="flex gap-2 w-max md:w-auto md:flex-wrap md:gap-2.5">
             {tabs.map((t) => (
               <button
                 key={t.id}
@@ -239,8 +239,8 @@ function BrandDetail() {
         </div>
 
         {/* Sort */}
-        <div className="mt-3 flex items-center gap-2">
-          <span className="text-[11px] text-muted-foreground">
+        <div className="mt-3 flex items-center gap-2 md:mt-5">
+          <span className="text-[11px] text-muted-foreground md:text-sm">
             {lang === "ar" ? "ترتيب:" : "Sort:"}
           </span>
           {(["price", "vendor"] as Sort[]).map((s) => (
@@ -267,14 +267,14 @@ function BrandDetail() {
             {lang === "ar" ? "جارٍ التحميل…" : "Loading…"}
           </p>
         ) : products.length === 0 ? (
-          <div className="py-16 text-center">
-            <Package className="size-14 mx-auto mb-3 text-muted-foreground/40" />
+          <div className="py-16 text-center md:py-28 md:mt-7 md:rounded-3xl md:border md:border-dashed md:border-border md:bg-card">
+            <Package className="size-14 mx-auto mb-3 text-muted-foreground/40 md:size-16 md:mb-5" />
             <p className="text-sm font-semibold text-muted-foreground">
               {lang === "ar" ? "لا توجد منتجات مضافة لهذا البراند حالياً." : "No products added for this brand yet."}
             </p>
           </div>
         ) : (
-          <ul className="mt-4 space-y-3">
+          <ul className="mt-4 space-y-3 md:mt-7 md:space-y-0 md:grid md:grid-cols-2 md:gap-5 xl:grid-cols-3 md:items-start">
             {products.map((p) => (
               <ProductCard key={`${p.id}-${gov}`} product={p} color={brand.color} gov={gov} activeGovLabel={activeGovLabel} />
             ))}
@@ -315,16 +315,16 @@ function ProductCard({
   const vendor = filteredVendors[safeIdx];
 
   return (
-    <li className="rounded-2xl bg-card border border-border p-3 shadow-soft">
+    <li className="rounded-2xl bg-card border border-border p-3 shadow-soft md:h-full md:p-4 md:shadow-none md:hover:shadow-lg md:hover:border-primary/30 md:transition">
       <div className="flex items-start gap-3">
         <span
-          className="size-16 rounded-xl shrink-0 flex items-center justify-center text-[10px] font-extrabold text-center px-1 leading-tight"
+          className="size-16 rounded-xl shrink-0 flex items-center justify-center text-[10px] font-extrabold text-center px-1 leading-tight md:size-20 md:text-xs"
           style={{ backgroundColor: "oklch(0.97 0.01 240)", color }}
         >
           {product.en.split(" ").slice(0, 2).join(" ")}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="font-display font-extrabold text-[13px] leading-tight">
+          <p className="font-display font-extrabold text-[13px] leading-tight md:text-base">
             {lang === "ar" ? product.ar : product.en}
           </p>
           <p className="text-[11px] text-muted-foreground">{product.en}</p>

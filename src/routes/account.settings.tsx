@@ -95,8 +95,8 @@ function SettingsPage() {
 
   if (loading) {
     return (
-      <MobileShell>
-        <TopBar title={ar ? "الإعدادات" : "Settings"} showBack />
+      <MobileShell wide>
+        <TopBar title={ar ? "الإعدادات" : "Settings"} showBack wide maxW="3xl" />
         <div className="flex justify-center py-20">
           <Loader2 className="size-8 animate-spin text-primary" />
         </div>
@@ -106,9 +106,9 @@ function SettingsPage() {
 
   if (!role) {
     return (
-      <MobileShell>
-        <TopBar title={ar ? "الإعدادات" : "Settings"} showBack />
-        <div className="p-6 text-center space-y-3">
+      <MobileShell wide>
+        <TopBar title={ar ? "الإعدادات" : "Settings"} showBack wide maxW="3xl" />
+        <div className="p-6 text-center space-y-3 md:py-24">
           <ShieldAlert className="size-10 text-destructive mx-auto" />
           <p className="font-bold text-slate-600">
             {ar ? "يجب تسجيل الدخول أولاً" : "Please sign in first"}
@@ -257,9 +257,9 @@ function SettingsPage() {
     "w-full h-11 rounded-xl border border-border bg-card px-4 text-sm font-medium placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-primary transition";
 
   return (
-    <MobileShell>
-      <TopBar title={ar ? "الإعدادات" : "Settings"} showBack />
-      <div className="px-4 pt-4 pb-6 space-y-4">
+    <MobileShell wide>
+      <TopBar title={ar ? "الإعدادات" : "Settings"} showBack wide maxW="3xl" />
+      <div className="px-4 pt-4 pb-6 space-y-4 md:px-6 md:pt-6 md:pb-12 lg:px-8 lg:max-w-3xl lg:mx-auto">
         {/* Section 1: Office Profile */}
         <section>
           <p className="text-xs font-bold text-muted-foreground mb-2 px-1">

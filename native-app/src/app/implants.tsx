@@ -47,10 +47,44 @@ export default function ImplantsScreen() {
   const ar = lang === 'ar';
   const [searchQ, setSearchQ] = useState('');
   const [showFilter, setShowFilter] = useState(false);
+
+  // Applied range — this is what actually filters the list below. The panel
+  // edits a separate draft so nothing changes while you're still adjusting
+  // it; only "تأكيد الفلترة" commits the draft here, and closing the panel
+  // without confirming just discards the draft and leaves this untouched.
   const [lenMin, setLenMin] = useState(String(LEN_BOUNDS[0]));
   const [lenMax, setLenMax] = useState(String(LEN_BOUNDS[1]));
   const [diaMin, setDiaMin] = useState(String(DIA_BOUNDS[0]));
   const [diaMax, setDiaMax] = useState(String(DIA_BOUNDS[1]));
+
+  const [draftLenMin, setDraftLenMin] = useState(lenMin);
+  const [draftLenMax, setDraftLenMax] = useState(lenMax);
+  const [draftDiaMin, setDraftDiaMin] = useState(diaMin);
+  const [draftDiaMax, setDraftDiaMax] = useState(diaMax);
+
+  const openFilter = () => {
+    setDraftLenMin(lenMin);
+    setDraftLenMax(lenMax);
+    setDraftDiaMin(diaMin);
+    setDraftDiaMax(diaMax);
+    setShowFilter(true);
+  };
+
+  const applyFilter = () => {
+    setLenMin(draftLenMin);
+    setLenMax(draftLenMax);
+    setDiaMin(draftDiaMin);
+    setDiaMax(draftDiaMax);
+    setShowFilter(false);
+  };
+
+  const clearFilter = () => {
+    setLenMin(String(LEN_BOUNDS[0]));
+    setLenMax(String(LEN_BOUNDS[1]));
+    setDiaMin(String(DIA_BOUNDS[0]));
+    setDiaMax(String(DIA_BOUNDS[1]));
+    setShowFilter(false);
+  };
 
   const { data: products = [] } = useProducts();
 
@@ -164,7 +198,7 @@ export default function ImplantsScreen() {
           className="flex-1"
         />
         <Pressable
-          onPress={() => setShowFilter((v) => !v)}
+          onPress={() => (showFilter ? setShowFilter(false) : openFilter())}
           className={cn('h-12 w-12 items-center justify-center rounded-2xl border', filterIsActive ? 'border-primary bg-primary' : 'border-slate-200 bg-white')}
         >
           <SlidersHorizontal size={18} color={filterIsActive ? '#FFFFFF' : '#64748B'} />
@@ -173,7 +207,10 @@ export default function ImplantsScreen() {
 
       {/* Simplified size filter: a plain min/max pair per dimension instead
           of four separate +/- steppers, which read as far more controls
-          than "set a range" actually needs. */}
+          than "set a range" actually needs. Edits a draft — the list below
+          only updates once "تأكيد الفلترة" is pressed, so there's a clear
+          signal filtering happened; closing without confirming discards the
+          draft and leaves the list exactly as it was. */}
       {showFilter && (
         <View className="mt-3 gap-3 rounded-2xl border border-slate-200 bg-white p-4">
           <View>
@@ -181,9 +218,9 @@ export default function ImplantsScreen() {
               {ar ? `الطول (مم) ${LEN_BOUNDS[0]}–${LEN_BOUNDS[1]}` : `Length (mm) ${LEN_BOUNDS[0]}–${LEN_BOUNDS[1]}`}
             </Text>
             <View className="flex-row items-center gap-2">
-              <Input value={lenMin} onChangeText={setLenMin} keyboardType="numeric" placeholder={ar ? 'من' : 'Min'} className="flex-1" style={{ writingDirection: 'ltr' }} />
+              <Input value={draftLenMin} onChangeText={setDraftLenMin} keyboardType="numeric" placeholder={ar ? 'من' : 'Min'} className="flex-1" style={{ writingDirection: 'ltr' }} />
               <Text className="text-slate-400">–</Text>
-              <Input value={lenMax} onChangeText={setLenMax} keyboardType="numeric" placeholder={ar ? 'إلى' : 'Max'} className="flex-1" style={{ writingDirection: 'ltr' }} />
+              <Input value={draftLenMax} onChangeText={setDraftLenMax} keyboardType="numeric" placeholder={ar ? 'إلى' : 'Max'} className="flex-1" style={{ writingDirection: 'ltr' }} />
             </View>
           </View>
           <View>
@@ -191,10 +228,18 @@ export default function ImplantsScreen() {
               {ar ? `القطر (مم) ${DIA_BOUNDS[0]}–${DIA_BOUNDS[1]}` : `Diameter (mm) ${DIA_BOUNDS[0]}–${DIA_BOUNDS[1]}`}
             </Text>
             <View className="flex-row items-center gap-2">
-              <Input value={diaMin} onChangeText={setDiaMin} keyboardType="numeric" placeholder={ar ? 'من' : 'Min'} className="flex-1" style={{ writingDirection: 'ltr' }} />
+              <Input value={draftDiaMin} onChangeText={setDraftDiaMin} keyboardType="numeric" placeholder={ar ? 'من' : 'Min'} className="flex-1" style={{ writingDirection: 'ltr' }} />
               <Text className="text-slate-400">–</Text>
-              <Input value={diaMax} onChangeText={setDiaMax} keyboardType="numeric" placeholder={ar ? 'إلى' : 'Max'} className="flex-1" style={{ writingDirection: 'ltr' }} />
+              <Input value={draftDiaMax} onChangeText={setDraftDiaMax} keyboardType="numeric" placeholder={ar ? 'إلى' : 'Max'} className="flex-1" style={{ writingDirection: 'ltr' }} />
             </View>
+          </View>
+          <View className="flex-row gap-2 pt-1">
+            <Pressable onPress={clearFilter} className="h-11 flex-1 items-center justify-center rounded-xl border border-slate-200 bg-white">
+              <Text className="text-xs font-bold text-slate-600">{ar ? 'إلغاء الفلترة' : 'Clear filter'}</Text>
+            </Pressable>
+            <Pressable onPress={applyFilter} className="h-11 flex-1 items-center justify-center rounded-xl bg-primary">
+              <Text className="text-xs font-extrabold text-primary-foreground">{ar ? 'تأكيد الفلترة' : 'Apply filter'}</Text>
+            </Pressable>
           </View>
         </View>
       )}

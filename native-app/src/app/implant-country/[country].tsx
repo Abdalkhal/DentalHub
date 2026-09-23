@@ -277,8 +277,8 @@ function ImplantDetailModal({
 
   return (
     <Modal visible transparent animationType="fade">
-      <View className="flex-1 justify-end bg-black/40">
-        <View className="w-full rounded-t-3xl bg-white" style={{ maxHeight: '88%' }}>
+      <View className="flex-1 items-center justify-center bg-black/40 p-5">
+        <View className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl" style={{ maxHeight: '85%' }}>
           <View className="flex-row items-center justify-between border-b border-slate-100 p-4">
             <Text className="text-base font-extrabold text-slate-900">{ar ? 'تفاصيل الزرعة' : 'Implant Details'}</Text>
             <View className="flex-row items-center gap-2">

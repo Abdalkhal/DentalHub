@@ -57,9 +57,9 @@ function DoctorInvoicesListInner() {
   const visibleInvoices = invoices.filter((i) => i.status !== "pending");
 
   return (
-    <MobileShell>
-      <TopBar title={ar ? "فواتير الأطباء" : "Doctor Invoices"} showBack />
-      <div className="px-4 pt-3 pb-6 space-y-4">
+    <MobileShell wide>
+      <TopBar title={ar ? "فواتير الأطباء" : "Doctor Invoices"} showBack wide />
+      <div className="px-4 pt-3 pb-6 space-y-4 md:px-6 md:pt-6 md:pb-12 lg:px-8 lg:max-w-5xl lg:mx-auto">
         {/* Counter header */}
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
@@ -81,7 +81,7 @@ function DoctorInvoicesListInner() {
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-5 xl:grid-cols-3 md:items-start">
             {visibleInvoices.map((inv) => {
               const meta = INVOICE_STATUS[inv.status];
               const count = invoiceItemCount(inv);

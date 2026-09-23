@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Trash2, TrendingDown, TrendingUp, Wallet, X } from 'lucide-react-native';
 
 import { Screen, Select, Text } from '@/components/ui';
@@ -125,6 +126,7 @@ export default function ClinicFinanceScreen() {
 }
 
 function AddTxModal({ open, onClose, ar }: { open: boolean; onClose: () => void; ar: boolean }) {
+  const insets = useSafeAreaInsets();
   const [label, setLabel] = useState('');
   const [kind, setKind] = useState<TxKind>('income');
   const [amountDisplay, setAmountDisplay] = useState('');
@@ -156,9 +158,10 @@ function AddTxModal({ open, onClose, ar }: { open: boolean; onClose: () => void;
   };
 
   return (
-    <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
-      <View className="flex-1 justify-end bg-black/40">
-        <View className="rounded-t-3xl bg-white">
+    <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+      <View className="flex-1 justify-start bg-black/40">
+        <View className="rounded-b-3xl bg-white" style={{ paddingTop: insets.top }}>
           <View className="flex-row items-center justify-between border-b border-slate-100 px-4 pb-2.5 pt-4">
             <Text className="text-base font-extrabold text-slate-900">
               {ar ? 'إضافة حركة مالية' : 'Add transaction'}
@@ -212,18 +215,16 @@ function AddTxModal({ open, onClose, ar }: { open: boolean; onClose: () => void;
               <Text className="mb-1.5 text-[11px] font-bold text-slate-500">
                 {ar ? 'المبلغ' : 'Amount'} ({ar ? 'د.ع' : 'IQD'})
               </Text>
-              <View className="relative">
+              <View className="h-11 flex-row items-center rounded-xl border border-slate-200 bg-slate-50 px-3">
                 <TextInput
                   value={amountDisplay}
                   onChangeText={(v) => setAmountDisplay(formatAmount(v))}
                   keyboardType="numeric"
                   placeholder="0"
                   placeholderTextColor="#94A3B8"
-                  className="h-11 rounded-xl border border-slate-200 bg-slate-50 pl-3 pr-12 text-right text-sm text-slate-800"
+                  className="flex-1 text-right text-sm text-slate-800"
                 />
-                <View className="absolute bottom-0 right-3 top-0 justify-center">
-                  <Text className="text-xs font-bold text-slate-400">{ar ? 'د.ع' : 'IQD'}</Text>
-                </View>
+                <Text className="ms-2 shrink-0 text-xs font-bold text-slate-400">{ar ? 'د.ع' : 'IQD'}</Text>
               </View>
             </View>
 
@@ -250,6 +251,7 @@ function AddTxModal({ open, onClose, ar }: { open: boolean; onClose: () => void;
           </ScrollView>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

@@ -37,10 +37,10 @@ function FinancePage() {
   const [open, setOpen] = useState(false);
 
   return (
-    <MobileShell>
-      <TopBar title={ar ? "المالية والحسابات" : "Finance & Accounts"} showBack />
-      <div className="px-3 pt-3 pb-6">
-        <div className="grid grid-cols-2 gap-2.5">
+    <MobileShell wide>
+      <TopBar title={ar ? "المالية والحسابات" : "Finance & Accounts"} showBack wide />
+      <div className="px-3 pt-3 pb-6 md:px-6 md:pt-6 md:pb-12 lg:px-8 lg:max-w-5xl lg:mx-auto">
+        <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4 md:gap-5">
           <Stat label={ar ? "الإيرادات" : "Revenue"} value={`${income} د.ع`} tone="good" />
           <Stat label={ar ? "المصاريف" : "Expenses"} value={`${expense} د.ع`} tone="bad" />
           <Stat label={ar ? "الصافي" : "Net"} value={`${net} د.ع`} tone={net >= 0 ? "good" : "bad"} />
@@ -49,13 +49,13 @@ function FinancePage() {
 
         <button
           onClick={() => setOpen(true)}
-          className="mt-3 w-full h-12 rounded-2xl bg-primary text-primary-foreground font-display font-extrabold text-sm shadow-card flex items-center justify-center gap-2"
+          className="mt-3 w-full h-12 rounded-2xl bg-primary md:w-fit md:h-11 md:px-6 md:rounded-xl md:mt-7 md:ms-auto text-primary-foreground font-display font-extrabold text-sm shadow-card flex items-center justify-center gap-2"
         >
           <Plus className="size-4" strokeWidth={3} />
           {ar ? "إضافة حركة مالية" : "Add transaction"}
         </button>
 
-        <ul className="mt-3 space-y-2.5">
+        <ul className="mt-3 space-y-2.5 md:mt-6 md:space-y-0 md:grid md:grid-cols-2 md:gap-4 xl:grid-cols-3 md:items-start">
           {data.transactions.length === 0 ? (
             <EmptyState icon={Wallet} title={ar ? "لا توجد حركات مالية" : "No transactions"} sub={ar ? "سجّل أول دفعة أو مصروف" : "Add your first entry"} />
           ) : (

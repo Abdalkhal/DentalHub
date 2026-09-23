@@ -150,7 +150,6 @@ function buildRevenueData(orders: OrderData[], lang: "ar" | "en") {
     const key = o.workType || "unknown";
     counts[key] = (counts[key] || 0) + 1;
   }
-  const maxCount = Math.max(...Object.values(counts), 1);
   return Object.entries(counts)
     .map(([key, value]) => ({
       name: WORK_TYPE_LABELS[key]?.[lang] ?? key,
@@ -174,7 +173,7 @@ function buildVolumeData(orders: OrderData[], lang: "ar" | "en") {
 }
 
 function Reports() {
-  const { t, lang, dir } = useI18n();
+  const { lang, dir } = useI18n();
   const ar = lang === "ar";
   const [range, setRange] = useState<Range>("30d");
 
@@ -201,11 +200,11 @@ function Reports() {
   const hasData = orders.length > 0;
 
   return (
-    <MobileShell>
-      <TopBar title={ar ? "التقارير" : "Reports"} showBack />
+    <MobileShell wide>
+      <TopBar title={ar ? "التقارير" : "Reports"} showBack wide />
 
-      <div className="px-4 pb-6 space-y-4" dir={dir}>
-        <div className="flex gap-2 bg-white border border-slate-200 rounded-2xl p-1 shadow-soft">
+      <div className="px-4 pb-6 space-y-4 md:px-6 md:pt-6 md:pb-12 lg:px-8 lg:max-w-5xl lg:mx-auto" dir={dir}>
+        <div className="flex gap-2 bg-white border border-slate-200 rounded-2xl p-1 shadow-soft md:max-w-sm">
           {RANGES.map((r) => {
             const labels: Record<Range, string> = {
               "7d": ar ? "٧ أيام" : "7 days",

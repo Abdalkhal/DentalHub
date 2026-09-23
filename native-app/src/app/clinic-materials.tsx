@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import { AlertTriangle, Boxes, Minus, Plus, Trash2, Truck, X } from 'lucide-react-native';
 
@@ -294,6 +294,7 @@ function AddMaterialSheet({ ar, onClose }: { ar: boolean; onClose: () => void })
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
       <View className="flex-1 justify-end bg-black/40">
         <View className="max-h-[92%] rounded-t-3xl bg-white">
           <View className="flex-row items-center justify-between border-b border-slate-100 px-4 pb-2.5 pt-4">
@@ -420,6 +421,7 @@ function AddMaterialSheet({ ar, onClose }: { ar: boolean; onClose: () => void })
           </ScrollView>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

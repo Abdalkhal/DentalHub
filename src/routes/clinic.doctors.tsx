@@ -29,18 +29,18 @@ function DoctorsPage() {
   const [open, setOpen] = useState(false);
 
   return (
-    <MobileShell>
-      <TopBar title={ar ? "أطباء العيادة" : "Clinic Doctors"} showBack />
-      <div className="px-3 pt-3 pb-6">
+    <MobileShell wide>
+      <TopBar title={ar ? "أطباء العيادة" : "Clinic Doctors"} showBack wide />
+      <div className="px-3 pt-3 pb-6 md:px-6 md:pt-6 md:pb-12 lg:px-8 lg:max-w-5xl lg:mx-auto">
         <button
           onClick={() => setOpen(true)}
-          className="w-full h-12 rounded-2xl bg-primary text-primary-foreground font-display font-extrabold text-sm shadow-card flex items-center justify-center gap-2"
+          className="w-full h-12 rounded-2xl bg-primary md:w-fit md:h-11 md:px-6 md:rounded-xl md:ms-auto text-primary-foreground font-display font-extrabold text-sm shadow-card flex items-center justify-center gap-2"
         >
           <Plus className="size-4" strokeWidth={3} />
           {ar ? "إضافة طبيب" : "Add doctor"}
         </button>
 
-        <ul className="mt-3 space-y-2.5">
+        <ul className="mt-3 space-y-2.5 md:mt-6 md:space-y-0 md:grid md:grid-cols-2 md:gap-4 xl:grid-cols-3 md:items-start">
           {doctors.length === 0 ? (
             <EmptyState icon={Stethoscope} title={ar ? "لا يوجد أطباء بعد" : "No doctors yet"} sub={ar ? "أضف أطباء العيادة واختصاصاتهم" : "Add clinic staff"} />
           ) : (

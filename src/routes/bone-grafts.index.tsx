@@ -54,9 +54,9 @@ function BoneGraftsPage() {
   });
 
   return (
-    <MobileShell>
-      <TopBar title={ar ? "البون كرافت" : "Bone Graft"} showBack />
-      <div className="px-4 pt-4 pb-6">
+    <MobileShell wide>
+      <TopBar title={ar ? "البون كرافت" : "Bone Graft"} showBack wide maxW="6xl" />
+      <div className="px-4 pt-4 pb-6 md:px-6 md:pt-6 md:pb-12 lg:px-8 lg:max-w-6xl lg:mx-auto">
         <p className="text-xs text-muted-foreground mb-3">
           {items.length} {ar ? "منتج بون كرافت" : "bone graft products"}
         </p>
@@ -78,7 +78,7 @@ function BoneGraftsPage() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 md:gap-5 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {items.map((p) => (
               <div
                 key={p.id}

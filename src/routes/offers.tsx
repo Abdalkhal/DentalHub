@@ -61,28 +61,28 @@ function OffersPage() {
   }, [classifieds, cat]);
 
   return (
-    <MobileShell>
-      <div className="px-3 pt-4 pb-24">
+    <MobileShell wide>
+      <div className="px-3 pt-4 pb-24 md:px-6 md:pt-8 lg:px-8 lg:max-w-6xl lg:mx-auto">
         {/* Top Tab Toggle */}
-        <div className="flex gap-1.5 mb-4">
-          <button onClick={() => setTab("products")} className={cn("flex-1 h-10 rounded-xl text-xs font-bold transition border-2", tab === "products" ? "bg-primary text-primary-foreground border-primary" : "bg-white text-slate-600 border-slate-200")}>{ar ? "عروض المنتجات والخصومات" : "Product Offers & Discounts"}</button>
-          <button onClick={() => setTab("classifieds")} className={cn("flex-1 h-10 rounded-xl text-xs font-bold transition border-2", tab === "classifieds" ? "bg-primary text-primary-foreground border-primary" : "bg-white text-slate-600 border-slate-200")}>{ar ? "الإعلانات والفرص المهنية" : "Classifieds & Opportunities"}</button>
+        <div className="flex gap-1.5 mb-4 md:gap-2 md:mb-7 md:max-w-xl md:mx-auto">
+          <button onClick={() => setTab("products")} className={cn("flex-1 h-10 rounded-xl text-xs font-bold transition border-2 md:h-12 md:text-sm md:rounded-2xl", tab === "products" ? "bg-primary text-primary-foreground border-primary" : "bg-white text-slate-600 border-slate-200")}>{ar ? "عروض المنتجات والخصومات" : "Product Offers & Discounts"}</button>
+          <button onClick={() => setTab("classifieds")} className={cn("flex-1 h-10 rounded-xl text-xs font-bold transition border-2 md:h-12 md:text-sm md:rounded-2xl", tab === "classifieds" ? "bg-primary text-primary-foreground border-primary" : "bg-white text-slate-600 border-slate-200")}>{ar ? "الإعلانات والفرص المهنية" : "Classifieds & Opportunities"}</button>
         </div>
 
         {tab === "products" ? (
           isLoading ? (
             <div className="flex justify-center py-12"><div className="size-6 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>
           ) : realOffers.length === 0 ? (
-            <div className="py-16 text-center text-slate-400">
-              <Megaphone className="size-12 mx-auto mb-3 opacity-30" />
+            <div className="py-16 text-center text-slate-400 md:py-24 md:rounded-2xl md:border md:border-dashed md:border-slate-200 md:bg-white">
+              <Megaphone className="size-12 mx-auto mb-3 opacity-30 md:size-16 md:mb-5" />
               <p className="font-semibold">{ar ? "لا توجد عروض أو خصومات متاحة حالياً" : "No offers available yet"}</p>
               <p className="text-[11px] text-slate-400 mt-1">{ar ? "ستظهر هنا عروض المكاتب والمختبرات" : "Offers from suppliers will appear here"}</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-3">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-5 xl:grid-cols-3">
               {realOffers.map((o) => (
-                <div key={o.id} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-                  <p className="font-bold text-sm">{o.title}</p>
+                <div key={o.id} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm md:p-5 md:shadow-none md:hover:shadow-lg md:hover:border-primary/30 md:transition">
+                  <p className="font-bold text-sm md:text-base">{o.title}</p>
                   {o.description && <p className="text-[11px] text-slate-500 mt-1 line-clamp-2">{o.description}</p>}
                   {o.price != null && <p className="font-extrabold text-sm text-primary mt-1.5">{fmtPrice(o.price, o.currency || "USD")}</p>}
                   {o.expiryDate && <p className="text-[10px] text-slate-400 mt-1">{ar ? "ينتهي" : "Expires"}: {o.expiryDate}</p>}
@@ -93,23 +93,25 @@ function OffersPage() {
         ) : (
           <>
             {/* Category filter chips */}
-            <div className="flex gap-1.5 overflow-x-auto pb-2 mb-3">
+            <div className="md:flex md:items-center md:justify-between md:gap-5 md:mb-6">
+            <div className="flex gap-1.5 overflow-x-auto pb-2 mb-3 md:mb-0 md:flex-wrap md:overflow-visible md:gap-2">
               {CLASSIFIED_CATS.map((c) => (
                 <button key={c.id} onClick={() => setCat(c.id)} className={cn("shrink-0 h-8 px-3 rounded-full text-[11px] font-bold border transition", cat === c.id ? "bg-primary text-primary-foreground border-primary" : "bg-white text-slate-600 border-slate-200")}>{ar ? c.ar : c.en}</button>
               ))}
             </div>
 
-            <button onClick={() => setShowForm(true)} className="w-full h-11 rounded-2xl bg-primary text-primary-foreground font-bold text-sm flex items-center justify-center gap-2 mb-3 shadow-lg">
+            <button onClick={() => setShowForm(true)} className="w-full h-11 rounded-2xl bg-primary text-primary-foreground font-bold text-sm flex items-center justify-center gap-2 mb-3 shadow-lg md:w-auto md:mb-0 md:px-6 md:rounded-xl md:shrink-0 md:shadow-sm">
               <Plus className="size-4" />{ar ? "إضافة إعلان / فرصة" : "Add Ad / Opportunity"}
             </button>
+            </div>
 
             {filtered.length === 0 ? (
-              <div className="py-12 text-center text-slate-400">
-                <Briefcase className="size-10 mx-auto mb-3 opacity-30" />
+              <div className="py-12 text-center text-slate-400 md:py-24 md:rounded-2xl md:border md:border-dashed md:border-slate-200 md:bg-white">
+                <Briefcase className="size-10 mx-auto mb-3 opacity-30 md:size-16 md:mb-5" />
                 <p className="font-semibold">{ar ? "لا توجد إعلانات" : "No classifieds yet"}</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-3">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-5 xl:grid-cols-3">
                 {filtered.map((ad) => (
                   <button
                     key={ad.id}

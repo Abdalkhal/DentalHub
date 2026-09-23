@@ -43,15 +43,15 @@ function OrdersPage() {
   const due = orders.filter((o) => o.status !== "delivered").reduce((s, o) => s + o.amount, 0);
 
   return (
-    <MobileShell>
-      <TopBar title={ar ? "طلبيات العيادة" : "Clinic Orders"} showBack />
-      <div className="px-3 pt-3 pb-6">
-        <div className="grid grid-cols-2 gap-2.5">
+    <MobileShell wide>
+      <TopBar title={ar ? "طلبيات العيادة" : "Clinic Orders"} showBack wide />
+      <div className="px-3 pt-3 pb-6 md:px-6 md:pt-6 md:pb-12 lg:px-8 lg:max-w-5xl lg:mx-auto">
+        <div className="grid grid-cols-2 gap-2.5 md:gap-5">
           <Stat label={ar ? "طلبات مفتوحة" : "Open orders"} value={String(openCount)} tone="warn" />
           <Stat label={ar ? "مبالغ مستحقة" : "Due amount"} value={fmtIQD(due)} tone="bad" />
         </div>
 
-        <div className="mt-3 flex items-center gap-1.5">
+        <div className="mt-3 flex items-center gap-1.5 md:mt-7 md:gap-2 md:flex-wrap">
           {(["all", "lab", "supply"] as const).map((k) => (
             <button key={k} onClick={() => setTab(k)}
               className={cn("h-8 px-3 rounded-full text-[11px] font-bold border transition", tab === k ? "bg-primary text-primary-foreground border-primary" : "bg-card text-muted-foreground border-border")}>
@@ -60,9 +60,9 @@ function OrdersPage() {
           ))}
         </div>
 
-        <ul className="mt-3 space-y-2.5">
+        <ul className="mt-3 space-y-2.5 md:mt-6 md:space-y-0 md:grid md:grid-cols-2 md:gap-4 xl:grid-cols-3 md:items-start">
           {orders.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center">
+            <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center md:col-span-full md:py-20">
               <ClipboardList className="size-8 mx-auto text-muted-foreground/50" />
               <p className="mt-2 text-sm font-semibold">{ar ? "لا توجد طلبيات مسجلة حالياً" : "No orders registered yet"}</p>
               <p className="text-[11px] text-muted-foreground mt-1">
@@ -70,7 +70,7 @@ function OrdersPage() {
               </p>
             </div>
           ) : list.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center">
+            <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center md:col-span-full md:py-20">
               <ClipboardList className="size-8 mx-auto text-muted-foreground/50" />
               <p className="mt-2 text-sm font-semibold">{ar ? "لا توجد طلبيات في هذه الفئة" : "No orders in this category"}</p>
             </div>

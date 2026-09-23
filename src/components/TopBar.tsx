@@ -11,7 +11,23 @@ type Props = {
   searchValue?: string;
   onSearchChange?: (v: string) => void;
   searchPlaceholder?: string;
+  // Set on pages that pass `wide` to MobileShell. Those pages get a fixed
+  // 64px top nav at lg:+, so this header has to stick below it instead of
+  // sliding underneath. Defaults to false, leaving every other page as-is.
+  wide?: boolean;
+  // Must match the page's own content column, or the title sits on a
+  // different edge than the content beneath it. Only read when `wide`.
+  maxW?: keyof typeof MAX_W;
 };
+
+// Written out in full so Tailwind's scanner sees each class literally.
+const MAX_W = {
+  "3xl": "md:max-w-3xl",
+  "4xl": "md:max-w-4xl",
+  "5xl": "md:max-w-5xl",
+  "6xl": "md:max-w-6xl",
+  "7xl": "md:max-w-7xl",
+} as const;
 
 export function TopBar({
   title,
@@ -21,6 +37,8 @@ export function TopBar({
   searchValue,
   onSearchChange,
   searchPlaceholder,
+  wide = false,
+  maxW = "5xl",
 }: Props) {
   const { t, lang, toggle, dir } = useI18n();
   const router = useRouter();
@@ -30,12 +48,21 @@ export function TopBar({
     <header
       className={cn(
         "sticky top-0 z-20 px-4 pt-5 pb-4",
+        wide && "lg:top-16",
         variant === "home"
           ? "bg-gradient-to-b from-primary-soft/70 to-transparent"
           : "bg-background/90 backdrop-blur border-b border-border",
       )}
     >
-      <div className="flex items-center justify-between gap-3">
+      {/* On wide pages the bar itself stays full-bleed, but its contents line
+          up with the page column below it — otherwise the title floats alone
+          at the far edge of an empty white band. */}
+      <div
+        className={cn(
+          "flex items-center justify-between gap-3",
+          wide && cn(MAX_W[maxW], "md:mx-auto md:w-full"),
+        )}
+      >
         <div className="flex items-center gap-2 min-w-0">
           {showBack && (
             <button
@@ -52,7 +79,9 @@ export function TopBar({
               <span className="text-primary">Hub</span>
             </Link>
           ) : (
-            <h1 className="font-display font-bold text-base truncate">{title}</h1>
+            <h1 className={cn("font-display font-bold text-base truncate", wide && "md:text-2xl")}>
+              {title}
+            </h1>
           )}
         </div>
 

@@ -441,7 +441,7 @@ export function LabRxFormModal({
     return (
       <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-        <div className="relative w-full max-w-md bg-[#EBF3FA] rounded-t-3xl sm:rounded-3xl p-6 pb-8 shadow-2xl animate-in slide-in-from-bottom">
+        <div className="relative w-full max-w-md md:max-w-3xl bg-[#EBF3FA] rounded-t-3xl sm:rounded-3xl p-6 pb-8 shadow-2xl animate-in slide-in-from-bottom">
           <div className="text-center space-y-3">
             <div className="size-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto">
               <Send className="size-8 text-emerald-600" />
@@ -469,7 +469,7 @@ export function LabRxFormModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-[#EBF3FA] rounded-t-3xl sm:rounded-3xl shadow-2xl animate-in slide-in-from-bottom max-h-[92vh] overflow-y-auto overflow-x-hidden">
+      <div className="relative w-full max-w-md md:max-w-3xl bg-[#EBF3FA] rounded-t-3xl sm:rounded-3xl shadow-2xl animate-in slide-in-from-bottom max-h-[92vh] overflow-y-auto overflow-x-hidden">
         {/* Header */}
         <div className="sticky top-0 z-10 bg-[#EBF3FA]/95 backdrop-blur border-b border-slate-200 px-5 py-3 flex items-center justify-between gap-3">
           <div className="min-w-0">

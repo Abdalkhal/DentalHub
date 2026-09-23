@@ -1,5 +1,6 @@
-import { Tabs, Redirect } from 'expo-router';
-import { Home, Heart, Menu, Search, ShoppingBag, Tag, User } from 'lucide-react-native';
+import { Pressable } from 'react-native';
+import { Tabs, Redirect, router } from 'expo-router';
+import { ArrowLeft, ArrowRight, Home, Heart, Menu, Search, ShoppingBag, Tag, User } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 
 import { useUserRole } from '@/lib/useAuth';
@@ -40,6 +41,34 @@ const LABELS: Record<(typeof ALL_NAMES)[number], { ar: string; en: string }> = {
 
 const DENTIST_TABS: readonly (typeof ALL_NAMES)[number][] = ['index', 'favorites', 'orders', 'offers', 'more'];
 const VENDOR_TABS: readonly (typeof ALL_NAMES)[number][] = ['index', 'explore', 'orders', 'account', 'more'];
+
+// Unlike stack screens, tabs never get an automatic back button — but these
+// two are usually reached via a push (e.g. from the account menu) rather
+// than a tab tap, so they need one added manually to get back where the
+// user came from.
+const BACK_BUTTON_TABS = new Set<(typeof ALL_NAMES)[number]>(['favorites', 'offers']);
+
+function HeaderBack() {
+  const { lang } = useI18n();
+  const Arrow = lang === 'ar' ? ArrowRight : ArrowLeft;
+  return (
+    <Pressable
+      onPress={() => {
+        // `router.back()` inside a tab navigator has no real push history to
+        // pop when this tab was reached by tapping it in the bottom bar (its
+        // normal, primary way in for dentists) — it was landing on the home
+        // tab instead of wherever the user actually came from. Only pop when
+        // there's genuine history (e.g. pushed here from the account menu);
+        // otherwise land on Account, a real screen rather than home.
+        if (router.canGoBack()) router.back();
+        else router.push('/account');
+      }}
+      className="ms-3 h-8 w-8 items-center justify-center"
+    >
+      <Arrow size={22} color="#0F172A" />
+    </Pressable>
+  );
+}
 
 export default function AppTabs() {
   const { lang } = useI18n();
@@ -100,6 +129,7 @@ export default function AppTabs() {
                   ? {
                       title: ar ? label.ar : label.en,
                       headerShown: name !== 'index',
+                      headerLeft: BACK_BUTTON_TABS.has(name) ? () => <HeaderBack /> : undefined,
                       tabBarIcon: ({ color, size }) => <Icon color={color} size={size} strokeWidth={2.2} />,
                       tabBarBadge: name === 'orders' && ordersCount > 0 ? ordersCount : undefined,
                       tabBarBadgeStyle: { backgroundColor: '#EF4444', color: '#FFFFFF', fontSize: 10 },

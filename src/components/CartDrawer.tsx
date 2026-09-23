@@ -199,10 +199,10 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-100 overflow-y-auto mx-auto w-full max-w-md">
+    <div className="fixed inset-0 z-50 bg-slate-100 overflow-y-auto mx-auto w-full max-w-md lg:max-w-3xl">
       {/* Sticky top bar */}
       <div className="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-slate-200">
-        <div className="max-w-md mx-auto flex items-center justify-between px-4 h-14">
+        <div className="max-w-md lg:max-w-3xl mx-auto flex items-center justify-between px-4 h-14">
           <div className="flex items-center gap-2.5">
             <span className="size-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${TEAL}14`, color: TEAL }}>
               <ShoppingCart className="size-5" />
@@ -224,7 +224,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
       </div>
 
       {cart.length === 0 ? (
-        <div className="max-w-md mx-auto flex flex-col items-center justify-center py-24 text-center px-6">
+        <div className="max-w-md lg:max-w-3xl mx-auto flex flex-col items-center justify-center py-24 text-center px-6">
           <div className="size-20 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: `${TEAL}14` }}>
             <ShoppingCart className="size-9" style={{ color: TEAL }} />
           </div>
@@ -246,7 +246,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
         </div>
       ) : (
         <>
-          <div id="cart-invoice" className="max-w-md mx-auto px-4 py-4 space-y-4 pb-40">
+          <div id="cart-invoice" className="max-w-md lg:max-w-3xl mx-auto px-4 py-4 space-y-4 pb-40">
             {/* Invoice header */}
             <div className="rounded-3xl p-5 text-white shadow-lg relative overflow-hidden" style={{ background: `linear-gradient(135deg, ${TEAL}, #0B5952)` }}>
               <div className="absolute -top-12 -end-12 size-40 rounded-full bg-white/10 blur-2xl" />
@@ -443,8 +443,8 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
 
       {/* Sticky bottom actions */}
       {cart.length > 0 && (
-        <div className="fixed bottom-0 inset-x-0 z-20 bg-white border-t border-slate-200 mx-auto w-full max-w-md">
-          <div className="max-w-md mx-auto px-4 py-3 flex items-center gap-2">
+        <div className="fixed bottom-0 inset-x-0 z-20 bg-white border-t border-slate-200 mx-auto w-full max-w-md lg:max-w-3xl">
+          <div className="max-w-md lg:max-w-3xl mx-auto px-4 py-3 flex items-center gap-2">
             <button
               onClick={handleShare}
               className="h-12 px-4 rounded-xl border border-slate-200 text-slate-600 font-bold text-sm flex items-center gap-2 hover:bg-slate-50 transition"

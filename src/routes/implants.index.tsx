@@ -50,6 +50,8 @@ import {
   ChevronRight,
   Check,
   Ruler,
+  Bone,
+  Sparkles,
 } from "lucide-react";
 import specializedImplantImg from "@/assets/spetialized_implant.jpg";
 
@@ -63,8 +65,8 @@ function ImplantsIndex() {
 
   if (roleLoading) {
     return (
-      <MobileShell>
-        <TopBar title="" />
+      <MobileShell wide>
+        <TopBar title="" wide />
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="size-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
@@ -111,47 +113,64 @@ function ImplantCompanyDashboard() {
 
   const mapsUrl = getMapsUrl(role ?? {});
 
+  const { data: allProducts = [] } = useProducts();
+  const productsCount = allProducts.filter(
+    (p) =>
+      (p.category === "implant" ||
+        p.category === "surgical_kit" ||
+        p.category === "specialized_implant" ||
+        p.branch === "bone_graft") &&
+      p.companyId === companyId,
+  ).length;
+  const { data: orders = [] } = useOrders(companyId);
+  const { data: offers = [] } = useOffers(companyId);
+
   return (
-    <MobileShell>
-      <div className="min-h-full">
-        <div className="px-4 pt-4 pb-2">
+    <MobileShell wide>
+      <div className="min-h-full md:max-w-6xl md:mx-auto">
+        <div className="px-4 pt-4 pb-2 md:px-0 md:pt-10 md:pb-0">
           <div
-          className="rounded-3xl shadow-lg text-white"
-          style={{ background: "linear-gradient(135deg, #0F172A, #1E40AF)" }}
+          className="rounded-3xl shadow-lg text-white md:rounded-[28px] md:shadow-none md:border md:border-border md:bg-card md:text-foreground"
+          style={{ background: "#0F172A" }}
           >
-            <div className="p-4 space-y-3">
-              <div className="flex items-center justify-between gap-3">
+            <div className="p-4 space-y-3 md:p-7 md:flex md:items-center md:justify-between md:gap-8 md:space-y-0">
+              <div className="flex items-center justify-between gap-3 md:contents">
                 <Link
                   to="/account"
-                  className="flex items-center gap-3 min-w-0 cursor-pointer hover:opacity-80 transition"
+                  className="flex items-center gap-3 min-w-0 cursor-pointer hover:opacity-80 transition md:hover:opacity-100 md:gap-4"
                 >
-                  <div className="size-12 rounded-full bg-white/10 ring-2 ring-white/25 flex items-center justify-center overflow-hidden shrink-0">
+                  <div className="size-12 rounded-full bg-white/10 ring-2 ring-white/25 flex items-center justify-center overflow-hidden shrink-0 md:size-16 md:ring-4 md:ring-primary/15 md:bg-primary/10">
                     {role?.photoURL ? (
                       <img src={role.photoURL} alt="" className="size-full object-cover" />
                     ) : (
-                      <UserCircle2 className="size-7 text-white/80" />
+                      <UserCircle2 className="size-7 text-white/80 md:size-9 md:text-primary" />
                     )}
                   </div>
                   <div className="min-w-0">
-                    <p className="font-display font-bold text-sm text-white truncate">
-                      {role?.name || (ar ? "المستخدم" : "User")}
-                    </p>
-                    <p className="text-[11px] text-white/70 truncate">
+                    <div className="flex items-center gap-2.5">
+                      <p className="font-display font-bold text-sm text-white truncate md:text-2xl md:text-foreground">
+                        {role?.name || (ar ? "المستخدم" : "User")}
+                      </p>
+                      <span className="hidden md:inline-flex items-center text-[11px] font-bold px-2.5 py-1 rounded-full bg-primary/10 text-primary">
+                        {ar ? "شركة زرعات" : "Implant Company"}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-white/70 truncate md:hidden">
                       {ar ? "شركة زرعات" : "Implant Company"}
                     </p>
-                    <p className="text-[11px] text-white/70 flex items-center gap-1 mt-0.5 truncate">
-                      <Phone className="size-3 shrink-0" />
+                    <p className="text-[11px] text-white/70 flex items-center gap-1 mt-0.5 truncate md:text-sm md:text-muted-foreground md:mt-1.5">
+                      <Phone className="size-3 shrink-0 md:size-3.5" />
                       {role?.phone || (ar ? "لم يتم إضافة رقم هاتف" : "No phone number added")}
                     </p>
                   </div>
                 </Link>
 
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-2 shrink-0 md:order-last">
                   <NotificationBell userId={companyId} dark />
                   <button
                     type="button"
                     onClick={toggle}
-                    className="px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-white/90 hover:bg-white/20 text-xs font-bold transition"
+                    className="px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-white/90 hover:bg-white/20 text-xs font-bold transition md:bg-muted md:border-border md:text-foreground md:hover:bg-accent"
                   >
                     {lang === "ar" ? "EN" : "AR"}
                   </button>
@@ -165,14 +184,14 @@ function ImplantCompanyDashboard() {
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
-                  className="text-[11px] text-white/70 flex items-center gap-1 ps-[60px] pt-3 border-t border-white/15 hover:text-white transition-colors cursor-pointer z-50 pointer-events-auto"
+                  className="text-[11px] text-white/70 flex items-center gap-1 ps-[60px] pt-3 border-t border-white/15 hover:text-white transition-colors cursor-pointer z-50 pointer-events-auto md:ps-0 md:pt-0 md:border-t-0 md:text-sm md:text-muted-foreground md:hover:text-primary md:shrink-0"
                 >
-                  <MapPin className="size-3 shrink-0" />
+                  <MapPin className="size-3 shrink-0 md:size-3.5" />
                   {role?.address || (ar ? "عرض الموقع على الخريطة" : "View on map")}
                 </a>
               ) : (
-                <p className="text-[11px] text-white/70 flex items-center gap-1 ps-[60px] pt-3 border-t border-white/15">
-                  <MapPin className="size-3 shrink-0" />
+                <p className="text-[11px] text-white/70 flex items-center gap-1 ps-[60px] pt-3 border-t border-white/15 md:ps-0 md:pt-0 md:border-t-0 md:text-sm md:text-muted-foreground md:shrink-0">
+                  <MapPin className="size-3 shrink-0 md:size-3.5" />
                   {ar ? "لم يتم تحديد العنوان بعد" : "No address set yet"}
                 </p>
               )}
@@ -180,8 +199,29 @@ function ImplantCompanyDashboard() {
           </div>
         </div>
 
-        <div className="px-4">
-          <div className="flex bg-slate-100 rounded-2xl p-1 mt-2">
+        <div className="px-4 md:px-0 grid grid-cols-3 gap-2 mt-4 md:gap-4 md:mt-8">
+          {[
+            { key: "products" as const, value: productsCount, ar: "المنتجات", en: "Products", icon: Package, tint: "bg-blue-50 text-blue-600" },
+            { key: "orders" as const, value: orders.length, ar: "الطلبات", en: "Orders", icon: ClipboardList, tint: "bg-amber-50 text-amber-600" },
+            { key: "offers" as const, value: offers.length, ar: "العروض", en: "Offers", icon: Megaphone, tint: "bg-violet-50 text-violet-600" },
+          ].map((stat) => (
+            <div
+              key={stat.key}
+              className="bg-card border border-border rounded-xl p-2.5 text-center md:rounded-2xl md:p-5 md:text-start md:flex md:items-center md:gap-4"
+            >
+              <span className={cn("hidden md:flex size-12 rounded-xl items-center justify-center shrink-0", stat.tint)}>
+                <stat.icon className="size-6" />
+              </span>
+              <span>
+                <p className="font-display font-bold text-lg md:text-3xl">{stat.value}</p>
+                <p className="text-[11px] md:text-sm text-muted-foreground mt-0.5 md:mt-0.5">{ar ? stat.ar : stat.en}</p>
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div className="px-4 md:px-0">
+          <div className="flex bg-slate-100 rounded-2xl p-1 mt-2 md:bg-transparent md:rounded-none md:p-0 md:mt-8 md:border-b md:border-border md:gap-6">
             {[
               { key: "products" as const, ar: "المنتجات", en: "Products", icon: Package },
               { key: "offers" as const, ar: "العروض", en: "Offers", icon: Megaphone },
@@ -193,9 +233,10 @@ function ImplantCompanyDashboard() {
                 onClick={() => setActiveTab(tab.key)}
                 className={cn(
                   "flex-1 h-11 rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 transition-all",
+                  "md:flex-none md:h-auto md:rounded-none md:pb-3 md:border-b-2 md:border-transparent",
                   activeTab === tab.key
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-500 hover:text-slate-700",
+                    ? "bg-white text-slate-900 shadow-sm md:bg-transparent md:shadow-none md:text-primary md:border-primary"
+                    : "text-slate-500 hover:text-slate-700 md:hover:border-border",
                 )}
               >
                 <tab.icon className="size-4" />
@@ -205,7 +246,7 @@ function ImplantCompanyDashboard() {
           </div>
         </div>
 
-        <div className="px-4 pt-4 pb-6">
+        <div className="px-4 md:px-0 pt-4 pb-6 md:pt-6">
           {activeTab === "products" && <ImplantProductsPanel />}
           {activeTab === "offers" && <OffersPanel companyId={companyId} />}
           {activeTab === "orders" && <ImplantOrdersPanel companyId={companyId} />}
@@ -323,6 +364,7 @@ function ImplantProductsPanel() {
   const [showBoneGraft, setShowBoneGraft] = useState(false);
   const [showImplantForm, setShowImplantForm] = useState(false);
   const [showSpecialized, setShowSpecialized] = useState(false);
+  const [showAddMenu, setShowAddMenu] = useState(false);
   const [editingImplant, setEditingImplant] = useState<Product | null>(null);
   const [editingSpecialized, setEditingSpecialized] = useState<Product | null>(null);
   const [editingGraft, setEditingGraft] = useState<Product | null>(null);
@@ -379,29 +421,55 @@ function ImplantProductsPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-bold text-slate-600 md:text-base">
+          {ar ? "منتجاتك" : "Your products"} ({implantProducts.length})
+        </p>
+        <button
+          type="button"
+          onClick={() => setShowAddMenu((v) => !v)}
+          className="size-9 rounded-xl bg-primary text-primary-foreground flex items-center justify-center hover:opacity-90 transition shrink-0 md:w-auto md:h-10 md:px-4 md:gap-2"
+          aria-label={ar ? "إضافة منتج" : "Add product"}
+        >
+          <Plus className="size-4" />
+          <span className="hidden md:inline text-sm font-bold">{ar ? "إضافة منتج" : "Add product"}</span>
+        </button>
+      </div>
+
+      {showAddMenu && (
+        <div className="grid grid-cols-3 gap-2 md:max-w-md md:gap-3">
           <button
-            onClick={openAdd}
-            className="h-14 rounded-2xl bg-primary text-primary-foreground font-display font-bold flex items-center justify-center gap-2 hover:opacity-90 transition shadow-card"
+            onClick={() => {
+              openAdd();
+              setShowAddMenu(false);
+            }}
+            className="h-16 rounded-xl border border-border bg-card flex flex-col items-center justify-center gap-1 hover:bg-slate-50 transition md:h-20 md:hover:border-primary/40"
           >
-            <Plus className="size-5" />
-            {ar ? "إضافة زرعة جديدة" : "Add New Implant"}
+            <Package className="size-4 text-primary md:size-5" />
+            <span className="text-[10px] font-semibold md:text-xs">{ar ? "زرعة جديدة" : "New implant"}</span>
           </button>
           <button
-            onClick={() => setShowBoneGraft(true)}
-            className="h-14 rounded-2xl bg-emerald-600 text-white font-display font-bold flex items-center justify-center gap-2 hover:opacity-90 transition shadow-card"
+            onClick={() => {
+              setShowBoneGraft(true);
+              setShowAddMenu(false);
+            }}
+            className="h-16 rounded-xl border border-border bg-card flex flex-col items-center justify-center gap-1 hover:bg-slate-50 transition md:h-20 md:hover:border-emerald-400/50"
           >
-            <Plus className="size-5" />
-            {ar ? "إضافة بون كرافت" : "Add Bone Graft"}
+            <Bone className="size-4 text-emerald-600 md:size-5" />
+            <span className="text-[10px] font-semibold md:text-xs">{ar ? "بون كرافت" : "Bone graft"}</span>
+          </button>
+          <button
+            onClick={() => {
+              setShowSpecialized(true);
+              setShowAddMenu(false);
+            }}
+            className="h-16 rounded-xl border border-border bg-card flex flex-col items-center justify-center gap-1 hover:bg-slate-50 transition md:h-20 md:hover:border-indigo-400/50"
+          >
+            <Sparkles className="size-4 text-indigo-600 md:size-5" />
+            <span className="text-[10px] font-semibold md:text-xs">{ar ? "زرعة متخصصة" : "Specialized"}</span>
           </button>
         </div>
-        <button
-          onClick={() => setShowSpecialized(true)}
-          className="w-full h-13 min-h-12 rounded-2xl bg-indigo-600 text-white font-display font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition shadow-card"
-        >
-          <Plus className="size-5 shrink-0" />
-          {ar ? "إضافة زرعة متخصصة" : "Add Specialized Implant"}
-        </button>
+      )}
 
       {isLoading ? (
           <div className="flex items-center justify-center py-20">
@@ -420,7 +488,7 @@ function ImplantProductsPanel() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 xl:grid-cols-4">
             {groupedProducts.map((product) => (
               <div key={product.id}>
                 <div
@@ -429,7 +497,7 @@ function ImplantProductsPanel() {
                       ? setShowGraftDetails(product)
                       : setSelectedProduct(product)
                   }
-                  className="bg-card border border-border rounded-2xl p-3.5 shadow-soft hover:shadow-card transition relative overflow-hidden group cursor-pointer"
+                  className="bg-card border border-border rounded-2xl p-3.5 shadow-soft hover:shadow-card transition relative overflow-hidden group cursor-pointer md:p-4 md:hover:-translate-y-0.5"
                 >
                   {product.images.length > 0 && imageUrlMap[product.images[0]] ? (
                     <div className="w-full aspect-[4/3] rounded-xl bg-slate-100 overflow-hidden mb-2.5">
@@ -520,17 +588,18 @@ function ImplantProductsPanel() {
                           openEdit(product);
                         }
                       }}
-                      className="flex-1 h-8 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-sky-100 hover:text-sky-600 flex items-center justify-center gap-1 transition"
+                      aria-label={ar ? "تعديل" : "Edit"}
+                      className="flex-1 h-7 rounded-lg bg-slate-100 hover:bg-sky-100 hover:text-sky-600 flex items-center justify-center transition"
                     >
-                      <Pencil className="size-3" />
-                      {ar ? "تعديل" : "Edit"}
+                      <Pencil className="size-3.5" />
                     </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         handleDelete(product);
                       }}
-                      className="w-8 h-8 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-rose-100 hover:text-rose-600 flex items-center justify-center transition"
+                      aria-label={ar ? "حذف" : "Delete"}
+                      className="flex-1 h-7 rounded-lg bg-slate-100 hover:bg-rose-100 hover:text-rose-600 flex items-center justify-center transition"
                     >
                       <Trash2 className="size-3.5" />
                     </button>
@@ -1025,7 +1094,7 @@ function OffersPanel({ companyId }: { companyId: string }) {
   const deleteOffer = useDeleteOffer();
 
   const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<Offer | null>(null);
+  const [editing] = useState<Offer | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [expiryDate, setExpiryDate] = useState("");
@@ -1035,19 +1104,6 @@ function OffersPanel({ companyId }: { companyId: string }) {
   const [imagePreview, setImagePreview] = useState("");
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState("");
-
-  const openAdd = () => {
-    setEditing(null);
-    setTitle("");
-    setDescription("");
-    setExpiryDate("");
-    setPrice("");
-    setCurrency("USD");
-    setImageFile(null);
-    setImagePreview("");
-    setFormError("");
-    setShowForm(true);
-  };
 
   const handleFile = (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -1111,19 +1167,8 @@ function OffersPanel({ companyId }: { companyId: string }) {
 
   return (
     <>
-      {!showForm && (
-        <button
-          onClick={openAdd}
-          className="w-full h-14 rounded-2xl bg-primary text-primary-foreground font-display font-bold flex items-center justify-center gap-2 hover:opacity-90 transition shadow-card"
-        >
-          <Plus className="size-5" />
-          <Megaphone className="size-5" />
-          {ar ? "إضافة عرض / إعلان" : "Add Offer / Ad"}
-        </button>
-      )}
-
       {showForm && (
-        <div className="bg-card border border-border rounded-3xl p-5 shadow-card space-y-4">
+        <div className="bg-card border border-border rounded-3xl p-5 shadow-card space-y-4 md:max-w-xl md:p-7">
           <div className="flex items-center justify-between">
             <h3 className="font-display font-bold text-lg">
               {editing ? (ar ? "تعديل عرض" : "Edit offer") : ar ? "عرض جديد" : "New offer"}
@@ -1303,30 +1348,30 @@ function OffersPanel({ companyId }: { companyId: string }) {
         </div>
       ) : offers.length === 0 ? (
         <div className="py-20 flex flex-col items-center text-center text-muted-foreground">
-          <Megaphone className="size-14 mb-4 opacity-20" />
-          <p className="font-display font-bold text-lg text-slate-400">
+          <Megaphone className="size-14 mb-4 opacity-20 md:size-16" />
+          <p className="font-display font-bold text-lg text-slate-400 md:text-xl">
             {ar ? "لا توجد عروض بعد" : "No offers yet"}
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-4 xl:grid-cols-3">
           {offers.map((offer) => (
             <div
               key={offer.id}
-              className="bg-card border border-border rounded-2xl p-3.5 shadow-soft"
+              className="bg-card border border-border rounded-2xl p-3.5 shadow-soft md:p-4 md:flex md:flex-col"
             >
-              <div className="flex gap-3">
-                <div className="size-16 rounded-xl bg-slate-100 overflow-hidden shrink-0">
+              <div className="flex gap-3 md:flex-col md:gap-0">
+                <div className="size-16 rounded-xl bg-slate-100 overflow-hidden shrink-0 md:size-full md:aspect-[16/9] md:mb-3">
                   {offer.imageUrl && urlMap[offer.imageUrl] ? (
                     <img src={urlMap[offer.imageUrl]} alt="" className="size-full object-cover" />
                   ) : (
                     <div className="size-full flex items-center justify-center">
-                      <Megaphone className="size-6 text-slate-300" />
+                      <Megaphone className="size-6 text-slate-300 md:size-8" />
                     </div>
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-display font-bold text-sm">{offer.title}</p>
+                  <p className="font-display font-bold text-sm md:text-base">{offer.title}</p>
                   {offer.description && (
                     <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
                       {offer.description}
@@ -1349,11 +1394,11 @@ function OffersPanel({ companyId }: { companyId: string }) {
                   )}
                 </div>
               </div>
-              <div className="flex gap-1 mt-2.5 pt-2.5 border-t border-border">
+              <div className="flex gap-1 mt-2.5 pt-2.5 border-t border-border md:mt-auto">
                 <button
                   type="button"
                   onClick={() => handleDelete(offer)}
-                  className="flex-1 h-8 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-rose-100 hover:text-rose-600 flex items-center justify-center gap-1 transition"
+                  className="flex-1 h-8 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-rose-100 hover:text-rose-600 flex items-center justify-center gap-1 transition md:h-9"
                 >
                   <Trash2 className="size-3" />
                   {ar ? "حذف" : "Delete"}
@@ -1429,8 +1474,8 @@ function ImplantOrdersPanel({ companyId }: { companyId: string }) {
   if (orders.length === 0) {
     return (
       <div className="py-20 flex flex-col items-center text-center text-muted-foreground">
-        <ClipboardList className="size-14 mb-4 opacity-20" />
-        <p className="font-display font-bold text-lg text-slate-400">
+        <ClipboardList className="size-14 mb-4 opacity-20 md:size-16" />
+        <p className="font-display font-bold text-lg text-slate-400 md:text-xl">
           {ar ? "لا توجد طلبات بعد" : "No orders yet"}
         </p>
         <p className="text-sm mt-1 max-w-xs text-slate-400">
@@ -1442,13 +1487,14 @@ function ImplantOrdersPanel({ companyId }: { companyId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 md:overflow-visible md:gap-3">
         {statusOptions.map((s) => (
           <button
             key={s.id}
             onClick={() => setStatusFilter(s.id)}
             className={cn(
               "shrink-0 h-8 px-3.5 rounded-full text-xs font-bold border transition whitespace-nowrap",
+              "md:h-9 md:px-4 md:text-sm",
               statusFilter === s.id
                 ? "bg-primary text-primary-foreground border-primary"
                 : "bg-card text-foreground border-border hover:bg-accent",
@@ -1464,13 +1510,13 @@ function ImplantOrdersPanel({ companyId }: { companyId: string }) {
           {ar ? "لا توجد طلبات مطابقة" : "No matching orders"}
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-4 xl:grid-cols-3">
           {filtered.map((o) => {
             const itemCount = (o.items || []).reduce((sum, i) => sum + (i.quantity || 1), 0);
             const firstItem = o.items?.[0]?.name || (ar ? "منتج" : "Product");
             const isPending = o.status === "pending";
             return (
-              <div key={o.id} className="bg-card border border-border rounded-2xl p-4 shadow-soft">
+              <div key={o.id} className="bg-card border border-border rounded-2xl p-4 shadow-soft md:flex md:flex-col">
                 <div className="flex items-start justify-between gap-3 mb-2">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <span className="size-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
@@ -1510,7 +1556,7 @@ function ImplantOrdersPanel({ companyId }: { companyId: string }) {
                 </div>
 
                 {isPending && (
-                  <div className="flex gap-2 mt-3 pt-3 border-t border-border">
+                  <div className="flex gap-2 mt-3 pt-3 border-t border-border md:mt-auto">
                     <button
                       onClick={() => handleConfirm(o)}
                       disabled={busyId === o.id}
@@ -1545,7 +1591,6 @@ function BrowseImplants() {
   const [showFilter, setShowFilter] = useState(false);
   const [lenRange, setLenRange] = useState([5, 18]);
   const [diaRange, setDiaRange] = useState([3, 7]);
-  const { role } = useUserRole();
   const { data: products = [] } = useProducts();
 
   const countryCounts = useMemo(() => {
@@ -1569,20 +1614,20 @@ function BrowseImplants() {
   ];
 
   return (
-    <MobileShell>
-      <TopBar title={ar ? "الزراعة" : "Implants"} showBack />
-      <div className="px-4 pt-4 pb-6 space-y-5">
+    <MobileShell wide>
+      <TopBar title={ar ? "الزراعة" : "Implants"} showBack wide />
+      <div className="px-4 pt-4 pb-6 space-y-5 md:px-6 md:pt-8 md:pb-12 md:space-y-7 lg:px-8 lg:max-w-5xl lg:mx-auto">
         {/* Search + Filter */}
-        <div className="flex gap-2">
+        <div className="flex gap-2 md:gap-3">
           <div className="relative flex-1">
-            <Search className="size-4 absolute top-1/2 -translate-y-1/2 start-3 text-slate-400" />
-            <input type="search" value={searchQ} onChange={(e) => setSearchQ(e.target.value)} placeholder={ar ? "ابحث حسب الشركة أو الطول أو القطر..." : "Search by company, length, diameter..."} className="w-full h-11 rounded-2xl bg-white border border-slate-200 ps-10 pe-4 text-sm outline-none focus:ring-2 focus:ring-primary/20" />
+            <Search className="size-4 absolute top-1/2 -translate-y-1/2 start-3 text-slate-400 md:size-4.5" />
+            <input type="search" value={searchQ} onChange={(e) => setSearchQ(e.target.value)} placeholder={ar ? "ابحث حسب الشركة أو الطول أو القطر..." : "Search by company, length, diameter..."} className="w-full h-11 rounded-2xl bg-white border border-slate-200 ps-10 pe-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 md:h-12 md:rounded-full md:text-base" />
           </div>
-          <button onClick={() => setShowFilter(!showFilter)} className={cn("size-11 rounded-2xl border flex items-center justify-center transition", showFilter ? "bg-primary text-white border-primary" : "bg-white text-slate-500 border-slate-200")}><SlidersHorizontal className="size-5" /></button>
+          <button onClick={() => setShowFilter(!showFilter)} className={cn("size-11 rounded-2xl border flex items-center justify-center transition md:size-12 md:rounded-full shrink-0", showFilter ? "bg-primary text-white border-primary" : "bg-white text-slate-500 border-slate-200")}><SlidersHorizontal className="size-5" /></button>
         </div>
 
         {showFilter && (
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 md:p-6 md:grid md:grid-cols-2 md:gap-8 md:space-y-0">
             <div>
               <div className="flex items-center justify-between mb-1"><span className="text-xs font-bold text-slate-500">{ar ? "الطول (مم)" : "Length (mm)"}</span><span className="text-xs font-bold text-primary">{lenRange[0]} - {lenRange[1]}</span></div>
               <input type="range" min={5} max={18} value={lenRange[0]} onChange={(e) => setLenRange([+e.target.value, lenRange[1]])} className="w-full accent-primary" />
@@ -1597,23 +1642,23 @@ function BrowseImplants() {
         )}
 
         {/* Promo Banner */}
-        <div className="relative rounded-2xl overflow-hidden bg-gradient-to-r from-blue-500 to-blue-700 p-4 shadow-lg">
-          <div className="absolute -top-8 -end-8 size-32 rounded-full bg-white/10" />
-          <p className="font-extrabold text-white text-lg relative z-10">{ar ? "دقة أعلى.. نتائج أفضل" : "Higher precision.. Better results"}</p>
-          <p className="text-white/70 text-xs mt-1 relative z-10">{ar ? "أحدث أنظمة الزراعة السنية" : "Latest dental implant systems"}</p>
+        <div className="relative rounded-2xl overflow-hidden bg-gradient-to-r from-blue-500 to-blue-700 p-4 shadow-lg md:p-10 md:rounded-3xl">
+          <div className="absolute -top-8 -end-8 size-32 rounded-full bg-white/10 md:size-72 md:-top-24" />
+          <p className="font-extrabold text-white text-lg relative z-10 md:text-4xl">{ar ? "دقة أعلى.. نتائج أفضل" : "Higher precision.. Better results"}</p>
+          <p className="text-white/70 text-xs mt-1 relative z-10 md:text-lg md:mt-3">{ar ? "أحدث أنظمة الزراعة السنية" : "Latest dental implant systems"}</p>
         </div>
 
         {/* Category Cards */}
         <div>
-          <h3 className="font-bold text-sm mb-3">{ar ? "اختر الفئة" : "Select category"}</h3>
-          <div className="grid grid-cols-3 gap-2.5">
+          <h3 className="font-bold text-sm mb-3 md:text-xl md:mb-5">{ar ? "اختر الفئة" : "Select category"}</h3>
+          <div className="grid grid-cols-3 gap-2.5 md:gap-5">
             {categories.map((c) => (
               <Link
                 key={c.title}
                 to={c.to}
-                className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition cursor-pointer"
+                className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition cursor-pointer md:shadow-none md:hover:shadow-lg md:hover:-translate-y-0.5 md:hover:border-primary/30"
               >
-                <div className="h-24 bg-slate-50 flex items-center justify-center p-2">
+                <div className="h-24 bg-slate-50 flex items-center justify-center p-2 md:h-48 md:p-3">
                   <img
                     src={c.img}
                     alt={c.title}
@@ -1621,7 +1666,7 @@ function BrowseImplants() {
                     loading="lazy"
                   />
                 </div>
-                <p className="p-2 text-[11px] font-bold text-center">{c.title}</p>
+                <p className="p-2 text-[11px] font-bold text-center md:p-4 md:text-base">{c.title}</p>
               </Link>
             ))}
           </div>
@@ -1629,22 +1674,22 @@ function BrowseImplants() {
 
         {/* Country Grid */}
         <div>
-          <h3 className="font-bold text-sm mb-3">{ar ? "زرعات حسب الدول" : "Implants by country"}</h3>
-          <div className="grid grid-cols-2 gap-3">
+          <h3 className="font-bold text-sm mb-3 md:text-xl md:mb-5">{ar ? "زرعات حسب الدول" : "Implants by country"}</h3>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-5 lg:grid-cols-5">
             {COUNTRIES.map((c) => {
               const count = countryCounts[c.slug] || 0;
               const flagUrl = `https://flagcdn.com/w80/${countryCodeMap[c.slug] || c.slug}.png`;
               return (
-                <Link key={c.slug} to="/implants/$country" params={{ country: c.slug }} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition group">
-                  <div className="relative w-20 h-20 rounded-full bg-sky-50 mx-auto mb-3 flex items-center justify-center">
+                <Link key={c.slug} to="/implants/$country" params={{ country: c.slug }} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition group md:p-6 md:shadow-none md:hover:shadow-lg md:hover:-translate-y-0.5 md:hover:border-primary/30">
+                  <div className="relative w-20 h-20 rounded-full bg-sky-50 mx-auto mb-3 flex items-center justify-center md:w-24 md:h-24 md:mb-4">
                     <img src="/photo/implant.jpg" alt="" className="w-14 h-14 object-contain" loading="lazy" />
                     <span className="absolute left-0 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full overflow-hidden shadow-sm border-2 border-white bg-white">
                       <img src={flagUrl} alt={c.en} className="w-full h-full object-cover" loading="lazy" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; (e.target as HTMLImageElement).parentElement!.textContent = c.flag; }} />
                       <span style={{ display: "none" }}>{c.flag}</span>
                     </span>
                   </div>
-                  <p className="font-bold text-sm text-center">زرعات {ar ? c.ar : c.en}</p>
-                  <p className="text-[11px] text-slate-500 text-center mt-0.5">{count} {ar ? "منتج" : "products"}</p>
+                  <p className="font-bold text-sm text-center md:text-base">زرعات {ar ? c.ar : c.en}</p>
+                  <p className="text-[11px] text-slate-500 text-center mt-0.5 md:text-sm md:mt-1.5">{count} {ar ? "منتج" : "products"}</p>
                 </Link>
               );
             })}

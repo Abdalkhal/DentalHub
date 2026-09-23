@@ -1,5 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Image, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Image,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  Pressable,
+  ScrollView,
+  TextInput,
+  View,
+} from 'react-native';
 import { Redirect, router, type Href } from 'expo-router';
 import {
   Bell,
@@ -7,10 +15,13 @@ import {
   FlaskConical,
   Globe,
   History,
+  MapPin,
   Megaphone,
   Package,
   Search,
+  Stethoscope,
   User,
+  X,
 } from 'lucide-react-native';
 
 import { Screen, Card, Button, Spinner, Text } from '@/components/ui';
@@ -33,6 +44,7 @@ import { useActiveAds, type Ad } from '@/lib/adsStore';
 import { AdDetailModal } from '@/components/AdDetailModal';
 import { useOrders } from '@/lib/ordersStore';
 import { useDentistCases, filterLegacyOrders } from '@/lib/caseTracking';
+import { useVendorAccounts, type VendorAccount } from '@/lib/search';
 import { BRANDS } from '@/data/brands';
 
 type Role = 'supply' | 'lab' | 'implant';
@@ -132,7 +144,10 @@ export default function HomeScreen() {
   const { offers: implantOffers = [] } = useImplantOffers();
 
   const [q, setQ] = useState('');
+  const searchInputRef = useRef<TextInput>(null);
   const [idx, setIdx] = useState(0);
+  const [carouselWidth, setCarouselWidth] = useState(0);
+  const carouselRef = useRef<ScrollView>(null);
 
   // Scope local stores to the signed-in user (web parity).
   useEffect(() => {
@@ -174,16 +189,40 @@ export default function HomeScreen() {
     return [...fromAds, ...loadBanners()];
   }, [adsForBanner, adImageUrls]);
 
-  // Auto-rotate banner carousel every 4s.
+  // Auto-rotate banner carousel every 4s, unless the user is swiping it
+  // themselves — a manual drag sets `idx` via onMomentumScrollEnd below, and
+  // this effect just keeps nudging the ScrollView to match.
   useEffect(() => {
     if (banners.length <= 1) return;
-    const t = setInterval(() => setIdx((i) => (i + 1) % banners.length), 4000);
+    const t = setInterval(() => {
+      setIdx((i) => {
+        const next = (i + 1) % banners.length;
+        carouselRef.current?.scrollTo({ x: next * carouselWidth, animated: true });
+        return next;
+      });
+    }, 4000);
     return () => clearInterval(t);
-  }, [banners.length]);
+  }, [banners.length, carouselWidth]);
 
-  const banner = banners[idx] ?? banners[0];
-  const bannerAd = idx < adsForBanner.length ? adsForBanner[idx] : null;
+  const onBannerScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (!carouselWidth) return;
+    const i = Math.round(e.nativeEvent.contentOffset.x / carouselWidth);
+    setIdx(Math.max(0, Math.min(banners.length - 1, i)));
+  };
+
   const [viewingAd, setViewingAd] = useState<Ad | null>(null);
+
+  // Typing an existing account (office/lab/implant company) name found
+  // nothing before — this only ever searched `products`, never accounts.
+  const { data: vendorAccounts = [] } = useVendorAccounts();
+
+  const accountResults = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (term.length < 2) return [];
+    return vendorAccounts
+      .filter((a) => [a.name, a.location].filter(Boolean).some((v) => v.toLowerCase().includes(term)))
+      .slice(0, 5);
+  }, [q, vendorAccounts]);
 
   const searchResults = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -294,91 +333,164 @@ export default function HomeScreen() {
       {/* 2 — Search */}
       <View className="relative mt-3">
         <TextInput
+          ref={searchInputRef}
           value={q}
           onChangeText={setQ}
-          placeholder={ar ? 'ابحث عن زراعة، مادة، مختبر...' : 'Search implants, materials, labs...'}
+          placeholder={ar ? 'ابحث...' : 'Search...'}
           placeholderTextColor="#94A3B8"
-          className="h-12 w-full rounded-2xl border border-slate-200 bg-white pl-4 pr-11 text-sm text-slate-700 shadow-sm"
+          style={{ writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }}
+          className="h-12 w-full rounded-2xl border border-slate-200 bg-white pl-9 pr-11 text-sm text-slate-700 shadow-sm"
         />
         <View className="absolute bottom-0 right-4 top-0 justify-center">
           <Search size={18} color="#94A3B8" />
         </View>
+        {q.length > 0 && (
+          <Pressable
+            onPress={() => {
+              // On Android, clearing a controlled TextInput's `value` while
+              // the IME still has an active composing span (autocomplete
+              // suggestion bar visible) doesn't always take — the native
+              // text can survive the state update. `.clear()` resets the
+              // native view directly, in addition to the state.
+              searchInputRef.current?.clear();
+              setQ('');
+            }}
+            className="absolute bottom-0 left-3 top-0 justify-center"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <View className="h-5 w-5 items-center justify-center rounded-full bg-slate-200">
+              <X size={12} color="#475569" />
+            </View>
+          </Pressable>
+        )}
       </View>
 
       {/* Search results (replaces content while typing) */}
       {q.trim().length >= 2 ? (
         <View className="mt-2 gap-2 pb-10">
-          {searchResults.length === 0 ? (
+          {accountResults.length === 0 && searchResults.length === 0 ? (
             <Text className="py-10 text-center text-slate-400">
               {ar ? 'لا توجد نتائج' : 'No results found'}
             </Text>
           ) : (
-            searchResults.map((p) => (
-              <Pressable
-                key={p.id}
-                onPress={() => {
-                  setQ('');
-                  openProduct(p.id);
-                }}
-                className="flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-card p-3 shadow-sm"
-              >
-                <View className="h-10 w-10 items-center justify-center rounded-xl bg-slate-100">
-                  <Package size={18} color="#64748B" />
-                </View>
-                <View className="min-w-0 flex-1">
-                  <Text className="text-sm font-bold text-slate-800" numberOfLines={1}>
-                    {ar ? p.ar || p.en : p.en || p.ar}
+            <>
+              {accountResults.map((a: VendorAccount) => (
+                <Pressable
+                  key={a.id}
+                  onPress={() => {
+                    setQ('');
+                    router.push({ pathname: '/profile/[accountId]', params: { accountId: a.id } });
+                  }}
+                  className="flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-card p-3 shadow-sm"
+                >
+                  <View className="h-10 w-10 items-center justify-center rounded-xl bg-indigo-50">
+                    {a.category === 'labs' ? (
+                      <Stethoscope size={18} color="#4F46E5" />
+                    ) : a.category === 'implants' ? (
+                      <FlaskConical size={18} color="#4F46E5" />
+                    ) : (
+                      <Package size={18} color="#4F46E5" />
+                    )}
+                  </View>
+                  <View className="min-w-0 flex-1">
+                    <Text className="text-sm font-bold text-slate-800" numberOfLines={1}>
+                      {a.name}
+                    </Text>
+                    {!!a.location && (
+                      <View className="mt-0.5 flex-row items-center gap-1">
+                        <MapPin size={10} color="#94A3B8" />
+                        <Text className="text-[11px] text-slate-400" numberOfLines={1}>
+                          {a.location}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </Pressable>
+              ))}
+              {searchResults.map((p) => (
+                <Pressable
+                  key={p.id}
+                  onPress={() => {
+                    setQ('');
+                    openProduct(p.id);
+                  }}
+                  className="flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-card p-3 shadow-sm"
+                >
+                  <View className="h-10 w-10 items-center justify-center rounded-xl bg-slate-100">
+                    <Package size={18} color="#64748B" />
+                  </View>
+                  <View className="min-w-0 flex-1">
+                    <Text className="text-sm font-bold text-slate-800" numberOfLines={1}>
+                      {ar ? p.ar || p.en : p.en || p.ar}
+                    </Text>
+                    <Text className="text-[11px] text-slate-400" numberOfLines={1}>
+                      {p.brand || (ar ? 'المورد' : 'Supplier')}
+                    </Text>
+                  </View>
+                  <Text className="text-sm font-extrabold text-primary">
+                    {p.currency === 'IQD' ? `${p.price.toLocaleString()} د.ع` : `$${p.price.toFixed(2)}`}
                   </Text>
-                  <Text className="text-[11px] text-slate-400" numberOfLines={1}>
-                    {p.brand || (ar ? 'المورد' : 'Supplier')}
-                  </Text>
-                </View>
-                <Text className="text-sm font-extrabold text-primary">
-                  {p.currency === 'IQD' ? `${p.price.toLocaleString()} د.ع` : `$${p.price.toFixed(2)}`}
-                </Text>
-              </Pressable>
-            ))
+                </Pressable>
+              ))}
+            </>
           )}
         </View>
       ) : isDentist ? (
         <>
           {/* 3 — Hero carousel */}
-          <View className="mt-4 overflow-hidden rounded-3xl">
-            {banner ? (
-              <Pressable
-                disabled={!bannerAd}
-                onPress={() => bannerAd && setViewingAd(bannerAd)}
-                className="relative min-h-[170px] justify-center overflow-hidden rounded-3xl bg-[#2563EB] p-6"
-              >
-                {!!banner.image && (
-                  <>
-                    <Image source={{ uri: banner.image }} resizeMode="cover" style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }} />
-                    <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(15,23,42,0.45)' }} />
-                  </>
-                )}
-                <View className="absolute -right-14 -top-16 h-48 w-48 rounded-full bg-white/15" />
-                <View className="absolute -bottom-20 -left-12 h-44 w-44 rounded-full bg-white/10" />
-                <View className="flex-row items-center gap-3">
-                  <View className="min-w-0 flex-1">
-                    <Text className="text-xl font-extrabold leading-tight text-white">
-                      {banner.title}
-                    </Text>
-                    {!!banner.subtitle && (
-                      <Text numberOfLines={2} className="mt-1.5 text-sm leading-snug text-white/85">{banner.subtitle}</Text>
-                    )}
-                    {!!banner.price && (
-                      <Text className="mt-2 text-lg font-extrabold text-yellow-300">{banner.price}</Text>
-                    )}
-                  </View>
-                </View>
+          <View
+            className="mt-4 overflow-hidden rounded-3xl"
+            onLayout={(e) => setCarouselWidth(e.nativeEvent.layout.width)}
+          >
+            {banners.length > 0 ? (
+              <>
+                <ScrollView
+                  ref={carouselRef}
+                  horizontal
+                  pagingEnabled
+                  showsHorizontalScrollIndicator={false}
+                  onMomentumScrollEnd={onBannerScrollEnd}
+                >
+                  {banners.map((b, i) => {
+                    const ad = i < adsForBanner.length ? adsForBanner[i] : null;
+                    return (
+                      <Pressable
+                        key={i}
+                        disabled={!ad}
+                        onPress={() => ad && setViewingAd(ad)}
+                        style={{ width: carouselWidth || undefined }}
+                        className="relative min-h-[170px] justify-center overflow-hidden bg-[#2563EB] p-6"
+                      >
+                        {!!b.image && (
+                          <>
+                            <Image source={{ uri: b.image }} resizeMode="cover" style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }} />
+                            <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(15,23,42,0.45)' }} />
+                          </>
+                        )}
+                        <View className="absolute -right-14 -top-16 h-48 w-48 rounded-full bg-white/15" />
+                        <View className="absolute -bottom-20 -left-12 h-44 w-44 rounded-full bg-white/10" />
+                        <View className="flex-row items-center gap-3">
+                          <View className="min-w-0 flex-1">
+                            <Text className="text-xl font-extrabold leading-tight text-white">
+                              {b.title}
+                            </Text>
+                            {!!b.price && (
+                              <Text className="mt-2 text-lg font-extrabold text-yellow-300">{b.price}</Text>
+                            )}
+                          </View>
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
                 {banners.length > 1 && (
-                  <View className="absolute bottom-3 left-0 right-0 flex-row items-center justify-center gap-1.5">
+                  <View pointerEvents="none" className="absolute bottom-3 left-0 right-0 flex-row items-center justify-center gap-1.5">
                     {banners.map((_, i) => (
                       <View key={i} className={cn('rounded-full', i === idx ? 'h-2 w-4 bg-white' : 'h-1.5 w-1.5 bg-white/50')} />
                     ))}
                   </View>
                 )}
-              </Pressable>
+              </>
             ) : (
               <View className="relative min-h-[170px] justify-center overflow-hidden rounded-3xl bg-[#2563EB] p-6">
                 <View className="absolute -right-14 -top-16 h-48 w-48 rounded-full bg-white/15" />
@@ -415,13 +527,13 @@ export default function HomeScreen() {
                 <Pressable
                   key={c.en}
                   onPress={() => router.push(c.to)}
-                  style={{ minHeight: 92 }}
+                  style={{ minHeight: 100 }}
                   className="flex-1 items-center justify-between rounded-2xl border border-slate-200 bg-white p-2.5 shadow-sm"
                 >
-                  <View className={cn('h-12 w-12 items-center justify-center overflow-hidden rounded-full border-2 bg-slate-50', c.border)}>
+                  <View className={cn('h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 bg-slate-50', c.border)}>
                     <Image source={c.img} className="h-full w-full" resizeMode="cover" />
                   </View>
-                  <Text className="mt-1.5 text-center text-[10px] font-bold leading-tight text-slate-700">
+                  <Text className="mt-1.5 text-center text-[11px] font-extrabold leading-tight text-slate-700">
                     {ar ? c.ar : c.en}
                   </Text>
                 </Pressable>

@@ -77,11 +77,14 @@ export function BoneGraftDetailsModal({
   const packSizes = spec?.packSizes ?? [];
 
   return (
-    <div className="fixed inset-0 z-[70]">
+    <div className="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:p-6">
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="absolute inset-x-0 bottom-0 top-6 mx-auto w-full max-w-md flex flex-col rounded-t-3xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom bg-white">
+      {/* Phone: full-height bottom sheet (the flex parent + h-calc reproduce
+          the previous inset-x-0/bottom-0/top-6 box exactly). md:+ : a centered
+          dialog, since a bottom sheet is a phone idiom. */}
+      <div className="relative w-full max-w-md h-[calc(100%-1.5rem)] flex flex-col rounded-t-3xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom bg-white md:h-auto md:max-h-[88vh] md:max-w-2xl md:rounded-3xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 pt-4 pb-3 shrink-0 border-b border-slate-100">
+        <div className="flex items-center justify-between px-4 pt-4 pb-3 shrink-0 border-b border-slate-100 md:px-6 md:pt-5 md:pb-4">
           <h3 className="font-display font-extrabold text-base text-slate-900">
             {ar ? "تفاصيل البون كرافت" : "Bone Graft Details"}
           </h3>

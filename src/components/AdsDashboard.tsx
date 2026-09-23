@@ -118,7 +118,7 @@ export function AdsDashboard() {
   return (
     <div className="min-h-full flex flex-col bg-[#F1F5F9] pb-28" dir="rtl">
       {/* Hero header */}
-      <div className="px-3 pt-3">
+      <div className="px-3 pt-3 md:px-6 md:pt-6 lg:px-8 lg:max-w-6xl lg:mx-auto">
         <div
           className="w-full rounded-2xl overflow-hidden text-white relative"
           style={{ background: "linear-gradient(135deg, #0052FF, #00A3FF)" }}
@@ -130,7 +130,7 @@ export function AdsDashboard() {
               <Megaphone className="size-6" />
             </span>
             <div className="min-w-0">
-              <h1 className="font-display font-extrabold text-xl text-white">
+              <h1 className="font-display font-extrabold text-xl text-white md:text-3xl">
                 {ar ? "إعلاناتي" : "My Ads"}
               </h1>
               <p className="text-white/80 text-xs mt-0.5 truncate">
@@ -144,7 +144,7 @@ export function AdsDashboard() {
       </div>
 
       {/* Campaign setup cards */}
-      <div className="px-4 mt-3 space-y-3">
+      <div className="px-4 mt-3 space-y-3 md:px-6 md:mt-5 lg:px-8 lg:max-w-6xl lg:mx-auto">
         <button
           type="button"
           onClick={() => setWizardType("main")}
@@ -196,7 +196,7 @@ export function AdsDashboard() {
 
       {/* Stats */}
       {activeAds.length > 0 && (
-        <div className="px-4 mt-4 grid grid-cols-2 gap-3">
+        <div className="px-4 mt-4 grid grid-cols-2 gap-3 md:px-6 md:gap-5 md:grid-cols-4 lg:px-8 lg:max-w-6xl lg:mx-auto">
           <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 flex items-center gap-3">
             <span className="size-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
               <Eye className="size-5" />
@@ -219,10 +219,10 @@ export function AdsDashboard() {
       )}
 
       {/* Filter tabs */}
-      <div className="px-4 mt-5 flex items-center justify-between">
+      <div className="px-4 mt-5 flex items-center justify-between md:px-6 md:mt-8 lg:px-8 lg:max-w-6xl lg:mx-auto">
         <p className="text-sm font-bold text-slate-800">{ar ? "إعلاناتي" : "My Ads"}</p>
       </div>
-      <div className="px-4 mt-3 flex gap-2 overflow-x-auto -mx-4 px-4">
+      <div className="px-4 mt-3 flex gap-2 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-6 md:flex-wrap md:overflow-visible lg:px-8 lg:max-w-6xl lg:mx-auto">
         {FILTERS.map((f) => (
           <button
             key={f.key}
@@ -249,13 +249,13 @@ export function AdsDashboard() {
       </div>
 
       {/* Ads list / empty state */}
-      <div className="px-4 mt-4 flex-1">
+      <div className="px-4 mt-4 flex-1 md:px-6 md:mt-6 lg:px-8 lg:max-w-6xl lg:mx-auto lg:w-full">
         {isLoading ? (
           <div className="flex justify-center py-16">
             <Loader2 className="size-6 text-[#0052FF] animate-spin" />
           </div>
         ) : filtered.length === 0 ? (
-          <div className="py-12 flex flex-col items-center text-center">
+          <div className="py-12 flex flex-col items-center text-center md:py-24 md:rounded-3xl md:border md:border-dashed md:border-slate-200 md:bg-white">
             <span className="size-20 rounded-3xl bg-white border border-slate-200 shadow-sm flex items-center justify-center">
               <Megaphone className="size-9 text-slate-300" />
             </span>
@@ -277,7 +277,7 @@ export function AdsDashboard() {
             </button>
           </div>
         ) : (
-          <div className="space-y-3 pb-2">
+          <div className="space-y-3 pb-2 md:space-y-0 md:grid md:grid-cols-2 md:gap-5 xl:grid-cols-3 md:items-start md:pb-8">
             {filtered.map((ad) => (
               <div
                 key={ad.id}
@@ -330,7 +330,7 @@ export function AdsDashboard() {
       </div>
 
       {/* WhatsApp support CTA */}
-      <div className="px-4 pt-5">
+      <div className="px-4 pt-5 md:px-6 lg:px-8 lg:max-w-6xl lg:mx-auto">
         <a
           href="https://wa.me/9640000000000?text=مرحباً،%20أريد%20الاستفسار%20عن%20الإعلانات"
           target="_blank"

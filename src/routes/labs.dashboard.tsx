@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, useMemo } from "react";
 import { auth, db } from "@/integrations/firebase/client";
 import { signOut } from "firebase/auth";
@@ -8,11 +8,12 @@ import { useSession } from "@/lib/useAuth";
 import { cn } from "@/lib/utils";
 import { CombinedLabOrderModal, type CombinedLabOrder } from "@/components/CombinedLabOrderModal";
 import { EditOrderModal } from "@/components/EditOrderModal";
+import { LabBottomTabBar } from "@/components/LabBottomTabBar";
 import { OrderInvoiceModal } from "@/components/OrderInvoiceModal";
 import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
 import { WORK_TYPES as DENTAL_WORK_TYPES } from "@/lib/dentalConfig";
 import { toast } from "sonner";
-import { deriveOrderLines } from "@/lib/orderLines";
+import { deriveOrderLines, resolveOrderTotal } from "@/lib/orderLines";
 import { NotificationBell } from "@/components/NotificationBell";
 import {
   addOrder,
@@ -31,14 +32,13 @@ import type { UserRoleDoc } from "@/integrations/firebase/types";
 import { useLabFinance, sumFinanceRevenue } from "@/lib/financeStore";
 import {
   Search,
-  Bell,
   MessageSquare,
   Megaphone,
+  Menu,
   Plus,
   List,
   Users,
   CreditCard,
-  ChevronLeft,
   Eye,
   Edit3,
   Trash2,
@@ -48,7 +48,6 @@ import {
   TrendingUp,
   TrendingDown,
   CheckCircle2,
-  XCircle,
   AlertCircle,
   BarChart3,
   DollarSign,
@@ -58,7 +57,6 @@ import {
   Building2,
   ChevronDown,
   X,
-  Loader2,
   Globe,
   type LucideIcon,
 } from "lucide-react";
@@ -128,12 +126,6 @@ function formatShortDate(dateStr: string): string {
   return `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}/${d.getFullYear()}`;
 }
 
-function fmtCurrency(amount: number, cur?: "USD" | "IQD"): string {
-  const isIQD = cur === "IQD";
-  if (isIQD) return `${amount.toLocaleString("en-US")} د.ع`;
-  return `$${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
 function StatCard({
   label,
   value,
@@ -179,21 +171,6 @@ function StatCard({
         <span className="text-xs font-semibold">{trend}</span>
       </div>
     </Comp>
-  );
-}
-
-function StatusBadge({ status }: { status: OrderStatus }) {
-  const sm = STATUS_META[status];
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border",
-        sm.color,
-      )}
-    >
-      <span className={cn("size-1.5 rounded-full", sm.dot)} />
-      {sm.ar}
-    </span>
   );
 }
 
@@ -524,7 +501,7 @@ function LabDashboard() {
                 onClick={() => setSidebarOpen(true)}
                 className="lg:hidden size-9 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-500"
               >
-                <Plus className="size-4" />
+                <Menu className="size-4" />
               </button>
 
               <div className="hidden lg:flex items-center gap-3">
@@ -587,7 +564,7 @@ function LabDashboard() {
             </div>
           </header>
 
-          <div className="p-4 lg:p-6 space-y-6">
+          <div className="p-4 lg:p-6 space-y-6 pb-24 lg:pb-6">
             {/* Stats row */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <StatCard
@@ -722,7 +699,7 @@ function LabDashboard() {
                             )}
                           </td>
                           <td className="px-3 py-3 text-xs font-bold text-emerald-700 whitespace-nowrap">
-                            {fmtCurrency(c.price ?? 0, c.currency)}
+                            {Number(resolveOrderTotal(c)).toLocaleString("en-US")} د.ع
                           </td>
                           <td className="px-3 py-3">
                             <div className="flex items-center gap-1">
@@ -974,6 +951,8 @@ function LabDashboard() {
           </div>
         </div>
       )}
+
+      <LabBottomTabBar className="lg:hidden" />
     </div>
   );
 }

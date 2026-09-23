@@ -237,9 +237,9 @@ function Invoices() {
     : null;
 
   return (
-    <MobileShell>
-      <TopBar title={ar ? "الفواتير" : "Invoices"} showBack />
-      <div className="px-4 pt-3 pb-6">
+    <MobileShell wide>
+      <TopBar title={ar ? "الفواتير" : "Invoices"} showBack wide />
+      <div className="px-4 pt-3 pb-6 md:px-6 md:pt-6 md:pb-12 lg:px-8 lg:max-w-5xl lg:mx-auto">
         {/* Filter tabs */}
         <div className="flex flex-wrap gap-1.5 mb-4">
           {tabs.map((t) => (
@@ -276,7 +276,7 @@ function Invoices() {
             </p>
           </div>
         ) : (
-          <div className="space-y-3">{list}</div>
+          <div className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-5 xl:grid-cols-3 md:items-start">{list}</div>
         )}
       </div>
 

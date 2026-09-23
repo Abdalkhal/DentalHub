@@ -3,13 +3,16 @@ import { Pressable, View } from 'react-native';
 import { ChevronDown } from 'lucide-react-native';
 
 import { Screen, Card, Text } from '@/components/ui';
-import { helpTopics } from '@/data/help-topics';
+import { helpTopicsFor } from '@/data/help-topics';
 import { useI18n } from '@/lib/i18n';
+import { useUserRole } from '@/lib/useAuth';
 import { cn } from '@/lib/utils';
 
 export default function HelpScreen() {
   const { lang } = useI18n();
   const ar = lang === 'ar';
+  const { role } = useUserRole();
+  const helpTopics = helpTopicsFor(role?.accountType);
   const [open, setOpen] = useState<string | null>(null);
 
   return (

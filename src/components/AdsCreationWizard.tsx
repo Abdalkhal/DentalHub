@@ -93,9 +93,9 @@ export function AdsCreationWizard({ type, onClose }: { type: AdsType; onClose: (
   };
 
   return (
-    <div className="fixed inset-0 z-[70]">
+    <div className="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:p-6">
       <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="absolute inset-x-0 bottom-0 top-8 mx-auto w-full max-w-md flex flex-col rounded-t-3xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom bg-[#F1F5F9]">
+      <div className="relative w-full max-w-md h-[calc(100%-2rem)] flex flex-col rounded-t-3xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom bg-[#F1F5F9] md:h-auto md:max-h-[88vh] md:max-w-3xl md:rounded-3xl">
         {/* Header */}
         <div className="shrink-0 px-4 pt-4 pb-3 border-b border-slate-200 bg-white flex items-center justify-between">
           <div className="flex items-center gap-2.5 min-w-0">

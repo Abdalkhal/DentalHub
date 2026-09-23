@@ -22,7 +22,6 @@ export function ProductsTab() {
   const { branches } = useAdminStore();
   const { data: products = [], isLoading } = useProducts();
   const upsert = useUpsertProduct();
-  const del = useDeleteProduct();
   type FormState = {
     id: string;
     branch: string;

@@ -85,8 +85,8 @@ function BranchAllPage() {
 
   if (!branch) {
     return (
-      <MobileShell>
-        <TopBar title={lang === "ar" ? "غير موجود" : "Not found"} showBack />
+      <MobileShell wide>
+        <TopBar title={lang === "ar" ? "غير موجود" : "Not found"} showBack wide maxW="6xl" />
         <div className="p-6 text-center text-sm text-muted-foreground">
           {lang === "ar" ? "هذا الفرع غير موجود" : "Branch not found"}
         </div>
@@ -109,16 +109,18 @@ function BranchAllPage() {
   ];
 
   return (
-    <MobileShell>
+    <MobileShell wide>
       <TopBar
         title={lang === "ar" ? branch.ar : branch.en}
         showBack
+        wide
+        maxW="6xl"
         showSearch
         searchValue={q}
         onSearchChange={setQ}
         searchPlaceholder={lang === "ar" ? "ابحث بالاسم أو الماركة…" : "Search name or brand…"}
       />
-      <div className="px-4 pt-4">
+      <div className="px-4 pt-4 md:px-6 md:pt-8 md:pb-12 lg:px-8 lg:max-w-6xl lg:mx-auto">
         <p className="text-xs text-muted-foreground mb-3">
           {lang === "ar" ? "كل المنتجات في هذا الفرع" : "All products in this branch"} ·{" "}
           {items.length}
@@ -181,7 +183,7 @@ function BranchAllPage() {
         )}
 
         {items.length === 0 ? (
-          <div className="py-12 flex flex-col items-center text-center text-muted-foreground">
+          <div className="py-12 flex flex-col items-center text-center text-muted-foreground md:py-24 md:rounded-2xl md:border md:border-dashed md:border-border md:bg-card">
             <SearchX className="size-8 mb-2" />
             <p className="text-sm">
               {isLoading
@@ -194,7 +196,7 @@ function BranchAllPage() {
             </p>
           </div>
         ) : (
-          <ul className="space-y-2.5">
+          <ul className="space-y-2.5 md:space-y-0 md:grid md:grid-cols-2 md:gap-4 xl:grid-cols-3 md:items-start">
             {items.map((p) => {
               const urls = p.images.map((path) => urlMap[path]).filter(Boolean);
               const first = urls[0];

@@ -71,7 +71,7 @@ export function OrderDetailsModal({ order, onClose, onStatusChange }: Props) {
       onClick={onClose}
     >
       <div
-        className="bg-white w-full max-w-lg rounded-3xl p-6 shadow-2xl"
+        className="bg-white w-full max-w-lg rounded-3xl p-6 shadow-2xl md:max-w-2xl md:p-8"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-5">

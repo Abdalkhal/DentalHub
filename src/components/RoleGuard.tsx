@@ -1,4 +1,4 @@
-import { useNavigate, Link } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { useUserRole, getAccountDashboard } from "@/lib/useAuth";
 import { useI18n } from "@/lib/i18n";
 import { ShieldAlert, ArrowRight, ArrowLeft, LogIn } from "lucide-react";

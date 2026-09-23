@@ -3,7 +3,6 @@ import { useState, useMemo } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
 import { clinicTotals, useClinic } from "@/lib/clinicStore";
 import { usePatients } from "@/lib/patientsStore";
 import { Download } from "lucide-react";
@@ -86,11 +85,11 @@ function ReportsPage() {
   const max = Math.max(1, ...bars.map((b) => b.value));
 
   return (
-    <MobileShell>
-      <TopBar title={ar ? "التقارير والإحصائيات" : "Reports & Analytics"} showBack />
-      <div className="px-3 pt-3 pb-6 space-y-3">
+    <MobileShell wide>
+      <TopBar title={ar ? "التقارير والإحصائيات" : "Reports & Analytics"} showBack wide />
+      <div className="px-3 pt-3 pb-6 space-y-3 md:px-6 md:pt-6 md:pb-12 lg:px-8 lg:max-w-5xl lg:mx-auto lg:grid lg:grid-cols-2 lg:gap-5 lg:space-y-0 lg:items-start">
         {/* Filter bar */}
-        <div className="flex gap-2">
+        <div className="flex gap-2 md:gap-3 md:max-w-xl lg:col-span-2">
           <div className="relative flex-1">
             <select value={doctorFilter} onChange={(e) => setDoctorFilter(e.target.value)}
               className="w-full h-10 rounded-xl bg-card border border-border px-3 pe-8 text-xs font-semibold appearance-none focus:outline-none focus:ring-2 focus:ring-primary/20">
@@ -108,7 +107,7 @@ function ReportsPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4 md:gap-4 lg:col-span-2">
           <Stat label={ar ? "إجمالي الإيرادات" : "Total revenue"} value={fmtIQD(income)} tone="good" />
           <Stat label={ar ? "إجمالي المصاريف" : "Total expenses"} value={fmtIQD(expense)} tone="bad" />
           <Stat label={ar ? "صافي الربح" : "Net profit"} value={fmtIQD(net)} tone={net >= 0 ? "good" : "bad"} />
@@ -116,8 +115,8 @@ function ReportsPage() {
         </div>
 
         {/* Month performance */}
-        <div className="rounded-2xl bg-card border border-border p-3.5 shadow-soft">
-          <p className="font-display font-extrabold text-sm">{ar ? "أداء الشهر الحالي" : "This month"}</p>
+        <div className="rounded-2xl bg-card border border-border p-3.5 shadow-soft md:p-5 lg:h-full">
+          <p className="font-display font-extrabold text-sm md:text-base">{ar ? "أداء الشهر الحالي" : "This month"}</p>
           <div className="mt-3 space-y-2.5">
             {bars.map((b) => (
               <div key={b.label}>
@@ -134,8 +133,8 @@ function ReportsPage() {
         </div>
 
         {/* Doctor performance */}
-        <div className="rounded-2xl bg-card border border-border p-3.5 shadow-soft">
-          <p className="font-display font-extrabold text-sm mb-3">{ar ? "ملخص أداء الأطباء والمستحقات" : "Doctor Performance & Dues"}</p>
+        <div className="rounded-2xl bg-card border border-border p-3.5 shadow-soft md:p-5 lg:h-full">
+          <p className="font-display font-extrabold text-sm mb-3 md:text-base">{ar ? "ملخص أداء الأطباء والمستحقات" : "Doctor Performance & Dues"}</p>
           <div className="space-y-2.5">
             {doctorPerformance.map((d) => (
               <div key={d.id} className="flex items-start gap-3 rounded-xl bg-muted/50 p-3">
@@ -160,8 +159,8 @@ function ReportsPage() {
         </div>
 
         {/* Patients */}
-        <div className="rounded-2xl bg-card border border-border p-3.5 shadow-soft">
-          <p className="font-display font-extrabold text-sm">{ar ? "المرضى والعلاجات" : "Patients & treatments"}</p>
+        <div className="rounded-2xl bg-card border border-border p-3.5 shadow-soft md:p-5">
+          <p className="font-display font-extrabold text-sm md:text-base">{ar ? "المرضى والعلاجات" : "Patients & treatments"}</p>
           <ul className="mt-2.5 space-y-2 text-sm">
             <Row label={ar ? "إجمالي المرضى" : "Total patients"} value={patients.length} />
             <Row label={ar ? "مرضى جدد" : "New patients"} value={newPatients} />
@@ -172,7 +171,7 @@ function ReportsPage() {
 
         {/* Export */}
         <button onClick={exportCsv}
-          className="w-full h-12 rounded-2xl bg-primary text-primary-foreground font-display font-extrabold text-sm shadow-card flex items-center justify-center gap-2">
+          className="w-full h-12 rounded-2xl bg-primary text-primary-foreground font-display font-extrabold text-sm shadow-card flex items-center justify-center gap-2 lg:self-start">
           <Download className="size-4" />
           {ar ? "تصدير التقرير المالي والإداري (CSV)" : "Export Financial & Admin Report (CSV)"}
         </button>

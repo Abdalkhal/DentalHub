@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo, useEffect } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/integrations/firebase/client";
@@ -9,10 +9,9 @@ import { LabRxFormModal } from "@/components/LabRxFormModal";
 import { useI18n } from "@/lib/i18n";
 import { useUserRole } from "@/lib/useAuth";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
 import {
-  Clock, Sparkles, Crown, Stethoscope, MapPin, Phone, Loader2,
-  ShoppingCart, ChevronLeft, ChevronRight, Send,
+  Clock, Crown, Stethoscope, MapPin, Phone, Loader2,
+  ShoppingCart, Send,
 } from "lucide-react";
 
 export const Route = createFileRoute("/labs/$labId")({
@@ -29,10 +28,8 @@ const PILL_COLORS = ["bg-sky-500","bg-violet-500","bg-indigo-500","bg-emerald-50
 
 function LabPage() {
   const { labId } = Route.useParams();
-  const { lang, dir } = useI18n();
+  const { lang } = useI18n();
   const ar = lang === "ar";
-  const navigate = useNavigate();
-  const BackIcon = dir === "rtl" ? ChevronLeft : ChevronRight;
   const { role } = useUserRole();
 
   const [profile, setProfile] = useState<UserRoleDoc | null>(null);
@@ -81,23 +78,23 @@ function LabPage() {
     filter === "all" ? services : services.filter((s) => s.category === filter),
   [services, filter]);
 
-  if (loading) return <MobileShell><TopBar title={ar ? "تحميل..." : "Loading..."} showBack /><div className="flex justify-center py-20"><Loader2 className="size-8 animate-spin text-primary" /></div></MobileShell>;
+  if (loading) return <MobileShell wide><TopBar title={ar ? "تحميل..." : "Loading..."} showBack wide maxW="6xl" /><div className="flex justify-center py-20"><Loader2 className="size-8 animate-spin text-primary" /></div></MobileShell>;
 
-  if (!profile) return <MobileShell><TopBar title={ar ? "غير موجود" : "Not found"} showBack /><div className="p-6 text-center text-slate-400"><p className="font-semibold">{ar ? "المختبر غير موجود" : "Lab not found"}</p></div></MobileShell>;
+  if (!profile) return <MobileShell wide><TopBar title={ar ? "غير موجود" : "Not found"} showBack wide maxW="6xl" /><div className="p-6 text-center text-slate-400"><p className="font-semibold">{ar ? "المختبر غير موجود" : "Lab not found"}</p></div></MobileShell>;
 
   return (
-    <MobileShell>
-      <TopBar title={labName} showBack />
+    <MobileShell wide>
+      <TopBar title={labName} showBack wide maxW="6xl" />
 
-      <div className="px-4 pt-4 pb-6 space-y-4">
+      <div className="px-4 pt-4 pb-6 space-y-4 md:px-6 md:pt-8 md:pb-12 md:space-y-6 lg:px-8 lg:max-w-6xl lg:mx-auto">
         {/* Profile header */}
-        <div className="bg-gradient-to-r from-sky-50 to-indigo-50/30 border border-sky-100 rounded-3xl p-5 shadow-sm">
-          <div className="flex items-start gap-4">
-            <span className="size-14 rounded-2xl bg-sky-100 text-sky-600 flex items-center justify-center font-bold text-xl shrink-0">
+        <div className="bg-gradient-to-r from-sky-50 to-indigo-50/30 border border-sky-100 rounded-3xl p-5 shadow-sm md:p-8 md:flex md:items-center md:justify-between md:gap-8">
+          <div className="flex items-start gap-4 md:items-center md:gap-6 md:flex-1 md:min-w-0">
+            <span className="size-14 rounded-2xl bg-sky-100 text-sky-600 flex items-center justify-center font-bold text-xl shrink-0 md:size-20 md:text-3xl md:rounded-3xl">
               {labName.charAt(0)}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="font-bold text-lg text-slate-800">{labName}</p>
+              <p className="font-bold text-lg text-slate-800 md:text-3xl">{labName}</p>
               <span className="inline-block text-[11px] font-semibold px-2.5 py-1 rounded-full mt-1.5 bg-sky-50 text-sky-600">{ar ? "مختبر أسنان" : "Dental Lab"}</span>
               {phone && <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-2.5"><Phone className="size-3.5" />{phone.replace(/\D/g, "").replace(/^964/, "+964 ")}</p>}
             </div>
@@ -107,7 +104,7 @@ function LabPage() {
           {role?.accountType === "dentist" && (
             <button
               onClick={() => setShowSendCase(true)}
-              className="w-full mt-4 h-10 rounded-xl bg-emerald-500 text-white font-bold text-sm flex items-center justify-center gap-2 hover:bg-emerald-600 transition"
+              className="w-full mt-4 h-10 rounded-xl bg-emerald-500 text-white font-bold text-sm flex items-center justify-center gap-2 hover:bg-emerald-600 transition md:w-auto md:mt-0 md:h-12 md:px-7 md:text-base md:rounded-full md:shrink-0"
             >
               <Send className="size-4" />
               {ar ? "إرسال حالة للمختبر" : "Send case to lab"}
@@ -117,7 +114,7 @@ function LabPage() {
 
         {/* Filter pills */}
         {services.length > 0 && (
-          <div className="flex gap-1.5 overflow-x-auto pb-1">
+          <div className="flex gap-1.5 overflow-x-auto pb-1 md:flex-wrap md:overflow-visible md:gap-2.5">
             <Pill active={filter === "all"} color="bg-sky-500" onClick={() => setFilter("all")}>{ar ? "الكل" : "All"}</Pill>
             {dynamicCategories.map((c) => <Pill key={c.id} active={filter === c.id} color={c.color} onClick={() => setFilter(c.id)}>{c.id}</Pill>)}
           </div>
@@ -125,23 +122,23 @@ function LabPage() {
 
         {/* Services grid */}
         {filtered.length === 0 ? (
-          <div className="py-16 text-center text-slate-400">
+          <div className="py-16 text-center text-slate-400 md:py-24">
             <Stethoscope className="size-10 mx-auto mb-3 opacity-30" />
             <p className="font-semibold">{ar ? "لا توجد خدمات بعد" : "No services yet"}</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filtered.map((s) => {
               const cat = dynamicCategories.find((c) => c.id === s.category);
               const fmt = s.currency === "IQD" ? `${s.price.toLocaleString()} د.ع` : `$${s.price.toFixed(2)}`;
               return (
-                <div key={s.id} className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm hover:shadow-md transition-all">
+                <div key={s.id} className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm hover:shadow-md transition-all md:flex md:flex-col md:shadow-none md:border-slate-200 md:hover:shadow-lg md:hover:-translate-y-0.5">
                   <div className={cn("h-1", cat?.color ?? "bg-slate-300")} />
                   {s.imageUrl ? <div className="h-36 bg-slate-50 flex items-center justify-center p-2"><img src={s.imageUrl} alt="" className="size-full object-contain" loading="lazy" /></div>
                   : <div className="h-24 bg-slate-50 flex items-center justify-center"><Crown className="size-8 text-slate-300" /></div>}
-                  <div className="p-3">
-                    <p className="font-bold text-sm leading-snug line-clamp-2 text-slate-800">{ar ? s.titleAr : s.titleEn}</p>
-                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                  <div className="p-3 md:p-4 md:flex-1 md:flex md:flex-col">
+                    <p className="font-bold text-sm leading-snug line-clamp-2 text-slate-800 md:text-base">{ar ? s.titleAr : s.titleEn}</p>
+                    <div className="flex items-center gap-2 mt-2 flex-wrap md:mt-auto md:pt-3">
                       <span className="inline-flex items-center gap-1 px-2 py-1 bg-slate-50 rounded-lg text-[10px] font-semibold text-slate-600"><Clock className="size-3" />{ar ? s.turnaroundAr : s.turnaroundEn}</span>
                       <span className="font-bold text-sm text-blue-600">{fmt}</span>
                     </div>

@@ -1,10 +1,10 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
 import { auth, db } from "@/integrations/firebase/client";
-import { fetchUserRoleDoc, getAccountDashboard } from "@/lib/useAuth";
+import { fetchUserRoleDoc, getAccountDashboard, type LabStaffRole } from "@/lib/useAuth";
 import type { AccountType } from "@/integrations/firebase/types";
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
@@ -227,7 +227,7 @@ const ICONS: Record<AccountType, (p: { className?: string }) => React.JSX.Elemen
   implant: ImplantIcon,
 };
 
-function AuthPage() {
+export function AuthPage() {
   const { lang } = useI18n();
   const ar = lang === "ar";
   const navigate = useNavigate();
@@ -248,7 +248,6 @@ function AuthPage() {
   const [error, setError] = useState<string | null>(null);
 
   const clearError = () => setError(null);
-  const activeColor = COLOR_MAP[ACCOUNT_OPTIONS.find((o) => o.id === accountType)?.color ?? "sky"];
 
   const handleSubmit = async () => {
     if (!email.trim() || !password.trim()) {
@@ -284,6 +283,22 @@ function AuthPage() {
         const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
         const roleDoc = await fetchUserRoleDoc(cred.user.uid);
         if (!roleDoc) {
+          // Invited lab staff (designers/ceramists added from "كادر
+          // المختبر") deliberately have no `user_roles` doc — only a custom
+          // claim set server-side by `inviteLabMember`. Check that before
+          // concluding there's no account at all.
+          const staffClaims = (await cred.user.getIdTokenResult()).claims as {
+            role?: LabStaffRole;
+            labId?: string;
+          };
+          const isLabStaff =
+            accountType === "lab" &&
+            !!staffClaims.labId &&
+            ["DESIGNER", "TECHNICIAN"].includes(staffClaims.role ?? "");
+          if (isLabStaff) {
+            navigate({ to: "/designer" });
+            return;
+          }
           setError(
             ar
               ? "لم يتم العثور على صلاحيات لهذا الحساب. يرجى التسجيل أولاً."
@@ -356,7 +371,7 @@ function AuthPage() {
   };
 
   return (
-    <MobileShell>
+    <MobileShell hideBottomNav>
       <TopBar title={ar ? "تسجيل الدخول" : "Sign in"} showBack />
       <div className="px-4 pt-2">
         <p className="text-xs text-muted-foreground text-center leading-relaxed bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3">
@@ -633,7 +648,7 @@ function AuthPage() {
               onClick={() => setShowPassword(!showPassword)}
               className="absolute end-2.5 top-1/2 -translate-y-1/2 size-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 transition"
             >
-              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              {showPassword ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
             </button>
           </div>
 
@@ -688,10 +703,6 @@ function AuthPage() {
             </p>
           )}
         </div>
-
-        <Link to="/" className="block text-center text-xs text-muted-foreground underline">
-          {ar ? "العودة إلى الرئيسية" : "Back to home"}
-        </Link>
       </div>
     </MobileShell>
   );

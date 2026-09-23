@@ -18,10 +18,10 @@ import dentalBridge from "@/assets/dental-bridge.png";
 import clinicHero from "@/assets/clinic-hero.jpg";
 import { BRANDS } from "@/data/brands";
 import { BrandLogo } from "@/components/BrandLogo";
-import { useProductSearch, type SearchResult } from "@/lib/search";
+import { useProductSearch } from "@/lib/search";
 import {
-  Bell, Globe, Search, ChevronLeft, ChevronRight,
-  ClipboardList, Plus, Sparkles, Stethoscope, User, Package, Megaphone,
+  Globe, Search, ChevronLeft, ChevronRight,
+  ClipboardList, Sparkles, Stethoscope, User, Package, Megaphone,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -54,7 +54,7 @@ function loadBanners(): Banner[] {
 }
 
 function Home() {
-  const { t, lang, dir, toggle } = useI18n();
+  const { lang, dir, toggle } = useI18n();
   const { user } = useSession();
   const [userBanners, setUserBanners] = useState<Banner[]>([]);
   const [idx, setIdx] = useState(0);
@@ -113,39 +113,43 @@ function Home() {
   ];
 
   return (
-    <MobileShell>
-      {/* Top Nav */}
-      <header className="px-3 pt-4 pb-2 bg-gradient-to-b from-sky-50 to-transparent">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <button onClick={toggle} className="h-9 px-2.5 rounded-full bg-white border border-slate-200 flex items-center gap-1 text-xs font-bold text-slate-700 shadow-sm">
+    <MobileShell wide>
+      {/* Top Nav — phone: two stacked rows (identity row, then search).
+          md:+ : one utility bar, with the search as its centrepiece and the
+          actions pushed to the end edge. */}
+      <header className="px-3 pt-4 pb-2 bg-gradient-to-b from-sky-50 to-transparent md:px-6 md:pt-6 md:pb-5 md:flex md:items-center md:gap-5 lg:px-8 lg:max-w-7xl lg:mx-auto lg:w-full">
+        <div className="flex items-center justify-between gap-2 md:contents">
+          <div className="flex items-center gap-2 md:order-3">
+            <button onClick={toggle} className="h-9 px-2.5 rounded-full bg-white border border-slate-200 flex items-center gap-1 text-xs font-bold text-slate-700 shadow-sm md:h-10 md:px-3.5">
               <span>{lang === "ar" ? "EN" : "AR"}</span>
               <Globe className="size-3.5 text-slate-400" />
             </button>
             <NotificationBell userId={user?.uid || ""} />
           </div>
 
-          <Link className="flex items-center gap-1.5 font-display font-extrabold text-lg" to="/">
+          {/* The fixed lg:+ header already carries the wordmark, so it only
+              needs to appear here on phones and tablets. */}
+          <Link className="flex items-center gap-1.5 font-display font-extrabold text-lg md:order-1 md:text-xl lg:hidden" to="/">
             <span className="text-primary">Dental</span>
             <span className="text-slate-800">Hub</span>
           </Link>
 
-          <Link to="/account" className="flex flex-col items-center gap-0.5 shrink-0">
-            <span className="size-11 rounded-full overflow-hidden ring-2 ring-primary shadow-sm bg-primary/10 flex items-center justify-center">
-              <User className="size-5 text-primary" />
+          <Link to="/account" className="flex flex-col items-center gap-0.5 shrink-0 md:order-4 md:flex-row md:gap-2.5 md:bg-white md:border md:border-slate-200 md:rounded-full md:ps-1 md:pe-4 md:py-1 md:shadow-sm md:hover:bg-slate-50 md:transition">
+            <span className="size-11 rounded-full overflow-hidden ring-2 ring-primary shadow-sm bg-primary/10 flex items-center justify-center md:size-9 md:ring-1">
+              <User className="size-5 text-primary md:size-4" />
             </span>
-            <span className="text-[10px] font-bold text-slate-700">{lang === "ar" ? "حسابي" : "Account"}</span>
+            <span className="text-[10px] font-bold text-slate-700 md:text-[13px]">{lang === "ar" ? "حسابي" : "Account"}</span>
           </Link>
         </div>
 
         {/* Search */}
-        <div className="mt-3 relative">
+        <div className="mt-3 relative md:order-2 md:mt-0 md:flex-1 md:max-w-2xl">
           <input
             type="search"
             value={searchQ}
             onChange={(e) => setSearchQ(e.target.value)}
             placeholder={lang === "ar" ? "ابحث عن زراعة، مادة، مختبر..." : "Search implants, materials, labs..."}
-            className="w-full h-12 rounded-2xl bg-white border border-slate-200 ps-4 pe-11 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-sm"
+            className="w-full h-12 rounded-2xl bg-white border border-slate-200 ps-4 pe-11 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-sm md:h-11 md:rounded-full md:text-[15px]"
           />
           <Search className="size-4 absolute top-1/2 -translate-y-1/2 end-4 text-slate-400 pointer-events-none" />
 
@@ -185,31 +189,37 @@ function Home() {
         </div>
       </header>
 
+      {/* On phones these sections stay a plain vertical stack (this wrapper is
+          class-less below lg). At lg:+ it becomes a 3-column dashboard grid:
+          full-width hero, full-width category and brand rows, then a final
+          row of three cards — which is what turns this from a stretched phone
+          screen into a marketplace home. */}
+      <div className="md:px-3 lg:px-8 lg:max-w-7xl lg:mx-auto lg:w-full lg:grid lg:grid-cols-3 lg:gap-5 lg:mt-6 lg:items-start">
       {/* Hero banner */}
-      <section className="px-3 mt-3">
+      <section className="px-3 mt-3 md:mt-4 lg:col-span-3 lg:px-0 lg:mt-0">
         {banners.length > 1 || userBanners.length > 0 ? (
-          <div className="relative rounded-3xl overflow-hidden min-h-[190px] shadow-card" style={{ background: "linear-gradient(135deg, #6bb2ee 0%, #3d86dd 50%, #1f5fb8 100%)" }}>
-            <div className="absolute -top-16 -end-14 size-52 rounded-full bg-white/15 blur-2xl pointer-events-none" />
-            <div className="absolute -bottom-20 -start-14 size-48 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+          <div className="relative rounded-3xl overflow-hidden min-h-[190px] shadow-card md:min-h-[280px] lg:min-h-[340px] lg:rounded-[32px]" style={{ background: "linear-gradient(135deg, #6bb2ee 0%, #3d86dd 50%, #1f5fb8 100%)" }}>
+            <div className="absolute -top-16 -end-14 size-52 rounded-full bg-white/15 blur-2xl pointer-events-none md:size-96 md:-top-32 md:-end-24" />
+            <div className="absolute -bottom-20 -start-14 size-48 rounded-full bg-white/10 blur-2xl pointer-events-none md:size-80 md:-bottom-32" />
             <div className="absolute top-3 end-3 z-10">
               <span className="inline-flex items-center justify-center size-14 rounded-full bg-white/20 text-white text-[11px] font-extrabold text-center leading-tight shadow-lg ring-2 ring-white/40">
                 {lang === "ar" ? "خصم\nخاص" : "Special\nOffer"}
               </span>
             </div>
-            <div className="relative flex items-center gap-3 p-4 pt-5">
+            <div className="relative flex items-center gap-3 p-4 pt-5 md:p-10 md:gap-10 lg:px-16">
               <div className="flex-1 min-w-0 text-white">
-                <h2 className="font-display font-extrabold text-[22px] leading-tight drop-shadow-sm">
+                <h2 className="font-display font-extrabold text-[22px] leading-tight drop-shadow-sm md:text-[40px] lg:text-[52px] md:max-w-xl">
                   {banner.title || (lang === "ar" ? ROLE_META[banner.role].ar : ROLE_META[banner.role].en)}
                 </h2>
-                <p className="mt-2 text-white/95 text-sm leading-snug">
+                <p className="mt-2 text-white/95 text-sm leading-snug md:mt-4 md:text-lg md:max-w-lg">
                   {banner.subtitle || (lang === "ar" ? "خصم حتى 15% على أدوات المختبرات" : "Up to 15% off lab tools")}
                 </p>
-                {banner.price && <div className="mt-1 font-display font-extrabold text-2xl text-yellow-300 drop-shadow">{banner.price}</div>}
-                <Link to="/supplies" className="mt-3 inline-flex h-10 px-5 rounded-full bg-white/20 text-white text-sm font-bold shadow-md hover:bg-white/30 transition items-center">
+                {banner.price && <div className="mt-1 font-display font-extrabold text-2xl text-yellow-300 drop-shadow md:mt-3 md:text-4xl">{banner.price}</div>}
+                <Link to="/supplies" className="mt-3 inline-flex h-10 px-5 rounded-full bg-white/20 text-white text-sm font-bold shadow-md hover:bg-white/30 transition items-center md:mt-7 md:h-12 md:px-8 md:text-base md:bg-white md:text-blue-700 md:hover:bg-white/90">
                   {lang === "ar" ? "تسوق الآن" : "Shop now"}
                 </Link>
               </div>
-              <div className="shrink-0 w-[130px] h-[140px] flex items-center justify-center">
+              <div className="shrink-0 w-[130px] h-[140px] flex items-center justify-center md:w-[300px] md:h-[300px] lg:w-[360px] lg:h-[340px]">
                 <img src={banner.image || dentalBridge} alt="" loading="lazy" className="max-w-full max-h-full object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.35)]" />
               </div>
             </div>
@@ -228,23 +238,23 @@ function Home() {
             )}
           </div>
         ) : (
-          <div className="relative rounded-3xl overflow-hidden min-h-[190px] shadow-card bg-gradient-to-r from-blue-600 to-sky-400">
-            <div className="absolute -top-16 -end-14 size-52 rounded-full bg-white/15 blur-2xl pointer-events-none" />
-            <div className="absolute -bottom-20 -start-14 size-48 rounded-full bg-white/10 blur-2xl pointer-events-none" />
-            <div className="relative flex items-center gap-3 p-4 pt-5">
+          <div className="relative rounded-3xl overflow-hidden min-h-[190px] shadow-card bg-gradient-to-r from-blue-600 to-sky-400 md:min-h-[280px] lg:min-h-[340px] lg:rounded-[32px]">
+            <div className="absolute -top-16 -end-14 size-52 rounded-full bg-white/15 blur-2xl pointer-events-none md:size-96 md:-top-32 md:-end-24" />
+            <div className="absolute -bottom-20 -start-14 size-48 rounded-full bg-white/10 blur-2xl pointer-events-none md:size-80 md:-bottom-32" />
+            <div className="relative flex items-center gap-3 p-4 pt-5 md:p-10 md:gap-10 lg:px-16">
               <div className="flex-1 min-w-0 text-white">
-                <h2 className="font-display font-extrabold text-[22px] leading-tight drop-shadow-sm">
+                <h2 className="font-display font-extrabold text-[22px] leading-tight drop-shadow-sm md:text-[40px] lg:text-[52px] md:max-w-xl">
                   {lang === "ar" ? "هل تريد زيادة مبيعاتك؟" : "Want to increase your sales?"}
                 </h2>
-                <p className="mt-2 text-white/95 text-sm leading-snug">
+                <p className="mt-2 text-white/95 text-sm leading-snug md:mt-4 md:text-lg md:max-w-lg">
                   {lang === "ar" ? "أعلن معنا ليصل منتجك لجميع أطباء الأسنان" : "Advertise with us to reach all dentists"}
                 </p>
-                <a href={`https://wa.me/9647700000000`} target="_blank" rel="noreferrer" className="mt-3 inline-flex h-10 px-5 rounded-full bg-white/20 text-white text-sm font-bold shadow-md hover:bg-white/30 transition items-center">
+                <a href={`https://wa.me/9647700000000`} target="_blank" rel="noreferrer" className="mt-3 inline-flex h-10 px-5 rounded-full bg-white/20 text-white text-sm font-bold shadow-md hover:bg-white/30 transition items-center md:mt-7 md:h-12 md:px-8 md:text-base md:bg-white md:text-blue-700 md:hover:bg-white/90">
                   {lang === "ar" ? "تواصل للإعلان" : "Contact to advertise"}
                 </a>
               </div>
-              <div className="shrink-0 w-[130px] h-[140px] flex items-center justify-center">
-                <Megaphone className="size-20 text-white/40 drop-shadow-[0_10px_20px_rgba(0,0,0,0.15)]" strokeWidth={1.5} />
+              <div className="shrink-0 w-[130px] h-[140px] flex items-center justify-center md:w-[300px] md:h-[300px] lg:w-[360px] lg:h-[340px]">
+                <Megaphone className="size-20 text-white/40 drop-shadow-[0_10px_20px_rgba(0,0,0,0.15)] md:size-44" strokeWidth={1.5} />
               </div>
             </div>
           </div>
@@ -252,19 +262,19 @@ function Home() {
       </section>
 
       {/* Categories */}
-      <section className="px-3 mt-4">
-        <ul className="grid grid-cols-4 gap-2">
+      <section className="px-3 mt-4 lg:col-span-3 lg:px-0 lg:mt-0">
+        <ul className="grid grid-cols-4 gap-2 md:gap-4">
           {categories.map((c) => (
               <li key={c.to}>
-                <Link to={c.to} className="flex flex-col items-center justify-between h-full min-h-[120px] p-2.5 rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition">
-                  <span className={cn("size-14 rounded-full flex items-center justify-center ring-2 bg-slate-50 overflow-hidden", c.ring)}>
+                <Link to={c.to} className="flex flex-col items-center justify-between h-full min-h-[120px] p-2.5 rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition md:min-h-[190px] md:p-6 md:justify-center md:gap-4 md:shadow-none md:hover:shadow-lg md:hover:border-primary/30">
+                  <span className={cn("size-14 rounded-full flex items-center justify-center ring-2 bg-slate-50 overflow-hidden md:size-24 md:ring-4", c.ring)}>
                     {c.img ? (
                       <img src={c.img} alt="" loading="lazy" className="size-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                     ) : c.icon ? (
-                      <c.icon className="size-6 text-slate-600" />
+                      <c.icon className="size-6 text-slate-600 md:size-10" />
                     ) : null}
                   </span>
-                  <p className="mt-2 text-center font-display font-bold text-[11px] leading-snug text-slate-700">{c.title}</p>
+                  <p className="mt-2 text-center font-display font-bold text-[11px] leading-snug text-slate-700 md:mt-0 md:text-base md:text-slate-800">{c.title}</p>
                 </Link>
               </li>
             ))}
@@ -272,44 +282,46 @@ function Home() {
       </section>
 
       {/* Brands */}
-      <section className="px-3 mt-4">
+      <section className="px-3 mt-4 lg:col-span-3 lg:px-0 lg:mt-0">
         <BrandsStrip lang={lang} />
       </section>
 
-      {/* Track Cases */}
-      <section className="px-3 mt-4">
-        <Link className="flex items-center gap-3 bg-sky-50 border border-sky-100 rounded-2xl p-3.5" to="/track-cases">
-          <span className="size-11 rounded-2xl bg-sky-100 ring-1 ring-sky-200 shadow-sm text-sky-600 flex items-center justify-center">
-            <ClipboardList className="size-5" strokeWidth={2.2} />
+      {/* Track Cases — a horizontal banner on phones; at lg:+ it becomes the
+          first card of the closing three-up row, so it stands as its own
+          panel rather than another full-width stripe. */}
+      <section className="px-3 mt-4 lg:col-span-1 lg:px-0 lg:mt-0 lg:h-full">
+        <Link className="flex items-center gap-3 bg-sky-50 border border-sky-100 rounded-2xl p-3.5 lg:h-full lg:flex-col lg:items-start lg:justify-center lg:gap-4 lg:p-6 lg:bg-white lg:border-slate-200 lg:hover:shadow-lg lg:hover:border-primary/30 lg:transition" to="/track-cases">
+          <span className="size-11 rounded-2xl bg-sky-100 ring-1 ring-sky-200 shadow-sm text-sky-600 flex items-center justify-center lg:size-14">
+            <ClipboardList className="size-5 lg:size-7" strokeWidth={2.2} />
           </span>
-          <div className="flex-1 min-w-0">
-            <p className="font-display font-extrabold text-sm">{lang === "ar" ? "تتبع حالاتك" : "Track your cases"}</p>
-            <p className="text-[11px] text-slate-500">{lang === "ar" ? "تابع حالة الطلبات من المختبر" : "Follow your lab order status"}</p>
-            <p className="text-[11px] font-bold text-primary mt-0.5">{lang === "ar" ? "عرض جميع الحالات ›" : "View all cases ›"}</p>
+          <div className="flex-1 min-w-0 lg:flex-none">
+            <p className="font-display font-extrabold text-sm lg:text-lg">{lang === "ar" ? "تتبع حالاتك" : "Track your cases"}</p>
+            <p className="text-[11px] text-slate-500 lg:text-sm lg:mt-1">{lang === "ar" ? "تابع حالة الطلبات من المختبر" : "Follow your lab order status"}</p>
+            <p className="text-[11px] font-bold text-primary mt-0.5 lg:text-sm lg:mt-3">{lang === "ar" ? "عرض جميع الحالات ›" : "View all cases ›"}</p>
           </div>
-          <div className="shrink-0 rounded-2xl bg-white border border-slate-200 px-3 py-2 text-center shadow-sm">
-            <p className="font-display font-extrabold text-xl text-slate-800">{caseCount}</p>
-            <p className="text-[10px] text-slate-500">{lang === "ar" ? "حالات" : "cases"}</p>
+          <div className="shrink-0 rounded-2xl bg-white border border-slate-200 px-3 py-2 text-center shadow-sm lg:w-full lg:bg-sky-50 lg:border-sky-100 lg:flex lg:items-baseline lg:justify-center lg:gap-2 lg:py-3">
+            <p className="font-display font-extrabold text-xl text-slate-800 lg:text-4xl">{caseCount}</p>
+            <p className="text-[10px] text-slate-500 lg:text-sm">{lang === "ar" ? "حالات" : "cases"}</p>
           </div>
         </Link>
       </section>
 
       {/* Dual quick-section cards */}
-      <section className="px-3 mt-4 pb-6">
-        <div className="grid grid-cols-2 gap-2.5">
+      <section className="px-3 mt-4 pb-6 lg:col-span-2 lg:px-0 lg:mt-0 lg:pb-0 lg:h-full">
+        <div className="grid grid-cols-2 gap-2.5 md:gap-4 lg:h-full">
           {/* Quick Orders */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm flex flex-col">
+          <div className="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm flex flex-col md:p-5 md:shadow-none">
             <div className="flex items-center justify-between mb-2">
-              <p className="font-display font-extrabold text-[13px]">{lang === "ar" ? "الطلبات السريعة" : "Quick Orders"}</p>
-              <Link to="/quick-orders" className="text-[10px] font-bold text-primary">{lang === "ar" ? "عرض الكل" : "View all"}</Link>
+              <p className="font-display font-extrabold text-[13px] md:text-lg">{lang === "ar" ? "الطلبات السريعة" : "Quick Orders"}</p>
+              <Link to="/quick-orders" className="text-[10px] font-bold text-primary md:text-sm">{lang === "ar" ? "عرض الكل" : "View all"}</Link>
             </div>
             {quickItems.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center text-center py-3">
-                <span className="size-10 rounded-full bg-sky-50 flex items-center justify-center">
-                  <ClipboardList className="size-5 text-primary" strokeWidth={2.2} />
+                <span className="size-10 rounded-full bg-sky-50 flex items-center justify-center md:size-16">
+                  <ClipboardList className="size-5 text-primary md:size-8" strokeWidth={2.2} />
                 </span>
-                <p className="mt-2 text-[10.5px] font-bold text-slate-700">{lang === "ar" ? "لا توجد طلبات بعد" : "No orders yet"}</p>
-                <p className="mt-0.5 text-[9.5px] text-slate-400 leading-snug">{lang === "ar" ? "لا توجد طلبات مستلزمات سابقة حتى الآن" : "No previous supply orders yet"}</p>
+                <p className="mt-2 text-[10.5px] font-bold text-slate-700 md:mt-3 md:text-base">{lang === "ar" ? "لا توجد طلبات بعد" : "No orders yet"}</p>
+                <p className="mt-0.5 text-[9.5px] text-slate-400 leading-snug md:mt-1 md:text-sm">{lang === "ar" ? "لا توجد طلبات مستلزمات سابقة حتى الآن" : "No previous supply orders yet"}</p>
               </div>
             ) : (
               <>
@@ -335,20 +347,20 @@ function Home() {
               </>
             )}
           </div>
-          <div className="relative bg-white border border-slate-200 rounded-2xl p-3 shadow-sm overflow-hidden">
+          <div className="relative bg-white border border-slate-200 rounded-2xl p-3 shadow-sm overflow-hidden md:p-5 md:shadow-none md:flex md:flex-col">
             <div className="flex items-center justify-between mb-1">
-              <p className="font-display font-extrabold text-[13px]">{lang === "ar" ? "عروض خاصة" : "Special Offers"}</p>
-              <Link to="/offers" className="text-[10px] font-bold text-primary">{lang === "ar" ? "عرض الكل" : "View all"}</Link>
+              <p className="font-display font-extrabold text-[13px] md:text-lg">{lang === "ar" ? "عروض خاصة" : "Special Offers"}</p>
+              <Link to="/offers" className="text-[10px] font-bold text-primary md:text-sm">{lang === "ar" ? "عرض الكل" : "View all"}</Link>
             </div>
             {latestOffer ? (
               <div className="space-y-1.5">
-                <div className="flex items-center justify-center h-16">
+                <div className="flex items-center justify-center h-16 md:h-40">
                   <img src={latestOffer.imageUrl || "/photo/implant.jpg"} alt="" loading="lazy" className="max-h-full object-contain" />
                 </div>
-                <p className="text-[10px] font-semibold text-slate-700 truncate text-center">{latestOffer.title}</p>
+                <p className="text-[10px] font-semibold text-slate-700 truncate text-center md:text-base">{latestOffer.title}</p>
                 {latestOffer.description && <p className="text-[9px] text-slate-400 line-clamp-1 text-center">{latestOffer.description}</p>}
                 {latestOffer.price != null && (
-                  <p className="font-display font-extrabold text-primary text-sm text-center">
+                  <p className="font-display font-extrabold text-primary text-sm text-center md:text-2xl">
                     {latestOffer.currency === "IQD" ? `${latestOffer.price.toLocaleString()} د.ع` : `$${latestOffer.price}`}
                   </p>
                 )}
@@ -357,15 +369,16 @@ function Home() {
                 )}
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center py-4 text-center">
-                <Megaphone className="size-8 text-slate-300 mb-1.5" />
-                <p className="text-[10px] font-semibold text-slate-400">{lang === "ar" ? "لا توجد عروض حالياً" : "No offers yet"}</p>
+              <div className="flex flex-col items-center justify-center py-4 text-center md:flex-1 md:py-10">
+                <Megaphone className="size-8 text-slate-300 mb-1.5 md:size-14 md:mb-3" />
+                <p className="text-[10px] font-semibold text-slate-400 md:text-base">{lang === "ar" ? "لا توجد عروض حالياً" : "No offers yet"}</p>
               </div>
             )}
             <Sparkles className="absolute -top-2 -end-2 size-8 text-primary/10" />
           </div>
         </div>
       </section>
+      </div>
     </MobileShell>
   );
 }
@@ -376,16 +389,18 @@ function BrandsStrip({ lang }: { lang: "ar" | "en" }) {
   return (
     <>
       <div className="flex items-center justify-between mb-2.5">
-        <h3 className="font-display font-extrabold text-sm text-slate-800">{ar ? "البراندات" : "Brands"}</h3>
-        <Link to="/brands" className="text-xs font-bold text-primary hover:underline">{ar ? "المزيد >" : "More >"}</Link>
+        <h3 className="font-display font-extrabold text-sm text-slate-800 md:text-xl">{ar ? "البراندات" : "Brands"}</h3>
+        <Link to="/brands" className="text-xs font-bold text-primary hover:underline md:text-sm">{ar ? "المزيد >" : "More >"}</Link>
       </div>
-      <div className="flex gap-2.5 overflow-x-auto pb-1">
+      {/* A swipeable strip is right on a phone; on a wide screen there is room
+          to lay all six out at once, so the scroll container becomes a grid. */}
+      <div className="flex gap-2.5 overflow-x-auto pb-1 md:grid md:grid-cols-6 md:gap-4 md:overflow-visible md:pb-0">
         {featured.map((b) => (
-          <Link key={b.id} to="/brands/$brandId" params={{ brandId: b.id }} className="shrink-0 w-28 bg-white border border-slate-200 rounded-2xl p-3 flex flex-col items-center shadow-sm hover:shadow-md transition">
-            <span className="size-16 rounded-xl bg-slate-50 flex items-center justify-center mb-1.5 overflow-hidden">
+          <Link key={b.id} to="/brands/$brandId" params={{ brandId: b.id }} className="shrink-0 w-28 bg-white border border-slate-200 rounded-2xl p-3 flex flex-col items-center shadow-sm hover:shadow-md transition md:w-auto md:shrink md:p-5 md:gap-2 md:shadow-none md:hover:shadow-lg md:hover:border-primary/30">
+            <span className="size-16 rounded-xl bg-slate-50 flex items-center justify-center mb-1.5 overflow-hidden md:size-20 md:mb-0">
               <BrandLogo brand={b} className="w-full h-full" />
             </span>
-            <p className="text-[11px] font-bold text-slate-700 text-center leading-tight line-clamp-2">{ar ? b.ar : b.name}</p>
+            <p className="text-[11px] font-bold text-slate-700 text-center leading-tight line-clamp-2 md:text-sm">{ar ? b.ar : b.name}</p>
           </Link>
         ))}
       </div>

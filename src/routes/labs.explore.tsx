@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { MobileShell } from "@/components/MobileShell";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Search, MapPin, Eye, Building2, Stethoscope, FlaskConical, Package } from "lucide-react";
@@ -211,16 +212,17 @@ function LabsExplore() {
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
-      <div>
-        <h2 className="font-display font-extrabold text-lg text-slate-800 flex items-center gap-2">
-          <Building2 className="size-5 text-sky-500" />
-          {ar ? "استكشاف الحسابات" : "Explore Accounts"}
-        </h2>
-        <p className="text-xs text-slate-500 mt-1">
-          {ar ? "ابحث عن الشركات المسجلة" : "Search registered companies"}
-        </p>
-      </div>
+    <MobileShell wide>
+      <div className="p-4 space-y-4">
+        <div>
+          <h2 className="font-display font-extrabold text-lg text-slate-800 flex items-center gap-2">
+            <Building2 className="size-5 text-sky-500" />
+            {ar ? "استكشاف الحسابات" : "Explore Accounts"}
+          </h2>
+          <p className="text-xs text-slate-500 mt-1">
+            {ar ? "ابحث عن الشركات المسجلة" : "Search registered companies"}
+          </p>
+        </div>
 
       <div className="relative">
         <Search className="size-4 absolute top-1/2 -translate-y-1/2 start-3 text-slate-400 pointer-events-none" />
@@ -275,7 +277,7 @@ function LabsExplore() {
             {filtered.length !== 1 ? (ar ? "" : "s") : ""}
           </p>
 
-          <div className="space-y-3">
+          <div className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-5 xl:grid-cols-3 md:items-start">
             {filtered.map((item) => {
               const meta = CATEGORY_META[item.type] ?? {
                 icon: Building2,
@@ -331,6 +333,7 @@ function LabsExplore() {
           </div>
         </>
       )}
-    </div>
+      </div>
+    </MobileShell>
   );
 }

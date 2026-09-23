@@ -67,8 +67,15 @@ const KEY_PREFIX = "dh_clinic_v3:";
 let currentUserId = "";
 
 export function setClinicStoreUser(uid: string) {
+  // Every clinic screen calls this on mount. Re-running it for the same,
+  // already-loaded user used to reset `state` to `def()` unconditionally —
+  // wiping whatever was just added in this session (e.g. a doctor) the
+  // moment you navigated back to a clinic screen, and persisting that empty
+  // state right over the saved data via emit()/save(). Only reset+reload
+  // when the signed-in user actually changes.
+  if (uid === currentUserId) return;
   currentUserId = uid;
-  state = def();
+  state = load();
   emit();
 }
 

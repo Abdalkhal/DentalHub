@@ -126,50 +126,53 @@ function Explore() {
   };
 
   return (
-    <MobileShell>
-      <TopBar title={ar ? "استكشاف" : "Explore"} />
+    <MobileShell wide>
+      <TopBar title={ar ? "استكشاف" : "Explore"} wide maxW="6xl" />
 
-      <div className="px-4 pt-4 space-y-4">
-        <div className="relative">
-          <Search className="size-4 absolute top-1/2 -translate-y-1/2 start-3 text-muted-foreground pointer-events-none" />
-          <input
-            type="search"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={ar ? "ابحث عن مكتب أو مختبر…" : "Search for office or lab…"}
-            className="w-full h-11 rounded-2xl bg-card border border-border ps-10 pe-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-primary"
-          />
+      <div className="px-4 pt-4 space-y-4 md:px-6 md:pt-8 lg:px-4 lg:max-w-6xl lg:mx-auto lg:pt-10">
+        <div className="md:flex md:items-center md:gap-4 md:space-y-0">
+          <div className="relative md:flex-1 lg:max-w-xl">
+            <Search className="size-4 absolute top-1/2 -translate-y-1/2 start-3 text-muted-foreground pointer-events-none lg:size-4.5" />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={ar ? "ابحث عن مكتب أو مختبر…" : "Search for office or lab…"}
+              className="w-full h-11 rounded-2xl bg-card border border-border ps-10 pe-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-primary lg:h-12 lg:text-base"
+            />
+          </div>
+
+          <div className="flex flex-wrap gap-1.5 mt-4 md:mt-0 md:flex-nowrap md:shrink-0">
+            {CATEGORIES.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => setCategory(c.id)}
+                className={cn(
+                  "px-3.5 h-8 rounded-full text-xs font-semibold border transition whitespace-nowrap",
+                  "lg:h-10 lg:px-4 lg:text-sm",
+                  category === c.id
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-card text-muted-foreground border-border hover:bg-accent",
+                )}
+              >
+                {ar ? c.ar : c.en}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="flex flex-wrap gap-1.5">
-          {CATEGORIES.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => setCategory(c.id)}
-              className={cn(
-                "px-3.5 h-8 rounded-full text-xs font-semibold border transition",
-                category === c.id
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-card text-muted-foreground border-border hover:bg-accent",
-              )}
-            >
-              {ar ? c.ar : c.en}
-            </button>
-          ))}
-        </div>
-
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-muted-foreground lg:text-sm">
           {filtered.length} {ar ? "نتيجة" : "result"}
           {filtered.length !== 1 ? (ar ? "" : "s") : ""}
         </p>
 
-        <div className="space-y-2 pb-4">
+        <div className="space-y-2 pb-4 md:space-y-0 md:grid md:grid-cols-2 md:gap-4 lg:grid-cols-3 xl:grid-cols-4">
           {isLoading ? (
-            <div className="flex items-center justify-center py-16">
+            <div className="flex items-center justify-center py-16 md:col-span-full">
               <div className="size-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
             </div>
           ) : filtered.length === 0 ? (
-            <div className="text-center py-16 text-sm text-muted-foreground">
+            <div className="text-center py-16 text-sm text-muted-foreground md:col-span-full">
               <Search className="size-10 mx-auto mb-3 text-muted-foreground/40" />
               {ar ? "لا توجد نتائج مطابقة" : "No matching results"}
             </div>
@@ -181,18 +184,19 @@ function Explore() {
                 <button
                   key={`${item.category}-${item.id}`}
                   onClick={() => handleSelect(item)}
-                  className="w-full text-start bg-card border border-border rounded-2xl p-4 shadow-soft hover:shadow-md hover:bg-slate-50 hover:border-primary/30 transition-all cursor-pointer flex items-start gap-3"
+                  className="w-full text-start bg-card border border-border rounded-2xl p-4 shadow-soft hover:shadow-md hover:bg-slate-50 hover:border-primary/30 transition-all cursor-pointer flex items-start gap-3 md:flex-col md:items-center md:text-center md:gap-2.5 md:p-6"
                 >
                   <span
                     className={cn(
                       "size-11 rounded-2xl flex items-center justify-center shrink-0",
+                      "lg:size-14",
                       meta.color,
                     )}
                   >
-                    <Icon className="size-5" />
+                    <Icon className="size-5 lg:size-6" />
                   </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-display font-bold text-sm truncate">
+                  <div className="flex-1 min-w-0 md:flex-none md:w-full">
+                    <p className="font-display font-bold text-sm truncate lg:text-base">
                       {ar ? item.name.ar : item.name.en}
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
@@ -200,7 +204,7 @@ function Explore() {
                         ? CATEGORIES.find((c) => c.id === item.category)?.ar
                         : CATEGORIES.find((c) => c.id === item.category)?.en}
                     </p>
-                    <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground md:justify-center">
                       <MapPin className="size-3" />
                       <span>{ar ? item.location.ar : item.location.en}</span>
                     </div>

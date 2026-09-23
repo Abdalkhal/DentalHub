@@ -9,7 +9,7 @@ import { TopBar } from "@/components/TopBar";
 import { CITIES } from "@/data/offices";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { Star, Clock, MapPin, SearchX, Stethoscope } from "lucide-react";
+import { Star, MapPin, SearchX } from "lucide-react";
 
 export const Route = createFileRoute("/labs/")({
   component: LabsIndex,
@@ -74,11 +74,11 @@ function LabsIndex() {
   }, [labs, city, sort]);
 
   return (
-    <MobileShell>
-      <TopBar title={t("labs")} showBack />
-      <div className="px-4 pt-4">
+    <MobileShell wide>
+      <TopBar title={t("labs")} showBack wide maxW="6xl" />
+      <div className="px-4 pt-4 md:px-6 md:pt-8 md:pb-12 lg:px-8 lg:max-w-6xl lg:mx-auto">
         {/* City filter */}
-        <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 mb-2">
+        <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 mb-2 md:flex-wrap md:overflow-visible md:gap-2.5 md:mb-4">
           <button onClick={() => setCity("all")} className={cn("shrink-0 h-8 px-3 rounded-full text-xs font-semibold border transition", city === "all" ? "bg-foreground text-background border-foreground" : "bg-card text-foreground border-border hover:bg-accent")}>{ar ? "كل المدن" : "All cities"}</button>
           {CITIES.map((c) => (
             <button key={c.id} onClick={() => setCity(c.id)} className={cn("shrink-0 h-8 px-3 rounded-full text-xs font-semibold border transition", city === c.id ? "bg-foreground text-background border-foreground" : "bg-card text-foreground border-border hover:bg-accent")}>{ar ? c.ar : c.en}</button>
@@ -86,7 +86,7 @@ function LabsIndex() {
         </div>
 
         {/* Sort chips */}
-        <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 mb-1">
+        <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 mb-1 md:flex-wrap md:overflow-visible md:gap-2.5">
           {([
             { key: "default", ar: "الكل", en: "All" },
             { key: "rating", ar: "الأعلى تقييماً", en: "Top rated" },
@@ -96,21 +96,21 @@ function LabsIndex() {
           ))}
         </div>
 
-        <h2 className="font-display font-bold text-base mb-3">{ar ? "المختبرات" : "Laboratories"}</h2>
+        <h2 className="font-display font-bold text-base mb-3 md:text-2xl md:mt-6 md:mb-5">{ar ? "المختبرات" : "Laboratories"}</h2>
         {filtered.length === 0 ? (
-          <div className="py-12 flex flex-col items-center text-center text-muted-foreground">
+          <div className="py-12 flex flex-col items-center text-center text-muted-foreground md:col-span-full">
             <SearchX className="size-8 mb-2" />
             <p className="text-sm">{ar ? "لا توجد مختبرات" : "No labs found"}</p>
           </div>
         ) : (
-          <ul className="space-y-3">
+          <ul className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-4 lg:grid-cols-3 xl:grid-cols-4">
             {filtered.map((item) => (
               <li key={item.id}>
-                <Link to="/labs/$labId" params={{ labId: item.id }} className="flex items-center gap-3 bg-card border border-border rounded-2xl p-3.5 shadow-soft hover:shadow-card transition">
-                  <span className="size-12 rounded-2xl bg-[oklch(0.95_0.05_250)] text-[oklch(0.45_0.18_250)] flex items-center justify-center font-display font-extrabold text-lg">{(ar ? item.name.ar : item.name.en).charAt(0)}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-display font-bold text-foreground truncate">{ar ? item.name.ar : item.name.en}</p>
-                    <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
+                <Link to="/labs/$labId" params={{ labId: item.id }} className="flex items-center gap-3 bg-card border border-border rounded-2xl p-3.5 shadow-soft hover:shadow-card transition md:h-full md:flex-col md:items-center md:text-center md:gap-3 md:p-6 md:shadow-none md:hover:shadow-lg md:hover:border-primary/30 md:hover:-translate-y-0.5">
+                  <span className="size-12 rounded-2xl bg-[oklch(0.95_0.05_250)] text-[oklch(0.45_0.18_250)] flex items-center justify-center font-display font-extrabold text-lg shrink-0 md:size-16 md:text-2xl md:rounded-3xl">{(ar ? item.name.ar : item.name.en).charAt(0)}</span>
+                  <div className="flex-1 min-w-0 md:flex-none md:w-full">
+                    <p className="font-display font-bold text-foreground truncate md:text-lg">{ar ? item.name.ar : item.name.en}</p>
+                    <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground md:justify-center md:mt-2 md:text-sm">
                       <span className="inline-flex items-center gap-1"><MapPin className="size-3" />{getCityName(item.cityId, ar)}</span>
                       {item.rating > 0 && <span className="inline-flex items-center gap-1 text-amber-500"><Star className="size-3 fill-current" /><span className="font-semibold">{item.rating}</span></span>}
                     </div>

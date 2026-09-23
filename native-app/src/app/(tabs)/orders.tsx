@@ -34,10 +34,14 @@ const FILTERS = [
   { id: 'rejected', ar: 'غير متوفر', en: 'Unavailable' },
 ];
 
-const TONE: Record<string, string> = {
-  pending: 'bg-amber-50 text-amber-700',
-  confirmed: 'bg-emerald-50 text-emerald-700',
-  rejected: 'bg-rose-50 text-rose-600',
+// Plain hex pairs instead of combined NativeWind bg-*/text-* classes — this
+// badge is re-rendered on every order-list update (FlatList `renderItem`),
+// which hits the same react-native-css-interop race documented on the
+// FilterChip above.
+const TONE: Record<string, { bg: string; text: string }> = {
+  pending: { bg: '#FFFBEB', text: '#B45309' },
+  confirmed: { bg: '#ECFDF5', text: '#047857' },
+  rejected: { bg: '#FFF1F2', text: '#E11D48' },
 };
 
 const LABEL: Record<string, { ar: string; en: string }> = {
@@ -46,21 +50,31 @@ const LABEL: Record<string, { ar: string; en: string }> = {
   rejected: { ar: 'غير متوفر', en: 'Unavailable' },
 };
 
-// A fixed `h-8` chip with a two-word label like "غير متوفر" can wrap to a
-// second line that the fixed height then clips — the exact bug already
-// fixed for the shared Button component (components/ui/Button.tsx), but
-// these filter chips are their own inline Pressable/Text, duplicated three
-// times in this file, so that earlier fix never reached them.
+// Plain style object instead of NativeWind border/bg classes: `setFilter`
+// re-renders this row on every tap, which hits a known react-native-css-
+// interop class-application race on this RN/Android setup — a two-word
+// label like "غير متوفر" can silently clip to its first word after that
+// re-render and never recover. See the identical fix in patients.tsx /
+// patient/[patientId].tsx. These filter chips are their own inline
+// Pressable/Text, duplicated three times in this file.
 function FilterChip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   return (
     <Pressable
       onPress={onPress}
-      className={cn(
-        'min-h-8 items-center justify-center rounded-full border px-3 py-1.5',
-        active ? 'border-[#2563EB] bg-[#2563EB]' : 'border-slate-200 bg-white',
-      )}
+      style={{
+        flexShrink: 0,
+        minHeight: 32,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 999,
+        borderWidth: 1,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderColor: active ? '#2563EB' : '#E2E8F0',
+        backgroundColor: active ? '#2563EB' : '#FFFFFF',
+      }}
     >
-      <Text className={cn('text-center text-[11px] font-bold', active ? 'text-white' : 'text-slate-600')}>
+      <Text className="text-center font-bold" style={{ fontSize: 11, color: active ? '#FFFFFF' : '#475569' }}>
         {label}
       </Text>
     </Pressable>
@@ -155,8 +169,8 @@ function DentistOrders() {
               <View className="p-4">
                 <View className="flex-row items-center justify-between gap-2">
                   <Text className="text-sm font-extrabold text-slate-800">{orderNo(o)}</Text>
-                  <View className={cn('shrink-0 rounded-full px-2.5 py-1', TONE[st] ?? TONE.pending)}>
-                    <Text className="text-[11px] font-bold">
+                  <View style={{ flexShrink: 0, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: (TONE[st] ?? TONE.pending).bg }}>
+                    <Text className="font-bold" style={{ fontSize: 11, color: (TONE[st] ?? TONE.pending).text }}>
                       {ar ? (LABEL[st]?.ar ?? st) : (LABEL[st]?.en ?? st)}
                     </Text>
                   </View>
@@ -326,23 +340,9 @@ function SupplierOrders() {
               leftIcon={<Search size={16} color="#94A3B8" />}
             />
             <View className="flex-row flex-wrap gap-1.5">
-              {FILTERS.map((f) => {
-                const active = filter === f.id;
-                return (
-                  <Pressable
-                    key={f.id}
-                    onPress={() => setFilter(f.id)}
-                    className={cn(
-                      'h-8 items-center justify-center rounded-full border px-3',
-                      active ? 'border-[#2563EB] bg-[#2563EB]' : 'border-slate-200 bg-white',
-                    )}
-                  >
-                    <Text className={cn('text-[11px] font-bold', active ? 'text-white' : 'text-slate-600')}>
-                      {ar ? f.ar : f.en}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+              {FILTERS.map((f) => (
+                <FilterChip key={f.id} label={ar ? f.ar : f.en} active={filter === f.id} onPress={() => setFilter(f.id)} />
+              ))}
             </View>
           </View>
         }
@@ -362,8 +362,8 @@ function SupplierOrders() {
               <View className="p-4">
                 <View className="flex-row items-center justify-between gap-2">
                   <Text className="text-sm font-extrabold text-slate-800">{orderNo(o)}</Text>
-                  <View className={cn('shrink-0 rounded-full px-2.5 py-1', TONE[st] ?? TONE.pending)}>
-                    <Text className="text-[11px] font-bold">
+                  <View style={{ flexShrink: 0, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: (TONE[st] ?? TONE.pending).bg }}>
+                    <Text className="font-bold" style={{ fontSize: 11, color: (TONE[st] ?? TONE.pending).text }}>
                       {ar ? (LABEL[st]?.ar ?? st) : (LABEL[st]?.en ?? st)}
                     </Text>
                   </View>
@@ -524,11 +524,11 @@ const LAB_ORDER_FILTERS: { id: 'all' | LabOrderStatus; ar: string; en: string }[
   { id: 'delayed', ar: 'متأخرة', en: 'Late' },
 ];
 
-const LAB_STATUS_TONE: Record<LabOrderStatus, string> = {
-  new: 'bg-sky-100 text-sky-700',
-  in_progress: 'bg-amber-100 text-amber-700',
-  completed: 'bg-emerald-100 text-emerald-700',
-  delayed: 'bg-rose-100 text-rose-700',
+const LAB_STATUS_TONE: Record<LabOrderStatus, { bg: string; text: string }> = {
+  new: { bg: '#E0F2FE', text: '#0369A1' },
+  in_progress: { bg: '#FEF3C7', text: '#B45309' },
+  completed: { bg: '#D1FAE5', text: '#047857' },
+  delayed: { bg: '#FFE4E6', text: '#BE123C' },
 };
 const LAB_STATUS_ACCENT: Record<LabOrderStatus, string> = {
   new: '#0369A1',
@@ -606,8 +606,8 @@ function LabOrders() {
               <Text className="min-w-0 flex-1 truncate text-sm font-extrabold text-slate-800">
                 {c.patient || (ar ? 'غير محدد' : 'Unspecified')}
               </Text>
-              <View className={cn('shrink-0 rounded-full px-2.5 py-1', LAB_STATUS_TONE[c.status] ?? LAB_STATUS_TONE.new)}>
-                <Text className="text-[10px] font-bold">
+              <View style={{ flexShrink: 0, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: (LAB_STATUS_TONE[c.status] ?? LAB_STATUS_TONE.new).bg }}>
+                <Text className="font-bold" style={{ fontSize: 10, color: (LAB_STATUS_TONE[c.status] ?? LAB_STATUS_TONE.new).text }}>
                   {ar ? LAB_STATUS_AR[c.status] : LAB_STATUS_EN[c.status]}
                 </Text>
               </View>

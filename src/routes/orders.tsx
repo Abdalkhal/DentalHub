@@ -14,7 +14,6 @@ import { useUserRole, useSession } from "@/lib/useAuth";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
-  updateOrderStatus,
   deleteOrder,
   useOrders,
   connectLabOrders,
@@ -22,7 +21,6 @@ import {
   updateOrder,
   buildInternalOrder,
   type Order,
-  type OrderStatus,
 } from "@/lib/ordersStore";
 import {
   MATERIALS,
@@ -186,14 +184,14 @@ function UnreadBadge({ labId, caseId, userId }: { labId?: string; caseId: string
 }
 
 function Orders() {
-  const { lang, t } = useI18n();
+  const { lang } = useI18n();
   const ar = lang === "ar";
   const { role, loading: roleLoading } = useUserRole();
 
   if (roleLoading) {
     return (
-      <MobileShell>
-        <TopBar title={ar ? "طلباتي" : "My Orders"} showBack />
+      <MobileShell wide>
+        <TopBar title={ar ? "طلباتي" : "My Orders"} showBack wide />
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="size-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
@@ -281,10 +279,6 @@ function LabOrders() {
       return true;
     });
   }, [statusFilter, search, orders]);
-
-  const handleStatusChange = (id: string, newStatus: OrderStatus) => {
-    updateOrderStatus(id, newStatus);
-  };
 
   return (
     <MobileShell>
@@ -478,10 +472,10 @@ function DentistOrders() {
 
   if (!user) {
     return (
-      <MobileShell>
-        <TopBar title={ar ? "طلباتي" : "My Orders"} showBack />
-        <div className="p-6 text-center space-y-3">
-          <Package className="size-10 text-slate-300 mx-auto" />
+      <MobileShell wide>
+        <TopBar title={ar ? "طلباتي" : "My Orders"} showBack wide />
+        <div className="p-6 text-center space-y-3 md:py-24">
+          <Package className="size-10 text-slate-300 mx-auto md:size-14" />
           <p className="font-bold text-slate-600">
             {ar ? "يجب تسجيل الدخول أولاً" : "Please sign in first"}
           </p>
@@ -491,16 +485,16 @@ function DentistOrders() {
   }
 
   return (
-    <MobileShell>
-      <TopBar title={ar ? "طلباتي" : "My Orders"} showBack />
-      <div className="px-4 pt-4 pb-6 space-y-4">
+    <MobileShell wide>
+      <TopBar title={ar ? "طلباتي" : "My Orders"} showBack wide />
+      <div className="px-4 pt-4 pb-6 space-y-4 md:px-6 md:pt-8 md:pb-12 md:space-y-6 lg:px-8 lg:max-w-5xl lg:mx-auto">
 
         {cart.length > 0 && (
-          <div className="bg-sky-50 border border-sky-200 rounded-2xl p-4">
-            <div className="flex items-center justify-between mb-3">
+          <div className="bg-sky-50 border border-sky-200 rounded-2xl p-4 md:p-6 md:flex md:items-center md:justify-between md:gap-8">
+            <div className="flex items-center justify-between mb-3 md:mb-0">
               <div>
-                <p className="font-bold text-sm text-sky-800">{ar ? "سلة التسوق" : "Shopping Cart"}</p>
-                <p className="text-xs text-sky-600 mt-0.5">
+                <p className="font-bold text-sm text-sky-800 md:text-xl">{ar ? "سلة التسوق" : "Shopping Cart"}</p>
+                <p className="text-xs text-sky-600 mt-0.5 md:text-sm md:mt-1.5">
                   {cart.length} {ar ? "منتجات" : "products"} ·{" "}
                   {fmtOrderMoney(
                     cart.filter((i) => i.currency !== "IQD").reduce((s, i) => s + (i.unitPrice || 0) * (i.quantity || 1), 0),
@@ -514,7 +508,7 @@ function DentistOrders() {
             <button
               onClick={handlePlaceOrder}
               disabled={placing}
-              className="w-full h-11 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-bold text-sm flex items-center justify-center gap-2 transition disabled:opacity-60"
+              className="w-full h-11 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-bold text-sm flex items-center justify-center gap-2 transition disabled:opacity-60 md:w-auto md:px-7 md:h-12 md:rounded-full md:shrink-0"
             >
               {placing ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
               {placing ? (ar ? "جارٍ الإرسال..." : "Placing...") : ar ? "إتمام الطلب" : "Complete order"}
@@ -522,7 +516,7 @@ function DentistOrders() {
           </div>
         )}
 
-        <h3 className="font-bold text-sm text-slate-600">
+        <h3 className="font-bold text-sm text-slate-600 md:text-2xl md:pt-2">
           {ar ? "سجل الطلبات السابقة" : "Past orders"}
         </h3>
 
@@ -531,24 +525,24 @@ function DentistOrders() {
             <Loader2 className="size-6 text-primary animate-spin" />
           </div>
         ) : myOrders.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="size-20 rounded-full bg-slate-100 flex items-center justify-center mb-4">
+          <div className="flex flex-col items-center justify-center py-16 text-center md:py-28 md:rounded-3xl md:border md:border-dashed md:border-slate-200 md:bg-card">
+            <div className="size-20 rounded-full bg-slate-100 flex items-center justify-center mb-4 md:size-24 md:mb-6">
               <Package className="size-9 text-slate-400" />
             </div>
             <p className="font-bold text-lg text-slate-500">{ar ? "لا توجد طلبات سابقة" : "No past orders"}</p>
             <p className="text-sm text-slate-400 mt-1">{ar ? "ستظهر هنا طلبات الشراء التي قمت بها" : "Your purchase orders will appear here"}</p>
-            <Link to="/supplies" className="mt-4 inline-flex h-11 px-5 rounded-xl bg-primary text-primary-foreground font-bold text-sm items-center gap-2 hover:opacity-90 transition">
+            <Link to="/supplies" className="mt-4 inline-flex h-11 px-5 rounded-xl bg-primary text-primary-foreground font-bold text-sm items-center gap-2 hover:opacity-90 transition md:mt-7 md:h-12 md:px-7 md:rounded-full">
               <Package className="size-4" />
               {ar ? "تصفح المنتجات" : "Browse Products"}
             </Link>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-2 md:space-y-0 md:grid md:grid-cols-2 md:gap-5 md:items-start">
             {myOrders.map((o) => {
               const s = (o.status as string) || "pending";
               const itemCount = (o.items || []).reduce((sum, i) => sum + (i.quantity || 1), 0);
               return (
-                <div key={o.id} className="bg-card border border-border rounded-2xl p-4 shadow-soft">
+                <div key={o.id} className="bg-card border border-border rounded-2xl p-4 shadow-soft md:h-full md:flex md:flex-col md:p-5 md:shadow-none md:hover:shadow-lg md:transition">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2.5">
                       <span className="size-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
@@ -639,48 +633,51 @@ function SupplierOrders() {
   };
 
   return (
-    <MobileShell>
-      <TopBar title={ar ? "طلباتي" : "My Orders"} showBack />
-      <div className="px-4 pt-4 pb-6 space-y-4">
-        <div className="relative">
-          <Search className="size-4 absolute top-1/2 -translate-y-1/2 start-3 text-muted-foreground pointer-events-none" />
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={ar ? "ابحث عن طلب أو طبيب…" : "Search order or doctor…"}
-            className="w-full h-11 rounded-2xl bg-card border border-border ps-10 pe-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-primary"
-          />
+    <MobileShell wide>
+      <TopBar title={ar ? "طلباتي" : "My Orders"} showBack wide />
+      <div className="px-4 pt-4 pb-6 space-y-4 md:px-6 md:pt-8 lg:px-4 lg:max-w-6xl lg:mx-auto lg:pt-10">
+        <div className="md:flex md:items-center md:gap-4 md:space-y-0">
+          <div className="relative md:flex-1 lg:max-w-xl">
+            <Search className="size-4 absolute top-1/2 -translate-y-1/2 start-3 text-muted-foreground pointer-events-none" />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={ar ? "ابحث عن طلب أو طبيب…" : "Search order or doctor…"}
+              className="w-full h-11 rounded-2xl bg-card border border-border ps-10 pe-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-primary lg:h-12 lg:text-base"
+            />
+          </div>
+
+          <div className="flex flex-wrap gap-1.5 mt-4 md:mt-0 md:flex-nowrap md:shrink-0">
+            {statusOptions.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setStatusFilter(s.id)}
+                className={cn(
+                  "px-3.5 h-8 rounded-full text-xs font-semibold border transition whitespace-nowrap",
+                  "lg:h-10 lg:px-4 lg:text-sm",
+                  statusFilter === s.id
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-card text-muted-foreground border-border hover:bg-accent",
+                )}
+              >
+                {ar ? s.ar : s.en}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="flex flex-wrap gap-1.5">
-          {statusOptions.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => setStatusFilter(s.id)}
-              className={cn(
-                "px-3.5 h-8 rounded-full text-xs font-semibold border transition",
-                statusFilter === s.id
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-card text-muted-foreground border-border hover:bg-accent",
-              )}
-            >
-              {ar ? s.ar : s.en}
-            </button>
-          ))}
-        </div>
-
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-muted-foreground lg:text-sm">
           {filteredOrders.length} {ar ? "طلب" : "order"}
         </p>
 
-        <div className="space-y-2">
+        <div className="space-y-2 md:space-y-0 md:grid md:grid-cols-2 md:gap-4 xl:grid-cols-3">
           {isLoading ? (
-            <div className="flex items-center justify-center py-16">
+            <div className="flex items-center justify-center py-16 md:col-span-full">
               <Loader2 className="size-6 text-primary animate-spin" />
             </div>
           ) : filteredOrders.length === 0 ? (
-            <div className="text-center py-16 text-sm text-muted-foreground">
+            <div className="text-center py-16 text-sm text-muted-foreground md:col-span-full">
               <Package className="size-10 mx-auto mb-3 text-muted-foreground/40" />
               {supplierOrders.length === 0
                 ? ar ? "لا توجد طلبات حتى الآن" : "No orders yet"
@@ -695,7 +692,7 @@ function SupplierOrders() {
                 <div
                   key={o.id}
                   onClick={() => setSelectedOrder(o)}
-                  className="bg-card border border-border rounded-2xl p-4 shadow-soft cursor-pointer hover:shadow-card transition"
+                  className="bg-card border border-border rounded-2xl p-4 shadow-soft cursor-pointer hover:shadow-card transition md:flex md:flex-col"
                 >
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <div className="flex items-center gap-2.5 min-w-0">
@@ -728,7 +725,7 @@ function SupplierOrders() {
                     {firstItem}{itemCount > 1 ? ` +${itemCount - 1}` : ""}
                   </p>
 
-                  <div className="flex items-center justify-between text-xs text-slate-500 border-t border-dashed border-border pt-2.5">
+                  <div className="flex items-center justify-between text-xs text-slate-500 border-t border-dashed border-border pt-2.5 md:mt-auto">
                     <span>
                       {itemCount} {ar ? "منتج" : "products"} · {o.createdAt ? formatShortDate(o.createdAt) : "-"}
                     </span>

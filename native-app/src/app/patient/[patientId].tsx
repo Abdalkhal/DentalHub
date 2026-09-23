@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Linking, Modal, Pressable, ScrollView, Share, TextInput, View } from 'react-native';
+import { Linking, Modal, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import {
   Activity,
@@ -57,6 +57,8 @@ import {
 } from '@/lib/patientsStore';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
+import { sharePdf, patientRecordHtml } from '@/lib/print';
+import { toast } from '@/lib/toast';
 
 type Sub = { ar: string; en: string };
 
@@ -149,10 +151,16 @@ const BRANCHES: Array<{ key: string; ar: string; en: string; icon: LucideIcon; b
   },
 ];
 
+// Plain color values instead of NativeWind bg-*/text-* classes on these two
+// maps: both badges below are re-rendered by their own onPress cycle
+// handler, which hits the same react-native-css-interop race documented
+// just below (shadowSm/shadowMd) — except here the symptom isn't a crash,
+// it's the label silently clipping to its first word or two after the first
+// re-render and staying that way.
 const PLAN_META: Record<PlanStatus, { ar: string; en: string; bg: string; text: string }> = {
-  done: { ar: 'مكتمل', en: 'Done', bg: 'bg-emerald-100', text: 'text-emerald-700' },
-  active: { ar: 'قيد التنفيذ', en: 'In progress', bg: 'bg-blue-100', text: 'text-blue-700' },
-  planned: { ar: 'مقترح', en: 'Planned', bg: 'bg-slate-100', text: 'text-slate-500' },
+  done: { ar: 'مكتمل', en: 'Done', bg: '#D1FAE5', text: '#047857' },
+  active: { ar: 'قيد التنفيذ', en: 'In progress', bg: '#DBEAFE', text: '#1D4ED8' },
+  planned: { ar: 'مقترح', en: 'Planned', bg: '#F1F5F9', text: '#64748B' },
 };
 
 // Plain style objects instead of `shadow-*` / color-opacity (`bg-x/NN`) utility
@@ -176,9 +184,9 @@ const shadowMd = {
 } as const;
 
 const STATUS_META: Record<PatientStatus, { ar: string; en: string; bg: string; text: string }> = {
-  new: { ar: 'مريض جديد', en: 'New', bg: 'bg-blue-100', text: 'text-blue-700' },
-  in_treatment: { ar: 'علاج قيد الإنجاز', en: 'In treatment', bg: 'bg-amber-100', text: 'text-amber-700' },
-  completed: { ar: 'مكتمل', en: 'Completed', bg: 'bg-emerald-100', text: 'text-emerald-700' },
+  new: { ar: 'مريض جديد', en: 'New', bg: '#DBEAFE', text: '#1D4ED8' },
+  in_treatment: { ar: 'علاج قيد الإنجاز', en: 'In treatment', bg: '#FEF3C7', text: '#B45309' },
+  completed: { ar: 'مكتمل', en: 'Completed', bg: '#D1FAE5', text: '#047857' },
 };
 
 const STATUS_AR: Record<PatientStatus, string> = {
@@ -207,6 +215,52 @@ export default function PatientDetailScreen() {
 
   const log = getLog(p);
 
+  const sharePatientRecord = async () => {
+    const genderLabel = p.gender === 'male' ? (ar ? 'ذكر' : 'Male') : ar ? 'أنثى' : 'Female';
+    const sym = p.feeCurrency === 'IQD' ? (ar ? 'د.ع' : 'IQD') : '$';
+    const teeth = Object.entries(p.teeth)
+      .map(([tooth, status]) => ({ tooth: Number(tooth), status, meta: TOOTH_META[status] }))
+      .sort((a, b) => a.tooth - b.tooth)
+      .map((x) => ({ tooth: x.tooth, status: ar ? x.meta.ar : x.meta.en, color: x.meta.dot }));
+    const plan = getPlan(p).map((s) => ({
+      title: s.title,
+      tooth: s.tooth,
+      dept: s.dept ? (ar ? BRANCHES.find((b) => b.key === s.dept)?.ar : BRANCHES.find((b) => b.key === s.dept)?.en) : undefined,
+      cost: s.cost ? `${sym}${s.cost}` : undefined,
+      status: ar ? PLAN_META[s.status].ar : PLAN_META[s.status].en,
+      statusColor: PLAN_META[s.status].text,
+      note: s.note,
+    }));
+    const ok = await sharePdf(
+      `${p.name}.pdf`,
+      patientRecordHtml({
+        ar,
+        meta: [
+          { label: ar ? 'اسم المريض' : 'Patient name', value: p.name },
+          { label: ar ? 'رقم الملف' : 'File #', value: p.fileNo },
+          { label: ar ? 'العمر' : 'Age', value: p.age ? `${p.age} ${ar ? 'سنة' : 'y'}` : '—' },
+          { label: ar ? 'الجنس' : 'Gender', value: genderLabel },
+          { label: ar ? 'الهاتف' : 'Phone', value: p.phone || '—' },
+          { label: ar ? 'الحالة' : 'Status', value: ar ? STATUS_META[p.status].ar : STATUS_META[p.status].en },
+          { label: ar ? 'آخر زيارة' : 'Last visit', value: p.lastVisit || '—' },
+        ],
+        complaint: p.complaint,
+        doctorNotes: p.doctorNote,
+        visits: p.visits.map((v) => ({
+          date: v.date,
+          time: v.time,
+          procedure: v.procedure,
+          doctor: v.doctor,
+          status: v.status ? v.status : v.upcoming ? (ar ? 'موعد قادم' : 'Upcoming') : ar ? 'منجزة' : 'Done',
+          note: v.note,
+        })),
+        teeth,
+        plan,
+      }),
+    );
+    if (!ok) toast.error(ar ? 'تعذر إنشاء ملف PDF' : 'Could not create PDF');
+  };
+
   const TABS = [
     { id: 'info', ar: 'المعلومات', en: 'Info' },
     { id: 'visits', ar: 'الزيارات', en: 'Visits' },
@@ -220,7 +274,7 @@ export default function PatientDetailScreen() {
       {/* Quick actions */}
       <View className="flex-row items-center gap-1.5">
         <Pressable
-          onPress={() => Share.share({ message: p.name, title: p.name })}
+          onPress={sharePatientRecord}
           className="h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm"
         >
           <Share2 size={15} color="#64748B" />
@@ -232,8 +286,8 @@ export default function PatientDetailScreen() {
           <Text className="text-[13px] font-black text-primary">Rx</Text>
         </Pressable>
         <View className="flex-1" />
-        <View className={cn('rounded-full px-2.5 py-1', STATUS_META[p.status].bg)}>
-          <Text className={cn('text-[11px] font-bold', STATUS_META[p.status].text)}>
+        <View style={{ borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: STATUS_META[p.status].bg }}>
+          <Text className="font-bold" style={{ fontSize: 11, color: STATUS_META[p.status].text }}>
             {ar ? STATUS_META[p.status].ar : STATUS_META[p.status].en}
           </Text>
         </View>
@@ -489,7 +543,8 @@ function BillingTab({ p, ar }: { p: Patient; ar: boolean }) {
           <Text className="text-xs font-bold text-slate-500">{ar ? 'إجمالي الأتعاب' : 'Total fees'}</Text>
           <Wallet size={16} color="#2563EB" />
         </View>
-        <View className="relative">
+        <View className="h-11 flex-row items-center rounded-xl border border-slate-200 bg-slate-50 px-3">
+          <Text className="me-2 shrink-0 text-xs font-bold text-slate-400">{sym}</Text>
           <TextInput
             value={p.totalFees ? p.totalFees.toLocaleString('en-US') : ''}
             onChangeText={(v) => {
@@ -499,11 +554,8 @@ function BillingTab({ p, ar }: { p: Patient; ar: boolean }) {
             keyboardType="numeric"
             placeholder="0"
             placeholderTextColor="#94A3B8"
-            className="h-11 rounded-xl border border-slate-200 bg-slate-50 pl-8 pr-3 text-sm text-slate-800"
+            className="flex-1 text-sm text-slate-800"
           />
-          <View className="absolute bottom-0 left-3 top-0 justify-center">
-            <Text className="text-xs font-bold text-slate-400">{sym}</Text>
-          </View>
         </View>
       </Card>
 
@@ -513,7 +565,8 @@ function BillingTab({ p, ar }: { p: Patient; ar: boolean }) {
         <View className="flex-row gap-2">
           <View className="flex-1">
             <Text className="mb-1 text-[10px] font-semibold text-slate-500">{ar ? 'المبلغ' : 'Amount'}</Text>
-            <View className="relative">
+            <View className="h-11 flex-row items-center rounded-xl border border-slate-200 bg-slate-50 px-3">
+              <Text className="me-2 shrink-0 text-xs font-bold text-slate-400">{sym}</Text>
               <TextInput
                 value={amount}
                 onChangeText={(v) => {
@@ -523,11 +576,8 @@ function BillingTab({ p, ar }: { p: Patient; ar: boolean }) {
                 keyboardType="numeric"
                 placeholder="0"
                 placeholderTextColor="#94A3B8"
-                className="h-11 rounded-xl border border-slate-200 bg-slate-50 pl-8 pr-3 text-sm text-slate-800"
+                className="flex-1 text-sm text-slate-800"
               />
-              <View className="absolute bottom-0 left-3 top-0 justify-center">
-                <Text className="text-xs font-bold text-slate-400">{sym}</Text>
-              </View>
             </View>
           </View>
           <View className="flex-1">
@@ -639,15 +689,16 @@ function PatientInfoCard({ p, ar }: { p: Patient; ar: boolean }) {
     age: p.age ? String(p.age) : '',
     gender: p.gender,
     phone: p.phone || '',
+    fileNo: p.fileNo,
   });
 
   const startEdit = () => {
-    setForm({ name: p.name, age: p.age ? String(p.age) : '', gender: p.gender, phone: p.phone || '' });
+    setForm({ name: p.name, age: p.age ? String(p.age) : '', gender: p.gender, phone: p.phone || '', fileNo: p.fileNo });
     setEditing(true);
   };
 
   const cancel = () => {
-    setForm({ name: p.name, age: p.age ? String(p.age) : '', gender: p.gender, phone: p.phone || '' });
+    setForm({ name: p.name, age: p.age ? String(p.age) : '', gender: p.gender, phone: p.phone || '', fileNo: p.fileNo });
     setEditing(false);
   };
 
@@ -657,6 +708,7 @@ function PatientInfoCard({ p, ar }: { p: Patient; ar: boolean }) {
       age: form.age === '' ? '' : Number(form.age) || 0,
       gender: form.gender,
       phone: form.phone.trim(),
+      fileNo: form.fileNo.trim() || p.fileNo,
     });
     setEditing(false);
   };
@@ -715,7 +767,7 @@ function PatientInfoCard({ p, ar }: { p: Patient; ar: boolean }) {
                 ))}
               </View>
             </View>
-            <MetaField label={ar ? 'رقم الملف' : 'File #'} value={p.fileNo} disabled ltr />
+            <MetaField label={ar ? 'رقم الملف' : 'File #'} value={form.fileNo} onChange={(v) => setForm((f) => ({ ...f, fileNo: v }))} ltr />
             <MetaField label={ar ? 'الهاتف' : 'Phone'} value={form.phone} onChange={(v) => setForm((f) => ({ ...f, phone: v }))} keyboardType="phone-pad" ltr />
           </>
         ) : (
@@ -1073,9 +1125,9 @@ function PlanCard({ p, ar }: { p: Patient; ar: boolean }) {
                 </View>
                 <Pressable
                   onPress={() => cyclePlanStep(p.id, s.id)}
-                  className={cn('shrink-0 rounded-full px-2 py-1', PLAN_META[s.status].bg)}
+                  style={{ flexShrink: 0, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: PLAN_META[s.status].bg }}
                 >
-                  <Text className={cn('text-[10px] font-bold', PLAN_META[s.status].text)}>
+                  <Text className="font-bold" style={{ fontSize: 10, color: PLAN_META[s.status].text }}>
                     {ar ? PLAN_META[s.status].ar : PLAN_META[s.status].en}
                   </Text>
                 </Pressable>

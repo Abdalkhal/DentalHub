@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-import { auth, db } from "@/integrations/firebase/client";
+import { signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { getFunctions, httpsCallable } from "firebase/functions";
+import { auth } from "@/integrations/firebase/client";
 import { useIsAdmin, fetchUserRoleDoc } from "@/lib/useAuth";
 import { AdminStandaloneApp } from "@/components/admin/AdminStandaloneApp";
 import { ShieldCheck, Loader2, LogOut, KeyRound } from "lucide-react";
@@ -11,12 +11,11 @@ export const Route = createFileRoute("/admin-standalone/")({
   component: AdminStandalonePage,
 });
 
-const ADMIN_EMAIL = "admin@dentalhub.com";
-const ADMIN_PASSWORD = "admin123";
+const DEFAULT_ADMIN_EMAIL = "admin@dentalhub.com";
 
 function AdminLogin() {
-  const [email, setEmail] = useState(ADMIN_EMAIL);
-  const [password, setPassword] = useState(ADMIN_PASSWORD);
+  const [email, setEmail] = useState(DEFAULT_ADMIN_EMAIL);
+  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [seeding, setSeeding] = useState(false);
   const [error, setError] = useState("");
@@ -36,35 +35,33 @@ function AdminLogin() {
     }
   };
 
+  // One-time bootstrap executed server-side by the createInitialAdmin Cloud
+  // Function (only succeeds while no admin exists). Dev-only.
   const seedAdmin = async () => {
     setError("");
     setInfo("");
     setSeeding(true);
     try {
-      const cred = await createUserWithEmailAndPassword(auth, ADMIN_EMAIL, ADMIN_PASSWORD);
-      await setDoc(doc(db, "user_roles", cred.user.uid), {
-        userId: cred.user.uid,
-        role: "admin",
-        accountType: "dentist",
-        name: "مدير النظام",
-        surname: "Admin",
-        email: ADMIN_EMAIL,
-        accountStatus: "active",
-        createdAt: serverTimestamp(),
+      const fn = httpsCallable(getFunctions(), "createInitialAdmin");
+      const res = await fn({
+        email: email.trim() || DEFAULT_ADMIN_EMAIL,
+        password,
       });
-      setInfo(`تم إنشاء حساب المدير بنجاح — ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`);
+      const r = (res.data ?? {}) as { uid?: string; email?: string };
+      setInfo(
+        `تم إنشاء حساب المدير الأول (${r.email ?? DEFAULT_ADMIN_EMAIL}) بنجاح. سجّل الخروج ثم ادخل ببيانات الحساب الجديد.`,
+      );
     } catch (err: unknown) {
-      const code = (err as { code?: string })?.code;
-      if (code === "auth/email-already-in-use") {
-        setInfo(
-          `الحساب ${ADMIN_EMAIL} موجود مسبقاً — استخدم بيانات الدخول التالية: ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`,
-        );
-      } else if (code === "auth/operation-not-allowed") {
-        setError(
-          "إنشاء المستخدم معطّل في إعدادات Firebase Authentication (Email/Password). فعّله من لوحة Firebase ثم أعد المحاولة.",
-        );
+      const msg =
+        err && typeof err === "object" && "message" in err
+          ? String((err as { message?: unknown }).message ?? "")
+          : String(err);
+      if (msg.includes("already exists")) {
+        setInfo("يوجد حساب مدير مسبقاً — استخدم بيانات دخوله.");
+      } else if (msg.includes("Authentication required")) {
+        setInfo("سجّل الدخول بأي حساب أولاً ثم أعد محاولة إنشاء المدير الأول.");
       } else {
-        setError(err instanceof Error ? err.message : String(err));
+        setError(msg);
       }
     } finally {
       setSeeding(false);
@@ -128,21 +125,23 @@ function AdminLogin() {
           {busy ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
           دخول
         </button>
-        <div className="text-center">
-          <button
-            type="button"
-            onClick={seedAdmin}
-            disabled={seeding}
-            className="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-500 hover:text-[#0052FF] transition disabled:opacity-60"
-          >
-            {seeding ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <KeyRound className="size-3.5" />
-            )}
-            إنشاء حساب المدير الافتراضي (مرة واحدة)
-          </button>
-        </div>
+        {import.meta.env.DEV && (
+          <div className="text-center border-t border-slate-100 pt-3">
+            <button
+              type="button"
+              onClick={seedAdmin}
+              disabled={seeding}
+              className="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-500 hover:text-[#0052FF] transition disabled:opacity-60"
+            >
+              {seeding ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <KeyRound className="size-3.5" />
+              )}
+              بث حساب المدير الأول (تطوير فقط)
+            </button>
+          </div>
+        )}
       </form>
     </div>
   );

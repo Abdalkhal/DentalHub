@@ -24,7 +24,6 @@ import {
   useOrders,
   addOrder,
   updateOrder,
-  updateOrderStatus,
   getNextOrderNumber,
   getNextCaseId,
   type Order,
@@ -82,11 +81,6 @@ export function DashboardHome() {
     () => (selectedOrderId ? (orders.find((o) => o.id === selectedOrderId) ?? null) : null),
     [selectedOrderId, orders],
   );
-
-  const handleStatusChange = (id: string, newStatus: OrderStatus) => {
-    updateOrderStatus(id, newStatus);
-  };
-
 
   const hour = new Date().getHours();
   const isMorning = hour >= 5 && hour < 12;

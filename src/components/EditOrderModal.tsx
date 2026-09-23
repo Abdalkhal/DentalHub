@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   X, User, Building2, Calendar, Wrench, Hash, DollarSign,
-  Percent, FileText, CheckCircle2, Loader2, Clock, AlertCircle,
+  Percent, FileText, CheckCircle2, Loader2, Clock,
 } from "lucide-react";
 import type { Order, OrderStatus } from "@/lib/ordersStore";
 
@@ -80,7 +80,7 @@ export function EditOrderModal({ order, onClose, onSave }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-      <div className="relative w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[92svh] flex flex-col animate-in slide-in-from-bottom duration-300" onClick={(e) => e.stopPropagation()}>
+      <div className="relative w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[92svh] flex flex-col animate-in slide-in-from-bottom duration-300 md:max-w-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-border shrink-0">
           <div className="flex items-center gap-2.5">
             <span className="size-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center"><Wrench className="size-4" /></span>

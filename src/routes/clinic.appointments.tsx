@@ -249,10 +249,10 @@ function AppointmentsPage() {
   const currentTime12h = format12h(nowTimeStr, ar);
 
   return (
-    <MobileShell>
-      <TopBar title={ar ? "جدول المواعيد" : "Appointments"} showBack />
+    <MobileShell wide>
+      <TopBar title={ar ? "جدول المواعيد" : "Appointments"} showBack wide />
 
-      <div className="px-4 pt-3 pb-2">
+      <div className="px-4 pt-3 pb-2 md:px-6 md:pt-6 lg:px-8 lg:max-w-5xl lg:mx-auto">
         {/* Month / Year header */}
         <div className="flex items-center justify-between mb-3">
           <button onClick={() => changeMonth(-1)} className="size-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition">
@@ -271,7 +271,7 @@ function AppointmentsPage() {
         </div>
 
         {/* Day picker strip */}
-        <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+        <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide md:gap-3 md:justify-between md:overflow-visible">
           {weekDays.map((d) => {
             const ds = toDateStr(d);
             const isToday = ds === todayStr;
@@ -306,7 +306,7 @@ function AppointmentsPage() {
         </div>
       </div>
 
-      <div className="px-4 pb-6 space-y-4">
+      <div className="px-4 pb-6 space-y-4 md:px-6 md:pb-12 md:space-y-6 lg:px-8 lg:max-w-5xl lg:mx-auto">
         {/* Today button */}
         {selectedDate !== todayStr && (
           <button
@@ -318,7 +318,7 @@ function AppointmentsPage() {
         )}
 
         {/* Stats cards */}
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-4 gap-2 md:gap-4">
           <StatCard ar={ar} label={{ ar: "الإجمالي", en: "Total" }} value={stats.total} color="bg-sky-50 text-sky-700" icon={Users} />
           <StatCard ar={ar} label={{ ar: "صباحاً", en: "Morning" }} value={stats.morning} color="bg-amber-50 text-amber-700" icon={Sun} />
           <StatCard ar={ar} label={{ ar: "مساءً", en: "Evening" }} value={stats.evening} color="bg-indigo-50 text-indigo-700" icon={Moon} />
@@ -327,7 +327,7 @@ function AppointmentsPage() {
 
         {/* Timeline */}
         <div>
-          <h3 className="font-display font-bold text-sm text-slate-700 mb-3 flex items-center gap-1.5">
+          <h3 className="font-display font-bold text-sm text-slate-700 mb-3 flex items-center gap-1.5 md:text-lg md:mb-4">
             <Clock className="size-4 text-[#007AFF]" />
             {ar ? "الجدول الزمني" : "Timeline"}
           </h3>
@@ -339,7 +339,7 @@ function AppointmentsPage() {
 
               return (
                 <div key={slot} className={`flex border-b border-slate-50 last:border-b-0 ${isCurrentHour ? "bg-blue-50/30" : ""}`}>
-                  <div className="w-16 shrink-0 py-3 flex flex-col items-center justify-start border-r border-slate-50">
+                  <div className="w-16 shrink-0 py-3 flex flex-col items-center justify-start border-r border-slate-50 md:w-24 md:py-4">
                     <span className={`text-[11px] font-bold ${isCurrentHour ? "text-[#007AFF]" : "text-slate-400"}`}>
                       {format12h(slot, ar)}
                     </span>
@@ -347,7 +347,7 @@ function AppointmentsPage() {
                       <span className="text-[9px] font-bold text-[#007AFF] mt-0.5">{ar ? "الآن" : "Now"}</span>
                     )}
                   </div>
-                  <div className="flex-1 py-1.5 px-2 space-y-1.5">
+                  <div className="flex-1 py-1.5 px-2 space-y-1.5 md:py-3 md:px-4 md:space-y-2">
                     {slotAppts.length === 0 ? (
                       <div className="h-6" />
                     ) : (

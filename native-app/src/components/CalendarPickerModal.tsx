@@ -24,12 +24,17 @@ export function CalendarPickerModal({
   selectedDate,
   onSelect,
   markedDates,
+  minDate,
 }: {
   visible: boolean;
   onClose: () => void;
   selectedDate: string;
   onSelect: (ds: string) => void;
   markedDates?: Set<string>;
+  // Dates before this (YYYY-MM-DD) render disabled and can't be picked.
+  // Omitted everywhere except appointment scheduling, where past dates
+  // aren't valid — calendars used to browse/filter history stay unrestricted.
+  minDate?: string;
 }) {
   const { lang } = useI18n();
   const ar = lang === 'ar';
@@ -88,13 +93,20 @@ export function CalendarPickerModal({
               const ds = toDateStr(new Date(calDays.year, calDays.month, d));
               const isSelected = ds === selectedDate;
               const hasMark = markedDates?.has(ds);
+              const isDisabled = !!minDate && ds < minDate;
               return (
                 <View key={ds} style={{ width: '14.28%', height: 40 }} className="items-center justify-center">
                   <Pressable
-                    onPress={() => onSelect(ds)}
+                    onPress={() => !isDisabled && onSelect(ds)}
+                    disabled={isDisabled}
                     className={cn('h-9 w-9 items-center justify-center rounded-xl', isSelected ? 'bg-primary' : 'bg-transparent')}
                   >
-                    <Text className={cn('text-sm font-semibold', isSelected ? 'text-primary-foreground' : 'text-slate-700')}>
+                    <Text
+                      className={cn(
+                        'text-sm font-semibold',
+                        isDisabled ? 'text-slate-300' : isSelected ? 'text-primary-foreground' : 'text-slate-700',
+                      )}
+                    >
                       {d}
                     </Text>
                     {hasMark && (

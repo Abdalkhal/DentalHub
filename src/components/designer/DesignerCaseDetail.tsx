@@ -10,7 +10,7 @@ import { useDesignerCases, useDesignerCase } from "@/lib/designerStore";
 import { uploadCaseFile } from "@/lib/storagePipeline";
 import type { OrderAttachment } from "@/lib/ordersStore";
 import { cn } from "@/lib/utils";
-import { Loader2, Upload, User, Stethoscope, Hash } from "lucide-react";
+import { Loader2, Upload, User, Stethoscope, Hash, PenTool, Palette } from "lucide-react";
 import { CaseFileLink } from "@/components/CaseFileLink";
 
 export function DesignerCaseDetail({ caseId }: { caseId: string }) {
@@ -114,6 +114,33 @@ export function DesignerCaseDetail({ caseId }: { caseId: string }) {
             <span dir="ltr">{order.id}</span>
           </div>
         </div>
+
+        {/* Assigned staff — who this case was assigned to at "طلب جديد" */}
+        {(order.designerName || order.ceramistName) && (
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-2.5">
+            <p className="text-xs font-bold text-slate-500 uppercase mb-1">
+              {ar ? "الكادر المسند" : "Assigned staff"}
+            </p>
+            {order.designerName && (
+              <div className="flex items-center gap-2 text-sm">
+                <PenTool className="size-4 text-sky-500" />
+                <span className="text-slate-700">
+                  {ar ? "المصمم: " : "Designer: "}
+                  <span className="font-bold text-slate-900">{order.designerName}</span>
+                </span>
+              </div>
+            )}
+            {order.ceramistName && (
+              <div className="flex items-center gap-2 text-sm">
+                <Palette className="size-4 text-pink-500" />
+                <span className="text-slate-700">
+                  {ar ? "السراميست: " : "Ceramist: "}
+                  <span className="font-bold text-slate-900">{order.ceramistName}</span>
+                </span>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Rx */}
         <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">

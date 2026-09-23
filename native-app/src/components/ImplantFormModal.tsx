@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Image, Modal, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { doc, updateDoc } from 'firebase/firestore';
 import { Check, Package, Paperclip, Plus, Ruler, Settings, Trash2, Wrench, X } from 'lucide-react-native';
@@ -118,6 +118,17 @@ const PLACEMENT_TYPES_AR = ['فورية (Immediate Placement)', 'غير فوري
 type VariantRow = { key: string; diameter: string; length: string; stock: string };
 const emptyVariant = (): VariantRow => ({ key: randomUUID(), diameter: '', length: '', stock: '0' });
 
+// Thousands separators for display only — the stored/edited value stays the
+// raw "12345.5" string (what parseFloat needs), this just formats it back
+// with commas in the integer part while a decimal is being typed keeps
+// typing normally.
+function formatPriceDisplay(raw: string): string {
+  if (!raw) return '';
+  const [intPart, ...rest] = raw.split('.');
+  const withCommas = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return rest.length > 0 ? `${withCommas}.${rest.join('.')}` : withCommas;
+}
+
 function Field({ label, children, required }: { label: string; children: React.ReactNode; required?: boolean }) {
   return (
     <View>
@@ -181,12 +192,16 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
   const [description, setDescription] = useState(product?.description ?? '');
   const [images, setImages] = useState<string[]>(product?.images ?? []);
 
-  // Accessory fields
+  // Accessory fields — its own image, entirely separate from the main
+  // implant's `images` above (they used to share that one state, so a
+  // picture/price added on one tab silently showed up on the others).
   const [accessoryCategory, setAccessoryCategory] = useState('');
   const [accessorySubType, setAccessorySubType] = useState('');
   const [parentId, setParentId] = useState(product?.parentId || '');
+  const [accessoryDraftImages, setAccessoryDraftImages] = useState<string[]>([]);
 
-  // Surgical kit fields
+  // Surgical kit fields — own price/currency/images too, for the same
+  // reason.
   const [kitType, setKitType] = useState(product?.surgicalKit?.kitType ?? KIT_TYPES[0]);
   const [placementType, setPlacementType] = useState(product?.surgicalKit?.placementType ?? PLACEMENT_TYPES_AR[0]);
   const [compatibility, setCompatibility] = useState<string[]>(product?.surgicalKit?.compatibility ?? []);
@@ -194,6 +209,9 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
   const [toolsCount, setToolsCount] = useState(product?.surgicalKit?.toolsCount ? String(product.surgicalKit.toolsCount) : '');
   const [kitSku, setKitSku] = useState(product?.sku ?? '');
   const [kitInStock, setKitInStock] = useState(product?.inStock ?? true);
+  const [kitPrice, setKitPrice] = useState(product?.branch === 'surgical_kit' && product?.price ? String(product.price) : '');
+  const [kitCurrency, setKitCurrency] = useState<Currency>((product?.branch === 'surgical_kit' && product?.currency) || 'USD');
+  const [kitImages, setKitImages] = useState<string[]>(product?.branch === 'surgical_kit' ? (product?.images ?? []) : []);
 
   const [accessoriesList, setAccessoriesList] = useState<ProductAccessory[]>(product?.accessories ?? []);
 
@@ -203,15 +221,20 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
   // Android, in an RTL app, resets a plain LTR TextInput's cursor to the
   // start after each keystroke — backspace then removes the first digit
   // instead of the last. Pinning the selection to the end ourselves after
-  // every change bypasses that.
+  // every change bypasses that. Shared across the two price fields since
+  // only one is ever mounted/focused at a time (the tabs are exclusive).
   const [priceSelection, setPriceSelection] = useState<{ start: number; end: number } | undefined>(undefined);
-  const onChangePrice = (v: string) => {
+  const makePriceHandler = (setValue: (v: string) => void) => (v: string) => {
     const clean = v.replace(/[^0-9.]/g, '');
-    setPrice(clean);
-    setPriceSelection({ start: clean.length, end: clean.length });
+    setValue(clean);
+    setPriceSelection({ start: formatPriceDisplay(clean).length, end: formatPriceDisplay(clean).length });
   };
+  const onChangePrice = makePriceHandler(setPrice);
+  const onChangeKitPrice = makePriceHandler(setKitPrice);
 
   const { data: urlMap = {} } = useSignedImageUrls(images);
+  const { data: kitUrlMap = {} } = useSignedImageUrls(kitImages);
+  const { data: accessoryDraftUrlMap = {} } = useSignedImageUrls(accessoryDraftImages);
   const accessoryImagePaths = useMemo(
     () => accessoriesList.filter((a) => a.imageUrl).map((a) => a.imageUrl),
     [accessoriesList],
@@ -226,9 +249,21 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
     queryClient.invalidateQueries({ queryKey: productsQueryKey });
   };
 
+  // Scoped to the signed-in vendor's own implants — without this a supply
+  // office could pick another company's implant as the "main implant" to
+  // link an accessory to, and the update would then be rejected by
+  // Firestore rules (accessories are saved onto the parent doc, which only
+  // its own owner can write).
   const mainImplantOptions = useMemo(
-    () => allProducts.filter((p) => (!p.productType || p.productType === 'main_implant') && p.category === 'implant' && p.id !== product?.id),
-    [allProducts, product?.id],
+    () =>
+      allProducts.filter(
+        (p) =>
+          (!p.productType || p.productType === 'main_implant') &&
+          p.category === 'implant' &&
+          p.id !== product?.id &&
+          p.companyId === user?.uid,
+      ),
+    [allProducts, product?.id, user?.uid],
   );
 
   const updateVariant = (key: string, field: 'diameter' | 'length' | 'stock', value: string) =>
@@ -244,13 +279,16 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
     setCompatDraft('');
   };
 
-  const pickImage = async () => {
+  const makePickImage = (setTarget: React.Dispatch<React.SetStateAction<string[]>>) => async () => {
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7 });
     if (res.canceled || !res.assets?.length) return;
     const asset = res.assets[0];
     const path = await uploadProductImage(draftId, { uri: asset.uri, name: asset.fileName ?? undefined, type: asset.mimeType ?? undefined });
-    setImages((prev) => [...prev, path]);
+    setTarget((prev) => [...prev, path]);
   };
+  const pickImage = makePickImage(setImages);
+  const pickKitImage = makePickImage(setKitImages);
+  const pickAccessoryImage = makePickImage(setAccessoryDraftImages);
 
   const submit = async () => {
     setError('');
@@ -273,7 +311,7 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
           return;
         }
         let imageUrl = '';
-        if (images.length > 0) imageUrl = images[0];
+        if (accessoryDraftImages.length > 0) imageUrl = accessoryDraftImages[0];
         const newAccessory: ProductAccessory = {
           type: ACCESSORY_CATEGORIES.find((c) => c.id === accessoryCategory)?.en ?? accessoryCategory,
           name: name.trim(),
@@ -291,12 +329,12 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
           ar: name.trim(),
           en: name.trim(),
           brand: brand.trim(),
-          price: Math.max(0, parseFloat(price) || 0),
+          price: Math.max(0, parseFloat(kitPrice) || 0),
           purchasePrice: undefined,
-          currency,
+          currency: kitCurrency,
           stock: kitInStock ? 1 : 0,
           inStock: kitInStock,
-          images,
+          images: kitImages,
           category: 'surgical_kit',
           country,
           companyId: product?.companyId || user?.uid || '',
@@ -388,6 +426,7 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
 
   return (
     <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
       <View className="flex-1 justify-end bg-black/40">
         <View className="max-h-[93%] overflow-hidden rounded-t-[32px] bg-[#F2F9FE]">
           <View className="flex-row items-center justify-between px-4 pb-3 pt-4" style={{ backgroundColor: ACCENT }}>
@@ -458,22 +497,22 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
 
                 <SectionCard title={ar ? 'صورة المنتج' : 'Product Image'}>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerClassName="gap-2.5">
-                    {images.map((path) => (
+                    {accessoryDraftImages.map((path) => (
                       <View key={path} className="h-20 w-20 overflow-hidden rounded-2xl border border-sky-100 bg-sky-50/40">
-                        {urlMap[path] ? (
-                          <Image source={{ uri: urlMap[path] }} className="h-full w-full" resizeMode="cover" />
+                        {accessoryDraftUrlMap[path] ? (
+                          <Image source={{ uri: accessoryDraftUrlMap[path] }} className="h-full w-full" resizeMode="cover" />
                         ) : (
                           <View className="h-full w-full items-center justify-center">
                             <Package size={20} color="#BAE6FD" />
                           </View>
                         )}
-                        <Pressable onPress={() => setImages((prev) => prev.filter((p) => p !== path))} className="absolute right-1 top-1 h-5 w-5 items-center justify-center rounded-full bg-black/60">
+                        <Pressable onPress={() => setAccessoryDraftImages((prev) => prev.filter((p) => p !== path))} className="absolute right-1 top-1 h-5 w-5 items-center justify-center rounded-full bg-black/60">
                           <X size={11} color="#FFFFFF" />
                         </Pressable>
                       </View>
                     ))}
-                    {images.length < MAX_PRODUCT_IMAGES && (
-                      <Pressable onPress={pickImage} className="h-20 w-20 items-center justify-center gap-0.5 rounded-2xl border-2 border-dashed border-sky-200">
+                    {accessoryDraftImages.length < MAX_PRODUCT_IMAGES && (
+                      <Pressable onPress={pickAccessoryImage} className="h-20 w-20 items-center justify-center gap-0.5 rounded-2xl border-2 border-dashed border-sky-200">
                         <Plus size={18} color={ACCENT} />
                         <Text className="text-[9px] font-bold" style={{ color: ACCENT }}>{ar ? 'إضافة' : 'Add'}</Text>
                       </Pressable>
@@ -545,17 +584,17 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
                 <SectionCard title={ar ? 'السعر والمخزون' : 'Price & Stock'}>
                   {/* No shadow at all — see the tab-bar note in supplies-office.tsx. */}
                   <View className="flex-row gap-2 self-end rounded-xl bg-sky-50 p-1">
-                    <Pressable onPress={() => setCurrency('USD')} className="h-8 items-center justify-center rounded-lg px-3" style={currency === 'USD' ? { backgroundColor: ACCENT } : undefined}>
-                      <Text className={cn('text-xs font-bold', currency === 'USD' ? 'text-white' : 'text-slate-500')}>$</Text>
+                    <Pressable onPress={() => setKitCurrency('USD')} className="h-8 items-center justify-center rounded-lg px-3" style={kitCurrency === 'USD' ? { backgroundColor: ACCENT } : undefined}>
+                      <Text className={cn('text-xs font-bold', kitCurrency === 'USD' ? 'text-white' : 'text-slate-500')}>$</Text>
                     </Pressable>
-                    <Pressable onPress={() => setCurrency('IQD')} className="h-8 items-center justify-center rounded-lg px-3" style={currency === 'IQD' ? { backgroundColor: ACCENT } : undefined}>
-                      <Text className={cn('text-xs font-bold', currency === 'IQD' ? 'text-white' : 'text-slate-500')}>{ar ? 'د.ع' : 'IQD'}</Text>
+                    <Pressable onPress={() => setKitCurrency('IQD')} className="h-8 items-center justify-center rounded-lg px-3" style={kitCurrency === 'IQD' ? { backgroundColor: ACCENT } : undefined}>
+                      <Text className={cn('text-xs font-bold', kitCurrency === 'IQD' ? 'text-white' : 'text-slate-500')}>{ar ? 'د.ع' : 'IQD'}</Text>
                     </Pressable>
                   </View>
                   <Field label={ar ? 'سعر البيع' : 'Selling price'} required>
                     <TextInput
-                      value={price}
-                      onChangeText={onChangePrice}
+                      value={formatPriceDisplay(kitPrice)}
+                      onChangeText={onChangeKitPrice}
                       selection={priceSelection}
                       onSelectionChange={(e) => setPriceSelection(e.nativeEvent.selection)}
                       keyboardType="decimal-pad"
@@ -581,22 +620,22 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
 
                 <SectionCard title={ar ? 'صورة المنتج' : 'Product Image'}>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerClassName="gap-2.5">
-                    {images.map((path) => (
+                    {kitImages.map((path) => (
                       <View key={path} className="h-20 w-20 overflow-hidden rounded-2xl border border-sky-100 bg-sky-50/40">
-                        {urlMap[path] ? (
-                          <Image source={{ uri: urlMap[path] }} className="h-full w-full" resizeMode="cover" />
+                        {kitUrlMap[path] ? (
+                          <Image source={{ uri: kitUrlMap[path] }} className="h-full w-full" resizeMode="cover" />
                         ) : (
                           <View className="h-full w-full items-center justify-center">
                             <Package size={20} color="#BAE6FD" />
                           </View>
                         )}
-                        <Pressable onPress={() => setImages((prev) => prev.filter((p) => p !== path))} className="absolute right-1 top-1 h-5 w-5 items-center justify-center rounded-full bg-black/60">
+                        <Pressable onPress={() => setKitImages((prev) => prev.filter((p) => p !== path))} className="absolute right-1 top-1 h-5 w-5 items-center justify-center rounded-full bg-black/60">
                           <X size={11} color="#FFFFFF" />
                         </Pressable>
                       </View>
                     ))}
-                    {images.length < MAX_PRODUCT_IMAGES && (
-                      <Pressable onPress={pickImage} className="h-20 w-20 items-center justify-center gap-0.5 rounded-2xl border-2 border-dashed border-sky-200">
+                    {kitImages.length < MAX_PRODUCT_IMAGES && (
+                      <Pressable onPress={pickKitImage} className="h-20 w-20 items-center justify-center gap-0.5 rounded-2xl border-2 border-dashed border-sky-200">
                         <Plus size={18} color={ACCENT} />
                         <Text className="text-[9px] font-bold" style={{ color: ACCENT }}>{ar ? 'إضافة' : 'Add'}</Text>
                       </Pressable>
@@ -755,7 +794,7 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
                   </View>
                   <Field label={ar ? 'السعر الأساسي' : 'Base price'} required>
                     <TextInput
-                      value={price}
+                      value={formatPriceDisplay(price)}
                       onChangeText={onChangePrice}
                       selection={priceSelection}
                       onSelectionChange={(e) => setPriceSelection(e.nativeEvent.selection)}
@@ -790,6 +829,7 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
           </ScrollView>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

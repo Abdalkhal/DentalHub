@@ -34,8 +34,8 @@ function Invoices() {
 
   if (roleLoading || isLoading) {
     return (
-      <MobileShell>
-        <TopBar title={ar ? "فواتير الأطباء" : "Doctor Invoices"} showBack />
+      <MobileShell wide>
+        <TopBar title={ar ? "فواتير الأطباء" : "Doctor Invoices"} showBack wide />
         <div className="flex items-center justify-center py-20">
           <Loader2 className="size-6 animate-spin text-muted-foreground" />
         </div>
@@ -44,9 +44,9 @@ function Invoices() {
   }
 
   return (
-    <MobileShell>
-      <TopBar title={ar ? "فواتير الأطباء" : "Doctor Invoices"} showBack />
-      <div className="px-4 pt-4 pb-6" dir={dir}>
+    <MobileShell wide>
+      <TopBar title={ar ? "فواتير الأطباء" : "Doctor Invoices"} showBack wide />
+      <div className="px-4 pt-4 pb-6 md:px-6 md:pt-6 md:pb-12 lg:px-8 lg:max-w-5xl lg:mx-auto" dir={dir}>
         {orders.length === 0 ? (
           <div className="flex flex-col items-center justify-center text-center py-20 px-6">
             <span className="size-16 rounded-2xl bg-muted flex items-center justify-center text-muted-foreground/30 mb-4">
@@ -57,7 +57,7 @@ function Invoices() {
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-5 xl:grid-cols-3 md:items-start">
             {orders.map((order) => (
               <div
                 key={order.id}
@@ -80,22 +80,16 @@ function Invoices() {
                 {/* Product */}
                 <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50 border border-border/60">
                   <div className="size-14 rounded-xl bg-white border border-border flex items-center justify-center overflow-hidden shrink-0">
-                    {order.productImage ? (
-                      <img
-                        src={order.productImage}
-                        alt={order.productName}
-                        className="size-full object-cover"
-                      />
-                    ) : (
-                      <Package className="size-6 text-muted-foreground/40" />
-                    )}
+                    <Package className="size-6 text-muted-foreground/40" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold truncate">{order.productName}</p>
+                    <p className="text-sm font-semibold truncate">
+                      {order.items[0]?.name || "—"}
+                    </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {ar
-                        ? `اشترى ${order.productName} بكمية ${order.quantity}`
-                        : `Purchased ${order.productName} ×${order.quantity}`}
+                        ? `اشترى ${order.items[0]?.name ?? ""} بكمية ${order.items[0]?.quantity ?? 0}`
+                        : `Purchased ${order.items[0]?.name ?? ""} ×${order.items[0]?.quantity ?? 0}`}
                     </p>
                   </div>
                 </div>
@@ -105,15 +99,16 @@ function Invoices() {
                   <div className="flex items-center gap-1.5 text-muted-foreground">
                     <Hash className="size-3.5" />
                     <span>
-                      {ar ? "الكمية:" : "Qty:"} {order.quantity}
+                      {ar ? "الكمية:" : "Qty:"} {order.items[0]?.quantity ?? 0}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">
-                      {fmtPrice(order.unitPrice, order.currency)} × {order.quantity}
+                      {fmtPrice(order.items[0]?.price ?? 0, order.items[0]?.currency ?? "USD")} ×{" "}
+                      {order.items[0]?.quantity ?? 0}
                     </span>
                     <span className="font-display font-extrabold text-base text-foreground">
-                      {fmtPrice(order.total, order.currency)}
+                      {fmtPrice(order.total, order.items[0]?.currency ?? "USD")}
                     </span>
                   </div>
                 </div>
@@ -122,22 +117,22 @@ function Invoices() {
                 <div className="flex items-center justify-between pt-2 border-t border-border/60">
                   <span
                     className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full ${
-                      order.status === "delivered"
-                        ? "bg-emerald-100 text-emerald-700"
-                        : order.status === "confirmed"
-                          ? "bg-sky-100 text-sky-700"
+                      order.status === "confirmed"
+                        ? "bg-sky-100 text-sky-700"
+                        : order.status === "rejected"
+                          ? "bg-rose-100 text-rose-600"
                           : "bg-amber-100 text-amber-700"
                     }`}
                   >
                     <FileText className="size-3" />
-                    {order.status === "delivered"
+                    {order.status === "confirmed"
                       ? ar
-                        ? "تم التسليم"
-                        : "Delivered"
-                      : order.status === "confirmed"
+                        ? "مؤكد"
+                        : "Confirmed"
+                      : order.status === "rejected"
                         ? ar
-                          ? "مؤكد"
-                          : "Confirmed"
+                          ? "مرفوض"
+                          : "Rejected"
                         : ar
                           ? "قيد الانتظار"
                           : "Pending"}

@@ -181,12 +181,17 @@ export default function BrandDetailScreen() {
               <MapPin size={13} color="rgba(255,255,255,0.9)" />
               <Text className="text-xs text-white/90">{ar ? brand.countryAr : brand.countryEn}</Text>
             </View>
-            <View className="mt-2 flex-row items-center gap-1 self-start rounded-full bg-white px-2.5 py-1">
-              <BadgeCheck size={13} color="#2563EB" />
-              <Text className="text-[11px] font-bold text-slate-800">
-                {ar ? `${brand.distributors} وكيل معتمد` : `${brand.distributors} certified distributors`}
-              </Text>
-            </View>
+            {/* `brand.distributors` was static seed data, disconnected from
+                the real vendors below (and often wrong for it) — count the
+                actual companies whose live products matched this brand. */}
+            {companyIds.length > 0 && (
+              <View className="mt-2 flex-row items-center gap-1 self-start rounded-full bg-white px-2.5 py-1">
+                <BadgeCheck size={13} color="#2563EB" />
+                <Text className="text-[11px] font-bold text-slate-800">
+                  {ar ? `${companyIds.length} وكيل معتمد` : `${companyIds.length} certified distributors`}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
       </View>
@@ -218,12 +223,19 @@ export default function BrandDetailScreen() {
           <Pressable
             key={s}
             onPress={() => setSort(s)}
-            className={cn(
-              'h-8 items-center justify-center rounded-full border px-3',
-              sort === s ? 'border-primary bg-primary/10' : 'border-slate-200 bg-white',
-            )}
+            style={{
+              flexShrink: 0,
+              height: 32,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 999,
+              borderWidth: 1,
+              paddingHorizontal: 12,
+              borderColor: sort === s ? '#3B82F6' : '#E2E8F0',
+              backgroundColor: sort === s ? 'rgba(59,130,246,0.1)' : '#FFFFFF',
+            }}
           >
-            <Text className={cn('text-[11px] font-bold', sort === s ? 'text-primary' : 'text-slate-500')}>
+            <Text className="font-bold" style={{ fontSize: 11, color: sort === s ? '#3B82F6' : '#64748B' }}>
               {s === 'price' ? (ar ? 'حسب السعر' : 'By price') : ar ? 'حسب المكاتب' : 'By vendors'}
             </Text>
           </Pressable>

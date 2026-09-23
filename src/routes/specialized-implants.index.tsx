@@ -95,7 +95,7 @@ function SpecializedImplantsPage() {
   const router = useRouter();
 
   return (
-    <MobileShell>
+    <MobileShell wide>
       <div className="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-slate-100 px-4 pt-4 pb-3">
         <div className="flex items-center justify-between gap-2">
           <button
@@ -136,9 +136,9 @@ function SpecializedImplantsPage() {
         </p>
       </div>
 
-      <div className="px-4 pt-4 pb-10 space-y-6">
+      <div className="px-4 pt-4 pb-10 space-y-6 md:px-6 md:pt-6 md:pb-14 md:space-y-8 lg:px-8 lg:max-w-6xl lg:mx-auto">
         {/* Specialized systems grid */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 md:gap-5 md:grid-cols-3 lg:grid-cols-4">
           {SYSTEMS.map((s) => (
             <Link
               key={s.id}
@@ -184,7 +184,7 @@ function SpecializedImplantsPage() {
             <p className="font-display font-extrabold text-base mb-3">
               {ar ? "لماذا الزرعات المتخصصة؟" : "Why specialized implants?"}
             </p>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 md:gap-5 md:grid-cols-3 lg:grid-cols-4">
               {FEATURES.map((f) => {
                 const Icon = f.icon;
                 return (

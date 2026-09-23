@@ -6,13 +6,12 @@ import { db } from "@/integrations/firebase/client";
 import { useI18n } from "@/lib/i18n";
 import { useSession } from "@/lib/useAuth";
 import { useOrders, type Order } from "@/lib/ordersStore";
+import { isCompletedStatus } from "@/lib/caseTracking";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { cn } from "@/lib/utils";
 import {
   DollarSign,
-  TrendingUp,
-  AlertCircle,
   Wallet,
   Stethoscope,
   FlaskConical,
@@ -139,10 +138,10 @@ function fmt(n: number) {
   return n.toLocaleString() + " د.ع";
 }
 
-function fmtShort(n: number) {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
-  if (n >= 1_000) return (n / 1_000).toFixed(0) + "K";
-  return String(n);
+/** Safely parses an amount, stripping currency symbols/commas and never returning NaN. */
+function parseAmount(val: unknown): number {
+  const n = Number(String(val || 0).replace(/[^0-9.-]+/g, ""));
+  return isNaN(n) ? 0 : n;
 }
 
 /* ── Page Component ──────────────────────────────── */
@@ -155,7 +154,6 @@ function FinancePage() {
   const orders = useOrders();
   const userId = user?.uid ?? "";
 
-  const [filter, setFilter] = useState<"all" | "paid" | "pending">("all");
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [editingExpenseCat, setEditingExpenseCat] = useState<string | null>(null);
   const [paymentClinic, setPaymentClinic] = useState("");
@@ -218,8 +216,12 @@ function FinancePage() {
 
     const results: ClinicSummary[] = [];
     for (const [name, clinicOrders] of byClinic) {
-      const billed = clinicOrders.reduce((s, o) => s + o.price, 0);
-      const collected = payments.filter((p) => p.clinic === name).reduce((s, p) => s + p.amount, 0);
+      const billed = clinicOrders
+        .filter((o) => isCompletedStatus(o.status))
+        .reduce((s, o) => s + parseAmount(o.totalAmount), 0);
+      const collected = payments
+        .filter((p) => p.clinic === name)
+        .reduce((s, p) => s + parseAmount(p.amount), 0);
       results.push({ name, billed, collected, remaining: billed - collected });
     }
     return results;
@@ -228,11 +230,14 @@ function FinancePage() {
   /* ── Totals ─────────────────────────────────────── */
 
   const totalInvoiced = useMemo(
-    () => clinicSummaries.reduce((s, c) => s + c.billed, 0),
-    [clinicSummaries],
+    () =>
+      orders
+        .filter((o) => isCompletedStatus(o.status))
+        .reduce((s, o) => s + parseAmount(o.totalAmount), 0),
+    [orders],
   );
   const totalCollected = useMemo(
-    () => payments.reduce((s, p) => s + p.amount, 0),
+    () => payments.reduce((s, p) => s + parseAmount(p.amount), 0),
     [payments],
   );
   const totalRemaining = totalInvoiced - totalCollected;
@@ -241,14 +246,6 @@ function FinancePage() {
     () => expenses.reduce((s, cat) => s + cat.items.reduce((a, i) => a + i.amount, 0), 0),
     [expenses],
   );
-
-  /* ── Filtered clinics ───────────────────────────── */
-
-  const filteredClinics = useMemo(() => {
-    if (filter === "paid") return clinicSummaries.filter((c) => c.remaining <= 0);
-    if (filter === "pending") return clinicSummaries.filter((c) => c.remaining > 0);
-    return clinicSummaries;
-  }, [clinicSummaries, filter]);
 
   /* ── Payment modal handlers ─────────────────────── */
 
@@ -293,9 +290,9 @@ function FinancePage() {
   };
 
   return (
-    <MobileShell>
-      <TopBar title={ar ? "المالية" : "Finance"} showBack />
-      <div className="px-4 pt-4 pb-6 space-y-4">
+    <MobileShell wide>
+      <TopBar title={ar ? "المالية" : "Finance"} showBack wide maxW="6xl" />
+      <div className="px-4 pt-4 pb-6 space-y-4 md:px-6 md:pt-6 md:pb-12 md:space-y-6 lg:px-8 lg:max-w-6xl lg:mx-auto">
         {/* ── Account Summary ─────────────────────────── */}
         <div className="bg-gradient-to-br from-primary/10 to-primary-soft/30 rounded-3xl border border-primary/10 p-5 space-y-4">
           <div className="flex items-center justify-between">
@@ -315,9 +312,9 @@ function FinancePage() {
               {ar ? "تسجيل دفعة" : "Log Payment"}
             </button>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-3 md:gap-5">
             <div className="bg-card/80 rounded-2xl p-3 text-center">
-              <p className="text-[10px] font-semibold text-muted-foreground mb-1">
+              <p className="text-sm font-bold text-slate-800 mb-1">
                 {t("total_invoiced")}
               </p>
               <p className="font-display font-extrabold text-sm text-foreground">
@@ -325,7 +322,7 @@ function FinancePage() {
               </p>
             </div>
             <div className="bg-emerald-50/80 rounded-2xl p-3 text-center">
-              <p className="text-[10px] font-semibold text-emerald-700 mb-1">
+              <p className="text-sm font-bold text-slate-800 mb-1">
                 {t("collected_paid")}
               </p>
               <p className="font-display font-extrabold text-sm text-emerald-700">
@@ -333,7 +330,7 @@ function FinancePage() {
               </p>
             </div>
             <div className="bg-amber-50/80 rounded-2xl p-3 text-center">
-              <p className="text-[10px] font-semibold text-amber-700 mb-1">
+              <p className="text-sm font-bold text-slate-800 mb-1">
                 {t("outstanding_balance")}
               </p>
               <p className="font-display font-extrabold text-sm text-amber-700">
@@ -349,29 +346,13 @@ function FinancePage() {
             <h2 className="font-display font-extrabold text-base text-foreground">
               {t("clinic_billing")}
             </h2>
-            <div className="flex gap-1">
-              {(["all", "paid", "pending"] as const).map((f) => (
-                <button
-                  key={f}
-                  onClick={() => setFilter(f)}
-                  className={cn(
-                    "px-2.5 h-7 rounded-full text-[10px] font-semibold border transition",
-                    filter === f
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-card text-muted-foreground border-border hover:bg-accent",
-                  )}
-                >
-                  {f === "all" ? (ar ? "الكل" : "All") : f === "paid" ? t("paid") : t("pending")}
-                </button>
-              ))}
-            </div>
           </div>
 
           {finLoading ? (
             <div className="text-center py-8">
               <div className="size-5 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
             </div>
-          ) : filteredClinics.length === 0 ? (
+          ) : clinicSummaries.length === 0 ? (
             <div className="text-center py-8 text-sm text-muted-foreground bg-card border border-dashed border-border rounded-2xl">
               {orders.length === 0
                 ? ar
@@ -381,7 +362,7 @@ function FinancePage() {
             </div>
           ) : (
             <div className="space-y-2">
-              {filteredClinics.map((clinic) => (
+              {clinicSummaries.map((clinic) => (
                 <div
                   key={clinic.name}
                   className="bg-card border border-border rounded-2xl p-4"
@@ -419,15 +400,15 @@ function FinancePage() {
                   </div>
                   <div className="grid grid-cols-3 gap-2 text-center text-[11px]">
                     <div className="bg-slate-50 rounded-xl p-2">
-                      <p className="text-muted-foreground">{t("total_invoiced")}</p>
+                      <p className="text-sm font-bold text-slate-800">{t("total_invoiced")}</p>
                       <p className="font-bold text-foreground">{fmt(clinic.billed)}</p>
                     </div>
                     <div className="bg-emerald-50 rounded-xl p-2">
-                      <p className="text-emerald-600">{t("collected_paid")}</p>
+                      <p className="text-sm font-bold text-slate-800">{t("collected_paid")}</p>
                       <p className="font-bold text-emerald-700">{fmt(clinic.collected)}</p>
                     </div>
                     <div className="bg-amber-50 rounded-xl p-2">
-                      <p className="text-amber-600">{t("outstanding_balance")}</p>
+                      <p className="text-sm font-bold text-slate-800">{t("outstanding_balance")}</p>
                       <p className="font-bold text-amber-700">{fmt(clinic.remaining)}</p>
                     </div>
                   </div>
@@ -457,7 +438,7 @@ function FinancePage() {
               {t("no_expenses")}
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-5 xl:grid-cols-3 md:items-start">
               {expenses.map((cat) => {
                 const catTotal = cat.items.reduce((s, i) => s + i.amount, 0);
                 const Icon = ICON_MAP[cat.icon] ?? DollarSign;
@@ -537,7 +518,7 @@ function FinancePage() {
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             onClick={() => setShowPaymentModal(false)}
           />
-          <div className="relative w-full max-w-sm bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl animate-in slide-in-from-bottom duration-300 p-5 space-y-4">
+          <div className="relative w-full max-w-sm md:max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl animate-in slide-in-from-bottom duration-300 p-5 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="font-display font-extrabold text-base">
                 {ar ? "تسجيل دفعة جديدة" : "Log New Payment"}

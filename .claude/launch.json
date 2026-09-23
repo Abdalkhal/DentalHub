@@ -6,6 +6,18 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--", "--port", "5199", "--strictPort"],
       "port": 5199
+    },
+    {
+      "name": "dental-hub-lan",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "--host", "--port", "5199", "--strictPort"],
+      "port": 5199
+    },
+    {
+      "name": "dental-hub-built",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["--yes", "serve@14", "-s", "dist/client", "-l", "5200"],
+      "port": 5200
     }
   ]
 }

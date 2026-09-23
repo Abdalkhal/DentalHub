@@ -87,6 +87,7 @@ export type Patient = {
   files: PatientFile[];
   totalFees: number;
   payments: Payment[];
+  feeCurrency?: "USD" | "IQD";
   dob?: string;
   avatar?: string;
   branch?: string;

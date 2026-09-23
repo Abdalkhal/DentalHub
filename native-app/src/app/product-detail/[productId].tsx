@@ -491,23 +491,33 @@ export default function ProductDetailScreen() {
 
       {/* Cart footer */}
       <View className="gap-3 border-t border-slate-200 bg-white px-4 pb-4 pt-3">
-        {/* Store profile */}
-        <View className="flex-row items-center gap-3 rounded-2xl border border-slate-200 p-3">
-          <View className="h-11 w-11 items-center justify-center rounded-full bg-emerald-50">
-            <Text className="font-bold text-emerald-700">{officeName.charAt(0) || '؟'}</Text>
-          </View>
-          <View className="min-w-0 flex-1">
-            <Text className="text-sm font-bold text-slate-800" numberOfLines={1}>
-              {officeName}
-            </Text>
-            {!!officeCity && (
-              <View className="mt-0.5 flex-row items-center gap-1">
-                <MapPin size={11} color="#94A3B8" />
-                <Text className="text-[11px] text-slate-500">{officeCity}</Text>
-              </View>
-            )}
-          </View>
-        </View>
+        {/* Store profile — the specialized-implant card above already shows
+            this same office with its own "Visit Profile" button, so this
+            duplicate row only renders when that card doesn't (i.e. `!spec`). */}
+        {!spec && (
+          <Pressable
+            onPress={() =>
+              product.companyId &&
+              router.push({ pathname: '/profile/[accountId]', params: { accountId: product.companyId } })
+            }
+            className="flex-row items-center gap-3 rounded-2xl border border-slate-200 p-3"
+          >
+            <View className="h-11 w-11 items-center justify-center rounded-full bg-emerald-50">
+              <Text className="font-bold text-emerald-700">{officeName.charAt(0) || '؟'}</Text>
+            </View>
+            <View className="min-w-0 flex-1">
+              <Text className="text-sm font-bold text-slate-800" numberOfLines={1}>
+                {officeName}
+              </Text>
+              {!!officeCity && (
+                <View className="mt-0.5 flex-row items-center gap-1">
+                  <MapPin size={11} color="#94A3B8" />
+                  <Text className="text-[11px] text-slate-500">{officeCity}</Text>
+                </View>
+              )}
+            </View>
+          </Pressable>
+        )}
 
         {/* Quantity + Add to cart */}
         <View className="flex-row items-center gap-3">

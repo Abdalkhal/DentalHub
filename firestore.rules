@@ -119,7 +119,16 @@ service cloud.firestore {
 
     match /products/{productId} {
       allow read: if true;
-      allow create, update, delete: if isAdmin() ||
+      // `resource` is null for a brand-new document (create), so the old
+      // single rule here — `resource != null && resource.data.companyId ==
+      // request.auth.uid` — could never be true on create: every non-admin
+      // create was rejected with "Missing or insufficient permissions",
+      // for every product type, on both apps. Create is checked against
+      // `request.resource` (the incoming data) instead; update/delete stay
+      // checked against the existing `resource`, same as before.
+      allow create: if isAdmin() ||
+        (isAuthenticated() && request.resource.data.companyId == request.auth.uid);
+      allow update, delete: if isAdmin() ||
         (isAuthenticated() && resource != null && resource.data.companyId == request.auth.uid);
 
       // Checkout stock decrement: a signed-in dentist may reduce the stock of

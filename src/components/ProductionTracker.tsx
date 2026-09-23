@@ -92,7 +92,7 @@ function formatShortDate(dateStr: string): string {
 }
 
 export function ProductionTracker() {
-  const { lang, t } = useI18n();
+  const { lang } = useI18n();
   const ar = lang === "ar";
   const orders = useOrders();
   const [expandedStep, setExpandedStep] = useState<ProdStageId | null>(null);

@@ -47,9 +47,9 @@ function LabMyServices() {
 
   if (!labId) {
     return (
-      <MobileShell>
-        <TopBar title={ar ? "خدمات المختبر" : "Lab Services"} showBack />
-        <div className="p-6 text-center space-y-3">
+      <MobileShell wide>
+        <TopBar title={ar ? "خدمات المختبر" : "Lab Services"} showBack wide maxW="6xl" />
+        <div className="p-6 text-center space-y-3 md:py-24">
           <Stethoscope className="size-10 text-slate-300 mx-auto" />
           <p className="font-bold text-slate-600">
             {ar ? "يجب تسجيل الدخول كمختبر" : "Please sign in as a lab"}
@@ -119,11 +119,11 @@ function LabMyServices() {
   };
 
   if (!labId) {
-    return <MobileShell><div className="flex items-center justify-center min-h-svh"><Loader2 className="size-8 animate-spin text-primary" /></div></MobileShell>;
+    return <MobileShell wide><div className="flex items-center justify-center min-h-svh"><Loader2 className="size-8 animate-spin text-primary" /></div></MobileShell>;
   }
 
   return (
-    <MobileShell hideBottomNav>
+    <MobileShell wide hideBottomNav>
       <div className="min-h-svh bg-slate-50">
         {/* Header */}
         <div className="bg-gradient-to-br from-sky-500 to-indigo-600 rounded-b-[2.5rem] px-5 pt-6 pb-8 shadow-xl">
@@ -149,10 +149,10 @@ function LabMyServices() {
         </div>
 
         {/* Grid */}
-        <div className="px-4 mt-4 pb-8">
+        <div className="px-4 mt-4 pb-8 md:px-6 md:pt-6 md:pb-12 lg:px-8 lg:max-w-6xl lg:mx-auto">
           {isLoading ? <div className="flex justify-center py-16"><Loader2 className="size-8 animate-spin text-primary" /></div>
           : filtered.length === 0 ? <div className="py-16 text-center text-slate-400"><Sparkles className="size-10 mx-auto mb-3 opacity-30" /><p className="font-semibold">{ar ? "لا توجد خدمات" : "No services yet"}</p></div>
-          : <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          : <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-5">
             {filtered.map((s) => {
               const cat = dynamicCategories.find((c) => c.id === s.category);
               const fmt = s.currency === "IQD" ? `${s.price.toLocaleString()} د.ع` : `$${s.price.toFixed(2)}`;
@@ -186,7 +186,7 @@ function LabMyServices() {
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowForm(false)} />
-          <div className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl p-5 space-y-3 max-h-[90svh] overflow-y-auto animate-in slide-in-from-bottom duration-300">
+          <div className="relative w-full max-w-md md:max-w-2xl md:p-7 bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl p-5 space-y-3 max-h-[90svh] overflow-y-auto animate-in slide-in-from-bottom duration-300">
             <div className="flex items-center justify-between"><h3 className="font-bold text-lg">{editingId ? (ar ? "تعديل" : "Edit") : ar ? "إضافة خدمة" : "Add Service"}</h3><button onClick={() => setShowForm(false)} className="size-8 rounded-xl hover:bg-slate-100 flex items-center justify-center"><X className="size-4" /></button></div>
             <F label={ar ? "اسم الخدمة (عربي)" : "Service Name (Arabic)"} v={form.titleAr} onChange={(v) => setForm((d) => ({ ...d, titleAr: v }))} ph={ar ? "مثال: تاج زيركونيا" : "e.g. Zirconia Crown"} />
             <F label={ar ? "اسم الخدمة (إنكليزي)" : "Service Name (English)"} v={form.titleEn} onChange={(v) => setForm((d) => ({ ...d, titleEn: v }))} ph="Optional" />

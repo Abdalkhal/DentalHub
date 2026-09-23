@@ -44,8 +44,8 @@ function InvoiceDetailInner() {
 
   if (loading) {
     return (
-      <MobileShell>
-        <TopBar title={ar ? "تفاصيل الفاتورة" : "Invoice Details"} showBack />
+      <MobileShell wide>
+        <TopBar title={ar ? "تفاصيل الفاتورة" : "Invoice Details"} showBack wide maxW="3xl" />
         <div className="flex justify-center py-20">
           <Loader2 className="size-6 animate-spin text-muted-foreground" />
         </div>
@@ -55,8 +55,8 @@ function InvoiceDetailInner() {
 
   if (!inv) {
     return (
-      <MobileShell>
-        <TopBar title={ar ? "تفاصيل الفاتورة" : "Invoice Details"} showBack />
+      <MobileShell wide>
+        <TopBar title={ar ? "تفاصيل الفاتورة" : "Invoice Details"} showBack wide maxW="3xl" />
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <ReceiptText className="size-12 text-muted-foreground/40 mb-3" />
           <p className="font-bold text-sm text-muted-foreground">
@@ -109,9 +109,9 @@ function InvoiceDetailInner() {
   };
 
   return (
-    <MobileShell>
-      <TopBar title={ar ? "تفاصيل الفاتورة" : "Invoice Details"} showBack />
-      <div className="px-4 py-4 space-y-4 pb-10">
+    <MobileShell wide>
+      <TopBar title={ar ? "تفاصيل الفاتورة" : "Invoice Details"} showBack wide maxW="3xl" />
+      <div className="px-4 py-4 space-y-4 pb-10 md:px-6 md:py-8 md:pb-16 lg:px-8 lg:max-w-3xl lg:mx-auto">
         {/* Print / Share actions */}
         <div className="flex gap-2 no-print">
           <button

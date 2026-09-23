@@ -81,6 +81,11 @@ const SHELL = (body: string, ar: boolean) => `
   .tot{font-weight:800}
   .note{margin-top:14px;padding:10px 12px;background:#f8fafc;border-radius:8px;font-size:12px;color:#334155}
   .note b{color:#64748b;font-size:10px;display:block;margin-bottom:2px}
+  .section{margin-top:18px}
+  .section-title{font-size:13px;font-weight:800;color:#0f172a;margin:0 0 8px;padding-bottom:6px;border-bottom:2px solid #e2e8f0}
+  .empty{padding:10px 0;color:#94a3b8;font-size:11px}
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700}
+  .tags{display:flex;flex-wrap:wrap;gap:6px}
 </style></head><body>
 <div class="brand">Dent<span style="color:#0f172a"> Hub</span></div>
 ${body}
@@ -123,5 +128,119 @@ export function invoiceHtml(opts: {
       <tbody>${rowsHtml}${totalsHtml}</tbody>
     </table>
     ${noteHtml}`;
+  return SHELL(body, ar);
+}
+
+// Full patient-record PDF, shared from the patient screen's share button.
+// Fixed section order for every patient — info, complaint/notes, visits,
+// teeth, treatment plan — so the printed file always reads the same way
+// regardless of how much data a given patient has.
+export function patientRecordHtml(opts: {
+  ar: boolean;
+  meta: { label: string; value: string }[];
+  complaint?: string;
+  doctorNotes?: string;
+  visits: { date: string; time?: string; procedure: string; doctor?: string; status?: string; note?: string }[];
+  teeth: { tooth: number; status: string; color: string }[];
+  plan: { title: string; tooth?: string; dept?: string; cost?: string; status: string; statusColor: string; note?: string }[];
+}): string {
+  const { ar } = opts;
+  const t = (ar: string, en: string) => (opts.ar ? ar : en);
+
+  const metaHtml = opts.meta
+    .map((m) => `<div class="meta-cell"><span class="meta-label">${m.label}</span><span class="meta-value">${m.value}</span></div>`)
+    .join('');
+
+  const complaintHtml =
+    opts.complaint || opts.doctorNotes
+      ? `<div class="section">
+          <h2 class="section-title">${t('الشكوى والملاحظات', 'Complaint & Notes')}</h2>
+          ${opts.complaint ? `<div class="note"><b>${t('الشكوى الرئيسية', 'Main complaint')}</b>${opts.complaint}</div>` : ''}
+          ${opts.doctorNotes ? `<div class="note" style="margin-top:8px"><b>${t('ملاحظات الطبيب', "Doctor's notes")}</b>${opts.doctorNotes}</div>` : ''}
+        </div>`
+      : '';
+
+  const visitsRows = opts.visits
+    .map(
+      (v) => `<tr>
+        <td>${v.date}${v.time ? ` ${v.time}` : ''}</td>
+        <td>${v.procedure}</td>
+        <td>${v.doctor ?? '—'}</td>
+        <td>${v.status ?? '—'}</td>
+        <td>${v.note ?? ''}</td>
+      </tr>`,
+    )
+    .join('');
+  const visitsHtml = `
+    <div class="section">
+      <h2 class="section-title">${t('الزيارات', 'Visits')}</h2>
+      ${
+        opts.visits.length
+          ? `<table>
+              <thead><tr>
+                <th>${t('التاريخ', 'Date')}</th>
+                <th>${t('الإجراء', 'Procedure')}</th>
+                <th>${t('الطبيب', 'Doctor')}</th>
+                <th>${t('الحالة', 'Status')}</th>
+                <th>${t('ملاحظة', 'Note')}</th>
+              </tr></thead>
+              <tbody>${visitsRows}</tbody>
+            </table>`
+          : `<div class="empty">${t('لا توجد زيارات مسجّلة', 'No visits recorded')}</div>`
+      }
+    </div>`;
+
+  const teethHtml = `
+    <div class="section">
+      <h2 class="section-title">${t('حالة الأسنان', 'Teeth')}</h2>
+      ${
+        opts.teeth.length
+          ? `<div class="tags">${opts.teeth
+              .map(
+                (x) =>
+                  `<span class="pill" style="background:${x.color}22;color:${x.color}">${t('سن', 'Tooth')} ${x.tooth} — ${x.status}</span>`,
+              )
+              .join('')}</div>`
+          : `<div class="empty">${t('كل الأسنان سليمة — لا توجد ملاحظات', 'All teeth healthy — nothing flagged')}</div>`
+      }
+    </div>`;
+
+  const planRows = opts.plan
+    .map(
+      (s) => `<tr>
+        <td>${s.title}</td>
+        <td>${s.tooth ?? '—'}</td>
+        <td>${s.dept ?? '—'}</td>
+        <td><span class="pill" style="background:${s.statusColor}22;color:${s.statusColor}">${s.status}</span></td>
+        <td class="num">${s.cost ?? '—'}</td>
+      </tr>`,
+    )
+    .join('');
+  const planHtml = `
+    <div class="section">
+      <h2 class="section-title">${t('خطة العلاج', 'Treatment Plan')}</h2>
+      ${
+        opts.plan.length
+          ? `<table>
+              <thead><tr>
+                <th>${t('الإجراء المختار', 'Chosen Procedure')}</th>
+                <th>${t('السن', 'Tooth')}</th>
+                <th>${t('القسم', 'Department')}</th>
+                <th>${t('الحالة', 'Status')}</th>
+                <th class="num">${t('التكلفة', 'Cost')}</th>
+              </tr></thead>
+              <tbody>${planRows}</tbody>
+            </table>`
+          : `<div class="empty">${t('لا توجد خطة علاج بعد', 'No treatment plan yet')}</div>`
+      }
+    </div>`;
+
+  const body = `
+    <h1>${t('ملف المريض', 'Patient Record')}</h1>
+    <div class="meta-grid">${metaHtml}</div>
+    ${complaintHtml}
+    ${visitsHtml}
+    ${teethHtml}
+    ${planHtml}`;
   return SHELL(body, ar);
 }

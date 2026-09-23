@@ -4,7 +4,7 @@ import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { ProductAddToCart } from "@/components/ProductAddToCart";
 import { COUNTRIES } from "@/data/implants";
-import { useProductsByCountry, useSignedImageUrls, type Product } from "@/lib/products";
+import { useProductsByCountry, useSignedImageUrls } from "@/lib/products";
 import { useImplantCompanyNames } from "@/lib/implantOffers";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -80,26 +80,26 @@ function CountryPage() {
   ];
 
   return (
-    <MobileShell>
-      <TopBar title={`${t("implants")} ${lang === "ar" ? country.ar : country.en}`} showBack />
+    <MobileShell wide>
+      <TopBar title={`${t("implants")} ${lang === "ar" ? country.ar : country.en}`} showBack wide />
       {isVisitor && (
-        <div className="mx-4 mt-3 flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold rounded-xl px-4 py-2.5">
+        <div className="mx-4 mt-3 flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold rounded-xl px-4 py-2.5 md:mx-6 md:mt-5 lg:mx-auto lg:max-w-5xl">
           <EyeOff className="size-4 shrink-0" />
           {ar
             ? "وضع القراءة فقط — لا يمكنك تعديل أو إضافة محتوى"
             : "Read-only mode — you cannot edit or add content"}
         </div>
       )}
-      <div className="px-4 pt-4">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="text-5xl">{country.flag}</div>
+      <div className="px-4 pt-4 md:px-6 md:pt-8 md:pb-12 lg:px-8 lg:max-w-5xl lg:mx-auto">
+        <div className="flex items-center gap-3 mb-4 md:gap-5 md:mb-7">
+          <div className="text-5xl md:text-7xl">{country.flag}</div>
           <div>
-            <p className="text-xs text-muted-foreground">{t("brands")}</p>
-            <p className="font-display font-extrabold text-xl">{filtered.length}</p>
+            <p className="text-xs text-muted-foreground md:text-sm">{t("brands")}</p>
+            <p className="font-display font-extrabold text-xl md:text-4xl">{filtered.length}</p>
           </div>
         </div>
 
-        <div className="flex gap-2 overflow-x-auto -mx-4 px-4 pb-1 scrollbar-hide">
+        <div className="flex gap-2 overflow-x-auto -mx-4 px-4 pb-1 scrollbar-hide md:mx-0 md:px-0 md:flex-wrap md:overflow-visible md:gap-2.5">
           {filters.map((f) => {
             const active = filter === f.key;
             return (
@@ -124,7 +124,7 @@ function CountryPage() {
             <Loader2 className="size-6 animate-spin text-primary" />
           </div>
         ) : filtered.length === 0 ? (
-          <div className="py-20 flex flex-col items-center text-center text-muted-foreground">
+          <div className="py-20 flex flex-col items-center text-center text-muted-foreground md:py-28 md:rounded-2xl md:border md:border-dashed md:border-border md:bg-card md:mt-7">
             <Cpu className="size-14 mb-4 opacity-20" />
             <p className="font-display font-bold text-lg text-slate-400">
               {ar ? "لا توجد زرعات بعد" : "No implants yet"}
@@ -136,7 +136,7 @@ function CountryPage() {
             </p>
           </div>
         ) : (
-          <ul className="space-y-3">
+          <ul className="space-y-3 md:mt-7 md:space-y-0 md:grid md:grid-cols-2 md:gap-5 xl:grid-cols-3 md:items-start">
             {filtered.map((p) => {
               const spec = p.implantSpec;
               const diams = spec?.diameters ?? [];

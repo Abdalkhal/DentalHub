@@ -177,8 +177,8 @@ function RxScreen() {
 
   if (!p) {
     return (
-      <MobileShell>
-        <TopBar title={ar ? "وصفة طبية" : "Prescription"} showBack />
+      <MobileShell wide>
+        <TopBar title={ar ? "وصفة طبية" : "Prescription"} showBack wide maxW="4xl" />
         <div className="p-6 text-center">
           <p className="text-sm font-semibold">{ar ? "لم يتم العثور على المريض" : "Patient not found"}</p>
           <Link to="/patients" className="text-primary text-xs font-bold mt-2 inline-block">
@@ -190,10 +190,10 @@ function RxScreen() {
   }
 
   return (
-    <MobileShell>
-      <TopBar title={ar ? "الوصفة الطبية الإلكترونية (Rx)" : "e-Prescription (Rx)"} showBack />
+    <MobileShell wide>
+      <TopBar title={ar ? "الوصفة الطبية الإلكترونية (Rx)" : "e-Prescription (Rx)"} showBack wide maxW="4xl" />
 
-      <div className="px-4 py-4 space-y-4 pb-28">
+      <div className="px-4 py-4 space-y-4 pb-28 md:px-6 md:py-8 md:space-y-6 lg:px-8 lg:max-w-4xl lg:mx-auto">
         <button
           onClick={() => setEditHeader(true)}
           className="w-full rounded-xl border border-primary/30 bg-primary/5 text-primary text-[12px] font-bold py-2.5 flex items-center justify-center gap-1.5"
@@ -247,7 +247,7 @@ function RxScreen() {
                 </p>
               </div>
             ) : (
-              <ul className="space-y-3">
+              <ul className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-5 xl:grid-cols-3 md:items-start">
                 {items.map((m, i) => (
                   <li key={`${m.id}-${i}`} className="flex items-start gap-2">
                     <span className="text-sm font-bold">{i + 1}.</span>
@@ -358,7 +358,7 @@ function HeaderDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-sm rounded-2xl bg-card p-4 space-y-3 max-h-[85vh] overflow-y-auto"
+        className="w-full max-w-sm rounded-2xl bg-card p-4 space-y-3 max-h-[85vh] overflow-y-auto md:max-w-lg md:p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <p className="text-sm font-extrabold">{ar ? "تعديل معلومات ورقة الوصفة" : "Edit prescription header"}</p>
@@ -432,9 +432,9 @@ function AddMedicineSheet({
   }, [cat, company, q, favs]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end bg-black/40" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={onClose}>
       <div
-        className="w-full rounded-t-3xl bg-card px-4 pb-4 pt-3 max-h-[88vh] flex flex-col"
+        className="w-full max-w-md rounded-t-3xl bg-card px-4 pb-4 pt-3 max-h-[88vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <span className="mx-auto mb-3 h-1 w-10 rounded-full bg-muted" />

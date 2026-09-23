@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Image, Modal, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Check, Minus, Package, Plus, ScanBarcode, X } from 'lucide-react-native';
 
@@ -520,6 +520,7 @@ export function AddSupplyProductModal({
 
   return (
     <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
       <View className="flex-1 justify-end bg-black/40">
         <View className="max-h-[92%] rounded-t-3xl bg-white">
           <View className="flex-row items-center justify-between border-b border-slate-100 px-4 pb-2.5 pt-4">
@@ -723,9 +724,11 @@ export function AddSupplyProductModal({
                     <Minus size={16} color="#334155" />
                   </Pressable>
                   <TextInput
-                    value={formatQtyInput(String(stock))}
+                    value={stock === 0 ? '' : formatQtyInput(String(stock))}
                     onChangeText={(v) => setStock(Number(v.replace(/[^\d]/g, '')) || 0)}
                     keyboardType="number-pad"
+                    placeholder="0"
+                    placeholderTextColor="#94A3B8"
                     className="flex-1 text-center text-xl font-extrabold text-slate-900"
                     style={{ writingDirection: 'ltr' }}
                   />
@@ -762,6 +765,7 @@ export function AddSupplyProductModal({
           </ScrollView>
         </View>
       </View>
+      </KeyboardAvoidingView>
 
       {showScanner && (
         <BarcodeScannerModal

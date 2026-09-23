@@ -45,30 +45,30 @@ function BrandsIndex() {
   }, [q]);
 
   return (
-    <MobileShell>
-      <TopBar title={lang === "ar" ? "البراندات" : "Brands"} showBack />
-      <div className="px-4 pt-4 pb-8">
-        <div className="relative">
+    <MobileShell wide>
+      <TopBar title={lang === "ar" ? "البراندات" : "Brands"} showBack wide maxW="6xl" />
+      <div className="px-4 pt-4 pb-8 md:px-6 md:pt-8 md:pb-14 lg:px-8 lg:max-w-6xl lg:mx-auto">
+        <div className="relative md:max-w-md">
           <Search className="size-4 absolute top-1/2 -translate-y-1/2 start-4 text-muted-foreground pointer-events-none" />
           <input
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder={lang === "ar" ? "ابحث عن براند..." : "Search a brand..."}
-            className="w-full h-12 rounded-2xl bg-card border border-border ps-11 pe-4 text-sm focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-primary shadow-sm"
+            className="w-full h-12 rounded-2xl bg-card border border-border ps-11 pe-4 text-sm focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-primary shadow-sm md:rounded-full"
           />
         </div>
 
         {groups.length === 0 && (
-          <p className="text-sm text-muted-foreground text-center py-10">
+          <p className="text-sm text-muted-foreground text-center py-10 md:py-24 md:rounded-3xl md:border md:border-dashed md:border-border md:bg-card md:mt-7">
             {lang === "ar" ? "لا توجد نتائج" : "No results"}
           </p>
         )}
 
         {groups.map(([letter, list]) => (
-          <section key={letter} className="mt-5">
-            <h2 className="font-display font-extrabold text-sm text-primary mb-2">{letter}</h2>
-            <ul className="grid grid-cols-3 gap-3">
+          <section key={letter} className="mt-5 md:mt-9">
+            <h2 className="font-display font-extrabold text-sm text-primary mb-2 md:text-2xl md:mb-4 md:pb-2 md:border-b md:border-border">{letter}</h2>
+            <ul className="grid grid-cols-3 gap-3 md:grid-cols-5 md:gap-5 lg:grid-cols-6 xl:grid-cols-8">
               {list.map((b) => {
                 const itemCount = b.products.length;
                 return (
@@ -76,13 +76,13 @@ function BrandsIndex() {
                     <Link
                       to="/brands/$brandId"
                       params={{ brandId: b.id }}
-                      className="flex flex-col h-full rounded-[20px] bg-card border border-border p-3 shadow-sm hover:shadow-card hover:-translate-y-0.5 transition"
+                      className="flex flex-col h-full rounded-[20px] bg-card border border-border p-3 shadow-sm hover:shadow-card hover:-translate-y-0.5 transition md:p-4 md:shadow-none md:hover:shadow-lg md:hover:border-primary/30"
                     >
-                      <span className="flex-1 flex items-center justify-center min-h-[88px] rounded-[14px] bg-slate-50 p-2">
+                      <span className="flex-1 flex items-center justify-center min-h-[88px] rounded-[14px] bg-slate-50 p-2 md:min-h-[104px] md:p-3">
                         <BrandLogo brand={b} className="w-full h-full" />
                       </span>
                       <div className="mt-2 text-center">
-                        <p className="text-[13px] font-bold text-foreground truncate leading-tight">
+                        <p className="text-[13px] font-bold text-foreground truncate leading-tight md:text-sm">
                           {lang === "ar" ? b.ar : b.name}
                         </p>
                         <p className="text-[10px] text-muted-foreground truncate mt-0.5">

@@ -5,13 +5,14 @@ import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import {
   addPatient,
+  updatePatient,
   usePatients,
   EMPTY_HISTORY,
   type MedicalHistory,
   type Patient,
   type PatientStatus,
 } from "@/lib/patientsStore";
-import { ArrowRight, ArrowLeft, Phone, Plus, Search, Users, X, CalendarDays } from "lucide-react";
+import { ArrowRight, ArrowLeft, Phone, Plus, Search, Users, X, CalendarDays, ChevronDown } from "lucide-react";
 
 export const Route = createFileRoute("/patients/")({
   head: () => ({
@@ -59,22 +60,23 @@ function PatientsPage() {
   }, [patients, q, status]);
 
   return (
-    <MobileShell>
-      <header className="px-3 pt-4 pb-3 bg-gradient-to-b from-[oklch(0.97_0.02_240)] to-transparent">
+    <MobileShell wide>
+      <header className="px-3 pt-4 pb-3 bg-gradient-to-b from-[oklch(0.97_0.02_240)] to-transparent md:px-6 md:pt-8 md:pb-5 lg:px-8 lg:max-w-6xl lg:mx-auto">
         <div className="flex items-center gap-2">
-          <Link to="/" className="size-9 rounded-full bg-card border border-border flex items-center justify-center shadow-sm">
+          <Link to="/clinic" className="size-9 rounded-full bg-card border border-border flex items-center justify-center shadow-sm">
             <Back className="size-4" />
           </Link>
           <div className="flex-1 min-w-0">
-            <h1 className="font-display font-extrabold text-lg leading-tight">{ar ? "سجل المرضى" : "Patient Records"}</h1>
-            <p className="text-[11px] text-muted-foreground">{ar ? "إدارة ملفات ومعلومات المرضى" : "Manage patient files & info"}</p>
+            <h1 className="font-display font-extrabold text-lg leading-tight md:text-3xl">{ar ? "سجل المرضى" : "Patient Records"}</h1>
+            <p className="text-[11px] text-muted-foreground md:text-sm md:mt-1">{ar ? "إدارة ملفات ومعلومات المرضى" : "Manage patient files & info"}</p>
           </div>
-          <span className="size-10 rounded-2xl bg-[oklch(0.93_0.06_250)] ring-1 ring-[oklch(0.82_0.1_250)] text-[oklch(0.45_0.18_256)] flex items-center justify-center">
+          <span className="size-10 rounded-2xl bg-[oklch(0.93_0.06_250)] ring-1 ring-[oklch(0.82_0.1_250)] text-[oklch(0.45_0.18_256)] flex items-center justify-center md:size-14">
             <Users className="size-5" />
           </span>
         </div>
 
-        <div className="mt-3 relative">
+        <div className="md:mt-6 md:flex md:items-center md:gap-4">
+        <div className="mt-3 relative md:mt-0 md:flex-1 md:max-w-md">
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -85,7 +87,7 @@ function PatientsPage() {
           <Search className="size-4 absolute top-1/2 -translate-y-1/2 end-4 text-muted-foreground pointer-events-none" />
         </div>
 
-        <div className="mt-2.5 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+        <div className="mt-2.5 flex items-center gap-1.5 overflow-x-auto no-scrollbar md:mt-0 md:overflow-visible md:gap-2">
           {(["all", "in_treatment", "completed", "new"] as const).map((s) => (
             <button
               key={s}
@@ -102,16 +104,17 @@ function PatientsPage() {
 
         <button
           onClick={() => setOpen(true)}
-          className="mt-3 w-full h-12 rounded-2xl bg-primary text-primary-foreground font-display font-extrabold text-sm shadow-card flex items-center justify-center gap-2 hover:brightness-105 transition"
+          className="mt-3 w-full h-12 rounded-2xl bg-primary text-primary-foreground font-display font-extrabold text-sm shadow-card flex items-center justify-center gap-2 hover:brightness-105 transition md:mt-0 md:w-auto md:h-11 md:px-6 md:ms-auto md:rounded-xl"
         >
           <Plus className="size-4" strokeWidth={3} />
           {ar ? "إضافة مريض جديد" : "Add new patient"}
         </button>
+        </div>
       </header>
 
-      <section className="px-3 pb-6 space-y-2.5">
+      <section className="px-3 pb-6 space-y-2.5 md:px-6 md:pb-12 md:space-y-0 md:grid md:grid-cols-2 md:gap-4 xl:grid-cols-3 md:items-start lg:px-8 lg:max-w-6xl lg:mx-auto">
         {list.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center">
+          <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center md:col-span-full md:py-16">
             <Users className="size-8 mx-auto text-muted-foreground/50" />
             <p className="mt-2 text-sm font-semibold">{ar ? "لا يوجد مرضى بعد" : "No patients yet"}</p>
             <p className="text-[11px] text-muted-foreground mt-1">
@@ -134,22 +137,46 @@ function PatientCard({ p, ar }: { p: Patient; ar: boolean }) {
     <Link
       to="/patients/$patientId"
       params={{ patientId: p.id }}
-      className="block rounded-2xl bg-card border border-border p-3.5 shadow-soft hover:shadow-card transition"
+      className="block rounded-2xl bg-card border border-border p-3.5 shadow-soft hover:shadow-card transition md:h-full md:p-4 md:shadow-none md:hover:shadow-lg md:hover:border-primary/30"
     >
       <div className="flex items-start gap-3">
-        <span className="size-11 shrink-0 rounded-2xl bg-[oklch(0.95_0.04_250)] text-[oklch(0.45_0.18_256)] font-display font-extrabold flex items-center justify-center">
+        <span className="size-11 shrink-0 rounded-2xl bg-[oklch(0.95_0.04_250)] text-[oklch(0.45_0.18_256)] font-display font-extrabold flex items-center justify-center md:size-12 md:text-lg">
           {p.name.trim().charAt(0) || "?"}
         </span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <p className="font-display font-extrabold text-sm truncate">{p.name}</p>
-            <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0", meta.cls)}>
-              {ar ? meta.ar : meta.en}
-            </span>
+            <div
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              className={cn(
+                "shrink-0 inline-flex items-center rounded-full ring-1 ring-black/10 shadow-sm cursor-pointer",
+                meta.cls,
+              )}
+            >
+              <select
+                value={p.status}
+                onChange={(e) => updatePatient(p.id, { status: e.target.value as PatientStatus })}
+                title={ar ? "تغيير حالة العلاج من هنا" : "Change treatment status here"}
+                className="bg-transparent text-[10px] font-bold appearance-none outline-none cursor-pointer ps-2 py-1 pe-0.5 text-center"
+              >
+                {(["new", "in_treatment", "completed"] as const).map((s) => (
+                  <option key={s} value={s}>
+                    {ar ? STATUS_META[s].ar : STATUS_META[s].en}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="size-3 me-1.5 pointer-events-none opacity-70" />
+            </div>
           </div>
-          <p className="text-[11px] text-muted-foreground mt-0.5">
-            {p.fileNo} · {p.age || "—"} {ar ? "سنة" : "yrs"}
-          </p>
+          <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground flex-wrap">
+            <span className="font-semibold whitespace-nowrap">{p.fileNo}</span>
+            <span className="text-slate-300">·</span>
+            <span className="whitespace-nowrap">{p.age || "—"} {ar ? "سنة" : "yrs"}</span>
+          </div>
           <div className="mt-1.5 flex items-center gap-3 text-[11px] text-muted-foreground">
             <span className="flex items-center gap-1"><Phone className="size-3" />{p.phone || "—"}</span>
             <span className="flex items-center gap-1"><CalendarDays className="size-3" />{p.lastVisit}</span>

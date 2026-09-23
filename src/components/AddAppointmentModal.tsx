@@ -168,19 +168,19 @@ export function AddAppointmentModal({ onClose }: { onClose: () => void }) {
     : new Date(date + "T00:00:00").toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" });
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-foreground/40 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-foreground/40 backdrop-blur-sm md:items-center md:p-6" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-[440px] max-h-[92vh] flex flex-col rounded-t-3xl bg-background"
+        className="w-full max-w-[440px] max-h-[92vh] flex flex-col rounded-t-3xl bg-background md:max-w-3xl md:max-h-[88vh] md:rounded-3xl md:shadow-2xl"
       >
-        <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b border-border">
+        <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b border-border md:px-6 md:pt-5 md:pb-4">
           <h2 className="font-display font-extrabold text-base">{ar ? "إضافة موعد" : "Add Appointment"}</h2>
           <button type="button" onClick={onClose} className="size-8 rounded-full bg-card border border-border flex items-center justify-center">
             <X className="size-4" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 pb-8">
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 pb-8 md:px-6 md:py-6 md:pb-6 md:grid md:grid-cols-2 md:gap-5 md:space-y-0 md:items-start md:content-start">
           {/* Patient */}
           <div className="space-y-2.5">
             <p className="text-[11px] font-bold text-muted-foreground">{ar ? "بيانات المريض" : "Patient"}</p>
@@ -239,7 +239,7 @@ export function AddAppointmentModal({ onClose }: { onClose: () => void }) {
           </div>
 
           {/* Type + Room */}
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-2 gap-2.5 md:col-span-2 md:gap-5">
             <div>
               <p className="text-[11px] font-bold text-muted-foreground mb-1.5">{ar ? "نوع الموعد" : "Appointment Type"}</p>
               <Select
@@ -260,7 +260,7 @@ export function AddAppointmentModal({ onClose }: { onClose: () => void }) {
           </div>
 
           {/* Doctor + Treatment */}
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-2 gap-2.5 md:col-span-2 md:gap-5">
             <div>
               <p className="text-[11px] font-bold text-muted-foreground mb-1.5">{ar ? "الطبيب" : "Doctor"}</p>
               <Select
@@ -280,7 +280,7 @@ export function AddAppointmentModal({ onClose }: { onClose: () => void }) {
           </div>
 
           {/* Notes */}
-          <div>
+          <div className="md:col-span-2">
             <div className="flex items-center justify-between mb-1.5">
               <p className="text-[11px] font-bold text-muted-foreground">{ar ? "ملاحظات" : "Notes"}</p>
               <span className="text-[10px] text-muted-foreground">{notes.length}/200</span>
@@ -299,7 +299,7 @@ export function AddAppointmentModal({ onClose }: { onClose: () => void }) {
             type="button"
             onClick={() => setReminder((v) => !v)}
             className={cn(
-              "w-full h-12 rounded-xl border px-4 flex items-center justify-between transition",
+              "w-full h-12 rounded-xl border px-4 flex items-center justify-between transition md:col-span-2",
               reminder ? "bg-primary/5 border-primary/30" : "bg-card border-border",
             )}
           >
@@ -313,10 +313,10 @@ export function AddAppointmentModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        <div className="p-4 border-t border-border bg-background shrink-0">
+        <div className="p-4 border-t border-border bg-background shrink-0 md:px-6 md:py-4">
           <button
             onClick={submit}
-            className="w-full h-12 rounded-2xl bg-primary text-primary-foreground font-display font-extrabold text-sm shadow-card flex items-center justify-center gap-1.5"
+            className="w-full h-12 rounded-2xl bg-primary text-primary-foreground font-display font-extrabold text-sm shadow-card flex items-center justify-center gap-1.5 md:h-11 md:max-w-xs md:mx-auto md:rounded-xl"
           >
             <Check className="size-4" />
             {ar ? "حفظ الموعد" : "Save Appointment"}

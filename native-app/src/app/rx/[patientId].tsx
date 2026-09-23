@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Image, Linking, Modal, Pressable, ScrollView, Share, TextInput, View } from 'react-native';
+import { Alert, Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, Share, TextInput, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import {
   Building2,
@@ -13,6 +13,7 @@ import {
   Send,
   Star,
   Stethoscope,
+  Trash2,
   X,
   Plus,
 } from 'lucide-react-native';
@@ -39,7 +40,22 @@ const COMPANIES: { key: RxCompany | 'ALL'; label: string; ar: string }[] = [
 ];
 
 const FAV_KEY = 'dh:rx:favs:v1';
+const HIDDEN_KEY = 'dh:rx:hidden:v1';
 const HEADER_KEY = 'dh:rx:header:v1';
+
+// Dedicated array loader for the hidden-medicines list — `loadJSON` below
+// merges its fallback as an *object* (`{ ...fallback, ...parsed }`), which
+// silently turns an array fallback into `{0: "a", 1: "b"}` instead of a real
+// array. Kept separate rather than reusing it for this new feature.
+function loadIdList(key: string): string[] {
+  try {
+    const raw = localStorage.getItem(key);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
 
 type RxHeader = {
   clinicName: string;
@@ -330,6 +346,7 @@ function HeaderDialog({
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
       <View className="flex-1 items-center justify-center bg-black/40 p-4">
         <View className="w-full max-w-sm gap-3 rounded-2xl bg-white p-4">
           <Text className="text-sm font-extrabold text-slate-900">
@@ -356,6 +373,7 @@ function HeaderDialog({
           </View>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -373,10 +391,43 @@ function AddMedicineSheet({
   const [company, setCompany] = useState<RxCompany | 'ALL'>('ALL');
   const [q, setQ] = useState('');
   const [favs, setFavs] = useState<string[]>([]);
+  const [hidden, setHidden] = useState<string[]>([]);
 
   useEffect(() => {
     setFavs(loadJSON<string[]>(FAV_KEY, []));
+    setHidden(loadIdList(HIDDEN_KEY));
   }, []);
+
+  // Not every doctor uses every medicine in the catalog — let them permanently
+  // hide the ones they never prescribe, after an explicit confirmation, so
+  // their own list stays short instead of scrolling past irrelevant items.
+  const confirmDelete = (m: RxCatalogItem) => {
+    Alert.alert(
+      ar ? 'حذف الدواء' : 'Delete medicine',
+      ar
+        ? `هل تريد حذف "${m.nameAr || m.name}" وصورته من هذه القائمة؟`
+        : `Delete "${m.name}" and its image from this list?`,
+      [
+        { text: ar ? 'إلغاء' : 'Cancel', style: 'cancel' },
+        {
+          text: ar ? 'حذف' : 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            setHidden((prev) => {
+              if (prev.includes(m.id)) return prev;
+              const next = [...prev, m.id];
+              try {
+                localStorage.setItem(HIDDEN_KEY, JSON.stringify(next));
+              } catch {
+                /* ignore */
+              }
+              return next;
+            });
+          },
+        },
+      ],
+    );
+  };
 
   const toggleFav = (id: string) => {
     setFavs((prev) => {
@@ -394,14 +445,16 @@ function AddMedicineSheet({
     const needle = q.trim().toLowerCase();
     return RX_CATALOG.filter(
       (m) =>
+        !hidden.includes(m.id) &&
         (cat === 'الكل' || m.category === cat) &&
         (company === 'ALL' || m.company === company) &&
         `${m.name} ${m.nameAr ?? ''}`.toLowerCase().includes(needle),
     ).sort((a, b) => Number(favs.includes(b.id)) - Number(favs.includes(a.id)));
-  }, [cat, company, q, favs]);
+  }, [cat, company, q, favs, hidden]);
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
       <View className="flex-1 justify-end bg-black/40">
         <View className="max-h-[88%] rounded-t-3xl bg-white px-4 pb-4 pt-3">
           <View className="mb-1 h-1 w-10 self-center rounded-full bg-slate-200" />
@@ -496,6 +549,9 @@ function AddMedicineSheet({
                   <Pressable onPress={() => toggleFav(m.id)} className="shrink-0 p-1">
                     <Star size={20} color={fav ? '#FBBF24' : '#CBD5E1'} fill={fav ? '#FBBF24' : 'transparent'} />
                   </Pressable>
+                  <Pressable onPress={() => confirmDelete(m)} className="shrink-0 p-1">
+                    <Trash2 size={18} color="#CBD5E1" />
+                  </Pressable>
                   <Pressable
                     onPress={() => onPick(m)}
                     className="h-9 w-9 shrink-0 items-center justify-center rounded-[10px]"
@@ -512,6 +568,7 @@ function AddMedicineSheet({
           </ScrollView>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

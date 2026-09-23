@@ -454,16 +454,16 @@ export function ImplantFormModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[70]">
+    <div className="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:p-6">
       <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} />
       <div
-        className="absolute inset-x-0 bottom-0 top-6 mx-auto w-full max-w-md flex flex-col rounded-t-3xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom"
+        className="relative w-full max-w-md max-h-[92vh] flex flex-col rounded-t-3xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom md:max-w-2xl md:max-h-[88vh] md:rounded-3xl lg:max-w-3xl"
         style={{ background: "linear-gradient(to bottom, #F7FCFF, #DCEEFB, #BFE1F7)" }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 pt-4 pb-3 shrink-0 border-b border-white/70">
+        <div className="flex items-center justify-between px-4 pt-4 pb-3 shrink-0 border-b border-white/70 md:px-6 md:pt-5 md:pb-4">
           <div>
-            <h2 className="font-display font-extrabold text-base text-[#17324A]">
+            <h2 className="font-display font-extrabold text-base text-[#17324A] lg:text-xl">
               {editing
                 ? ar
                   ? "تعديل زرعة"
@@ -472,7 +472,7 @@ export function ImplantFormModal({
                   ? "إضافة زرعة جديدة"
                   : "Add New Implant"}
             </h2>
-            <p className="text-[11px] text-[#7A94A8] mt-0.5">
+            <p className="text-[11px] text-[#7A94A8] mt-0.5 lg:text-xs">
               {ar ? "أضف زرعة وإكسسواراتها بسهولة" : "Add implant and its accessories easily"}
             </p>
           </div>
@@ -486,8 +486,8 @@ export function ImplantFormModal({
         </div>
 
         {/* Type toggle */}
-        <div className="px-4 pt-3 shrink-0">
-          <div className="flex rounded-2xl bg-[#E7F4FE] p-1">
+        <div className="px-4 pt-3 shrink-0 md:px-6">
+          <div className="flex rounded-2xl bg-[#E7F4FE] p-1 md:max-w-md">
             <button
               type="button"
               onClick={() => setProductType("main_implant")}
@@ -531,7 +531,7 @@ export function ImplantFormModal({
         </div>
 
         {/* Scrollable body */}
-        <div className="flex-1 overflow-y-auto px-4 pt-4 pb-6 space-y-4">
+        <div className="flex-1 overflow-y-auto px-4 pt-4 pb-6 space-y-4 md:px-6 md:pt-6">
           {productType === "main_implant" ? (
             <>
               <div className="bg-white border border-[#D3E8F7] rounded-3xl p-5 shadow-md">
@@ -1373,14 +1373,14 @@ export function ImplantFormModal({
         </div>
 
         {/* Footer */}
-        <div className="shrink-0 border-t border-white/70 bg-white/95 backdrop-blur p-4">
-          <div className="flex gap-3">
+        <div className="shrink-0 border-t border-white/70 bg-white/95 backdrop-blur p-4 md:px-6 md:py-4">
+          <div className="flex gap-3 md:max-w-md md:mx-auto">
             <button
               type="button"
               onClick={submit}
               disabled={busy}
               className={cn(
-                "flex-1 h-14 rounded-2xl font-display font-bold flex items-center justify-center gap-2 transition shadow-lg text-white",
+                "flex-1 h-14 rounded-2xl font-display font-bold flex items-center justify-center gap-2 transition shadow-lg text-white md:h-11",
                 busy ? "bg-slate-200 text-slate-400 cursor-not-allowed" : "hover:opacity-95",
               )}
               style={busy ? undefined : { background: "linear-gradient(to right, #2AA6D1, #4FC3E8)" }}
@@ -1401,7 +1401,7 @@ export function ImplantFormModal({
             <button
               type="button"
               onClick={onClose}
-              className="h-14 px-8 rounded-2xl font-display font-bold flex items-center gap-2 transition bg-[#E7F4FE] hover:bg-[#DCEEFB] text-[#1C6FB5]"
+              className="h-14 px-8 rounded-2xl font-display font-bold flex items-center gap-2 transition bg-[#E7F4FE] hover:bg-[#DCEEFB] text-[#1C6FB5] md:h-11"
             >
               {ar ? "إلغاء" : "Cancel"}
             </button>

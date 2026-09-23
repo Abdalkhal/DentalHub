@@ -27,6 +27,7 @@ import type { LucideIcon } from 'lucide-react-native';
 import { Screen, Text } from '@/components/ui';
 import { useIsAdmin, useLabStaffClaim, useUserRole } from '@/lib/useAuth';
 import { useI18n } from '@/lib/i18n';
+import { cn } from '@/lib/utils';
 
 const ROLE_AR: Record<string, string> = {
   dentist: 'طبيب أسنان',
@@ -127,7 +128,7 @@ export default function MoreScreen() {
 
   return (
     <Screen>
-      <View className="flex-row items-center gap-2 px-1">
+      <View className={cn('flex-row items-center gap-2 px-1', ar && 'flex-row-reverse')}>
         <Text className="text-xs font-bold text-slate-500">{ar ? 'الحساب:' : 'Account:'}</Text>
         <View className="rounded-full bg-sky-50 px-2.5 py-1">
           <Text className="text-xs font-bold text-sky-700">{roleLabel}</Text>

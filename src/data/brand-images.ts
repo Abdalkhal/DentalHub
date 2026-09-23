@@ -382,6 +382,42 @@ export const BRAND_IMAGES: Record<string, string> = {
   "zimmer": "https://www.dentalstation.co/uploads/brands/Zimmer.png",
   "zirc": "https://www.dentalstation.co/uploads/brands/logo%20(1).png",
   "zzlinker": "https://www.dentalstation.co/uploads/brands_new/zzlinker.jpg",
+
+  // Added later — brands that had no image above (each URL verified by
+  // fetching and visually checking the actual logo, not just trusting a
+  // page's text). "orthodontica" and "bsmiley" have no confident source
+  // and are intentionally left out; those brands fall back to initials.
+  "acteon": "https://www.acteongroup.com/images/logo.svg",
+  "aflatek": "https://www.dentalstation.co/uploads_cache/-80-rbh-1772615328-aflatekeu-logo-1577090293.jpg",
+  "ar-instrument": "https://www.dentalstation.co/uploads_cache/-80-rbh-1772929770-AR-Instrumed-UK.png",
+  "artspa-dental": "https://www.dentalstation.co/uploads_cache/-80-rbh-1772615349-logo-1.jpg",
+  "biodinamica": "https://www.dentalstation.co/uploads_cache/-80-rbh-1772615360-photo_2023-03-09_05-29-05.jpg",
+  "biolase": "https://www.biolase.com/biolase-logo-2023.png",
+  "bomedent": "https://www.dentalstation.co/uploads_cache/-80-rbh-1772615322-179.jpg",
+  "d-perfect": "https://www.dentalstation.co/uploads_cache/-80-rbh-1772613945-logo-2.png",
+  "denbio-co": "https://www.dentalstation.co/uploads_cache/-80-rbh-1772933717-R%20(2).png",
+  "denflex": "https://www.dentalstation.co/uploads_cache/-80-rbh-1772615350-logo-2.png",
+  "denu": "https://www.dentalstation.co/uploads_cache/-80-rbh-1772613945-logo-1.png",
+  "dte": "https://www.dentalstation.co/uploads_cache/-80-rbh-1772615337-DTE.jpg",
+  "fa": "https://www.dentalstation.co/uploads_cache/-80-rbh-1772615350-logo-4.png",
+  "fengdan": "https://www.dentalstation.co/uploads_cache/-80-rbh-1772613946-logo-3.png",
+  "han-dae-chemical": "https://www.dentalstation.co/uploads_cache/-80-rbh-1772613945-logo-2.jpg",
+  "hirol": "https://www.dentalstation.co/uploads_cache/-80-rbh-1772613945-logo-1.jpg",
+  "kerr": "https://www.kerrdental.com/sites/g/files/wdvifx451/files/2025-08/KerrLogo.png",
+  "kollsut-usa": "https://www.dentalstation.co/uploads_cache/-80-rbh-1772615348-kollsut-logo-300x171.jpg",
+  "kyzen": "https://www.dentalstation.co/uploads_cache/-80-rbh-1772615345-IMG_20231007_100758_748.png",
+  "laja": "https://www.dentalstation.co/uploads_cache/-80-rbh-1772615350-logo-1.png",
+  "nexobio": "https://www.dentalstation.co/uploads_cache/-80-rbh-1772615355-nexobio12.jpg",
+  "orikam": "https://www.dentalstation.co/uploads_cache/-80-rbh-1772615358-Orikam-logo-75-222-222.png",
+  "quick-white": "https://www.dentalstation.co/uploads_cache/-80-rbh-1772615363-QuickWhite-2021-v2-Top-web-logo-1-e1633006962962-150x150.jpg",
+  "rhondium": "https://www.dentalstation.co/uploads_cache/-80-rbh-1772615138-Rhondium-Logo-65x258-web.png",
+  "rident": "https://www.dentalstation.co/uploads_cache/-80-rbh-1772615138-rident-logo-1.png",
+  "sani": "https://www.dentalstation.co/uploads_cache/-80-rbh-1772615327-A4%20logo-600x315.jpg",
+  "scrapie": "https://www.dentalstation.co/uploads_cache/-80-rbh-1774430635-IMG-20240506-WA0013.jpg",
+  "wbt": "https://www.dentalstation.co/uploads_cache/-80-rbh-1774432344-f-logo.png",
+  "yadeng": "https://img.waimaoniu.net/2380/2380-202601091406247197.png",
+  "yingmed": "https://www.dentalstation.co/uploads_cache/-80-rbh-1772615350-logo-3.png",
+  "zerodent": "https://zerodent.com.tr/img/logo-beyaz.png",
 };
 
 export const BRAND_NAMES: Record<string, string> = {

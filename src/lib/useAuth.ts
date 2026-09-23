@@ -59,22 +59,85 @@ export function useUserRole() {
   return { user, role: q.data ?? null, loading: authLoading || q.isLoading };
 }
 
+/** Lab staff roles issued as custom claims by the `inviteLabMember` function. */
+export type LabStaffRole = "ADMIN" | "DESIGNER" | "TECHNICIAN";
+
+export type LabStaffClaim = { labId: string; role: LabStaffRole } | null;
+
+/**
+ * Reads the lab-staff custom claims off the ID token.
+ *
+ * Invited staff get an Auth user plus a `lab_members` document, but no
+ * `user_roles` document — so `useUserRole` returns null for them. The claim
+ * is the only signal that a signed-in user is a lab designer/ceramist.
+ */
+export function useLabStaffClaim() {
+  const { user, loading: authLoading } = useSession();
+  const [claim, setClaim] = useState<LabStaffClaim>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!user) {
+      setClaim(null);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    (async () => {
+      try {
+        const token = await user.getIdTokenResult();
+        const role = token.claims.role as LabStaffRole | undefined;
+        const labId = token.claims.labId as string | undefined;
+        if (!cancelled) {
+          setClaim(
+            role && labId && ["ADMIN", "DESIGNER", "TECHNICIAN"].includes(role)
+              ? { labId, role }
+              : null,
+          );
+        }
+      } catch {
+        if (!cancelled) setClaim(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  return { claim, loading: authLoading || loading };
+}
+
 export function useIsAdmin() {
   const { user, loading } = useSession();
-  const userId = user?.uid;
-  const q = useQuery({
-    queryKey: ["is-admin", userId],
-    enabled: !!userId,
-    staleTime: 5 * 60 * 1000,
-    queryFn: async (): Promise<boolean> => {
-      const q = query(
-        collection(db, "user_roles"),
-        where("userId", "==", userId!),
-        where("role", "==", "admin"),
-      );
-      const snap = await getDocs(q);
-      return !snap.empty;
-    },
-  });
-  return { user, loading: loading || q.isLoading, isAdmin: q.data === true };
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [claimsLoading, setClaimsLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!user) {
+      setIsAdmin(false);
+      setClaimsLoading(false);
+      return;
+    }
+    setClaimsLoading(true);
+    user
+      .getIdTokenResult()
+      .then((res) => {
+        if (!cancelled) setIsAdmin(res.claims.role === "admin");
+      })
+      .catch(() => {
+        if (!cancelled) setIsAdmin(false);
+      })
+      .finally(() => {
+        if (!cancelled) setClaimsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  return { user, loading: loading || claimsLoading, isAdmin };
 }

@@ -114,11 +114,11 @@ function Pricing() {
   ];
 
   return (
-    <MobileShell>
-      <TopBar title={t.title} showBack />
-      <div className="px-4 pt-4 pb-8 space-y-5">
+    <MobileShell wide>
+      <TopBar title={t.title} showBack wide maxW="6xl" />
+      <div className="px-4 pt-4 pb-8 space-y-5 md:px-6 md:pt-8 md:pb-16 md:space-y-8 lg:px-8 lg:max-w-6xl lg:mx-auto">
         {/* Header */}
-        <div className="text-center space-y-2">
+        <div className="text-center space-y-2 md:space-y-3">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[oklch(0.93_0.06_175)] ring-1 ring-[oklch(0.8_0.09_175)] text-[oklch(0.35_0.15_175)] text-xs font-bold">
             <Sparkles className="size-3.5" />
             {t.trial}
