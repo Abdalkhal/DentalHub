@@ -69,7 +69,7 @@ export function useProductSearch(queryText: string, debounceMs = 300) {
 
     const searchAccounts = async () => {
       try {
-        const accountsRef = collection(db, "user_roles");
+        const accountsRef = collection(db, "public_profiles");
         const snap = await getDocs(query(accountsRef, limit(30)));
         const all = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as any);
 

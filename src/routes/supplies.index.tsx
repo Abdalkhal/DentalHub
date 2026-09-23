@@ -3333,7 +3333,7 @@ function BrowseSupplies() {
     queryKey: ["supplies-firestore-supplies"],
     queryFn: async (): Promise<CompanyItem[]> => {
       try {
-        const snap = await getDocs(collection(db, "user_roles"));
+        const snap = await getDocs(collection(db, "public_profiles"));
         const results: CompanyItem[] = [];
         for (const d of snap.docs) {
           const u = d.data() as UserRoleDoc;

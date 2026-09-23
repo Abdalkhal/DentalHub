@@ -42,7 +42,7 @@ function BoneGraftsPage() {
     queryFn: async (): Promise<Record<string, UserRoleDoc>> => {
       const entries = await Promise.all(
         supplierIds.map(async (id) => {
-          const snap = await getDoc(doc(db, "user_roles", id));
+          const snap = await getDoc(doc(db, "public_profiles", id));
           return [id, snap.exists() ? (snap.data() as UserRoleDoc) : null] as const;
         }),
       );

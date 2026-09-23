@@ -166,11 +166,7 @@ export async function notifyDentistOnStatusChange(
   newStatus: string,
 ) {
   try {
-    const { doc: fsDoc, getDoc } = await import("firebase/firestore");
-    const profileSnap = await getDoc(fsDoc(db, "user_roles", order.doctor));
-
     let body = "";
-    void profileSnap;
     if (newStatus === "completed") {
       body = `Case #${order.orderNumber} for patient ${order.patient} has been completed.`;
     } else if (newStatus === "in_progress") {

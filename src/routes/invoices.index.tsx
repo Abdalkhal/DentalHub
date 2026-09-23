@@ -69,7 +69,7 @@ function useProfiles(ids: string[]) {
       await Promise.all(
         ids.map(async (id) => {
           try {
-            const snap = await getDoc(doc(db, "user_roles", id));
+            const snap = await getDoc(doc(db, "public_profiles", id));
             if (snap.exists()) map[id] = snap.data() as UserRoleDoc;
           } catch {
             /* ignore missing profiles */

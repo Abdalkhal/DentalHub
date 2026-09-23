@@ -78,7 +78,7 @@ export default function BrandDetailScreen() {
       await Promise.all(
         companyIds.map(async (id) => {
           try {
-            const snap = await getDoc(doc(db, 'user_roles', id));
+            const snap = await getDoc(doc(db, 'public_profiles', id));
             if (snap.exists()) {
               const u = snap.data() as Record<string, unknown>;
               map[id] = { name: String(u.name || ''), city: String(u.city || '') };

@@ -18,7 +18,7 @@ export default function DoctorsScreen() {
   const { data: doctors = [], isLoading } = useQuery({
     queryKey: ['doctors-directory'],
     queryFn: async (): Promise<Doctor[]> => {
-      const snap = await getDocs(collection(db, 'user_roles'));
+      const snap = await getDocs(collection(db, 'public_profiles'));
       return snap.docs
         .map((d) => d.data() as Record<string, unknown>)
         .filter((u) => u.accountType === 'dentist')

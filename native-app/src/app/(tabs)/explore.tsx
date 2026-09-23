@@ -67,7 +67,7 @@ export default function ExploreScreen() {
   const { data: items = [], isLoading } = useQuery({
     queryKey: ['explore-accounts'],
     queryFn: async (): Promise<ResultItem[]> => {
-      const snap = await getDocs(collection(db, 'user_roles'));
+      const snap = await getDocs(collection(db, 'public_profiles'));
       const results: ResultItem[] = [];
       for (const d of snap.docs) {
         const u = d.data() as Record<string, unknown>;

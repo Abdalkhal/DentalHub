@@ -358,7 +358,7 @@ export default function NewLabOrderScreen() {
   useEffect(() => {
     (async () => {
       try {
-        const snap = await getDocs(query(collection(db, 'user_roles'), where('accountType', '==', 'dentist')));
+        const snap = await getDocs(query(collection(db, 'public_profiles'), where('accountType', '==', 'dentist')));
         setDentistAccounts(
           snap.docs
             .map((d) => {

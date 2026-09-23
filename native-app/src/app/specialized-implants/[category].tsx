@@ -44,7 +44,7 @@ export default function SpecializedCategoryScreen() {
     queryKey: ['specialized-suppliers', supplierIds],
     enabled: supplierIds.length > 0,
     queryFn: async () => {
-      const snap = await getDocs(collection(db, 'user_roles'));
+      const snap = await getDocs(collection(db, 'public_profiles'));
       const map: Record<string, string> = {};
       snap.docs.forEach((d) => {
         const u = d.data() as Record<string, unknown>;

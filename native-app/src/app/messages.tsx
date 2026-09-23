@@ -102,7 +102,7 @@ export default function MessagesScreen() {
   const { data: withAccount } = useQuery({
     queryKey: ['dm-with-account', params.with],
     queryFn: async () => {
-      const snap = await getDoc(doc(db, 'user_roles', params.with ?? ''));
+      const snap = await getDoc(doc(db, 'public_profiles', params.with ?? ''));
       if (!snap.exists()) return null;
       const d = snap.data() as Record<string, unknown>;
       return {
@@ -166,7 +166,7 @@ export default function MessagesScreen() {
   const { data: labNames = {} } = useQuery({
     queryKey: ['lab-names'],
     queryFn: async () => {
-      const snap = await getDocs(collection(db, 'user_roles'));
+      const snap = await getDocs(collection(db, 'public_profiles'));
       const map: Record<string, string> = {};
       snap.docs.forEach((d) => {
         const u = d.data() as Record<string, unknown>;

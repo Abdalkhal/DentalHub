@@ -1,5 +1,5 @@
-import { collection, getDocs, query, where } from "firebase/firestore";
-import { db } from "@/integrations/firebase/client";
+import { getFunctions, httpsCallable } from "firebase/functions";
+import { app } from "@/integrations/firebase/config";
 
 export type PromoCode = {
   id: string;
@@ -22,15 +22,20 @@ export type DiscountResult = {
   discountIQD: number;
 };
 
-/** Look up a promo code (case-insensitive) from Firestore. */
+/**
+ * Look up a promo code (case-insensitive). Goes through the `lookupPromoCode`
+ * Cloud Function: `promo_codes` isn't client-readable, so nobody can list
+ * every code — the server returns only the one that was typed.
+ */
 export async function findPromoCode(code: string): Promise<PromoCode | null> {
   const normalized = code.trim().toUpperCase();
   if (!normalized) return null;
-  const q = query(collection(db, "promo_codes"), where("code", "==", normalized));
-  const snap = await getDocs(q);
-  if (snap.empty) return null;
-  const d = snap.docs[0];
-  return { id: d.id, ...(d.data() as Omit<PromoCode, "id">) };
+  const call = httpsCallable<{ code: string }, { promo: PromoCode | null }>(
+    getFunctions(app),
+    "lookupPromoCode",
+  );
+  const { data } = await call({ code: normalized });
+  return data.promo;
 }
 
 export function isPromoValid(p: PromoCode): boolean {

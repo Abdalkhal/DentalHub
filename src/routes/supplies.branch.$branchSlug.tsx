@@ -73,7 +73,7 @@ function BranchAllPage() {
       const ids = [...new Set(items.map((i) => i.companyId).filter(Boolean))] as string[];
       const map: Record<string, { name: string; city: string }> = {};
       for (const id of ids) {
-        const snap = await getDoc(doc(db, "user_roles", id));
+        const snap = await getDoc(doc(db, "public_profiles", id));
         if (snap.exists()) {
           const d = snap.data() as UserRoleDoc;
           map[id] = { name: d.name || "", city: d.city || "" };

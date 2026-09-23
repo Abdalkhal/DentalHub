@@ -16,6 +16,7 @@
  */
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onDocumentWritten } = require("firebase-functions/v2/firestore");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const admin = require("firebase-admin");
 const vision = require("@google-cloud/vision");
@@ -414,3 +415,108 @@ exports.checkImageSafety = onCall({ region: "us-central1" }, async (request) => 
   }
   return { safe: true };
 });
+
+/**
+ * PRIVACY — public profile mirror.
+ *
+ * `user_roles` holds private account data (email, dob, gender, account
+ * status, subscription, push tokens) but the directory pages (explore,
+ * search, labs, supplies, brands, profiles) need other accounts' business
+ * details. Those pages read `public_profiles/{uid}` instead, a copy of the
+ * account doc with the private fields removed, kept in sync here. Clients
+ * can't write it (see firestore.rules).
+ */
+const PRIVATE_PROFILE_FIELDS = [
+  "email",
+  "dob",
+  "gender",
+  "role",
+  "accountStatus",
+  "subscriptionExpiry",
+  "pushTokens",
+  "notificationsEnabled",
+];
+
+/**
+ * Strips private fields from a `user_roles` doc.
+ * @param {object} data user_roles document data.
+ * @return {object} the public subset.
+ */
+function toPublicProfile(data) {
+  const out = { ...data };
+  for (const f of PRIVATE_PROFILE_FIELDS) delete out[f];
+  return out;
+}
+
+exports.syncPublicProfile = onDocumentWritten(
+  { document: "user_roles/{uid}", region: "us-central1" },
+  async (event) => {
+    const ref = firestore.collection("public_profiles").doc(event.params.uid);
+    const after = event.data && event.data.after;
+    if (!after || !after.exists) {
+      await ref.delete();
+      return;
+    }
+    await ref.set(toPublicProfile(after.data()));
+  },
+);
+
+/**
+ * PRIVACY — promo code lookup.
+ *
+ * `promo_codes` used to be readable by every signed-in account so the cart
+ * could query it by code, which also let anyone list every code. The cart
+ * now asks for one code by its exact value and gets only that code back.
+ *
+ * Payload: { code }
+ */
+exports.lookupPromoCode = onCall({ region: "us-central1" }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Authentication required.");
+  }
+  const code = String((request.data && request.data.code) || "")
+    .trim()
+    .toUpperCase();
+  if (!code || code.length > 64) return { promo: null };
+
+  const snap = await firestore.collection("promo_codes").where("code", "==", code).limit(1).get();
+  if (snap.empty) return { promo: null };
+  const d = snap.docs[0];
+  return { promo: { id: d.id, ...d.data() } };
+});
+
+/**
+ * PRIVACY — (re)build every `public_profiles` doc from `user_roles`. Needed
+ * once for accounts created before syncPublicProfile existed; safe to re-run.
+ * Admin only (custom claim, or role 'admin' on the caller's user_roles doc,
+ * matching isAdmin() in firestore.rules).
+ */
+exports.backfillPublicProfiles = onCall(
+  { region: "us-central1", maxInstances: 1 },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Authentication required.");
+    }
+    let isAdmin = request.auth.token.role === "admin";
+    if (!isAdmin) {
+      const me = await firestore.collection("user_roles").doc(request.auth.uid).get();
+      isAdmin = me.exists && me.data().role === "admin";
+    }
+    if (!isAdmin) {
+      throw new HttpsError("permission-denied", "Only an admin can run this.");
+    }
+
+    const snap = await firestore.collection("user_roles").get();
+    let batch = firestore.batch();
+    let n = 0;
+    for (const d of snap.docs) {
+      batch.set(firestore.collection("public_profiles").doc(d.id), toPublicProfile(d.data()));
+      if (++n % 400 === 0) {
+        await batch.commit();
+        batch = firestore.batch();
+      }
+    }
+    await batch.commit();
+    return { copied: n };
+  },
+);

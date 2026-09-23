@@ -120,7 +120,7 @@ function BrandDetail() {
       await Promise.all(
         companyIds.map(async (id) => {
           try {
-            const snap = await getDoc(doc(db, "user_roles", id));
+            const snap = await getDoc(doc(db, "public_profiles", id));
             if (snap.exists()) {
               const u = snap.data() as UserRoleDoc;
               map[id] = { name: u.name || "", city: u.city || "" };

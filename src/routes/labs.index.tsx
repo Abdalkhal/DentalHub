@@ -46,7 +46,7 @@ function LabsIndex() {
   const { data: labs = [] } = useQuery({
     queryKey: ["labs-directory"],
     queryFn: async (): Promise<LabItem[]> => {
-      const snap = await getDocs(collection(db, "user_roles"));
+      const snap = await getDocs(collection(db, "public_profiles"));
       return snap.docs
         .map((d) => d.data() as UserRoleDoc)
         .filter((u) => u.accountType === "lab")

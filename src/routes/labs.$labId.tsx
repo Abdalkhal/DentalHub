@@ -44,7 +44,7 @@ function LabPage() {
       if (!done) { done = true; setLoading(false); }
     }, 8000);
 
-    const unsubProfile = onSnapshot(doc(db, "user_roles", labId), (snap) => {
+    const unsubProfile = onSnapshot(doc(db, "public_profiles", labId), (snap) => {
       if (snap.exists()) setProfile(snap.data() as UserRoleDoc);
       if (!done) { done = true; clearTimeout(timeout); }
       setLoading(false);

@@ -44,7 +44,7 @@ export default function SuppliesDirectoryScreen() {
   const { data: offices = [] } = useQuery({
     queryKey: ['supplies-directory'],
     queryFn: async (): Promise<SupplyOffice[]> => {
-      const snap = await getDocs(collection(db, 'user_roles'));
+      const snap = await getDocs(collection(db, 'public_profiles'));
       const results: SupplyOffice[] = [];
       snap.docs.forEach((d) => {
         const u = d.data() as Record<string, unknown>;

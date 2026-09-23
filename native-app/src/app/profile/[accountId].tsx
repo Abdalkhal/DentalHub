@@ -57,7 +57,7 @@ export default function ProfileScreen() {
   const { data: account, isLoading } = useQuery({
     queryKey: ['profile-account', accountId],
     queryFn: async () => {
-      const snap = await getDoc(doc(db, 'user_roles', accountId ?? ''));
+      const snap = await getDoc(doc(db, 'public_profiles', accountId ?? ''));
       if (!snap.exists()) return null;
       return snap.data() as Record<string, unknown>;
     },

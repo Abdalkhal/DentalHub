@@ -12,7 +12,7 @@ export function useImplantOffers(): { offers: Offer[]; isLoading: boolean } {
   const { data: implantIds = new Set<string>(), isLoading: idsLoading } = useQuery({
     queryKey: ["implant-company-ids"],
     queryFn: async () => {
-      const snap = await getDocs(collection(db, "user_roles"));
+      const snap = await getDocs(collection(db, "public_profiles"));
       return new Set(
         snap.docs
           .map((d) => d.data() as UserRoleDoc)
@@ -35,7 +35,7 @@ export function useImplantCompanyNames(): Record<string, string> {
   const { data = {} } = useQuery({
     queryKey: ["implant-company-names"],
     queryFn: async () => {
-      const snap = await getDocs(collection(db, "user_roles"));
+      const snap = await getDocs(collection(db, "public_profiles"));
       const map: Record<string, string> = {};
       for (const d of snap.docs) {
         const u = d.data() as UserRoleDoc;

@@ -21,7 +21,7 @@ export function useVendorAccounts() {
   return useQuery({
     queryKey: ["vendor-accounts"],
     queryFn: async (): Promise<VendorAccount[]> => {
-      const snap = await getDocs(collection(db, "user_roles"));
+      const snap = await getDocs(collection(db, "public_profiles"));
       const results: VendorAccount[] = [];
       for (const d of snap.docs) {
         const u = d.data() as Record<string, unknown>;

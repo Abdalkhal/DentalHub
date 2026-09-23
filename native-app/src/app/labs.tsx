@@ -32,7 +32,7 @@ function getCityName(cityId: string, ar: boolean): string {
 }
 
 const queryDirectory = async (accountType: string): Promise<DirectoryItem[]> => {
-  const snap = await getDocs(collection(db, 'user_roles'));
+  const snap = await getDocs(collection(db, 'public_profiles'));
   return snap.docs
     .map((d) => d.data() as Record<string, unknown>)
     .filter((u) => u.accountType === accountType)

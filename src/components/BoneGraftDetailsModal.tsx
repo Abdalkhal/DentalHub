@@ -30,7 +30,7 @@ export function BoneGraftDetailsModal({
     queryKey: ["bone-graft-supplier", product.companyId],
     enabled: !!product.companyId,
     queryFn: async (): Promise<UserRoleDoc | null> => {
-      const snap = await getDoc(doc(db, "user_roles", product.companyId!));
+      const snap = await getDoc(doc(db, "public_profiles", product.companyId!));
       if (!snap.exists()) return null;
       return snap.data() as UserRoleDoc;
     },

@@ -44,7 +44,7 @@ function getCityName(cityId: string, ar: boolean): string {
 }
 
 const queryCompanies = async (): Promise<Pick<CompanyItem, 'id' | 'name' | 'cityId'>[]> => {
-  const snap = await getDocs(collection(db, 'user_roles'));
+  const snap = await getDocs(collection(db, 'public_profiles'));
   return snap.docs
     .map((d) => d.data() as Record<string, unknown>)
     .filter((u) => u.accountType === 'supply' || u.accountType === 'medical_supplies')

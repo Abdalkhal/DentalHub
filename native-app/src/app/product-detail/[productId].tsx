@@ -70,7 +70,7 @@ export default function ProductDetailScreen() {
     queryKey: ['product-office', product?.companyId],
     enabled: !!product?.companyId,
     queryFn: async (): Promise<UserRoleDoc | null> => {
-      const snap = await getDoc(doc(db, 'user_roles', product!.companyId!));
+      const snap = await getDoc(doc(db, 'public_profiles', product!.companyId!));
       return snap.exists() ? (snap.data() as UserRoleDoc) : null;
     },
     staleTime: 60_000,
