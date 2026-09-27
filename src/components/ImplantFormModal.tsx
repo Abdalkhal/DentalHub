@@ -36,18 +36,6 @@ const emptyVariant = (): VariantRow => ({
   stock: "0",
 });
 
-type AccessoryRow = {
-  key: string;
-  imageFile: File | null;
-  imagePreview: string;
-  existingImageUrl: string;
-  type: string;
-  subType: string;
-  specs: string;
-  price: string;
-  currency: Currency;
-};
-
 const ACCESSORY_CATEGORIES: {
   id: string;
   ar: string;
@@ -218,7 +206,10 @@ export function ImplantFormModal({
         }))
       : [emptyVariant()];
   });
-  const [accessoryRows] = useState<AccessoryRow[]>([]);
+  const [accessoryPrice, setAccessoryPrice] = useState("");
+  const [accessoryCurrency, setAccessoryCurrency] = useState<Currency>("USD");
+  const [accessorySpecs, setAccessorySpecs] = useState("");
+  const [accessoryStock, setAccessoryStock] = useState("");
   const [price, setPrice] = useState(product?.price ? String(product.price) : "");
   const [currency, setCurrency] = useState<Currency>(product?.currency || "USD");
   const [minOrderQty, setMinOrderQty] = useState("");
@@ -316,10 +307,11 @@ export function ImplantFormModal({
         const newAccessory: ProductAccessory = {
           type: ACCESSORY_CATEGORIES.find((c) => c.id === accessoryCategory)?.en ?? accessoryCategory,
           name: name.trim(),
-          specs: "",
-          price: 0,
+          specs: accessorySpecs.trim(),
+          price: Math.max(0, parseFloat(accessoryPrice) || 0),
           imageUrl,
-          currency: "USD",
+          currency: accessoryCurrency,
+          stock: Math.max(0, parseInt(accessoryStock, 10) || 0),
         };
         await updateDoc(doc(db, "products", parentId), {
           accessories: [...(parentImplant.accessories ?? []), newAccessory],
@@ -387,17 +379,6 @@ export function ImplantFormModal({
           }
         }
 
-        const savedAccessories: ProductAccessory[] = accessoryRows
-          .filter((a) => a.type && a.subType)
-          .map((a) => ({
-            type: ACCESSORY_CATEGORIES.find((c) => c.id === a.type)?.en ?? a.type,
-            name: a.subType,
-            specs: a.specs.trim(),
-            price: Math.max(0, parseFloat(a.price) || 0),
-            imageUrl: a.existingImageUrl || "",
-            currency: a.currency,
-          }));
-
         const variantsArr = variants
           .map((v) => ({
             diameter: Number(v.diameter),
@@ -433,7 +414,11 @@ export function ImplantFormModal({
             lengths: uniqueLengths.length > 0 ? uniqueLengths : undefined,
             variants: variantsArr.length > 0 ? variantsArr : undefined,
           },
-          accessories: savedAccessories.length > 0 ? savedAccessories : undefined,
+          // Accessories are managed on their own tab, which writes straight to
+          // the parent doc's `accessories` array — this save must leave that
+          // array untouched (an empty/undefined value here would overwrite it
+          // with nothing on every edit of the implant itself).
+          accessories: editing?.accessories,
           productType: "main_implant",
           parentId: null,
           description: description.trim() || undefined,
@@ -1180,6 +1165,75 @@ export function ImplantFormModal({
                         ))}
                     </select>
                   </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
+                      {ar ? "مواصفات إضافية (اختياري)" : "Additional specs (optional)"}
+                    </label>
+                    <input
+                      value={accessorySpecs}
+                      onChange={(e) => setAccessorySpecs(e.target.value)}
+                      placeholder={ar ? "مثال: قطر 3.5mm" : "e.g. 3.5mm diameter"}
+                      className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
+                      {ar ? "العملة" : "Currency"}
+                    </label>
+                    <div className="flex rounded-xl bg-[#F5FAFE] border border-[#D3E8F7] overflow-hidden w-fit">
+                      <button
+                        type="button"
+                        onClick={() => setAccessoryCurrency("USD")}
+                        className={cn(
+                          "px-4 py-2.5 text-sm font-bold transition",
+                          accessoryCurrency === "USD" ? "bg-[#2E93E0] text-white" : "text-[#7A94A8] hover:text-[#17324A]",
+                        )}
+                      >
+                        $
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAccessoryCurrency("IQD")}
+                        className={cn(
+                          "px-4 py-2.5 text-sm font-bold transition",
+                          accessoryCurrency === "IQD" ? "bg-[#2E93E0] text-white" : "text-[#7A94A8] hover:text-[#17324A]",
+                        )}
+                      >
+                        IQD
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
+                        {ar ? "سعر البيع" : "Selling price"}
+                      </label>
+                      <input
+                        type="number"
+                        value={accessoryPrice}
+                        onChange={(e) => setAccessoryPrice(e.target.value)}
+                        placeholder="0"
+                        dir="ltr"
+                        className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
+                        {ar ? "المخزون المتوفر" : "Available stock"}
+                      </label>
+                      <input
+                        type="number"
+                        value={accessoryStock}
+                        onChange={(e) => setAccessoryStock(e.target.value.replace(/[^0-9]/g, ""))}
+                        placeholder="0"
+                        dir="ltr"
+                        className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 <div>
@@ -1236,69 +1290,71 @@ export function ImplantFormModal({
             </div>
           )}
 
-          <div className="bg-white border border-[#D3E8F7] rounded-3xl p-5 space-y-4 shadow-md">
-            <h3 className="font-display font-bold text-base text-[#1C6FB5] flex items-center gap-1.5">
-              <span className="size-1.5 rounded-full bg-[#1C6FB5]" />
-              {ar ? "السعر والمخزون" : "Price & Stock"}
-            </h3>
+          {productType !== "accessory" && (
+            <div className="bg-white border border-[#D3E8F7] rounded-3xl p-5 space-y-4 shadow-md">
+              <h3 className="font-display font-bold text-base text-[#1C6FB5] flex items-center gap-1.5">
+                <span className="size-1.5 rounded-full bg-[#1C6FB5]" />
+                {ar ? "السعر والمخزون" : "Price & Stock"}
+              </h3>
 
-            <div>
-              <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-                {ar ? "العملة" : "Currency"}
-              </label>
-              <div className="flex rounded-xl bg-[#F5FAFE] border border-[#D3E8F7] overflow-hidden w-fit">
-                <button
-                  type="button"
-                  onClick={() => setCurrency("USD")}
-                  className={cn(
-                    "px-4 py-2.5 text-sm font-bold transition",
-                    currency === "USD" ? "bg-[#2E93E0] text-white" : "text-[#7A94A8] hover:text-[#17324A]",
-                  )}
-                >
-                  $
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCurrency("IQD")}
-                  className={cn(
-                    "px-4 py-2.5 text-sm font-bold transition",
-                    currency === "IQD" ? "bg-[#2E93E0] text-white" : "text-[#7A94A8] hover:text-[#17324A]",
-                  )}
-                >
-                  IQD
-                </button>
+              <div>
+                <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
+                  {ar ? "العملة" : "Currency"}
+                </label>
+                <div className="flex rounded-xl bg-[#F5FAFE] border border-[#D3E8F7] overflow-hidden w-fit">
+                  <button
+                    type="button"
+                    onClick={() => setCurrency("USD")}
+                    className={cn(
+                      "px-4 py-2.5 text-sm font-bold transition",
+                      currency === "USD" ? "bg-[#2E93E0] text-white" : "text-[#7A94A8] hover:text-[#17324A]",
+                    )}
+                  >
+                    $
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCurrency("IQD")}
+                    className={cn(
+                      "px-4 py-2.5 text-sm font-bold transition",
+                      currency === "IQD" ? "bg-[#2E93E0] text-white" : "text-[#7A94A8] hover:text-[#17324A]",
+                    )}
+                  >
+                    IQD
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
+                  {ar ? "السعر الأساسي للزرعة" : "Base Implant Price"} <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  placeholder="0"
+                  dir="ltr"
+                  className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
+                  {ar ? "أدنى كمية طلب (اختياري)" : "Min Order Qty (Optional)"}
+                </label>
+                <input
+                  type="number"
+                  value={minOrderQty}
+                  onChange={(e) => setMinOrderQty(e.target.value)}
+                  placeholder="1"
+                  min="1"
+                  dir="ltr"
+                  className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
+                />
               </div>
             </div>
-
-            <div>
-              <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-                {ar ? "السعر الأساسي للزرعة" : "Base Implant Price"} <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="number"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                placeholder="0"
-                dir="ltr"
-                className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-                {ar ? "أدنى كمية طلب (اختياري)" : "Min Order Qty (Optional)"}
-              </label>
-              <input
-                type="number"
-                value={minOrderQty}
-                onChange={(e) => setMinOrderQty(e.target.value)}
-                placeholder="1"
-                min="1"
-                dir="ltr"
-                className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
-              />
-            </div>
-          </div>
+          )}
 
           {productType === "main_implant" && (
             <div className="bg-white border border-[#D3E8F7] rounded-3xl p-5 space-y-4 shadow-md">

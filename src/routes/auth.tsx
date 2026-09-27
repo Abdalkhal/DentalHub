@@ -6,8 +6,9 @@ import { useI18n } from "@/lib/i18n";
 import { auth, db } from "@/integrations/firebase/client";
 import { fetchUserRoleDoc, getAccountDashboard, type LabStaffRole } from "@/lib/useAuth";
 import type { AccountType } from "@/integrations/firebase/types";
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { toast } from "sonner";
 import { Loader2, Mail, Lock, ArrowRight, Eye, EyeOff, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CITIES } from "@/data/offices";
@@ -237,6 +238,7 @@ export function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [resetBusy, setResetBusy] = useState(false);
   const [name, setName] = useState("");
   const [title, setTitle] = useState("");
   const [gender, setGender] = useState<"male" | "female" | "">("");
@@ -294,7 +296,7 @@ export function AuthPage() {
           const isLabStaff =
             accountType === "lab" &&
             !!staffClaims.labId &&
-            ["DESIGNER", "TECHNICIAN"].includes(staffClaims.role ?? "");
+            ["ADMIN", "DESIGNER", "TECHNICIAN"].includes(staffClaims.role ?? "");
           if (isLabStaff) {
             navigate({ to: "/designer" });
             return;
@@ -367,6 +369,28 @@ export function AuthPage() {
       }
     } finally {
       setBusy(false);
+    }
+  };
+
+  const forgotPassword = async () => {
+    if (!email.trim()) {
+      setError(ar ? "أدخل بريدك الإلكتروني أولاً" : "Enter your email first");
+      return;
+    }
+    setResetBusy(true);
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+      toast.success(
+        ar ? "تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك" : "Password reset link sent to your email",
+      );
+    } catch {
+      toast.error(
+        ar
+          ? "تعذر إرسال رابط إعادة التعيين — تحقق من البريد الإلكتروني"
+          : "Could not send reset link — check the email",
+      );
+    } finally {
+      setResetBusy(false);
     }
   };
 
@@ -651,6 +675,19 @@ export function AuthPage() {
               {showPassword ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
             </button>
           </div>
+
+          {mode === "signin" && (
+            <div className="flex justify-end -mt-1">
+              <button
+                type="button"
+                onClick={forgotPassword}
+                disabled={resetBusy}
+                className="text-xs font-bold text-primary hover:underline disabled:opacity-60"
+              >
+                {resetBusy ? (ar ? "جارٍ الإرسال..." : "Sending...") : ar ? "نسيت كلمة المرور؟" : "Forgot password?"}
+              </button>
+            </div>
+          )}
 
           {error && (
             <p

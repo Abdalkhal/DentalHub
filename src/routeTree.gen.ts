@@ -9,9 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SignupRouteImport } from './routes/signup'
 import { Route as ReportsRouteImport } from './routes/reports'
-import { Route as RegisterRouteImport } from './routes/register'
 import { Route as QuickOrdersRouteImport } from './routes/quick-orders'
 import { Route as ProductionRouteImport } from './routes/production'
 import { Route as PrivacyRouteImport } from './routes/privacy'
@@ -77,19 +75,9 @@ import { Route as PatientsRxPatientIdRouteImport } from './routes/patients.rx.$p
 import { Route as LabsLabIdStatementRouteImport } from './routes/labs.$labId.statement'
 import { Route as AccountHelpTopicSlugRouteImport } from './routes/account.help.topic.$slug'
 
-const SignupRoute = SignupRouteImport.update({
-  id: '/signup',
-  path: '/signup',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ReportsRoute = ReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const RegisterRoute = RegisterRouteImport.update({
-  id: '/register',
-  path: '/register',
   getParentRoute: () => rootRouteImport,
 } as any)
 const QuickOrdersRoute = QuickOrdersRouteImport.update({
@@ -436,9 +424,7 @@ export interface FileRoutesByFullPath {
   '/privacy': typeof PrivacyRoute
   '/production': typeof ProductionRoute
   '/quick-orders': typeof QuickOrdersRoute
-  '/register': typeof RegisterRoute
   '/reports': typeof ReportsRoute
-  '/signup': typeof SignupRoute
   '/account/about': typeof AccountAboutRoute
   '/account/balances': typeof AccountBalancesRoute
   '/account/help': typeof AccountHelpRouteWithChildren
@@ -505,9 +491,7 @@ export interface FileRoutesByTo {
   '/privacy': typeof PrivacyRoute
   '/production': typeof ProductionRoute
   '/quick-orders': typeof QuickOrdersRoute
-  '/register': typeof RegisterRoute
   '/reports': typeof ReportsRoute
-  '/signup': typeof SignupRoute
   '/account/about': typeof AccountAboutRoute
   '/account/balances': typeof AccountBalancesRoute
   '/account/help': typeof AccountHelpRouteWithChildren
@@ -575,9 +559,7 @@ export interface FileRoutesById {
   '/privacy': typeof PrivacyRoute
   '/production': typeof ProductionRoute
   '/quick-orders': typeof QuickOrdersRoute
-  '/register': typeof RegisterRoute
   '/reports': typeof ReportsRoute
-  '/signup': typeof SignupRoute
   '/account/about': typeof AccountAboutRoute
   '/account/balances': typeof AccountBalancesRoute
   '/account/help': typeof AccountHelpRouteWithChildren
@@ -646,9 +628,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/production'
     | '/quick-orders'
-    | '/register'
     | '/reports'
-    | '/signup'
     | '/account/about'
     | '/account/balances'
     | '/account/help'
@@ -715,9 +695,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/production'
     | '/quick-orders'
-    | '/register'
     | '/reports'
-    | '/signup'
     | '/account/about'
     | '/account/balances'
     | '/account/help'
@@ -784,9 +762,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/production'
     | '/quick-orders'
-    | '/register'
     | '/reports'
-    | '/signup'
     | '/account/about'
     | '/account/balances'
     | '/account/help'
@@ -854,9 +830,7 @@ export interface RootRouteChildren {
   PrivacyRoute: typeof PrivacyRoute
   ProductionRoute: typeof ProductionRoute
   QuickOrdersRoute: typeof QuickOrdersRoute
-  RegisterRoute: typeof RegisterRoute
   ReportsRoute: typeof ReportsRoute
-  SignupRoute: typeof SignupRoute
   BrandsBrandIdRoute: typeof BrandsBrandIdRoute
   ClinicAppointmentsRoute: typeof ClinicAppointmentsRoute
   ClinicDoctorsRoute: typeof ClinicDoctorsRoute
@@ -901,25 +875,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/signup': {
-      id: '/signup'
-      path: '/signup'
-      fullPath: '/signup'
-      preLoaderRoute: typeof SignupRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/reports': {
       id: '/reports'
       path: '/reports'
       fullPath: '/reports'
       preLoaderRoute: typeof ReportsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/register': {
-      id: '/register'
-      path: '/register'
-      fullPath: '/register'
-      preLoaderRoute: typeof RegisterRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/quick-orders': {
@@ -1433,9 +1393,7 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacyRoute: PrivacyRoute,
   ProductionRoute: ProductionRoute,
   QuickOrdersRoute: QuickOrdersRoute,
-  RegisterRoute: RegisterRoute,
   ReportsRoute: ReportsRoute,
-  SignupRoute: SignupRoute,
   BrandsBrandIdRoute: BrandsBrandIdRoute,
   ClinicAppointmentsRoute: ClinicAppointmentsRoute,
   ClinicDoctorsRoute: ClinicDoctorsRoute,

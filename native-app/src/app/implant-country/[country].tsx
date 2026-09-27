@@ -1,18 +1,54 @@
 import { useMemo, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, View } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
-import { Cpu, Heart, X } from 'lucide-react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
+import { doc, getDoc } from 'firebase/firestore';
+import { Check, Cpu, Heart, Minus, Phone, Plus, ShoppingCart, X } from 'lucide-react-native';
 
 import { Screen, Text, Spinner } from '@/components/ui';
 import { ProductImage } from '@/components/ProductImage';
-import { ProductAddToCart } from '@/components/ProductAddToCart';
+import { db } from '@/integrations/firebase/client';
 import { COUNTRIES } from '@/data/implants';
 import { ALL_COUNTRIES, countryFlagUrl } from '@/data/countries';
 import { useProductsByCountry, useSignedImageUrls, COUNTRY_SLUG_TO_CODE, type ImplantSpec, type Product } from '@/lib/products';
 import { useImplantCompanyNames } from '@/lib/implantOffers';
 import { useIsFavorited, toggleFavorite } from '@/lib/favoritesStore';
+import { addToCart } from '@/lib/cartStore';
+import { addToPurchaseHistory } from '@/lib/quickOrders';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
+import type { UserRoleDoc } from '@/integrations/firebase/types';
+
+function QtyStepper({
+  qty,
+  onChange,
+  max,
+}: {
+  qty: number;
+  onChange: (q: number) => void;
+  max?: number;
+}) {
+  const atMax = max != null && qty >= max;
+  return (
+    <View className="h-8 shrink-0 flex-row items-center rounded-lg border border-slate-200 bg-white">
+      <Pressable
+        onPress={() => onChange(Math.max(0, qty - 1))}
+        disabled={qty <= 0}
+        className={cn('h-8 w-8 items-center justify-center', qty <= 0 && 'opacity-30')}
+      >
+        <Minus size={13} color="#475569" />
+      </Pressable>
+      <Text className="min-w-6 text-center text-xs font-bold text-slate-800">{qty}</Text>
+      <Pressable
+        onPress={() => onChange(max != null ? Math.min(max, qty + 1) : qty + 1)}
+        disabled={atMax}
+        className={cn('h-8 w-8 items-center justify-center', atMax && 'opacity-30')}
+      >
+        <Plus size={13} color="#475569" />
+      </Pressable>
+    </View>
+  );
+}
 
 // Faithful port of the web per-country implants page
 // (src/routes/implants.$country.tsx), reached from the "زرعات حسب الدول"
@@ -259,6 +295,17 @@ function ImplantDetailModal({
   const category = implantCategoryOf(spec);
   const name = ar ? product.ar || product.en : product.en || product.ar;
   const favorited = useIsFavorited(product.id);
+  const accessories = product.accessories ?? [];
+
+  const { data: office } = useQuery({
+    queryKey: ['product-office', product.companyId],
+    enabled: !!product.companyId,
+    queryFn: async (): Promise<UserRoleDoc | null> => {
+      const snap = await getDoc(doc(db, 'public_profiles', product.companyId!));
+      return snap.exists() ? (snap.data() as UserRoleDoc) : null;
+    },
+    staleTime: 60_000,
+  });
 
   const toggleFav = () =>
     toggleFavorite(
@@ -274,6 +321,115 @@ function ImplantDetailModal({
       },
       ar ? 'ar' : 'en',
     );
+
+  const vKey = (v: { diameter: number; length: number }) => `${v.diameter}x${v.length}`;
+  const [baseQty, setBaseQty] = useState(1);
+  const [variantQty, setVariantQty] = useState<Record<string, number>>({});
+  const [accQty, setAccQty] = useState<Record<number, number>>({});
+  const [added, setAdded] = useState(false);
+
+  const variantTotal = Object.values(variantQty).reduce((s, q) => s + q, 0);
+  const accTotal = Object.values(accQty).reduce((s, q) => s + q, 0);
+  const grandTotal = (variants.length > 0 ? variantTotal : baseQty) + accTotal;
+  const canAdd = variants.length > 0 ? variantTotal + accTotal > 0 : (product.inStock ?? true) || accTotal > 0;
+
+  const handleAdd = () => {
+    const officeId = product.companyId || '';
+    if (variants.length > 0) {
+      for (const v of variants) {
+        const q = variantQty[vKey(v)] || 0;
+        if (q <= 0) continue;
+        addToCart({
+          productId: product.id,
+          productName: `${name} · Ø${v.diameter}×${v.length}mm`,
+          productImage: imgUrl,
+          officeId,
+          officeName,
+          brand: product.brand,
+          category: 'implant',
+          specs: {
+            [ar ? 'القطر' : 'Diameter']: `${v.diameter}mm`,
+            [ar ? 'الطول' : 'Length']: `${v.length}mm`,
+          },
+          unitPrice: product.price,
+          currency: product.currency || 'USD',
+          quantity: q,
+          variantLabel: vKey(v),
+        });
+        addToPurchaseHistory({
+          productId: product.id,
+          productName: `${name} · Ø${v.diameter}×${v.length}mm`,
+          vendor: officeName,
+          brand: product.brand,
+          unitPrice: product.price,
+          image: imgUrl,
+          qty: q,
+        });
+      }
+    } else if (baseQty > 0) {
+      addToCart({
+        productId: product.id,
+        productName: name,
+        productImage: imgUrl,
+        officeId,
+        officeName,
+        brand: product.brand,
+        category: 'implant',
+        unitPrice: product.price,
+        currency: product.currency || 'USD',
+        quantity: baseQty,
+      });
+      addToPurchaseHistory({
+        productId: product.id,
+        productName: name,
+        vendor: officeName,
+        brand: product.brand,
+        unitPrice: product.price,
+        image: imgUrl,
+        qty: baseQty,
+      });
+    }
+
+    accessories.forEach((acc, i) => {
+      const q = accQty[i] || 0;
+      if (q <= 0) return;
+      const accImage = acc.imageUrl ? imageUrlMap[acc.imageUrl] : undefined;
+      // A synthetic id (never a real product doc) keeps the accessory line
+      // out of the implant's own stock-decrement on confirmation — the
+      // implant's `stock` counts implant units only, never accessories.
+      addToCart({
+        productId: `${product.id}__acc${i}`,
+        productName: `${name} — ${acc.name}`,
+        productImage: accImage,
+        officeId,
+        officeName,
+        brand: product.brand,
+        category: 'implant',
+        specs: acc.specs ? { [ar ? 'المواصفات' : 'Specs']: acc.specs } : undefined,
+        unitPrice: acc.price,
+        currency: acc.currency,
+        quantity: q,
+        variantLabel: `acc:${i}`,
+      });
+      addToPurchaseHistory({
+        productId: `${product.id}__acc${i}`,
+        productName: `${name} — ${acc.name}`,
+        vendor: officeName,
+        brand: product.brand,
+        unitPrice: acc.price,
+        image: accImage,
+        qty: q,
+      });
+    });
+
+    setAdded(true);
+    setTimeout(() => {
+      setAdded(false);
+      setVariantQty({});
+      setAccQty({});
+      setBaseQty(1);
+    }, 1500);
+  };
 
   return (
     <Modal visible transparent animationType="fade">
@@ -292,6 +448,40 @@ function ImplantDetailModal({
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 24 }}>
+            {!!office && (
+              <View className="mb-4 flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-card p-3 shadow-sm">
+                <View className="h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-indigo-50">
+                  {office.photoURL ? (
+                    <Image source={{ uri: office.photoURL }} className="h-full w-full" resizeMode="cover" />
+                  ) : (
+                    <Text className="font-bold text-indigo-600">{(office.name || '؟').charAt(0)}</Text>
+                  )}
+                </View>
+                <View className="min-w-0 flex-1">
+                  <Text className="text-sm font-bold text-slate-800" numberOfLines={1}>
+                    {office.name || officeName}
+                  </Text>
+                  {!!office.phone && (
+                    <View className="mt-0.5 flex-row items-center gap-1">
+                      <Phone size={11} color="#94A3B8" />
+                      <Text className="text-[11px] text-slate-500" style={{ writingDirection: 'ltr' }}>
+                        {office.phone}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                <Pressable
+                  onPress={() =>
+                    product.companyId &&
+                    router.push({ pathname: '/profile/[accountId]', params: { accountId: product.companyId } })
+                  }
+                  className="shrink-0 rounded-xl bg-indigo-600 px-3 py-2"
+                >
+                  <Text className="text-xs font-bold text-white">{ar ? 'زيارة الملف' : 'Visit Profile'}</Text>
+                </Pressable>
+              </View>
+            )}
+
             <View className="flex-row items-start gap-3">
               <ProductImage uri={imgUrl} className="h-16 w-16 rounded-xl" iconSize={26} />
               <View className="min-w-0 flex-1 gap-1">
@@ -318,20 +508,34 @@ function ImplantDetailModal({
                 each with its own stock, not just the deduped summary. */}
             {variants.length > 0 ? (
               <View className="mt-3 overflow-hidden rounded-xl border border-slate-200">
-                <View className="flex-row bg-slate-50 px-3 py-2">
+                <View className="flex-row items-center bg-slate-50 px-3 py-2">
                   <Text className="flex-1 text-[11px] font-bold text-slate-500">{ar ? 'القطر' : 'Diameter'}</Text>
                   <Text className="flex-1 text-[11px] font-bold text-slate-500">{ar ? 'الطول' : 'Length'}</Text>
-                  <Text className="flex-1 text-end text-[11px] font-bold text-slate-500">{ar ? 'المخزون' : 'Stock'}</Text>
+                  <Text className="w-10 text-end text-[11px] font-bold text-slate-500">{ar ? 'المخزون' : 'Stock'}</Text>
+                  <Text className="w-[76px] text-end text-[11px] font-bold text-slate-500">{ar ? 'الكمية' : 'Qty'}</Text>
                 </View>
-                {variants.map((v, i) => (
-                  <View key={i} className={cn('flex-row px-3 py-2', i % 2 === 0 ? 'bg-white' : 'bg-slate-50/60')}>
-                    <Text className="flex-1 text-xs text-slate-700">{v.diameter} mm</Text>
-                    <Text className="flex-1 text-xs text-slate-700">{v.length} mm</Text>
-                    <Text className={cn('flex-1 text-end text-xs font-bold', v.count > 0 ? 'text-emerald-600' : 'text-rose-500')}>
-                      {v.count}
-                    </Text>
-                  </View>
-                ))}
+                {variants.map((v, i) => {
+                  const key = vKey(v);
+                  return (
+                    <View
+                      key={i}
+                      className={cn('flex-row items-center gap-2 px-3 py-2', i % 2 === 0 ? 'bg-white' : 'bg-slate-50/60')}
+                    >
+                      <Text className="flex-1 text-xs text-slate-700">{v.diameter} mm</Text>
+                      <Text className="flex-1 text-xs text-slate-700">{v.length} mm</Text>
+                      <Text className={cn('w-10 text-end text-xs font-bold', v.count > 0 ? 'text-emerald-600' : 'text-rose-500')}>
+                        {v.count}
+                      </Text>
+                      <View className="w-[76px] items-end">
+                        <QtyStepper
+                          qty={variantQty[key] || 0}
+                          max={v.count}
+                          onChange={(q) => setVariantQty((prev) => ({ ...prev, [key]: q }))}
+                        />
+                      </View>
+                    </View>
+                  );
+                })}
               </View>
             ) : (
               (diams.length > 0 || lens.length > 0) && (
@@ -396,37 +600,71 @@ function ImplantDetailModal({
                 <Text className="mb-0.5 text-[11px] font-semibold text-slate-500">
                   {ar ? 'الإكسسوارات' : 'Accessories'} ({product.accessories.length})
                 </Text>
-                {product.accessories.map((acc, i) => (
-                  <View key={i} className="flex-row items-center gap-2 rounded-lg bg-slate-50 px-2.5 py-1.5">
-                    <ProductImage uri={acc.imageUrl ? imageUrlMap[acc.imageUrl] : undefined} className="h-8 w-8 rounded-md" iconSize={12} />
-                    <View className="min-w-0 flex-1">
-                      <Text className="text-[11px] font-semibold text-slate-800" numberOfLines={1}>
-                        {acc.name}
-                      </Text>
-                      <Text className="text-[9px] text-slate-400">
-                        <Text className="font-bold text-sky-600">{acc.type}</Text>
-                        {!!acc.specs && ` · ${acc.specs}`}
-                      </Text>
+                {product.accessories.map((acc, i) => {
+                  const accStock = acc.stock ?? 0;
+                  return (
+                    <View key={i} className="flex-row items-center gap-2 rounded-lg bg-slate-50 px-2.5 py-1.5">
+                      <ProductImage uri={acc.imageUrl ? imageUrlMap[acc.imageUrl] : undefined} className="h-8 w-8 rounded-md" iconSize={12} />
+                      <View className="min-w-0 flex-1">
+                        <Text className="text-[11px] font-semibold text-slate-800" numberOfLines={1}>
+                          {acc.name}
+                        </Text>
+                        <Text className="text-[9px] text-slate-400">
+                          <Text className="font-bold text-sky-600">{acc.type}</Text>
+                          {!!acc.specs && ` · ${acc.specs}`}
+                        </Text>
+                        <View className="mt-0.5 flex-row items-center gap-2">
+                          {acc.price > 0 && (
+                            <Text className="text-[11px] font-bold text-primary">{money(acc.price, acc.currency)}</Text>
+                          )}
+                          <Text className={cn('text-[10px] font-bold', accStock > 0 ? 'text-emerald-600' : 'text-rose-500')}>
+                            {ar ? 'متوفر: ' : 'In stock: '}{accStock}
+                          </Text>
+                        </View>
+                      </View>
+                      <QtyStepper qty={accQty[i] || 0} max={accStock} onChange={(q) => setAccQty((prev) => ({ ...prev, [i]: q }))} />
                     </View>
-                    {acc.price > 0 && <Text className="shrink-0 text-[11px] font-bold text-primary">${acc.price.toFixed(2)}</Text>}
-                  </View>
-                ))}
+                  );
+                })}
               </View>
             )}
 
-            <ProductAddToCart
-              productId={product.id}
-              productName={name}
-              productImage={imgUrl}
-              officeId={product.companyId || ''}
-              officeName={officeName}
-              brand={product.brand}
-              category="implant"
-              unitPrice={product.price}
-              currency={product.currency || 'USD'}
-              inStock={product.inStock ?? true}
-              ar={ar}
-            />
+            <View className="mt-4 gap-1.5">
+              {variants.length === 0 && (
+                <View className="h-9 flex-row items-center justify-between rounded-lg border border-slate-200 bg-slate-50">
+                  <Pressable
+                    onPress={() => setBaseQty((q) => Math.max(1, q - 1))}
+                    disabled={baseQty <= 1}
+                    className={cn('h-9 w-9 items-center justify-center', baseQty <= 1 && 'opacity-30')}
+                  >
+                    <Minus size={15} color="#475569" />
+                  </Pressable>
+                  <Text className="min-w-6 text-center text-sm font-bold text-primary">{baseQty}</Text>
+                  <Pressable
+                    onPress={() => setBaseQty((q) => Math.min(product.stock || q, q + 1))}
+                    disabled={baseQty >= (product.stock || 0)}
+                    className={cn('h-9 w-9 items-center justify-center', baseQty >= (product.stock || 0) && 'opacity-30')}
+                  >
+                    <Plus size={15} color="#475569" />
+                  </Pressable>
+                </View>
+              )}
+
+              <Pressable
+                onPress={handleAdd}
+                disabled={!canAdd}
+                className={cn('h-9 flex-row items-center justify-center gap-1.5 rounded-lg bg-primary', !canAdd && 'opacity-40')}
+              >
+                {added ? <Check size={14} color="#FFFFFF" /> : <ShoppingCart size={14} color="#FFFFFF" />}
+                <Text className="text-xs font-bold text-white">
+                  {added
+                    ? ar ? 'تمت الإضافة' : 'Added'
+                    : ar
+                      ? `أضف للسلة${grandTotal > 1 ? ` (${grandTotal})` : ''}`
+                      : `Add to cart${grandTotal > 1 ? ` (${grandTotal})` : ''}`}
+                </Text>
+              </Pressable>
+            </View>
           </ScrollView>
         </View>
       </View>

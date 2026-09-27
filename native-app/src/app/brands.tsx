@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Image, Pressable, ScrollView, View } from 'react-native';
+import { Image, Pressable, SectionList, View } from 'react-native';
 import { router } from 'expo-router';
 import { Search } from 'lucide-react-native';
 
@@ -98,6 +98,13 @@ export default function BrandsScreen() {
   // the header makes it obvious where each letter begins while scrolling
   // or after a search, instead of the next letter's brands quietly
   // continuing on the same row as the previous letter's leftovers.
+  //
+  // Rows (not individual brands) are the SectionList's items: RN's Image
+  // mounts and starts fetching the moment it's rendered, with no
+  // visibility check, so a plain ScrollView.map over ~400 brands fires
+  // ~400 concurrent image loads on mount. Chunking into rows of 3 and
+  // handing them to SectionList gives real virtualization — only rows
+  // near the viewport ever mount, so only their images load.
   const sections = useMemo(() => {
     const groups: { letter: string; items: Brand[] }[] = [];
     for (const b of filtered) {
@@ -107,7 +114,11 @@ export default function BrandsScreen() {
       if (last && last.letter === letter) last.items.push(b);
       else groups.push({ letter, items: [b] });
     }
-    return groups;
+    return groups.map((g) => {
+      const rows: Brand[][] = [];
+      for (let i = 0; i < g.items.length; i += 3) rows.push(g.items.slice(i, i + 3));
+      return { title: g.letter, data: rows };
+    });
   }, [filtered, ar]);
 
   return (
@@ -127,35 +138,39 @@ export default function BrandsScreen() {
         className="mt-3"
       />
 
-      <ScrollView className="mt-4 flex-1" showsVerticalScrollIndicator={false}>
-        <View className="pb-6">
-          {sections.map((sec) => {
-            // Pad the last row up to a multiple of 3 with invisible tiles so
-            // `justify-between` doesn't stretch a 1- or 2-item row into an
-            // ugly wide gap — the row still lays out as if it were full.
-            const fillerCount = (3 - (sec.items.length % 3)) % 3;
-            return (
-              <View key={sec.letter} className="mb-3">
-                <Text className="mb-2 text-[11px] font-extrabold text-slate-400">{sec.letter}</Text>
-                <View className="flex-row flex-wrap justify-between gap-y-3">
-                  {sec.items.map((b) => (
-                    <Pressable
-                      key={b.id}
-                      onPress={() => router.push({ pathname: '/brand/[brandId]', params: { brandId: b.id } })}
-                      className="w-[31%]"
-                    >
-                      <BrandTile name={b.name} ar={ar ? b.ar : b.name} image={b.image} color={b.color} />
-                    </Pressable>
-                  ))}
-                  {Array.from({ length: fillerCount }).map((_, i) => (
-                    <View key={`filler-${i}`} className="w-[31%]" />
-                  ))}
-                </View>
-              </View>
-            );
-          })}
-        </View>
-      </ScrollView>
+      <SectionList
+        className="mt-4 flex-1"
+        showsVerticalScrollIndicator={false}
+        sections={sections}
+        stickySectionHeadersEnabled={false}
+        keyExtractor={(row, index) => (row.length ? row.map((b) => b.id).join('-') : `row-${index}`)}
+        initialNumToRender={8}
+        maxToRenderPerBatch={8}
+        windowSize={7}
+        removeClippedSubviews
+        contentContainerStyle={{ paddingBottom: 24 }}
+        renderSectionHeader={({ section }) => (
+          <Text className="mb-2 mt-3 text-[11px] font-extrabold text-slate-400">{section.title}</Text>
+        )}
+        renderItem={({ item: row }) => (
+          // Pad a short last row with invisible tiles so `justify-between`
+          // doesn't stretch a 1- or 2-item row into an ugly wide gap.
+          <View className="mb-3 flex-row flex-wrap justify-between gap-y-3">
+            {row.map((b) => (
+              <Pressable
+                key={b.id}
+                onPress={() => router.push({ pathname: '/brand/[brandId]', params: { brandId: b.id } })}
+                className="w-[31%]"
+              >
+                <BrandTile name={b.name} ar={ar ? b.ar : b.name} image={b.image} color={b.color} />
+              </Pressable>
+            ))}
+            {Array.from({ length: (3 - (row.length % 3)) % 3 }).map((_, i) => (
+              <View key={`filler-${i}`} className="w-[31%]" />
+            ))}
+          </View>
+        )}
+      />
     </Screen>
   );
 }

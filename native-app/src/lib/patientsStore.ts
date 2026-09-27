@@ -112,19 +112,25 @@ export const EMPTY_HISTORY: MedicalHistory = {
 const KEY_PREFIX = "dh:patients:v1:";
 
 let currentUserId = "";
+let currentClinicId = "";
 let state: Patient[] = [];
 let loaded = false;
 const listeners = new Set<() => void>();
 
-export function setPatientStoreUser(uid: string) {
+// Keyed by clinic, not just account — a dentist working across several
+// clinics (see clinicsStore.ts) must never see one clinic's patients bleed
+// into another's. Called by clinicsStore.ts's `pointStoresAt` every time
+// the active clinic changes, not just on sign-in.
+export function setPatientStoreUser(uid: string, clinicId: string) {
   currentUserId = uid;
+  currentClinicId = clinicId;
   loaded = false;
   state = [];
   listeners.forEach((l) => l());
 }
 
 function getKey() {
-  return KEY_PREFIX + (currentUserId || "guest");
+  return KEY_PREFIX + (currentUserId || "guest") + ":" + (currentClinicId || "default");
 }
 
 function load(): Patient[] {

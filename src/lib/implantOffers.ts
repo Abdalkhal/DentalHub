@@ -23,8 +23,12 @@ export function useImplantOffers(): { offers: Offer[]; isLoading: boolean } {
     staleTime: 60_000,
   });
 
+  // Dentist-facing surfaces must only ever show approved offers — `offers`
+  // now defaults new/edited entries to "pending" (admin review), and this
+  // hook feeds the home banner and public offer listings, which had no
+  // status check at all and were showing pending/rejected offers live.
   const offers = useMemo(
-    () => allOffers.filter((o) => implantIds.has(o.supplierId)),
+    () => allOffers.filter((o) => implantIds.has(o.supplierId) && (!o.status || o.status === "active")),
     [allOffers, implantIds]
   );
 

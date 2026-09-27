@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Image, Linking, Pressable, View } from 'react-native';
+import { Alert, Image, Linking, Pressable, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -41,6 +41,16 @@ export default function ImplantsOfficeScreen() {
   const unreadCount = useUnreadNotificationsCount(user?.uid);
   const { data: products = [], isLoading } = useProducts();
   const remove = useDeleteProduct();
+  const confirmDelete = (p: Product) => {
+    Alert.alert(
+      ar ? 'حذف المنتج' : 'Delete product',
+      p.ar || p.en || '',
+      [
+        { text: ar ? 'إلغاء' : 'Cancel', style: 'cancel' },
+        { text: ar ? 'حذف' : 'Delete', style: 'destructive', onPress: () => remove.mutate(p.id) },
+      ],
+    );
+  };
 
   const mine = useMemo(
     () =>
@@ -282,7 +292,7 @@ export default function ImplantsOfficeScreen() {
                       <Pencil size={13} color="#475569" />
                     </Pressable>
                     <Pressable
-                      onPress={() => remove.mutate(p.id)}
+                      onPress={() => confirmDelete(p)}
                       className="flex-1 items-center rounded-lg bg-rose-50 py-1.5"
                     >
                       <Trash2 size={13} color="#F43F5E" />

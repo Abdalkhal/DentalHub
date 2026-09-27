@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { db, storage } from "@/integrations/firebase/client";
+import { auth, db, storage } from "@/integrations/firebase/client";
 import {
   collection,
   doc,
@@ -44,6 +44,7 @@ export type ProductAccessory = {
   price: number;
   imageUrl: string;
   currency: Currency;
+  stock: number;
 };
 
 export type BoneGraftPackSize = {
@@ -307,10 +308,15 @@ export function useDeleteProduct() {
 }
 
 export async function uploadProductImage(productId: string, file: File): Promise<string> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error("Not signed in");
   const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
   const path = `products/${productId}/${crypto.randomUUID()}.${ext || "jpg"}`;
   const storageRef = ref(storage, path);
-  await uploadBytes(storageRef, file, { contentType: file.type || "image/jpeg" });
+  await uploadBytes(storageRef, file, {
+    contentType: file.type || "image/jpeg",
+    customMetadata: { companyId: uid },
+  });
   return path;
 }
 

@@ -6,13 +6,13 @@ import { Trash2, TrendingDown, TrendingUp, Wallet, X } from 'lucide-react-native
 import { Screen, Select, Text } from '@/components/ui';
 import { useUserRole } from '@/lib/useAuth';
 import {
-  setClinicStoreUser,
   useClinic,
   clinicTotals,
   addTransaction,
   removeTransaction,
   type TxKind,
 } from '@/lib/clinicStore';
+import { setClinicsStoreUser } from '@/lib/clinicsStore';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
@@ -48,7 +48,7 @@ export default function ClinicFinanceScreen() {
   const ar = lang === 'ar';
   const { user } = useUserRole();
   useEffect(() => {
-    if (user?.uid) setClinicStoreUser(user.uid);
+    if (user?.uid) setClinicsStoreUser(user.uid);
   }, [user?.uid]);
 
   const clinic = useClinic();

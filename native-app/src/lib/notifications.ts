@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { setDoc, doc, collection, onSnapshot, query, where } from "firebase/firestore";
-import { db } from "@/integrations/firebase/client";
+import { auth, db } from "@/integrations/firebase/client";
 
 export type Notification = {
   id: string;
@@ -13,6 +13,11 @@ export type Notification = {
   orderId?: string;
   invoiceId?: string;
   expiresAt?: number;
+  /** The account that triggered this notification — required by the
+   * `notifications` Firestore rule (must equal the writer's own uid) so an
+   * arbitrary signed-in account can't forge a notification into someone
+   * else's feed under a fake identity. */
+  senderId?: string;
   senderName?: string;
   senderPhotoURL?: string;
   /** For type "message": the other participant's uid, so tapping the
@@ -48,12 +53,13 @@ export function useUnreadNotificationsCount(userId?: string): number {
 }
 
 export function createNotification(
-  data: Omit<Notification, "id" | "isRead" | "createdAt" | "expiresAt">,
+  data: Omit<Notification, "id" | "isRead" | "createdAt" | "expiresAt" | "senderId">,
 ) {
   const id = `${data.userId}_${Date.now()}`;
   return setDoc(doc(db, "notifications", id), {
     ...data,
     id,
+    senderId: auth.currentUser?.uid ?? "",
     isRead: false,
     createdAt: Date.now(),
     expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,

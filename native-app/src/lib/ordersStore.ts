@@ -120,6 +120,11 @@ export type Order = {
   rxTeeth?: Record<string, string>;
   rxItems?: string[];
   rxData?: Record<string, unknown>;
+  /** Epoch ms of the last create/update — drives the dashboard's "most
+   * recently touched first" sort (labs-office.tsx), separate from `caseId`
+   * (a fixed, chronological-at-creation number that a later confirm/status
+   * change must never reshuffle). */
+  updatedAt?: number;
 };
 
 const STORAGE_KEY = "dental_hub_orders";
@@ -380,8 +385,14 @@ export function formatOrderId(order: Pick<Order, "orderNumber" | "caseId" | "id"
   return order.orderNumber || order.id;
 }
 
+// Must be called AFTER `getNextOrderNumber()` in the same call — every call
+// site does exactly that (`orderNumber: getNextOrderNumber(), caseId:
+// getNextCaseId()`), relying on `getNextOrderNumber()` having already
+// bumped `_counter` to the value this case should carry. Reading `_counter
+// + 1` here (as if this function bumps its own separate sequence) made
+// every new case's `caseId` one higher than its own `orderNumber`.
 export function getNextCaseId(): number {
-  return _counter + 1;
+  return _counter;
 }
 
 const MATERIAL_LABELS: Record<string, string> = {
@@ -489,6 +500,7 @@ export function buildInternalOrder(
     dentistId: o.dentistId,
     status,
     agent: "",
+    updatedAt: Date.now(),
   };
 }
 
@@ -545,13 +557,14 @@ export async function attachOrderFile(
 
 export function updateOrderStatus(id: string, status: OrderStatus) {
   const target = orders.find((o) => o.id === id);
-  orders = orders.map((o) => (o.id === id ? { ...o, status } : o));
+  const updatedAt = Date.now();
+  orders = orders.map((o) => (o.id === id ? { ...o, status, updatedAt } : o));
   emit();
-  // Partial update: only the status field is written, so dentist ownership
+  // Partial update: only status/updatedAt are written, so dentist ownership
   // fields (dentistId, doctor, clinic, orderNumber, totalAmount, …) are never
   // overwritten or stripped on the Firestore document.
   if (_labId && db) {
-    updateDoc(caseDocRef(_labId, id), { status }).catch((err) => {
+    updateDoc(caseDocRef(_labId, id), { status, updatedAt }).catch((err) => {
       console.warn("Failed to update order status:", id, err);
     });
     if (isCompletedStatusValue(status)) {
@@ -561,7 +574,8 @@ export function updateOrderStatus(id: string, status: OrderStatus) {
 }
 
 export function updateOrder(id: string, updates: Partial<Order>) {
-  orders = orders.map((o) => (o.id === id ? { ...o, ...updates } : o));
+  const stamped = { ...updates, updatedAt: Date.now() };
+  orders = orders.map((o) => (o.id === id ? { ...o, ...stamped } : o));
   emit();
   const updated = orders.find((o) => o.id === id);
   if (updated) syncToFirestore(updated);
@@ -575,7 +589,7 @@ export function setOrders(newOrders: Order[]) {
 export { initOrdersStore };
 
 export function updateOrderStage(id: string, stage: ProdStageId) {
-  orders = orders.map((o) => (o.id === id ? { ...o, currentStage: stage } : o));
+  orders = orders.map((o) => (o.id === id ? { ...o, currentStage: stage, updatedAt: Date.now() } : o));
   emit();
   const updated = orders.find((o) => o.id === id);
   if (updated) syncToFirestore(updated);
@@ -624,11 +638,15 @@ export async function submitDentistCase(
   },
 ) {
   const id = `case_${Date.now().toString(36)}`;
-  const orderNumber = `ORD-${String(_counter + 1).padStart(3, "0")}`;
+  // Was reading `_counter + 1` directly without ever bumping/persisting
+  // `_counter` — every case a dentist sent in the same session got the
+  // identical orderNumber/caseId. `getNextOrderNumber()` is the one place
+  // that actually advances and saves the counter.
+  const orderNumber = getNextOrderNumber();
   const order: Order = {
     id,
     orderNumber,
-    caseId: _counter + 1,
+    caseId: getNextCaseId(),
     patient: data.patient,
     doctor: data.doctor,
     workType: data.workType,
@@ -657,6 +675,7 @@ export async function submitDentistCase(
     rxTeeth: data.rxTeeth ?? {},
     rxItems: data.rxItems ?? [],
     rxData: data.rxData ?? {},
+    updatedAt: Date.now(),
   };
 
   await setDoc(caseDocRef(labId, id), serializeOrder(order));

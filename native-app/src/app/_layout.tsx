@@ -57,7 +57,6 @@ const TITLED_SCREENS: { name: string; title: DictKey; cart?: boolean }[] = [
   { name: 'doctors', title: 'screen_doctors' },
   { name: 'clinic-doctors', title: 'screen_clinic_doctors' },
   { name: 'clinic-materials', title: 'screen_clinic_materials' },
-  { name: 'designer/index', title: 'screen_designer_cases' },
   { name: 'designer/[caseId]', title: 'screen_case_details' },
   { name: 'new-lab-order', title: 'screen_new_lab_order' },
   { name: 'lab-finance', title: 'screen_lab_finance' },

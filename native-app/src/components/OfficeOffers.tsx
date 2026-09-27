@@ -173,11 +173,16 @@ function OfferFormModal({
         price: price.trim() ? Number(price) : undefined,
         currency: price.trim() ? currency : undefined,
         discountPct: initial?.discountPct,
-        status: initial?.status ?? 'active',
+        // A brand-new offer starts "pending" (admin review) — only an admin
+        // may move it to "active". Editing an already-reviewed offer keeps
+        // its current status.
+        status: initial?.status ?? 'pending',
         rejectReason: initial?.rejectReason,
         createdAt: initial?.createdAt,
       });
-      toast.success(ar ? 'تم حفظ العرض' : 'Offer saved');
+      toast.success(
+        initial ? (ar ? 'تم حفظ العرض' : 'Offer saved') : ar ? 'تم إرسال العرض للمراجعة' : 'Offer submitted for review',
+      );
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));

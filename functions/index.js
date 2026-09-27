@@ -77,6 +77,22 @@ exports.inviteLabMember = onCall({ region: "us-central1" }, async (request) => {
     throw new HttpsError("permission-denied", "Only the lab owner or an admin can invite members.");
   }
 
+  // `isOwner` above only proves the caller passed their OWN uid as `labId` —
+  // it does not prove `labId` is actually a registered lab account. Without
+  // this, any signed-up account (dentist, supplier, anyone) could self-invoke
+  // "lab owner" for a `labId` that's just their own uid and start minting
+  // staff claims / lab_members docs, and — worse — reuse the branch below to
+  // touch OTHER people's accounts.
+  if (isOwner) {
+    const labDoc = await firestore.collection("user_roles").doc(labId).get();
+    if (!labDoc.exists || labDoc.data().accountType !== "lab") {
+      throw new HttpsError(
+        "permission-denied",
+        "Only a registered lab account can invite members.",
+      );
+    }
+  }
+
   const normalizedEmail = String(email).trim().toLowerCase();
 
   let uid;
@@ -84,7 +100,33 @@ exports.inviteLabMember = onCall({ region: "us-central1" }, async (request) => {
   try {
     const existing = await auth.getUserByEmail(normalizedEmail);
     uid = existing.uid;
+
+    // The target Auth account already exists — it may belong to a total
+    // stranger (a dentist, a different lab's staff, even the platform
+    // admin), not someone this caller has any right to touch. Only allow
+    // proceeding if the account is either already staff of THIS SAME lab
+    // (idempotent re-invite/reactivation) or has no independent registered
+    // identity at all (e.g. a stub Auth user left over from a previous
+    // invite that was never completed). Otherwise `setCustomUserClaims`
+    // below would silently wipe and replace a real, unrelated account's
+    // actual role/labId/admin claim.
+    const existingClaims = existing.customClaims || {};
+    const alreadyThisLab = existingClaims.labId === labId;
+    if (!alreadyThisLab) {
+      const [roleDoc, memberSnap] = await Promise.all([
+        firestore.collection("user_roles").doc(uid).get(),
+        firestore.collection("lab_members").doc(uid).get(),
+      ]);
+      const hasIndependentIdentity = roleDoc.exists || memberSnap.exists || !!existingClaims.role;
+      if (hasIndependentIdentity) {
+        throw new HttpsError(
+          "already-exists",
+          "This email already belongs to a registered account and cannot be invited as lab staff.",
+        );
+      }
+    }
   } catch (err) {
+    if (err instanceof HttpsError) throw err;
     if (err && err.code !== "auth/user-not-found") throw err;
     if (!password || String(password).length < 6) {
       throw new HttpsError("invalid-argument", "password must be at least 6 characters.");
@@ -273,6 +315,22 @@ exports.createInitialAdmin = onCall({ region: "us-central1" }, async (request) =
   }
 
   const data = request.data || {};
+
+  // This is a one-time production bootstrap, not a general-purpose endpoint —
+  // "signed in" alone must never be enough to self-grant global admin. The
+  // Firestore "no admin doc exists yet" check below is a best-effort mirror
+  // check, not a real access-control decision: it's a non-atomic query (a
+  // race lets two concurrent callers both pass it) and it drifts from the
+  // truth if that doc is ever deleted/missing independent of the real
+  // `role: 'admin'` claim. Requiring this deploy-only secret (an env var,
+  // which callers can neither read nor set) means the function stays inert
+  // by default and only does anything during a deliberately-opened bootstrap
+  // window — the Firestore check below still applies as a second layer.
+  const bootstrapSecret = process.env.ADMIN_BOOTSTRAP_SECRET;
+  if (!bootstrapSecret || data.secret !== bootstrapSecret) {
+    throw new HttpsError("permission-denied", "Admin bootstrap is not open.");
+  }
+
   const email = String(data.email || process.env.ADMIN_EMAIL || "admin@dentalhub.com")
     .trim()
     .toLowerCase();
@@ -295,7 +353,17 @@ exports.createInitialAdmin = onCall({ region: "us-central1" }, async (request) =
   try {
     const existing = await auth.getUserByEmail(email);
     uid = existing.uid;
+    if (existing.customClaims && existing.customClaims.role) {
+      // Never overwrite an account that already has a real role/claim of its
+      // own (e.g. the caller's own dentist/lab account, or lab staff) — this
+      // bootstrap is only meant to mint a brand-new super-admin identity.
+      throw new HttpsError(
+        "already-exists",
+        "This email belongs to an account with an existing role and cannot be used for bootstrap.",
+      );
+    }
   } catch (err) {
+    if (err instanceof HttpsError) throw err;
     if (err && err.code !== "auth/user-not-found") throw err;
     const user = await auth.createUser({ email, password, emailVerified: true });
     uid = user.uid;
@@ -520,3 +588,345 @@ exports.backfillPublicProfiles = onCall(
     return { copied: n };
   },
 );
+
+/* ============================================================
+ * PHASE 6 — server-verified checkout / confirm / item-availability.
+ *
+ * `orders`/`invoices` create is now Admin-SDK-only (see firestore.rules):
+ * a plain client `create` could set `items[].price`/`total` to anything —
+ * nothing ever recomputed them from the real `products/{productId}.price`,
+ * so either party in a transaction could forge the billed amount. These
+ * three functions are now the only way `orders`/`invoices` financial data
+ * gets written, and are what `placeCartOrder`/`confirmOrder`/
+ * `updateOrderItemAvailability` (both apps) call instead of writing
+ * Firestore directly.
+ * ============================================================ */
+
+function genOrderNumber() {
+  return `DNT-${Math.floor(1000 + Math.random() * 9000)}`;
+}
+
+exports.placeVerifiedOrder = onCall({ region: "us-central1" }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Authentication required.");
+  }
+  const data = request.data || {};
+  const rawItems = Array.isArray(data.items) ? data.items : [];
+  if (rawItems.length === 0) {
+    throw new HttpsError("invalid-argument", "Cart is empty.");
+  }
+
+  const dentistId = request.auth.uid;
+  const dentistInput = data.dentist || {};
+
+  const productIds = [...new Set(rawItems.map((i) => String((i && i.productId) || "")))].filter(
+    Boolean,
+  );
+  if (productIds.length === 0) {
+    throw new HttpsError("invalid-argument", "No valid items.");
+  }
+
+  const [productSnaps, dentistDoc] = await Promise.all([
+    Promise.all(productIds.map((id) => firestore.collection("products").doc(id).get())),
+    firestore.collection("user_roles").doc(dentistId).get(),
+  ]);
+  const productsById = new Map();
+  productSnaps.forEach((snap, i) => {
+    if (snap.exists) productsById.set(productIds[i], snap.data());
+  });
+
+  const dentistPhotoURL = dentistDoc.exists ? dentistDoc.data().photoURL || "" : "";
+  const dentistName =
+    String(dentistInput.name || (dentistDoc.exists && dentistDoc.data().name) || "").trim() ||
+    "طبيب";
+
+  // Group verified line items (price/currency/supplier read straight off
+  // the product doc, never off the client's cart) by supplier. A cart item
+  // whose product was deleted (or lost its companyId) between add-to-cart
+  // and checkout is dropped here — `skippedCount` is returned so the client
+  // can tell the dentist rather than silently reporting full success.
+  const bySupplier = new Map();
+  let skippedCount = 0;
+  for (const raw of rawItems) {
+    const productId = String((raw && raw.productId) || "");
+    const product = productsById.get(productId);
+    if (!product || !product.companyId) {
+      skippedCount += 1;
+      continue;
+    }
+    const quantity = Math.max(1, Math.floor(Number(raw.quantity) || 1));
+    const line = {
+      productId,
+      name: product.ar || product.en || "",
+      quantity,
+      price: Number(product.price) || 0,
+      currency: product.currency === "IQD" ? "IQD" : "USD",
+    };
+    if (!bySupplier.has(product.companyId)) bySupplier.set(product.companyId, []);
+    bySupplier.get(product.companyId).push(line);
+  }
+  if (bySupplier.size === 0) {
+    throw new HttpsError("invalid-argument", "No valid items.");
+  }
+
+  // A promo-code discount is computed client-side against the WHOLE cart's
+  // subtotal (see src/lib/promo.ts's computeDiscount), but the cart is split
+  // into one order per supplier below. Prorate the discount across those
+  // orders by each one's share of the relevant currency's subtotal, so a
+  // multi-supplier cart doesn't hand the whole discount to one order (or
+  // drop it entirely).
+  const groups = [...bySupplier.entries()].map(([supplierId, lineItems]) => ({
+    supplierId,
+    lineItems,
+    rawUSD: lineItems
+      .filter((i) => i.currency !== "IQD")
+      .reduce((s, i) => s + i.price * i.quantity, 0),
+    rawIQD: lineItems
+      .filter((i) => i.currency === "IQD")
+      .reduce((s, i) => s + i.price * i.quantity, 0),
+  }));
+  const discountInput = data.discount || null;
+  const discountUSDTotal = Math.max(0, Number(discountInput?.discountUSD) || 0);
+  const discountIQDTotal = Math.max(0, Number(discountInput?.discountIQD) || 0);
+  const grandUSD = groups.reduce((s, g) => s + g.rawUSD, 0);
+  const grandIQD = groups.reduce((s, g) => s + g.rawIQD, 0);
+
+  let firstOrderId;
+  const orderIds = [];
+  let n = 0;
+  for (const { supplierId, lineItems, rawUSD, rawIQD } of groups) {
+    const orderRef = firestore.collection("orders").doc();
+    const orderNumber = genOrderNumber();
+    const shareDiscountUSD = grandUSD > 0 ? discountUSDTotal * (rawUSD / grandUSD) : 0;
+    const shareDiscountIQD = grandIQD > 0 ? discountIQDTotal * (rawIQD / grandIQD) : 0;
+    const totalUSD = Math.max(0, rawUSD - shareDiscountUSD);
+    const totalIQD = Math.max(0, rawIQD - shareDiscountIQD);
+    const total = totalUSD + totalIQD;
+
+    await orderRef.set({
+      id: orderRef.id,
+      supplierId,
+      dentistId,
+      dentistName,
+      dentistPhone: dentistInput.phone || "",
+      dentistAddress: dentistInput.address || "",
+      clinicName: dentistInput.clinicName || dentistName,
+      orderNumber,
+      items: lineItems,
+      total,
+      totalUSD,
+      totalIQD,
+      note: data.note || "",
+      discount: discountInput
+        ? { ...discountInput, discountUSD: shareDiscountUSD, discountIQD: shareDiscountIQD }
+        : null,
+      status: "pending",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    const itemLabel = lineItems.length === 1 ? "منتج" : "منتجات";
+    await firestore
+      .collection("notifications")
+      .doc(`${supplierId}_${Date.now()}_${n}`)
+      .set({
+        id: `${supplierId}_${Date.now()}_${n}`,
+        userId: supplierId,
+        title: `طلب جديد من ${dentistName}`,
+        body: dentistInput.address
+          ? `رقم الطلب ${orderNumber} · ${lineItems.length} ${itemLabel} — ${dentistInput.address}`
+          : `رقم الطلب ${orderNumber} · ${lineItems.length} ${itemLabel}`,
+        type: "order_new",
+        orderId: orderRef.id,
+        senderId: dentistId,
+        senderName: dentistName,
+        senderPhotoURL: dentistPhotoURL,
+        isRead: false,
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+      })
+      .catch(() => {});
+
+    if (!firstOrderId) firstOrderId = orderRef.id;
+    orderIds.push(orderRef.id);
+    n += 1;
+  }
+
+  // Stock is decremented on confirmation (confirmVerifiedOrder), not here —
+  // at this point the office hasn't reviewed the order yet, so an item can
+  // still end up rejected or marked unavailable; decrementing this early
+  // would wrongly reduce stock for something that may never actually ship.
+  return { count: orderIds.length, orderId: firstOrderId, skippedCount };
+});
+
+exports.setOrderItemAvailability = onCall({ region: "us-central1" }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Authentication required.");
+  }
+  const { orderId, index, availability } = request.data || {};
+  if (
+    !orderId ||
+    !Number.isInteger(index) ||
+    !["available", "not_available"].includes(availability)
+  ) {
+    throw new HttpsError(
+      "invalid-argument",
+      "orderId, index and a valid availability are required.",
+    );
+  }
+
+  const orderRef = firestore.collection("orders").doc(orderId);
+  const orderSnap = await orderRef.get();
+  if (!orderSnap.exists) {
+    throw new HttpsError("not-found", "Order not found.");
+  }
+  const order = orderSnap.data();
+  if (order.supplierId !== request.auth.uid) {
+    throw new HttpsError("permission-denied", "Only the order's own supplier may edit it.");
+  }
+  const items = Array.isArray(order.items) ? order.items : [];
+  if (index < 0 || index >= items.length) {
+    throw new HttpsError("invalid-argument", "index out of range.");
+  }
+  const nextItems = items.map((it, i) => (i === index ? { ...it, availability } : it));
+  await orderRef.update({
+    items: nextItems,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  return { ok: true };
+});
+
+exports.confirmVerifiedOrder = onCall({ region: "us-central1" }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Authentication required.");
+  }
+  const { orderId } = request.data || {};
+  if (!orderId) {
+    throw new HttpsError("invalid-argument", "orderId is required.");
+  }
+
+  const orderRef = firestore.collection("orders").doc(orderId);
+  const orderSnap = await orderRef.get();
+  if (!orderSnap.exists) {
+    throw new HttpsError("not-found", "Order not found.");
+  }
+  const order = orderSnap.data();
+  if (order.supplierId !== request.auth.uid) {
+    throw new HttpsError("permission-denied", "Only the order's own supplier may confirm it.");
+  }
+  if (order.status === "confirmed") {
+    throw new HttpsError("failed-precondition", "Order is already confirmed.");
+  }
+
+  const items = Array.isArray(order.items) ? order.items : [];
+  const availableItems = items.filter((i) => i.availability !== "not_available");
+  const unavailableItems = items.filter((i) => i.availability === "not_available");
+
+  const rawUSD = availableItems
+    .filter((i) => i.currency !== "IQD")
+    .reduce((s, i) => s + i.price * i.quantity, 0);
+  const rawIQD = availableItems
+    .filter((i) => i.currency === "IQD")
+    .reduce((s, i) => s + i.price * i.quantity, 0);
+  // The order's discount was already fixed (and prorated to this supplier)
+  // at placement time in placeVerifiedOrder — honor that same amount here
+  // rather than recomputing it, only capping so an item that turned out to
+  // be unavailable can't make the discount exceed what's actually billed.
+  const discountUSD = Math.max(0, Number(order.discount?.discountUSD) || 0);
+  const discountIQD = Math.max(0, Number(order.discount?.discountIQD) || 0);
+  const totalUSD = Math.max(0, rawUSD - discountUSD);
+  const totalIQD = Math.max(0, rawIQD - discountIQD);
+  const total = totalUSD + totalIQD;
+
+  const invoiceRef = firestore.collection("invoices").doc();
+  await invoiceRef.set({
+    id: invoiceRef.id,
+    orderNumber: order.orderNumber || genOrderNumber(),
+    officeId: order.supplierId,
+    doctorId: order.dentistId,
+    doctorName: order.dentistName,
+    clinicName: order.clinicName || order.dentistName,
+    doctorPhone: order.dentistPhone || "",
+    doctorAddress: order.dentistAddress || "",
+    items: availableItems,
+    total,
+    totalUSD,
+    totalIQD,
+    note: order.note || "",
+    discount: order.discount || null,
+    status: "confirmed",
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
+    shippedAt: null,
+    deliveredAt: null,
+    rejectedAt: null,
+  });
+
+  if (unavailableItems.length > 0 && order.dentistId) {
+    const supplierDoc = await firestore.collection("user_roles").doc(order.supplierId).get();
+    const senderName = supplierDoc.exists ? supplierDoc.data().name || "" : "";
+    const senderPhotoURL = supplierDoc.exists ? supplierDoc.data().photoURL || "" : "";
+    const notifId = `${order.dentistId}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    await firestore
+      .collection("notifications")
+      .doc(notifId)
+      .set({
+        id: notifId,
+        userId: order.dentistId,
+        title: "تعذر توفير منتج في طلبك",
+        body:
+          unavailableItems.length === 1
+            ? `تعذر توفير المنتج "${unavailableItems[0].name}" في طلبك ${order.orderNumber || ""}`
+            : `تعذر توفير المنتجات التالية في طلبك ${order.orderNumber || ""}: ${unavailableItems
+                .map((i) => i.name)
+                .join("، ")}`,
+        type: "order_status",
+        orderId,
+        senderId: order.supplierId,
+        senderName,
+        senderPhotoURL,
+        isRead: false,
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+      })
+      .catch(() => {});
+  }
+
+  await orderRef.update({
+    status: "confirmed",
+    invoiceId: invoiceRef.id,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  // Decrement stock now that the office has actually confirmed the order —
+  // only for the items that made it into the invoice (an item marked
+  // "not_available" above must never touch stock). Transactional per
+  // product, best-effort: a failure here must never undo the confirmation.
+  const byProductQty = new Map();
+  for (const item of availableItems) {
+    if (!item.productId) continue;
+    byProductQty.set(
+      item.productId,
+      (byProductQty.get(item.productId) || 0) + (item.quantity || 1),
+    );
+  }
+  await Promise.all(
+    [...byProductQty.entries()].map(async ([productId, qty]) => {
+      const ref = firestore.collection("products").doc(productId);
+      try {
+        await firestore.runTransaction(async (tx) => {
+          const snap = await tx.get(ref);
+          if (!snap.exists) return;
+          const current = Number(snap.data().stock);
+          if (!Number.isFinite(current) || current <= 0) return;
+          const next = Math.max(0, current - qty);
+          tx.update(ref, { stock: next, inStock: next > 0 });
+        });
+      } catch {
+        /* best-effort */
+      }
+    }),
+  );
+
+  return { invoiceId: invoiceRef.id };
+});

@@ -18,12 +18,13 @@ export type Appointment = {
 
 const KEY_PREFIX = "dh_appointments_v1:";
 let currentUserId = "";
+let currentClinicId = "";
 let state: Appointment[] = [];
 let loaded = false;
 const listeners = new Set<() => void>();
 
 function getKey() {
-  return KEY_PREFIX + (currentUserId || "guest");
+  return KEY_PREFIX + (currentUserId || "guest") + ":" + (currentClinicId || "default");
 }
 
 function def(): Appointment[] {
@@ -63,8 +64,12 @@ function emit() {
   notify();
 }
 
-export function setAppointmentsStoreUser(uid: string) {
+// Keyed by clinic, not just account — see patientsStore.ts's setPatientStoreUser
+// for why. Called by clinicsStore.ts's `pointStoresAt` whenever the active
+// clinic changes, not just on sign-in.
+export function setAppointmentsStoreUser(uid: string, clinicId: string) {
   currentUserId = uid;
+  currentClinicId = clinicId;
   loaded = false;
   state = [];
   notify();

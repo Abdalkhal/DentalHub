@@ -52,7 +52,7 @@ export function ProductDetailsModal({
 
   const { data: supplier } = useQuery({
     queryKey: ["product-detail-supplier", product.companyId],
-    enabled: !!product.specializedImplant && !!product.companyId,
+    enabled: !!product.companyId,
     queryFn: async (): Promise<UserRoleDoc | null> => {
       const snap = await getDoc(doc(db, "public_profiles", product.companyId!));
       if (!snap.exists()) return null;
@@ -209,8 +209,8 @@ export function ProductDetailsModal({
         </div>
 
         <div className="flex-1 overflow-y-auto flex flex-col gap-4">
-          {/* Supplier contact card (specialized implants only) */}
-          {product.specializedImplant && supplier && (
+          {/* Supplier contact card */}
+          {supplier && (
             <div className="mx-4 mt-4 rounded-2xl bg-white border border-slate-200 shadow-sm p-3 flex items-center gap-3">
               <span className="size-11 rounded-full bg-indigo-50 text-indigo-600 ring-2 ring-indigo-100 flex items-center justify-center font-bold shrink-0 overflow-hidden">
                 {supplier.photoURL ? (
@@ -564,23 +564,6 @@ export function ProductDetailsModal({
         {/* Cart footer (doctor view only) */}
         {isDoctorView && cart && (
           <div className="shrink-0 border-t border-slate-200 bg-white p-4 space-y-3">
-            {/* Store profile */}
-            <div className="flex items-center gap-3 rounded-2xl border border-slate-200 p-3">
-              <span className="size-11 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold shrink-0">
-                {(cart.officeName || "؟").charAt(0)}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-bold truncate">
-                  {cart.officeName || (ar ? "المكتب" : "Office")}
-                </p>
-                {cart.officeCity && (
-                  <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
-                    <MapPin className="size-3" /> {cart.officeCity}
-                  </p>
-                )}
-              </div>
-            </div>
-
             {/* Quantity + Add to cart */}
             <div className="flex items-center gap-3">
               <div className="flex items-center justify-between rounded-2xl bg-slate-100 border border-slate-200 h-12 px-1 w-32 shrink-0">

@@ -1,9 +1,9 @@
-import { useState } from 'react';
-import { Image, Modal, Pressable, ScrollView, View } from 'react-native';
-import { Check, ChevronDown, X } from 'lucide-react-native';
+import { useMemo, useState } from 'react';
+import { Image, Modal, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Check, ChevronDown, Search, X } from 'lucide-react-native';
 
 import { Text } from '@/components/ui';
-import { ALL_COUNTRIES, countryFlagUrl } from '@/data/countries';
+import { ALL_COUNTRIES, filterCountries, countryFlagUrl } from '@/data/countries';
 import { cn } from '@/lib/utils';
 
 function FlagIcon({ code }: { code: string }) {
@@ -26,7 +26,14 @@ export function CountrySelect({
   allowEmpty?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
   const selected = ALL_COUNTRIES.find((c) => c.code === value);
+  const filtered = useMemo(() => filterCountries(ALL_COUNTRIES, search), [search]);
+
+  const close = () => {
+    setOpen(false);
+    setSearch('');
+  };
 
   return (
     <>
@@ -37,21 +44,38 @@ export function CountrySelect({
         </Text>
         <ChevronDown size={16} color="#94A3B8" />
       </Pressable>
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+      <Modal visible={open} transparent animationType="fade" onRequestClose={close}>
         <View className="flex-1 items-center justify-center bg-black/40 p-6">
           <View className="h-[70%] w-full max-w-xs overflow-hidden rounded-2xl bg-white shadow-xl">
             <View className="flex-row items-center justify-between border-b border-slate-100 px-4 py-3">
               <Text className="text-sm font-bold text-slate-800">{ar ? 'اختر بلداً' : 'Select country'}</Text>
-              <Pressable onPress={() => setOpen(false)} className="h-7 w-7 items-center justify-center rounded-full bg-slate-100">
+              <Pressable onPress={close} className="h-7 w-7 items-center justify-center rounded-full bg-slate-100">
                 <X size={14} color="#64748B" />
               </Pressable>
             </View>
-            <ScrollView>
-              {allowEmpty && (
+            <View className="flex-row items-center gap-2 border-b border-slate-100 px-4 py-2.5">
+              <Search size={15} color="#94A3B8" />
+              <TextInput
+                value={search}
+                onChangeText={setSearch}
+                placeholder={ar ? 'ابحث عن بلد...' : 'Search country...'}
+                placeholderTextColor="#94A3B8"
+                className="flex-1 text-sm text-slate-700"
+                style={{ writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }}
+                autoCorrect={false}
+              />
+              {!!search && (
+                <Pressable onPress={() => setSearch('')} hitSlop={8}>
+                  <X size={14} color="#94A3B8" />
+                </Pressable>
+              )}
+            </View>
+            <ScrollView keyboardShouldPersistTaps="handled">
+              {allowEmpty && !search && (
                 <Pressable
                   onPress={() => {
                     onChange('');
-                    setOpen(false);
+                    close();
                   }}
                   className={cn('flex-row items-center gap-2.5 px-4 py-3', !value && 'bg-sky-50')}
                 >
@@ -62,14 +86,19 @@ export function CountrySelect({
                   {!value && <Check size={14} color="#0369A1" />}
                 </Pressable>
               )}
-              {ALL_COUNTRIES.map((c) => {
+              {filtered.length === 0 && (
+                <Text className="px-4 py-6 text-center text-xs text-slate-400">
+                  {ar ? 'لا توجد نتائج' : 'No results'}
+                </Text>
+              )}
+              {filtered.map((c) => {
                 const isSelected = c.code === value;
                 return (
                   <Pressable
                     key={c.code}
                     onPress={() => {
                       onChange(c.code);
-                      setOpen(false);
+                      close();
                     }}
                     className={cn('flex-row items-center gap-2.5 px-4 py-3', isSelected && 'bg-sky-50')}
                   >

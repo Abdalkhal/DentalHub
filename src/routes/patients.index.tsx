@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,8 @@ import {
   type Patient,
   type PatientStatus,
 } from "@/lib/patientsStore";
+import { setClinicsStoreUser } from "@/lib/clinicsStore";
+import { useSession } from "@/lib/useAuth";
 import { ArrowRight, ArrowLeft, Phone, Plus, Search, Users, X, CalendarDays, ChevronDown } from "lucide-react";
 
 export const Route = createFileRoute("/patients/")({
@@ -45,6 +47,16 @@ export const HISTORY_LABELS: Array<{ key: keyof MedicalHistory; ar: string; en: 
 function PatientsPage() {
   const { lang, dir } = useI18n();
   const ar = lang === "ar";
+  const { user } = useSession();
+
+  useEffect(() => {
+    // Defensive re-init for landing directly on this route (e.g. a reload)
+    // without passing through the home route's effect first — must resolve
+    // the full clinic context (list + active clinic), not just re-key this
+    // one store, or it could point at the wrong clinic's data.
+    setClinicsStoreUser(user?.uid || "");
+  }, [user?.uid]);
+
   const patients = usePatients();
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<PatientStatus | "all">("all");

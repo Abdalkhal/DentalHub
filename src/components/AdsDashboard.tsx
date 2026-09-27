@@ -29,6 +29,10 @@ type AdItem = {
   views: number;
   clicks: number;
   expiryDate?: string;
+  /** Only set when the underlying offer's real status is "rejected" (folded
+   * into the "expired" bucket above for filtering) — shown so a rejected
+   * supplier isn't left with no explanation. */
+  rejectReason?: string;
 };
 
 const FILTERS: { key: AdStatus; label: string }[] = [
@@ -68,6 +72,7 @@ export function AdsDashboard() {
           views: 0,
           clicks: 0,
           expiryDate: o.expiryDate,
+          rejectReason: o.status === "rejected" ? o.rejectReason : undefined,
         };
       }),
     [offers, urlMap],
@@ -303,6 +308,12 @@ export function AdsDashboard() {
                     {ad.description && (
                       <p className="text-[11px] text-slate-500 mt-1 line-clamp-2">
                         {ad.description}
+                      </p>
+                    )}
+                    {ad.rejectReason && (
+                      <p className="text-[11px] text-rose-600 mt-1">
+                        {ar ? "سبب الرفض: " : "Rejection reason: "}
+                        {ad.rejectReason}
                       </p>
                     )}
                     <div className="flex items-center gap-4 mt-2 text-[11px] font-bold text-slate-500">

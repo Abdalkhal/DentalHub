@@ -4,7 +4,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Clock, Phone, Plus, Stethoscope, Trash2, X } from 'lucide-react-native';
 
 import { Screen, Select, Text } from '@/components/ui';
-import { addDoctor, removeDoctor, setClinicStoreUser, useClinic } from '@/lib/clinicStore';
+import { addDoctor, removeDoctor, useClinic } from '@/lib/clinicStore';
+import { setClinicsStoreUser } from '@/lib/clinicsStore';
 import { useUserRole } from '@/lib/useAuth';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
@@ -29,7 +30,7 @@ export default function ClinicDoctorsScreen() {
   const { user } = useUserRole();
 
   useEffect(() => {
-    if (user?.uid) setClinicStoreUser(user.uid);
+    if (user?.uid) setClinicsStoreUser(user.uid);
   }, [user?.uid]);
 
   const { doctors } = useClinic();

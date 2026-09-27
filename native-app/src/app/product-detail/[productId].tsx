@@ -159,7 +159,6 @@ export default function ProductDetailScreen() {
 
   const name = ar ? product.ar || product.en : product.en || product.ar;
   const officeName = String(office?.name || '') || (ar ? 'المكتب' : 'Office');
-  const officeCity = String(office?.city || '');
   const inStock = product.inStock ?? true;
 
   const prev = () => setActiveImg((i) => (images.length === 0 ? 0 : (i - 1 + images.length) % images.length));
@@ -213,8 +212,8 @@ export default function ProductDetailScreen() {
   return (
     <Screen scroll={false}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
-        {/* Supplier contact card (specialized implants only) */}
-        {!!spec && !!office && (
+        {/* Supplier contact card */}
+        {!!office && (
           <View className="mb-4 flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-card p-3 shadow-sm">
             <View className="h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-indigo-50">
               {office.photoURL ? (
@@ -491,34 +490,6 @@ export default function ProductDetailScreen() {
 
       {/* Cart footer */}
       <View className="gap-3 border-t border-slate-200 bg-white px-4 pb-4 pt-3">
-        {/* Store profile — the specialized-implant card above already shows
-            this same office with its own "Visit Profile" button, so this
-            duplicate row only renders when that card doesn't (i.e. `!spec`). */}
-        {!spec && (
-          <Pressable
-            onPress={() =>
-              product.companyId &&
-              router.push({ pathname: '/profile/[accountId]', params: { accountId: product.companyId } })
-            }
-            className="flex-row items-center gap-3 rounded-2xl border border-slate-200 p-3"
-          >
-            <View className="h-11 w-11 items-center justify-center rounded-full bg-emerald-50">
-              <Text className="font-bold text-emerald-700">{officeName.charAt(0) || '؟'}</Text>
-            </View>
-            <View className="min-w-0 flex-1">
-              <Text className="text-sm font-bold text-slate-800" numberOfLines={1}>
-                {officeName}
-              </Text>
-              {!!officeCity && (
-                <View className="mt-0.5 flex-row items-center gap-1">
-                  <MapPin size={11} color="#94A3B8" />
-                  <Text className="text-[11px] text-slate-500">{officeCity}</Text>
-                </View>
-              )}
-            </View>
-          </Pressable>
-        )}
-
         {/* Quantity + Add to cart */}
         <View className="flex-row items-center gap-3">
           <View className="h-12 w-32 shrink-0 flex-row items-center justify-between rounded-2xl border border-slate-200 bg-slate-100 px-1">
@@ -526,7 +497,11 @@ export default function ProductDetailScreen() {
               <Minus size={16} color="#475569" />
             </Pressable>
             <Text className="min-w-6 text-center text-sm font-bold text-slate-800">{qty}</Text>
-            <Pressable onPress={() => setQty((q) => q + 1)} className="h-9 w-9 items-center justify-center">
+            <Pressable
+              onPress={() => setQty((q) => Math.min(product.stock, q + 1))}
+              disabled={qty >= product.stock}
+              className={cn('h-9 w-9 items-center justify-center', qty >= product.stock && 'opacity-30')}
+            >
               <Plus size={16} color="#475569" />
             </Pressable>
           </View>

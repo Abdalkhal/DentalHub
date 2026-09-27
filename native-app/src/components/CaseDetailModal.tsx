@@ -1,5 +1,6 @@
-import { Modal, Pressable, ScrollView, Share, View } from 'react-native';
-import { FileText, Hash, Layers, Paintbrush, Ruler, Share2, Smile, Syringe, X, type LucideIcon } from 'lucide-react-native';
+import { useState } from 'react';
+import { Image, Modal, Pressable, ScrollView, Share, View, type LayoutChangeEvent } from 'react-native';
+import { Check, FileText, Hash, Layers, Paintbrush, Ruler, Share2, Smile, Syringe, X, type LucideIcon } from 'lucide-react-native';
 
 import { Text } from '@/components/ui';
 import {
@@ -13,6 +14,7 @@ import {
   classifyShade,
 } from '@/lib/dentalConfig';
 import { deriveOrderLines, deriveWorkDetailGroups, cleanDoctorNotes, resolveOrderTotal, type OrderLine } from '@/lib/orderLines';
+import { FDI_UPPER, FDI_LOWER, UPPER_POS, LOWER_POS } from '@/components/DentalArch';
 import type { Order, OrderStatus } from '@/lib/ordersStore';
 
 // A faithful port of the web app's OrderInvoiceModal (src/components/OrderInvoiceModal.tsx)
@@ -134,6 +136,68 @@ function formatInvoiceDate(dateStr: string, ar: boolean): string {
   return d.toLocaleDateString(ar ? 'ar-IQ' : 'en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
+// Read-only mirror of the doctor's own tooth-charting picker
+// (SendCaseModal.tsx's OdontogramArch / web's IncomingOrderRxModal's
+// RxArch) — a still-unconfirmed incoming case carries no price (see
+// `isUnconfirmedIncoming` below), so the lab needs this instead to know
+// *which tooth* needs *which* treatment before it can price anything.
+type RxWorkTypeKey = 'crown' | 'bridge' | 'veneer' | 'inlay';
+const RX_WORK_TYPE_META: Record<RxWorkTypeKey, { ar: string; en: string; dot: string }> = {
+  crown: { ar: 'تاج', en: 'Crown', dot: '#3B82F6' },
+  bridge: { ar: 'جسر', en: 'Bridge', dot: '#22C55E' },
+  veneer: { ar: 'فينير', en: 'Veneer', dot: '#A855F7' },
+  inlay: { ar: 'حشوة داخلية/خارجية', en: 'Inlay/Onlay', dot: '#F97316' },
+};
+const RX_WORK_TYPE_ORDER: RxWorkTypeKey[] = ['crown', 'bridge', 'veneer', 'inlay'];
+
+function RxOdontogramArch({ jaw, teeth }: { jaw: 'upper' | 'lower'; teeth: Record<number, RxWorkTypeKey> }) {
+  const [size, setSize] = useState({ width: 0, height: 0 });
+  const onLayout = (e: LayoutChangeEvent) => setSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height });
+
+  const fdiList = jaw === 'upper' ? FDI_UPPER : FDI_LOWER;
+  const posMap = jaw === 'upper' ? UPPER_POS : LOWER_POS;
+  const archSrc = jaw === 'upper' ? require('../../assets/home/arch-upper.png') : require('../../assets/home/arch-lower.png');
+
+  return (
+    // `direction: 'ltr'` (matching DentalArch.tsx) keeps the absolute tooth
+    // markers from being mirrored under forced Arabic RTL layout.
+    <View onLayout={onLayout} style={{ width: '100%', aspectRatio: 4 / 3, direction: 'ltr' }}>
+      <Image source={archSrc} style={{ position: 'absolute', width: '100%', height: '100%' }} resizeMode="contain" />
+      {size.width > 0 &&
+        fdiList.map((n) => {
+          const pos = posMap[n];
+          if (!pos) return null;
+          const lx = 50 + (pos[0] - 50) * 1.22;
+          const ly = 50 + (pos[1] - 50) * 1.18;
+          const cx = (lx / 100) * size.width;
+          const cy = (ly / 100) * size.height;
+          const wt = teeth[n];
+          const meta = wt ? RX_WORK_TYPE_META[wt] : null;
+          return (
+            <View
+              key={n}
+              style={{
+                position: 'absolute',
+                left: cx - 12,
+                top: cy - 12,
+                width: 24,
+                height: 24,
+                borderRadius: 12,
+                borderWidth: 1.5,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderColor: meta ? meta.dot : '#E2E8F0',
+                backgroundColor: meta ? meta.dot : '#F8FAFC',
+              }}
+            >
+              <Text style={{ fontSize: 8, fontWeight: '700', color: meta ? '#FFFFFF' : '#94A3B8' }}>{n}</Text>
+            </View>
+          );
+        })}
+    </View>
+  );
+}
+
 function CaseBox({ label, value }: { label: string; value?: string }) {
   return (
     <View className="w-[31%] gap-0.5 rounded-xl bg-white p-2.5" style={{ borderWidth: 1, borderColor: C.lightBlue }}>
@@ -170,12 +234,22 @@ export function CaseDetailModal({
   order,
   onClose,
   labName,
+  onConfirm,
 }: {
   ar: boolean;
   order: Order;
   onClose: () => void;
   labName?: string;
+  /** Rendered as a "تأكيد الحالة" footer button, only shown for a case the
+   * lab hasn't priced yet (`source === 'incoming_doctor_case'`) — the doctor
+   * who sent it has no way to set a price, so that pricing table below is
+   * hidden here too and replaced by this button, which routes to "New Order"
+   * pre-filled to let the lab actually price and confirm the case. */
+  onConfirm?: () => void;
 }) {
+  // Flips to "internal" once the lab confirms (new-lab-order.tsx), so this
+  // only ever applies to a still-unpriced, just-arrived doctor case.
+  const isUnconfirmedIncoming = order.source === 'incoming_doctor_case';
   const workDetailGroups = deriveWorkDetailGroups(order);
   const selectedShade = order.shade ? order.shade.trim() : '';
   const shadeTab = selectedShade ? classifyShade(selectedShade) : null;
@@ -194,6 +268,16 @@ export function CaseDetailModal({
 
   const hasImplantDetails = order.implantCompany || order.implantSystem || order.implantConnection || order.implantPlatform || order.implantLevel;
   const hasAlignerDetails = order.alignerTreatmentType || order.alignerArch || order.alignerScans || order.alignerCount;
+
+  const rxTeeth: Record<number, RxWorkTypeKey> = {};
+  Object.entries(order.rxTeeth ?? {}).forEach(([n, t]) => {
+    if (t === 'crown' || t === 'bridge' || t === 'veneer' || t === 'inlay') rxTeeth[Number(n)] = t;
+  });
+  const rxToothItems = (order.rxData?.toothItems as Record<string, string[]> | undefined) ?? {};
+  // Kept visible after confirmation too (not gated on `isUnconfirmedIncoming`
+  // like the pricing table/confirm button above) — the tooth chart the
+  // doctor drew stays useful for production long after the case is priced.
+  const hasOdontogram = Object.keys(rxTeeth).length > 0 || Object.keys(rxToothItems).length > 0;
 
   const handleShare = () => {
     const lines = items.map((i) => `• ${i.name} ×${i.quantity} — ${fmtRowTotal(i, finalAmount)}`);
@@ -261,6 +345,50 @@ export function CaseDetailModal({
                   <CaseBox label={ar ? 'العيادة' : 'Clinic'} value={order.clinic || '-'} />
                 </View>
               </SectionCard>
+
+              {hasOdontogram && (
+                <SectionCard icon={Layers} title={ar ? 'مخطط الأسنان (Odontogram)' : 'Odontogram'}>
+                  <View className="gap-2 p-3">
+                    <RxOdontogramArch jaw="upper" teeth={rxTeeth} />
+                    <RxOdontogramArch jaw="lower" teeth={rxTeeth} />
+                    <View className="flex-row flex-wrap justify-center gap-1.5 pt-1">
+                      {RX_WORK_TYPE_ORDER.map((k) => {
+                        const meta = RX_WORK_TYPE_META[k];
+                        const count = Object.values(rxTeeth).filter((t) => t === k).length;
+                        return (
+                          <View key={k} className="flex-row items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1">
+                            <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: meta.dot }} />
+                            <Text className="text-[10px] font-bold text-slate-600">
+                              {ar ? meta.ar : meta.en} · {count}
+                            </Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  </View>
+                  {Object.keys(rxToothItems).length > 0 && (
+                    <View className="gap-2 border-t border-slate-100 p-3">
+                      <Text className="text-[11px] font-bold uppercase" style={{ color: C.lightBlueText }}>
+                        {ar ? 'تفاصيل كل سن' : 'Per-Tooth Details'}
+                      </Text>
+                      {Object.entries(rxToothItems).map(([tooth, labels]) => (
+                        <View key={tooth} className="flex-row items-start gap-2">
+                          <View className="h-6 w-6 items-center justify-center rounded-full bg-slate-100">
+                            <Text style={{ fontSize: 10 }} className="font-bold text-slate-600">{tooth}</Text>
+                          </View>
+                          <View className="flex-1 flex-row flex-wrap gap-1.5">
+                            {labels.map((label, i) => (
+                              <View key={i} className="rounded-lg border border-slate-300 bg-slate-50 px-2.5 py-1">
+                                <Text className="text-[11px] font-semibold text-slate-700">{label}</Text>
+                              </View>
+                            ))}
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </SectionCard>
+              )}
 
               <SectionCard icon={Paintbrush} title={ar ? 'درجة اللون' : 'Shade'}>
                 <View className="p-3">
@@ -366,45 +494,47 @@ export function CaseDetailModal({
               </SectionCard>
               )}
 
-              <SectionCard
-                icon={Hash}
-                title={ar ? (order.pricingMode === 'mixed' ? 'جدول تسعير الوحدات المتعددة' : 'جدول التسعير') : order.pricingMode === 'mixed' ? 'Mixed Units Pricing' : 'Pricing'}
-              >
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View style={{ minWidth: 480 }}>
-                    <View className="flex-row px-4 py-2.5" style={{ backgroundColor: C.lightBlueSoft, borderBottomWidth: 1, borderColor: C.lightBlue }}>
-                      <Text style={{ width: 190, color: C.lightBlueText }} className="text-[10px] font-bold">{ar ? 'العنصر' : 'Item'}</Text>
-                      <Text style={{ width: 70, color: C.lightBlueText }} className="text-center text-[10px] font-bold">{ar ? 'العدد' : 'Units'}</Text>
-                      <Text style={{ width: 110, color: C.lightBlueText }} className="text-center text-[10px] font-bold">{ar ? 'السعر' : 'Price'}</Text>
-                      <Text style={{ width: 110, color: C.lightBlueText }} className="text-center text-[10px] font-bold">{ar ? 'الإجمالي' : 'Total'}</Text>
-                    </View>
-                    {items.map((it) => (
-                      <View key={it.id} className="flex-row items-center px-4 py-3" style={{ borderBottomWidth: 1, borderColor: C.lightBlue }}>
-                        <Text numberOfLines={1} style={{ width: 190 }} className="text-xs font-semibold text-slate-800">{it.name}</Text>
-                        <Text style={{ width: 70, writingDirection: 'ltr' }} className="text-center text-xs font-bold text-slate-700">{it.quantity}</Text>
-                        <Text style={{ width: 110, writingDirection: 'ltr' }} className="text-center text-[10px] text-slate-500">{fmtAmount(itemUnitPrice(it, finalAmount), it.currency)}</Text>
-                        <Text style={{ width: 110, color: C.deepBlue, writingDirection: 'ltr' }} className="text-center text-xs font-extrabold">{fmtRowTotal(it, finalAmount)}</Text>
+              {!isUnconfirmedIncoming && (
+                <SectionCard
+                  icon={Hash}
+                  title={ar ? (order.pricingMode === 'mixed' ? 'جدول تسعير الوحدات المتعددة' : 'جدول التسعير') : order.pricingMode === 'mixed' ? 'Mixed Units Pricing' : 'Pricing'}
+                >
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <View style={{ minWidth: 480 }}>
+                      <View className="flex-row px-4 py-2.5" style={{ backgroundColor: C.lightBlueSoft, borderBottomWidth: 1, borderColor: C.lightBlue }}>
+                        <Text style={{ width: 190, color: C.lightBlueText }} className="text-[10px] font-bold">{ar ? 'العنصر' : 'Item'}</Text>
+                        <Text style={{ width: 70, color: C.lightBlueText }} className="text-center text-[10px] font-bold">{ar ? 'العدد' : 'Units'}</Text>
+                        <Text style={{ width: 110, color: C.lightBlueText }} className="text-center text-[10px] font-bold">{ar ? 'السعر' : 'Price'}</Text>
+                        <Text style={{ width: 110, color: C.lightBlueText }} className="text-center text-[10px] font-bold">{ar ? 'الإجمالي' : 'Total'}</Text>
                       </View>
-                    ))}
-                  </View>
-                </ScrollView>
+                      {items.map((it) => (
+                        <View key={it.id} className="flex-row items-center px-4 py-3" style={{ borderBottomWidth: 1, borderColor: C.lightBlue }}>
+                          <Text numberOfLines={1} style={{ width: 190 }} className="text-xs font-semibold text-slate-800">{it.name}</Text>
+                          <Text style={{ width: 70, writingDirection: 'ltr' }} className="text-center text-xs font-bold text-slate-700">{it.quantity}</Text>
+                          <Text style={{ width: 110, writingDirection: 'ltr' }} className="text-center text-[10px] text-slate-500">{fmtAmount(itemUnitPrice(it, finalAmount), it.currency)}</Text>
+                          <Text style={{ width: 110, color: C.deepBlue, writingDirection: 'ltr' }} className="text-center text-xs font-extrabold">{fmtRowTotal(it, finalAmount)}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </ScrollView>
 
-                <View className="flex-row flex-wrap items-center justify-between gap-3 p-4" style={{ backgroundColor: C.lightBlueSoft, borderTopWidth: 1, borderColor: C.lightBlue }}>
-                  <View>
-                    <Text className="text-[10px] font-bold uppercase" style={{ color: C.gold }}>{ar ? 'إجمالي عدد الوحدات' : 'Total Units'}</Text>
-                    <Text className="text-lg font-extrabold" style={{ color: C.deepBlue, writingDirection: 'ltr' }}>{fmtNum(totalUnits)}</Text>
+                  <View className="flex-row flex-wrap items-center justify-between gap-3 p-4" style={{ backgroundColor: C.lightBlueSoft, borderTopWidth: 1, borderColor: C.lightBlue }}>
+                    <View>
+                      <Text className="text-[10px] font-bold uppercase" style={{ color: C.gold }}>{ar ? 'إجمالي عدد الوحدات' : 'Total Units'}</Text>
+                      <Text className="text-lg font-extrabold" style={{ color: C.deepBlue, writingDirection: 'ltr' }}>{fmtNum(totalUnits)}</Text>
+                    </View>
+                    <View className="items-end">
+                      <Text className="text-[10px] font-bold uppercase" style={{ color: C.gold }}>{ar ? 'الإجمالي الكلي' : 'Grand Total'}</Text>
+                      <Text className="text-xl font-extrabold" style={{ color: C.gold, writingDirection: 'ltr' }}>{grandTotalLabel}</Text>
+                      {showUsdSecondary && (
+                        <Text className="text-xs font-semibold" style={{ color: C.lightBlueText, writingDirection: 'ltr' }}>
+                          ≈ ${usdTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </Text>
+                      )}
+                    </View>
                   </View>
-                  <View className="items-end">
-                    <Text className="text-[10px] font-bold uppercase" style={{ color: C.gold }}>{ar ? 'الإجمالي الكلي' : 'Grand Total'}</Text>
-                    <Text className="text-xl font-extrabold" style={{ color: C.gold, writingDirection: 'ltr' }}>{grandTotalLabel}</Text>
-                    {showUsdSecondary && (
-                      <Text className="text-xs font-semibold" style={{ color: C.lightBlueText, writingDirection: 'ltr' }}>
-                        ≈ ${usdTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </Text>
-                    )}
-                  </View>
-                </View>
-              </SectionCard>
+                </SectionCard>
+              )}
 
               {!!notes && (
                 <SectionCard icon={FileText} title={ar ? 'ملاحظات' : 'Notes'}>
@@ -423,6 +553,20 @@ export function CaseDetailModal({
               </View>
             </View>
           </ScrollView>
+
+          {isUnconfirmedIncoming && onConfirm && (
+            <View className="border-t border-slate-100 p-4">
+              <Pressable
+                onPress={onConfirm}
+                className="h-12 flex-row items-center justify-center gap-2 rounded-xl bg-primary"
+              >
+                <Check size={16} color="#FFFFFF" />
+                <Text className="text-sm font-extrabold text-white">
+                  {ar ? 'تأكيد الحالة' : 'Confirm Case'}
+                </Text>
+              </Pressable>
+            </View>
+          )}
         </View>
       </View>
     </Modal>

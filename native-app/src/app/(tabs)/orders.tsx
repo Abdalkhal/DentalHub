@@ -1,5 +1,6 @@
 ﻿import { useMemo, useState } from 'react';
 import { FlatList, Pressable, View } from 'react-native';
+import { router } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { Check, ChevronDown, FlaskConical, MapPin, Package, Phone, Search, X } from 'lucide-react-native';
 
@@ -96,6 +97,24 @@ function money(o: { totalUSD?: number; total?: number; totalIQD?: number }): str
   return `${(o.total ?? 0).toLocaleString()} د.ع`;
 }
 
+// The order doc's own total*/total fields are stamped once at checkout, before
+// the supplier can mark any item "not available" — a rejected item's price
+// stays baked into that stored total forever. The dentist's list must instead
+// total the items live, skipping whatever the supplier has since rejected.
+function availableMoney(items: { price?: number; quantity?: number; currency?: string; availability?: string }[]): string {
+  let usd = 0;
+  let iqd = 0;
+  for (const it of items) {
+    if (it.availability === 'not_available') continue;
+    const amt = (it.price ?? 0) * (it.quantity ?? 1);
+    if (it.currency === 'IQD') iqd += amt;
+    else usd += amt;
+  }
+  if (usd) return `$${usd.toFixed(2)}`;
+  if (iqd) return `${iqd.toLocaleString()} د.ع`;
+  return '0';
+}
+
 /**
  * Mirrors the web app's role branching in `src/routes/orders.tsx`: suppliers and
  * implant companies see the orders sent *to* them, dentists see the orders they
@@ -156,7 +175,9 @@ function DentistOrders() {
             quantity?: number;
             unitPrice?: number;
             price?: number;
+            currency?: string;
             productImage?: string;
+            availability?: string;
           }>;
           return (
             <Pressable
@@ -178,7 +199,7 @@ function DentistOrders() {
                 <Text className="mt-1 text-xs text-slate-400">{fmtDate(o.createdAt)}</Text>
                 <View className="mt-2 flex-row items-center justify-between border-t border-slate-100 pt-2">
                   <Text className="text-xs text-slate-500">
-                    {items.length} {ar ? 'منتج' : 'items'} · {money(o)}
+                    {items.length} {ar ? 'منتج' : 'items'} · {availableMoney(items)}
                   </Text>
                   <ChevronDown
                     size={16}
@@ -194,21 +215,39 @@ function DentistOrders() {
                       {ar ? 'لا توجد تفاصيل' : 'No details'}
                     </Text>
                   ) : (
-                    items.map((it, i) => (
-                      <View key={i} className="flex-row items-center gap-2">
-                        {it.productImage ? (
-                          <ProductImage uri={it.productImage} className="h-10 w-10 rounded-lg bg-slate-100" iconSize={16} />
-                        ) : (
-                          <View className="h-10 w-10 items-center justify-center rounded-lg bg-slate-100">
-                            <Package size={16} color="#94A3B8" />
+                    items.map((it, i) => {
+                      const unavailable = it.availability === 'not_available';
+                      return (
+                        <View key={i} className={cn('flex-row items-center gap-2', unavailable && 'opacity-40')}>
+                          {it.productImage ? (
+                            <ProductImage uri={it.productImage} className="h-10 w-10 rounded-lg bg-slate-100" iconSize={16} />
+                          ) : (
+                            <View className="h-10 w-10 items-center justify-center rounded-lg bg-slate-100">
+                              <Package size={16} color="#94A3B8" />
+                            </View>
+                          )}
+                          <View className="min-w-0 flex-1">
+                            <Text
+                              className={cn(
+                                'text-xs font-semibold',
+                                unavailable ? 'text-slate-400 line-through' : 'text-slate-700',
+                              )}
+                              numberOfLines={1}
+                            >
+                              {it.productName || it.name || '—'}
+                            </Text>
+                            {unavailable && (
+                              <Text className="text-[10px] font-bold text-rose-500">
+                                {ar ? 'غير متوفر' : 'Not available'}
+                              </Text>
+                            )}
                           </View>
-                        )}
-                        <Text className="min-w-0 flex-1 text-xs font-semibold text-slate-700" numberOfLines={1}>
-                          {it.productName || it.name || '—'}
-                        </Text>
-                        <Text className="text-xs font-bold text-slate-500">× {it.quantity ?? 1}</Text>
-                      </View>
-                    ))
+                          <Text className={cn('text-xs font-bold', unavailable ? 'text-slate-300' : 'text-slate-500')}>
+                            × {it.quantity ?? 1}
+                          </Text>
+                        </View>
+                      );
+                    })
                   )}
                 </View>
               )}
@@ -632,7 +671,19 @@ function LabOrders() {
         }
       />
 
-      {selected && <CaseDetailModal ar={ar} order={selected} onClose={() => setSelected(null)} labName={role?.name} />}
+      {selected && (
+        <CaseDetailModal
+          ar={ar}
+          order={selected}
+          onClose={() => setSelected(null)}
+          labName={role?.name}
+          onConfirm={() => {
+            const id = selected.id;
+            setSelected(null);
+            router.push({ pathname: '/new-lab-order', params: { confirmId: id } });
+          }}
+        />
+      )}
     </Screen>
   );
 }

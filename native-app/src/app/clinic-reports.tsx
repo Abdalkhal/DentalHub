@@ -3,8 +3,9 @@ import { Pressable, View } from 'react-native';
 import { Download } from 'lucide-react-native';
 
 import { Screen, Select, Text } from '@/components/ui';
-import { setClinicStoreUser, useClinic, clinicTotals } from '@/lib/clinicStore';
+import { useClinic, clinicTotals } from '@/lib/clinicStore';
 import { usePatients } from '@/lib/patientsStore';
+import { setClinicsStoreUser } from '@/lib/clinicsStore';
 import { useUserRole } from '@/lib/useAuth';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
@@ -53,7 +54,7 @@ export default function ClinicReportsScreen() {
   const { user } = useUserRole();
 
   useEffect(() => {
-    if (user?.uid) setClinicStoreUser(user.uid);
+    if (user?.uid) setClinicsStoreUser(user.uid);
   }, [user?.uid]);
 
   const data = useClinic();

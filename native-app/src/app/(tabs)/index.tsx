@@ -31,9 +31,7 @@ import { useLabStaffClaim, useUserRole, useSession } from '@/lib/useAuth';
 import SuppliesOfficeScreen from './supplies-office';
 import ImplantsOfficeScreen from './implants-office';
 import LabsOfficeScreen from './labs-office';
-import { setPatientStoreUser } from '@/lib/patientsStore';
-import { setClinicStoreUser } from '@/lib/clinicStore';
-import { setAppointmentsStoreUser } from '@/lib/appointmentsStore';
+import { setClinicsStoreUser } from '@/lib/clinicsStore';
 import { setFavoritesStoreUser } from '@/lib/favoritesStore';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
@@ -149,12 +147,13 @@ export default function HomeScreen() {
   const [carouselWidth, setCarouselWidth] = useState(0);
   const carouselRef = useRef<ScrollView>(null);
 
-  // Scope local stores to the signed-in user (web parity).
+  // Scope local stores to the signed-in user (web parity). Clinic-scoped
+  // stores (patients/appointments/clinic finance) go through
+  // setClinicsStoreUser, which resolves (and migrates, on first run) the
+  // active clinic before pointing them at it — see clinicsStore.ts.
   useEffect(() => {
     const uid = user?.uid || '';
-    setPatientStoreUser(uid);
-    setClinicStoreUser(uid);
-    setAppointmentsStoreUser(uid);
+    setClinicsStoreUser(uid);
     setFavoritesStoreUser(uid);
     setQuickOrdersStoreUser(uid);
   }, [user?.uid]);
@@ -253,11 +252,12 @@ export default function HomeScreen() {
 
   // Invited lab staff have no `user_roles` document — only a custom claim — so
   // route them from the claim before falling through to the account-type logic,
-  // otherwise they land on the dentist marketplace with no role at all. Both
-  // staff slots a lab can assign a case to (designer, ceramist/technician)
-  // share the same restricted case screen — see designerStore.ts, which
-  // matches on `designerId` OR `ceramistId`.
-  if (labStaff?.role === 'DESIGNER' || labStaff?.role === 'TECHNICIAN') {
+  // otherwise they land on the dentist marketplace with no role at all. All
+  // three staff roles a lab owner can invite (designer, ceramist/technician,
+  // and the simple assistant-admin role) share the same restricted case
+  // screen — see designerStore.ts/listDesignerCases, which matches on
+  // `designerId` OR `ceramistId` regardless of the staff member's role.
+  if (labStaff?.role === 'DESIGNER' || labStaff?.role === 'TECHNICIAN' || labStaff?.role === 'ADMIN') {
     return <Redirect href={'/designer' as never} />;
   }
 

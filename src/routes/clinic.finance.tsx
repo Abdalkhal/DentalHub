@@ -1,10 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { addTransaction, clinicTotals, removeTransaction, useClinic, type TxKind } from "@/lib/clinicStore";
+import { setClinicsStoreUser } from "@/lib/clinicsStore";
+import { useSession } from "@/lib/useAuth";
 import { Wallet, Plus, Trash2, TrendingUp, TrendingDown } from "lucide-react";
 import { EmptyState, Field, Sheet, Stat, inputCls } from "./clinic.materials";
 
@@ -32,6 +34,16 @@ const SOURCES = [
 function FinancePage() {
   const { lang } = useI18n();
   const ar = lang === "ar";
+  const { user } = useSession();
+
+  useEffect(() => {
+    // Defensive re-init for landing directly on this route (e.g. a reload)
+    // without passing through the home route's effect first — must resolve
+    // the full clinic context (list + active clinic), not just re-key this
+    // one store, or it could point at the wrong clinic's data.
+    setClinicsStoreUser(user?.uid || "");
+  }, [user?.uid]);
+
   const data = useClinic();
   const { income, expense, net, dueOrders } = clinicTotals(data);
   const [open, setOpen] = useState(false);

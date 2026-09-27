@@ -4,9 +4,7 @@ import { useI18n } from "@/lib/i18n";
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useSession, useUserRole } from "@/lib/useAuth";
-import { setPatientStoreUser } from "@/lib/patientsStore";
-import { setClinicStoreUser } from "@/lib/clinicStore";
-import { setAppointmentsStoreUser } from "@/lib/appointmentsStore";
+import { setClinicsStoreUser } from "@/lib/clinicsStore";
 import { NotificationBell } from "@/components/NotificationBell";
 import { useOrders } from "@/lib/ordersStore";
 import { useDentistCases, filterLegacyOrders } from "@/lib/caseTracking";
@@ -60,10 +58,10 @@ function Home() {
   const [idx, setIdx] = useState(0);
 
   useEffect(() => {
-    const uid = user?.uid || "";
-    setPatientStoreUser(uid);
-    setClinicStoreUser(uid);
-    setAppointmentsStoreUser(uid);
+    // Resolves (and migrates, on first run) this account's clinic list, then
+    // points patients/appointments/clinic-finance at whichever clinic is
+    // active — see clinicsStore.ts's pointStoresAt.
+    setClinicsStoreUser(user?.uid || "");
   }, [user?.uid]);
 
   useEffect(() => {

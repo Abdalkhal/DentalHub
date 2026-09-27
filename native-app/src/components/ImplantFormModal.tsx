@@ -199,6 +199,10 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
   const [accessorySubType, setAccessorySubType] = useState('');
   const [parentId, setParentId] = useState(product?.parentId || '');
   const [accessoryDraftImages, setAccessoryDraftImages] = useState<string[]>([]);
+  const [accessoryPrice, setAccessoryPrice] = useState('');
+  const [accessoryCurrency, setAccessoryCurrency] = useState<Currency>('USD');
+  const [accessorySpecs, setAccessorySpecs] = useState('');
+  const [accessoryStock, setAccessoryStock] = useState('');
 
   // Surgical kit fields — own price/currency/images too, for the same
   // reason.
@@ -221,7 +225,7 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
   // Android, in an RTL app, resets a plain LTR TextInput's cursor to the
   // start after each keystroke — backspace then removes the first digit
   // instead of the last. Pinning the selection to the end ourselves after
-  // every change bypasses that. Shared across the two price fields since
+  // every change bypasses that. Shared across the three price fields since
   // only one is ever mounted/focused at a time (the tabs are exclusive).
   const [priceSelection, setPriceSelection] = useState<{ start: number; end: number } | undefined>(undefined);
   const makePriceHandler = (setValue: (v: string) => void) => (v: string) => {
@@ -231,6 +235,7 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
   };
   const onChangePrice = makePriceHandler(setPrice);
   const onChangeKitPrice = makePriceHandler(setKitPrice);
+  const onChangeAccessoryPrice = makePriceHandler(setAccessoryPrice);
 
   const { data: urlMap = {} } = useSignedImageUrls(images);
   const { data: kitUrlMap = {} } = useSignedImageUrls(kitImages);
@@ -315,10 +320,11 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
         const newAccessory: ProductAccessory = {
           type: ACCESSORY_CATEGORIES.find((c) => c.id === accessoryCategory)?.en ?? accessoryCategory,
           name: name.trim(),
-          specs: '',
-          price: 0,
+          specs: accessorySpecs.trim(),
+          price: Math.max(0, parseFloat(accessoryPrice) || 0),
           imageUrl,
-          currency: 'USD',
+          currency: accessoryCurrency,
+          stock: Math.max(0, parseInt(accessoryStock, 10) || 0),
         };
         await updateDoc(doc(db, 'products', parentId), { accessories: [...(parent.accessories ?? []), newAccessory] });
         queryClient.invalidateQueries({ queryKey: productsQueryKey });
@@ -492,6 +498,52 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
                   </Field>
                   <Field label={ar ? 'ربط مع زرعة أساسية' : 'Link to main implant'}>
                     <Select value={parentId} onChange={setParentId} options={parentOptions} />
+                  </Field>
+                  <Field label={ar ? 'مواصفات إضافية (اختياري)' : 'Additional specs (optional)'}>
+                    <TextInput
+                      value={accessorySpecs}
+                      onChangeText={setAccessorySpecs}
+                      placeholder={ar ? 'مثال: قطر 3.5mm' : 'e.g. 3.5mm diameter'}
+                      placeholderTextColor="#94A3B8"
+                      className={inputCls}
+                      style={{ writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }}
+                    />
+                  </Field>
+                </SectionCard>
+
+                <SectionCard title={ar ? 'السعر والمخزون' : 'Price & Stock'}>
+                  {/* No shadow at all — see the tab-bar note in supplies-office.tsx. */}
+                  <View className="flex-row gap-2 self-end rounded-xl bg-sky-50 p-1">
+                    <Pressable onPress={() => setAccessoryCurrency('USD')} className="h-8 items-center justify-center rounded-lg px-3" style={accessoryCurrency === 'USD' ? { backgroundColor: ACCENT } : undefined}>
+                      <Text className={cn('text-xs font-bold', accessoryCurrency === 'USD' ? 'text-white' : 'text-slate-500')}>$</Text>
+                    </Pressable>
+                    <Pressable onPress={() => setAccessoryCurrency('IQD')} className="h-8 items-center justify-center rounded-lg px-3" style={accessoryCurrency === 'IQD' ? { backgroundColor: ACCENT } : undefined}>
+                      <Text className={cn('text-xs font-bold', accessoryCurrency === 'IQD' ? 'text-white' : 'text-slate-500')}>{ar ? 'د.ع' : 'IQD'}</Text>
+                    </Pressable>
+                  </View>
+                  <Field label={ar ? 'سعر البيع' : 'Selling price'}>
+                    <TextInput
+                      value={formatPriceDisplay(accessoryPrice)}
+                      onChangeText={onChangeAccessoryPrice}
+                      selection={priceSelection}
+                      onSelectionChange={(e) => setPriceSelection(e.nativeEvent.selection)}
+                      keyboardType="decimal-pad"
+                      placeholder="0"
+                      placeholderTextColor="#94A3B8"
+                      className={inputCls}
+                      style={{ writingDirection: 'ltr', textAlign: 'left' }}
+                    />
+                  </Field>
+                  <Field label={ar ? 'المخزون المتوفر' : 'Available stock'}>
+                    <TextInput
+                      value={accessoryStock}
+                      onChangeText={(t) => setAccessoryStock(t.replace(/[^0-9]/g, ''))}
+                      keyboardType="number-pad"
+                      placeholder="0"
+                      placeholderTextColor="#94A3B8"
+                      className={inputCls}
+                      style={{ writingDirection: 'ltr', textAlign: 'left' }}
+                    />
                   </Field>
                 </SectionCard>
 
@@ -742,6 +794,9 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
                         <View className="min-w-0 flex-1">
                           <Text className="text-sm font-bold text-slate-800" numberOfLines={1}>{acc.name}</Text>
                           <Text className="text-[11px] text-slate-400" numberOfLines={1}>{acc.type}</Text>
+                          <Text className={cn('text-[10px] font-bold', (acc.stock ?? 0) > 0 ? 'text-emerald-600' : 'text-rose-500')}>
+                            {ar ? 'المخزون: ' : 'Stock: '}{acc.stock ?? 0}
+                          </Text>
                         </View>
                         <Pressable onPress={() => removeAccessory(i)} className="h-8 w-8 items-center justify-center rounded-lg bg-rose-50">
                           <Trash2 size={14} color="#F43F5E" />

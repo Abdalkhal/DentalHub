@@ -239,9 +239,7 @@ export function SendCaseModal({ labId, labName, labPhone, labAddress, labInstagr
   const [patientGender, setPatientGender] = useState<'male' | 'female' | ''>('');
   const [patientPhone, setPatientPhone] = useState('');
   const [receivedDate, setReceivedDate] = useState(() => toDateStr(new Date()));
-  const [deliveryDate, setDeliveryDate] = useState('');
   const [showReceivedCal, setShowReceivedCal] = useState(false);
-  const [showDeliveryCal, setShowDeliveryCal] = useState(false);
 
   const [activeWorkType, setActiveWorkType] = useState<WorkTypeKey | null>(null);
   const [teeth, setTeeth] = useState<Record<number, WorkTypeKey>>({});
@@ -343,7 +341,6 @@ export function SendCaseModal({ labId, labName, labPhone, labAddress, labInstagr
     setPatientGender('');
     setPatientPhone('');
     setReceivedDate(toDateStr(new Date()));
-    setDeliveryDate('');
     setActiveWorkType(null);
     setTeeth({});
     setActiveTooth(null);
@@ -428,7 +425,6 @@ export function SendCaseModal({ labId, labName, labPhone, labAddress, labInstagr
         patient: patient.trim(),
         doctor: doctorName || (ar ? 'غير محدد' : 'Unspecified'),
         workType,
-        dueDate: deliveryDate || '',
         unitsCount: parseInt(unitsCount, 10) || 1,
         notes: notes.trim(),
         clinic: role?.clinicName || (ar ? 'غير محدد' : 'Unspecified'),
@@ -456,6 +452,40 @@ export function SendCaseModal({ labId, labName, labPhone, labAddress, labInstagr
         },
       });
 
+      // Sent right after the case doc exists, and *before* the scan-file
+      // upload below — that upload can throw (bad network, storage rules,
+      // a huge file) and was previously in the same try block ahead of this,
+      // which silently skipped the notification entirely on failure, on top
+      // of the write itself being retried here since a lab depends on this
+      // to know a case arrived at all (see notifications.tsx / the bell).
+      const notifyPayload = {
+        userId: labId,
+        title: ar ? 'وصفة حالة جديدة (Rx)' : 'New Rx Case Request',
+        body: ar
+          ? `قام د. ${order.doctor} بإرسال وصفة حالة للمريض ${order.patient}.`
+          : `Dr. ${order.doctor} sent an Rx case for patient ${order.patient}.`,
+        type: 'order_new' as const,
+        orderId: order.id,
+      };
+      try {
+        await createNotification(notifyPayload);
+      } catch (notifyErr) {
+        console.warn('Failed to create case notification, retrying once:', notifyErr);
+        try {
+          await createNotification(notifyPayload);
+        } catch (retryErr) {
+          console.warn('Case notification retry also failed:', retryErr);
+          // Surfaced to the sender (not just the console, which isn't visible
+          // on a real device) so a failure here is never silent again — the
+          // case itself is still saved regardless (see setDone(true) below).
+          toast.error(
+            ar
+              ? 'تم إرسال الحالة، لكن تعذر إشعار المختبر بها'
+              : "Case sent, but couldn't notify the lab",
+          );
+        }
+      }
+
       if (scanFile) {
         const blob = await fetch(scanFile.uri).then((r) => r.blob());
         const { path } = await uploadOrderFile({
@@ -467,20 +497,6 @@ export function SendCaseModal({ labId, labName, labPhone, labAddress, labInstagr
           onProgress: (pct) => setUploadProgress(pct),
         });
         await attachOrderFile(labId, order.id, { name: scanFile.name, path });
-      }
-
-      try {
-        await createNotification({
-          userId: labId,
-          title: ar ? 'وصفة حالة جديدة (Rx)' : 'New Rx Case Request',
-          body: ar
-            ? `قام د. ${order.doctor} بإرسال وصفة حالة للمريض ${order.patient}.`
-            : `Dr. ${order.doctor} sent an Rx case for patient ${order.patient}.`,
-          type: 'order_new',
-          orderId: order.id,
-        });
-      } catch {
-        /* notification is non-critical */
       }
 
       setDone(true);
@@ -615,24 +631,16 @@ export function SendCaseModal({ labId, labName, labPhone, labAddress, labInstagr
                   </GenderChip>
                 </View>
               </Field>
-              <View className="flex-row gap-3">
-                <View className="flex-1">
-                  <Field label={ar ? 'تاريخ الاستلام' : 'Received date'}>
-                    <Pressable onPress={() => setShowReceivedCal(true)} className={cn(inputCls, 'flex-row items-center gap-1.5')}>
-                      <Calendar size={14} color="#2563EB" />
-                      <Text className="text-sm text-slate-700">{receivedDate}</Text>
-                    </Pressable>
-                  </Field>
-                </View>
-                <View className="flex-1">
-                  <Field label={ar ? 'تاريخ التسليم' : 'Delivery date'}>
-                    <Pressable onPress={() => setShowDeliveryCal(true)} className={cn(inputCls, 'flex-row items-center gap-1.5')}>
-                      <Calendar size={14} color="#2563EB" />
-                      <Text className="text-sm text-slate-700">{deliveryDate || (ar ? 'اختر تاريخ' : 'Pick a date')}</Text>
-                    </Pressable>
-                  </Field>
-                </View>
-              </View>
+              {/* No delivery-date field here: only the lab knows its own
+                  production timeline, so that date is set by the lab itself
+                  when it confirms the case (new-lab-order.tsx), not by the
+                  referring doctor. */}
+              <Field label={ar ? 'تاريخ الاستلام' : 'Received date'}>
+                <Pressable onPress={() => setShowReceivedCal(true)} className={cn(inputCls, 'flex-row items-center gap-1.5')}>
+                  <Calendar size={14} color="#2563EB" />
+                  <Text className="text-sm text-slate-700">{receivedDate}</Text>
+                </Pressable>
+              </Field>
             </View>
 
             {/* Odontogram */}
@@ -948,12 +956,6 @@ export function SendCaseModal({ labId, labName, labPhone, labAddress, labInstagr
         onClose={() => setShowReceivedCal(false)}
         selectedDate={receivedDate}
         onSelect={(ds) => { setReceivedDate(ds); setShowReceivedCal(false); }}
-      />
-      <CalendarPickerModal
-        visible={showDeliveryCal}
-        onClose={() => setShowDeliveryCal(false)}
-        selectedDate={deliveryDate || toDateStr(new Date())}
-        onSelect={(ds) => { setDeliveryDate(ds); setShowDeliveryCal(false); }}
       />
     </Modal>
   );

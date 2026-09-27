@@ -8,7 +8,7 @@ import { TopBar } from "@/components/TopBar";
 import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
 import { IncomingOrderRxModal } from "@/components/IncomingOrderRxModal";
 import { SupplierOrderDetailModal } from "@/components/SupplierOrderDetailModal";
-import { CombinedLabOrderModal, type CombinedLabOrder, type OrderPrefill } from "@/components/CombinedLabOrderModal";
+import { CombinedLabOrderModal, type CombinedLabOrder, type OrderPrefill, type PricingItem } from "@/components/CombinedLabOrderModal";
 import { useI18n } from "@/lib/i18n";
 import { useUserRole, useSession } from "@/lib/useAuth";
 import { toast } from "sonner";
@@ -102,6 +102,22 @@ function fmtOrderMoney(usd: number, iqd: number, ar: boolean): string {
   return parts.length > 0 ? parts.join(" + ") : "$0.00";
 }
 
+// The order doc's own total*/total fields are stamped once at checkout,
+// before the supplier can mark any item "not available" — a rejected item's
+// price stays baked into that stored total forever. The list must instead
+// total the items live, skipping whatever the supplier has since rejected.
+function availableTotals(items: { price?: number; quantity?: number; currency?: string; availability?: string }[]) {
+  let usd = 0;
+  let iqd = 0;
+  for (const it of items) {
+    if (it.availability === "not_available") continue;
+    const amt = (it.price ?? 0) * (it.quantity ?? 1);
+    if (it.currency === "IQD") iqd += amt;
+    else usd += amt;
+  }
+  return { usd, iqd };
+}
+
 /* ── Rx → prefill helpers ────────────────────────── */
 
 const VALID_MATERIAL_IDS = new Set<string>(MATERIALS.map((m) => m.id));
@@ -135,7 +151,40 @@ function deriveWorkType(order: Order): WorkTypeId | undefined {
   return undefined;
 }
 
-function buildPrefillFromOrder(order: Order): OrderPrefill {
+/**
+ * One pricing row per distinct treatment label the doctor actually charted
+ * on the odontogram (not one row per tooth) — two teeth given the same
+ * label become a single row with quantity 2, matching how a real invoice
+ * line groups identical work. Each row's name carries its tooth number(s)
+ * so the lab can price it without cross-referencing the odontogram above.
+ * Returns undefined when the case has no per-tooth chart at all (a legacy
+ * case, or one sent before this existed), so the caller falls back to
+ * today's single-material prefill.
+ */
+function buildToothTaggedPricingItems(order: Order, ar: boolean): PricingItem[] | undefined {
+  const toothItems = (order.rxData?.toothItems as Record<string, string[]> | undefined) ?? {};
+  const teethKeys = Object.keys(toothItems);
+  if (teethKeys.length === 0) return undefined;
+
+  const labelToTeeth = new Map<string, string[]>();
+  for (const tooth of teethKeys) {
+    for (const label of toothItems[tooth] ?? []) {
+      const list = labelToTeeth.get(label) ?? [];
+      list.push(tooth);
+      labelToTeeth.set(label, list);
+    }
+  }
+
+  return Array.from(labelToTeeth.entries()).map(([label, teeth]) => ({
+    id: crypto.randomUUID(),
+    name: `${label} — ${ar ? "سن" : "tooth"} ${teeth.map((t) => `#${t}`).join("، ")}`,
+    quantity: teeth.length,
+    unitPrice: 0,
+    currency: "IQD" as const,
+  }));
+}
+
+function buildPrefillFromOrder(order: Order, ar: boolean): OrderPrefill {
   const customShade = (order.rxData?.customShade as string | undefined) || undefined;
   const shade = order.shade || undefined;
   const shadeTab: ShadeTab | undefined = customShade
@@ -158,6 +207,8 @@ function buildPrefillFromOrder(order: Order): OrderPrefill {
       ? (rawWorkType as WorkTypeId)
       : deriveWorkType(order);
 
+  const pricingItems = buildToothTaggedPricingItems(order, ar);
+
   return {
     patientName: order.patient,
     doctorName: order.doctor,
@@ -168,6 +219,8 @@ function buildPrefillFromOrder(order: Order): OrderPrefill {
     shadeTab,
     customShade,
     notes: order.notes || "",
+    pricingItems,
+    pricingMode: pricingItems ? "mixed" : undefined,
   };
 }
 
@@ -421,7 +474,7 @@ function LabOrders() {
         }}
         onSubmit={handleConfirmSubmit}
         labId={user?.uid}
-        prefill={confirmTarget ? buildPrefillFromOrder(confirmTarget) : null}
+        prefill={confirmTarget ? buildPrefillFromOrder(confirmTarget, ar) : null}
       />
       {deleteTarget && (
         <DeleteConfirmModal
@@ -541,6 +594,8 @@ function DentistOrders() {
             {myOrders.map((o) => {
               const s = (o.status as string) || "pending";
               const itemCount = (o.items || []).reduce((sum, i) => sum + (i.quantity || 1), 0);
+              const hasUnavailable = (o.items || []).some((i) => i.availability === "not_available");
+              const { usd, iqd } = availableTotals(o.items || []);
               return (
                 <div key={o.id} className="bg-card border border-border rounded-2xl p-4 shadow-soft md:h-full md:flex md:flex-col md:p-5 md:shadow-none md:hover:shadow-lg md:transition">
                   <div className="flex items-center justify-between mb-2">
@@ -573,9 +628,14 @@ function DentistOrders() {
                   <div className="flex items-center justify-between text-xs text-slate-500">
                     <span>{itemCount} {ar ? "منتجات" : "products"}</span>
                     <span className="font-display font-extrabold text-sm text-foreground">
-                      {fmtOrderMoney(o.totalUSD ?? 0, o.totalIQD ?? 0, ar)}
+                      {fmtOrderMoney(usd, iqd, ar)}
                     </span>
                   </div>
+                  {hasUnavailable && (
+                    <p className="mt-1 text-[10px] font-bold text-rose-500">
+                      {ar ? "يتضمن منتجاً غير متوفر، تم استبعاده من الإجمالي" : "Includes an unavailable item, excluded from the total"}
+                    </p>
+                  )}
                 </div>
               );
             })}

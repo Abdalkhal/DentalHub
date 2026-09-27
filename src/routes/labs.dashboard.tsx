@@ -65,6 +65,12 @@ export const Route = createFileRoute("/labs/dashboard")({
   component: LabDashboard,
 });
 
+function activityTime(o: Order): number {
+  if (o.updatedAt) return o.updatedAt;
+  const t = new Date(o.receivedDate || o.dueDate || 0).getTime();
+  return Number.isNaN(t) ? 0 : t;
+}
+
 const STATUS_META: Record<OrderStatus, { ar: string; en: string; color: string; dot: string }> = {
   new: {
     ar: "جديد",
@@ -212,8 +218,18 @@ function LabDashboard() {
   const labAddress = profile?.city ? [profile.city, profile.address].filter(Boolean).join("، ") : profile?.address || "";
   const labPhone = profile?.phone || "";
 
+  // Sorted by most-recently-touched instead of the Firestore query's
+  // `caseId` order: `caseId` is fixed at creation, so a case created long
+  // ago (a low number) that a doctor's incoming Rx used, then just now got
+  // confirmed/priced, would otherwise stay buried under every case with a
+  // higher number instead of surfacing as the most recent activity it is.
+  // `receivedDate`/`dueDate` is the fallback for pre-existing docs written
+  // before `updatedAt` existed.
   const internalOrders = useMemo(
-    () => orders.filter((o) => o.source !== "incoming_doctor_case"),
+    () =>
+      orders
+        .filter((o) => o.source !== "incoming_doctor_case")
+        .sort((a, b) => activityTime(b) - activityTime(a)),
     [orders],
   );
 

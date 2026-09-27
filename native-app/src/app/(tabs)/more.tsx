@@ -118,7 +118,16 @@ export default function MoreScreen() {
   const { isAdmin } = useIsAdmin();
 
   // Invited staff have a claim but no user_roles doc — key the menu off that.
-  const type = labStaff?.role === 'DESIGNER' ? 'designer' : (role?.accountType ?? 'dentist');
+  // TECHNICIAN and ADMIN staff land on the same `/designer` screen as
+  // DESIGNER staff (see (tabs)/index.tsx's redirect), so they need the same
+  // menu here too — this used to fall through to `role?.accountType ??
+  // 'dentist'` (always 'dentist' for staff, since they have no user_roles
+  // doc), mislabeling a staff member's own More screen as a dentist account
+  // with the wrong menu.
+  const type =
+    labStaff?.role === 'DESIGNER' || labStaff?.role === 'TECHNICIAN' || labStaff?.role === 'ADMIN'
+      ? 'designer'
+      : (role?.accountType ?? 'dentist');
   // `isAdmin` reflects the real `role: 'admin'` auth claim, independent of
   // `accountType` (an admin is usually still a real dentist/etc. account
   // underneath) — so the admin link is added on top of the normal menu

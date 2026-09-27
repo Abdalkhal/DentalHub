@@ -3,7 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
-import { useAppointments, setAppointmentsStoreUser, type Appointment } from "@/lib/appointmentsStore";
+import { useAppointments, type Appointment } from "@/lib/appointmentsStore";
+import { setClinicsStoreUser } from "@/lib/clinicsStore";
 import { useSession } from "@/lib/useAuth";
 import { cn } from "@/lib/utils";
 import {
@@ -163,7 +164,11 @@ function AppointmentsPage() {
   const todayStr = toDateStr(today);
 
   useEffect(() => {
-    setAppointmentsStoreUser(user?.uid || "");
+    // Defensive re-init for landing directly on this route (e.g. a reload)
+    // without passing through the home route's effect first — must resolve
+    // the full clinic context (list + active clinic), not just re-key this
+    // one store, or it could point at the wrong clinic's appointments.
+    setClinicsStoreUser(user?.uid || "");
   }, [user?.uid]);
 
   const [selectedDate, setSelectedDate] = useState(todayStr);

@@ -90,7 +90,13 @@ service cloud.firestore {
     // admin-controlled business fields (setAccountStatus/extendSubscription),
     // not something the account holder should be able to grant themselves.
     match /user_roles/{userId} {
-      allow read: if isAuthenticated();
+      // Holds private account data (email, dob, gender, accountStatus,
+      // subscriptionExpiry, pushTokens) — `public_profiles` exists precisely
+      // so other accounts never need to read this raw doc. Was previously
+      // `isAuthenticated()` with no ownership check, which let any signed-in
+      // user read any other user's full profile (harvestable at scale, since
+      // uids are visible on public products/offers/labs listings).
+      allow read: if isAdmin() || (isAuthenticated() && request.auth.uid == userId);
 
       // Also blocks a "delete my doc, then create a fresh one" bypass of the
       // update rule below: without this, a suspended account (or one an
@@ -166,11 +172,21 @@ service cloud.firestore {
       // Create is checked against the incoming supplierId: the old
       // `resource == null` branch let any account publish an offer under
       // another supplier's id. Owners can't hand an offer to someone else.
+      // Mirrors `ads` below: a new offer must start "pending" — only an
+      // admin may set it "active"/"rejected"/"expired". Previously had no
+      // status constraint at all, so any supplier could self-approve their
+      // own offer straight to "active", bypassing admin review entirely.
       allow create: if isAdmin() || (isAuthenticated()
-        && request.resource.data.supplierId == request.auth.uid);
+        && request.resource.data.supplierId == request.auth.uid
+        && request.resource.data.status == 'pending');
+      // Owner may edit their offer, but only an admin can approve it: the
+      // owner may keep the current status or send it back to 'pending'
+      // (re-submission after an edit), never set 'active' themselves.
       allow update: if isAdmin() || (isAuthenticated()
         && resource.data.supplierId == request.auth.uid
-        && request.resource.data.supplierId == request.auth.uid);
+        && request.resource.data.supplierId == request.auth.uid
+        && request.resource.data.get('status', null) in
+             [resource.data.get('status', null), 'pending']);
       allow delete: if isAdmin() || (isAuthenticated()
         && resource.data.supplierId == request.auth.uid);
     }
@@ -199,23 +215,38 @@ service cloud.firestore {
     match /orders/{orderId} {
       allow read: if isAuthenticated() &&
         (resource.data.supplierId == request.auth.uid || resource.data.dentistId == request.auth.uid);
-      allow create: if isAuthenticated() &&
-        request.resource.data.dentistId == request.auth.uid;
-      // Either party may update the order, but not re-point who the parties are.
+      // Only `placeVerifiedOrder` (Cloud Function, Admin SDK — bypasses this
+      // rule entirely) creates orders now. A direct client `create` used to
+      // be trusted for `items[].price`/`total`/`currency`: nothing ever
+      // cross-checked them against the real `products/{productId}.price`,
+      // so either party in a "transaction" could forge the billed amount.
+      allow create: if isAdmin();
+      // Direct client updates are for non-financial status transitions only
+      // (e.g. the supplier rejecting an order via markOrderUnavailable).
+      // Setting "confirmed" and every financial field is reserved for
+      // `confirmVerifiedOrder`/`setOrderItemAvailability` (Cloud Functions).
       allow update: if isAuthenticated() &&
         (resource.data.supplierId == request.auth.uid || resource.data.dentistId == request.auth.uid)
-        && isUnchanged('dentistId') && isUnchanged('supplierId');
+        && isUnchanged('dentistId') && isUnchanged('supplierId')
+        && isUnchanged('items') && isUnchanged('total') && isUnchanged('totalUSD') && isUnchanged('totalIQD')
+        && isUnchanged('discount') && isUnchanged('invoiceId')
+        && request.resource.data.status != 'confirmed';
       allow delete: if isAdmin();
     }
 
     match /invoices/{invoiceId} {
       allow read: if isAuthenticated() &&
         (resource.data.officeId == request.auth.uid || resource.data.doctorId == request.auth.uid);
-      allow create: if isAuthenticated() &&
-        (request.resource.data.doctorId == request.auth.uid || request.resource.data.officeId == request.auth.uid);
+      // Only `confirmVerifiedOrder` (Cloud Function) creates invoices now —
+      // see `orders` above for the same client-trusted-total bug this closes.
+      allow create: if isAdmin();
+      // Status/shipping-timestamp progression stays client-writable; line
+      // items and totals, once invoiced, are never client-editable again.
       allow update: if isAuthenticated() &&
         (resource.data.officeId == request.auth.uid || resource.data.doctorId == request.auth.uid)
-        && isUnchanged('officeId') && isUnchanged('doctorId');
+        && isUnchanged('officeId') && isUnchanged('doctorId')
+        && isUnchanged('items') && isUnchanged('total') && isUnchanged('totalUSD') && isUnchanged('totalIQD')
+        && isUnchanged('discount');
       allow delete: if isAdmin();
     }
 
@@ -242,7 +273,13 @@ service cloud.firestore {
     match /notifications/{notificationId} {
       allow read: if isAuthenticated() &&
         resource.data.userId == request.auth.uid;
-      allow create: if isAuthenticated();
+      // Was `if isAuthenticated()` alone — any signed-in account could write
+      // a notification into ANY other user's feed with a forged title/body
+      // (phishing/spam indistinguishable from a real order/message alert).
+      // `createNotification()` (both apps) now always stamps `senderId` as
+      // the writer's own uid, so this costs no legitimate flow anything.
+      allow create: if isAuthenticated() &&
+        request.resource.data.senderId == request.auth.uid;
       allow update: if isAuthenticated() &&
         resource.data.userId == request.auth.uid;
       allow delete: if isAuthenticated() &&
@@ -285,7 +322,22 @@ service cloud.firestore {
         || isLabMember(resource.data.labId)
         || resource.data.dentistId == request.auth.uid
       );
-      allow create, update: if isAuthenticated() && (
+      allow create: if isAuthenticated() && (
+        request.auth.uid == request.resource.data.labId
+        || isLabMember(request.resource.data.labId)
+        || request.resource.data.dentistId == request.auth.uid
+      );
+      // Unlike `create` (no existing doc to check), `update` must ALSO
+      // verify the caller against the EXISTING owner (`resource.data`), not
+      // just their own claimed identity in the new payload — otherwise
+      // anyone could overwrite another lab's/dentist's dedup record by
+      // simply supplying their own labId/dentistId in the new data, quietly
+      // redirecting `path` to a different (or attacker-controlled) file.
+      allow update: if isAuthenticated() && (
+        request.auth.uid == resource.data.labId
+        || isLabMember(resource.data.labId)
+        || resource.data.dentistId == request.auth.uid
+      ) && (
         request.auth.uid == request.resource.data.labId
         || isLabMember(request.resource.data.labId)
         || request.resource.data.dentistId == request.auth.uid
@@ -464,12 +516,19 @@ service cloud.firestore {
 
       allow delete: if isAdmin();
 
+      // Membership is read straight off `threadId` (the two participant uids,
+      // sorted and joined with "_" — see `dmThreadId` in the app, and the
+      // `create` rule above which enforces this same format) rather than via
+      // `get()` on the parent `dm_threads` doc: opening a brand-new
+      // conversation subscribes to this subcollection before either side has
+      // sent a first message, i.e. before that parent doc exists, and `get()`
+      // on a nonexistent doc makes `.data` throw — denying the very listener
+      // that's supposed to show "start the conversation".
       match /messages/{messageId} {
-        allow read: if isAuthenticated()
-          && request.auth.uid in get(/databases/$(database)/documents/dm_threads/$(threadId)).data.participants;
+        allow read: if isAuthenticated() && request.auth.uid in threadId.split('_');
         allow create: if isAuthenticated()
           && request.resource.data.senderId == request.auth.uid
-          && request.auth.uid in get(/databases/$(database)/documents/dm_threads/$(threadId)).data.participants;
+          && request.auth.uid in threadId.split('_');
         allow update, delete: if isAdmin();
       }
     }

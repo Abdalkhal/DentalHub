@@ -65,21 +65,27 @@ export type ClinicState = {
 
 const KEY_PREFIX = "dh_clinic_v3:";
 let currentUserId = "";
+let currentClinicId = "";
 
-export function setClinicStoreUser(uid: string) {
+// Keyed by clinic, not just account — a dentist working across several
+// clinics (see clinicsStore.ts) must never see one clinic's finance/orders/
+// materials/doctors bleed into another's. Called by clinicsStore.ts's
+// `pointStoresAt` every time the active clinic changes, not just on sign-in.
+export function setClinicStoreUser(uid: string, clinicId: string) {
   // Every clinic screen calls this on mount. Re-running it for the same,
-  // already-loaded user used to reset `state` to `def()` unconditionally —
-  // wiping whatever was just added in this session (e.g. a doctor) the
-  // moment you navigated back to a clinic screen, and persisting that empty
-  // state right over the saved data via emit()/save(). Only reset+reload
-  // when the signed-in user actually changes.
-  if (uid === currentUserId) return;
+  // already-loaded user+clinic used to reset `state` to `def()`
+  // unconditionally — wiping whatever was just added in this session (e.g. a
+  // doctor) the moment you navigated back to a clinic screen, and persisting
+  // that empty state right over the saved data via emit()/save(). Only
+  // reset+reload when the active user or clinic actually changes.
+  if (uid === currentUserId && clinicId === currentClinicId) return;
   currentUserId = uid;
+  currentClinicId = clinicId;
   state = load();
   emit();
 }
 
-function getKey() { return KEY_PREFIX + (currentUserId || "guest"); }
+function getKey() { return KEY_PREFIX + (currentUserId || "guest") + ":" + (currentClinicId || "default"); }
 
 function def(): ClinicState {
   return { transactions: [], orders: [], materials: [], doctors: [] };

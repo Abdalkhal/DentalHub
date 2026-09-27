@@ -1149,6 +1149,15 @@ function OffersPanel({ companyId }: { companyId: string }) {
         currency,
       });
 
+      toast.success(
+        editing
+          ? ar
+            ? "تم حفظ التعديل — سيُعرض بعد مراجعة الإدارة"
+            : "Changes saved — pending admin review"
+          : ar
+            ? "تم إرسال العرض للمراجعة"
+            : "Offer submitted for review",
+      );
       setShowForm(false);
     } catch (e: any) {
       alert(ar ? `فشل حفظ العرض: ${e.message || e}` : `Failed to save offer: ${e.message || e}`);
@@ -1371,7 +1380,34 @@ function OffersPanel({ companyId }: { companyId: string }) {
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-display font-bold text-sm md:text-base">{offer.title}</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="font-display font-bold text-sm md:text-base">{offer.title}</p>
+                    {offer.status && offer.status !== "active" && (
+                      <span
+                        className={cn(
+                          "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold",
+                          offer.status === "pending" && "bg-amber-100 text-amber-700",
+                          offer.status === "rejected" && "bg-rose-100 text-rose-700",
+                          offer.status === "expired" && "bg-slate-100 text-slate-500",
+                        )}
+                      >
+                        {offer.status === "pending"
+                          ? ar
+                            ? "قيد المراجعة"
+                            : "Pending"
+                          : offer.status === "rejected"
+                            ? ar
+                              ? "مرفوض"
+                              : "Rejected"
+                            : ar
+                              ? "منتهي"
+                              : "Expired"}
+                      </span>
+                    )}
+                  </div>
+                  {offer.status === "rejected" && offer.rejectReason && (
+                    <p className="text-[11px] text-rose-600 mt-0.5">{offer.rejectReason}</p>
+                  )}
                   {offer.description && (
                     <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
                       {offer.description}

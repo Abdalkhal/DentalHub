@@ -28,7 +28,8 @@ import {
   ExtractionIcon,
   type DentalIconComponent,
 } from '@/components/DentalIcons';
-import { setAppointmentsStoreUser, useAppointments, type Appointment } from '@/lib/appointmentsStore';
+import { useAppointments, type Appointment } from '@/lib/appointmentsStore';
+import { setClinicsStoreUser } from '@/lib/clinicsStore';
 import { useUserRole } from '@/lib/useAuth';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
@@ -195,7 +196,7 @@ export default function ClinicAppointmentsScreen() {
   const todayStr = toDateStr(today);
 
   useEffect(() => {
-    if (user?.uid) setAppointmentsStoreUser(user.uid);
+    if (user?.uid) setClinicsStoreUser(user.uid);
   }, [user?.uid]);
 
   const [selectedDate, setSelectedDate] = useState(todayStr);

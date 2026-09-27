@@ -3,11 +3,14 @@ import { MobileShell } from "@/components/MobileShell";
 import { useI18n } from "@/lib/i18n";
 import { useState } from "react";
 import { usePatients } from "@/lib/patientsStore";
+import { useClinics, addClinic, updateClinic, setActiveClinic, type Clinic } from "@/lib/clinicsStore";
 import { AddAppointmentModal } from "@/components/AddAppointmentModal";
+import { cn } from "@/lib/utils";
 import clinicHero from "@/assets/clinic-hero.jpg";
 import {
   ArrowRight, ArrowLeft, User, CreditCard, Users,
   Calendar, Plus, Package, ClipboardList, BarChart3, Stethoscope,
+  Building2, ChevronDown, Pencil, Check,
 } from "lucide-react";
 
 export const Route = createFileRoute("/clinic/")({
@@ -22,6 +25,41 @@ function ClinicHome() {
 
   const patients = usePatients();
   const [showAddAppointment, setShowAddAppointment] = useState(false);
+
+  const { clinics, activeClinicId } = useClinics();
+  const activeClinic = clinics.find((c) => c.id === activeClinicId);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [formMode, setFormMode] = useState<"closed" | "add" | "edit">("closed");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [formName, setFormName] = useState("");
+  const [formAddress, setFormAddress] = useState("");
+  const [formWorkDays, setFormWorkDays] = useState("");
+
+  const openAddClinic = () => {
+    setEditingId(null);
+    setFormName("");
+    setFormAddress("");
+    setFormWorkDays("");
+    setFormMode("add");
+    setMenuOpen(false);
+  };
+  const openEditClinic = (c: Clinic) => {
+    setEditingId(c.id);
+    setFormName(c.name);
+    setFormAddress(c.address);
+    setFormWorkDays(c.workDays);
+    setFormMode("edit");
+    setMenuOpen(false);
+  };
+  const saveClinicForm = () => {
+    if (!formName.trim()) return;
+    if (formMode === "add") {
+      addClinic({ name: formName.trim(), address: formAddress.trim(), workDays: formWorkDays.trim() });
+    } else if (formMode === "edit" && editingId) {
+      updateClinic(editingId, { name: formName.trim(), address: formAddress.trim(), workDays: formWorkDays.trim() });
+    }
+    setFormMode("closed");
+  };
 
   return (
     <MobileShell hideBottomNav wide className="md:bg-slate-50">
@@ -57,6 +95,69 @@ function ClinicHome() {
               </button>
             </div>
           </header>
+
+          {/* Clinic switcher — a dentist running more than one clinic picks
+              which one is active here; every patient/appointment/finance/
+              inventory store below re-keys to that clinic's own isolated
+              storage the moment it changes (see clinicsStore.ts). */}
+          <div className="relative flex justify-center px-4 pb-3 md:px-0 md:justify-start">
+            <button
+              onClick={() => setMenuOpen((v) => !v)}
+              className="flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white ps-4 pe-2 shadow-sm transition hover:shadow-md"
+            >
+              <span className="font-display text-sm font-bold text-slate-800">
+                {activeClinic?.name ?? (ar ? "عيادتي" : "My Clinic")}
+              </span>
+              <ChevronDown className={cn("size-4 text-slate-400 transition-transform", menuOpen && "rotate-180")} />
+              <span className="flex size-8 items-center justify-center rounded-full bg-sky-50 text-sky-600">
+                <Building2 className="size-4" />
+              </span>
+            </button>
+
+            {menuOpen && (
+              <>
+                <div className="fixed inset-0 z-20" onClick={() => setMenuOpen(false)} />
+                <div className="absolute top-full z-30 mt-2 w-72 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+                  {clinics.map((c) => (
+                    <div
+                      key={c.id}
+                      className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 last:border-0 hover:bg-slate-50"
+                    >
+                      <button
+                        onClick={() => {
+                          setActiveClinic(c.id);
+                          setMenuOpen(false);
+                        }}
+                        className="min-w-0 flex-1 text-start"
+                      >
+                        <p className="truncate font-display text-sm font-bold text-slate-800">{c.name}</p>
+                      </button>
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        <button
+                          onClick={() => openEditClinic(c)}
+                          className="flex size-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100"
+                        >
+                          <Pencil className="size-3.5" />
+                        </button>
+                        {c.id === activeClinicId && (
+                          <span className="flex size-7 items-center justify-center rounded-lg bg-sky-50 text-sky-600">
+                            <Check className="size-3.5" />
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  <button
+                    onClick={openAddClinic}
+                    className="flex w-full items-center justify-center gap-1.5 px-4 py-3 text-sm font-bold text-primary hover:bg-sky-50"
+                  >
+                    <Plus className="size-4" />
+                    {ar ? "إضافة عيادة جديدة" : "Add new clinic"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
 
           {/* Phone: one vertical stack. md:+ : the hero spans the full width
               and the three labelled groups become side-by-side columns, so
@@ -102,15 +203,17 @@ function ClinicHome() {
                 {ar ? "الخدمات اليومية والمرضى" : "Daily Services & Patients"}
               </h3>
               <div className="grid grid-cols-2 gap-3 md:gap-4">
-                <Link to="/clinic/finance" className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-primary/20 transition md:p-5 md:shadow-none md:border-slate-200 md:hover:shadow-lg md:hover:-translate-y-0.5">
+                <Link to="/clinic/finance" className="flex flex-col bg-white border border-slate-100 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-primary/20 transition md:p-5 md:shadow-none md:border-slate-200 md:hover:shadow-lg md:hover:-translate-y-0.5">
                   <span className="size-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-3 md:size-14 md:mb-4"><CreditCard className="size-5 md:size-6" /></span>
                   <p className="font-display font-bold text-sm text-slate-800 md:text-base md:leading-snug">{ar ? "المالية والحسابات" : "Finance & Accounts"}</p>
-                  <span className="inline-block mt-2 text-[10px] font-semibold bg-emerald-50 text-emerald-600 px-2 py-1 rounded-lg md:mt-3 md:text-xs md:px-2.5">{ar ? "إيرادات اليوم $0" : "Today's revenue $0"}</span>
+                  <p className="mt-1 text-xs text-muted-foreground leading-snug md:text-sm">{ar ? "الإيرادات، المصاريف، الفواتير والمدفوعات" : "Income, expenses, invoices and payments"}</p>
+                  <span className="inline-block w-fit mt-auto pt-2 text-[10px] font-semibold bg-emerald-50 text-emerald-600 px-2 py-1 rounded-lg md:mt-3 md:text-xs md:px-2.5">{ar ? "إيرادات اليوم $0" : "Today's revenue $0"}</span>
                 </Link>
-                <Link to="/patients" className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-primary/20 transition md:p-5 md:shadow-none md:border-slate-200 md:hover:shadow-lg md:hover:-translate-y-0.5">
+                <Link to="/patients" className="flex flex-col bg-white border border-slate-100 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-primary/20 transition md:p-5 md:shadow-none md:border-slate-200 md:hover:shadow-lg md:hover:-translate-y-0.5">
                   <span className="size-11 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center mb-3 md:size-14 md:mb-4"><Users className="size-5 md:size-6" /></span>
                   <p className="font-display font-bold text-sm text-slate-800 md:text-base md:leading-snug">{ar ? "المرضى والمواعيد" : "Patients & Appointments"}</p>
-                  <span className="inline-block mt-2 text-[10px] font-semibold bg-sky-50 text-sky-600 px-2 py-1 rounded-lg md:mt-3 md:text-xs md:px-2.5">{ar ? `مرضى ${patients.length}` : `${patients.length} patients`}</span>
+                  <p className="mt-1 text-xs text-muted-foreground leading-snug md:text-sm">{ar ? "سجلات المرضى، المواعيد والخطط العلاجية" : "Patient records, appointments and treatment plans"}</p>
+                  <span className="inline-block w-fit mt-auto pt-2 text-[10px] font-semibold bg-sky-50 text-sky-600 px-2 py-1 rounded-lg md:mt-3 md:text-xs md:px-2.5">{ar ? `مرضى ${patients.length}` : `${patients.length} patients`}</span>
                 </Link>
               </div>
             </div>
@@ -121,13 +224,15 @@ function ClinicHome() {
                 {ar ? "المخزون والمشتريات" : "Inventory & Purchases"}
               </h3>
               <div className="grid grid-cols-2 gap-3 md:gap-4">
-                <Link to="/clinic/orders" className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-primary/20 transition md:p-5 md:shadow-none md:border-slate-200 md:hover:shadow-lg md:hover:-translate-y-0.5">
+                <Link to="/clinic/orders" className="flex flex-col bg-white border border-slate-100 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-primary/20 transition md:p-5 md:shadow-none md:border-slate-200 md:hover:shadow-lg md:hover:-translate-y-0.5">
                   <span className="size-11 rounded-2xl bg-violet-50 text-violet-600 flex items-center justify-center mb-3 md:size-14 md:mb-4"><ClipboardList className="size-5 md:size-6" /></span>
                   <p className="font-display font-bold text-sm text-slate-800 md:text-base md:leading-snug">{ar ? "طلبيات العيادة والمختبرات" : "Clinic & Lab Orders"}</p>
+                  <p className="mt-1 text-xs text-muted-foreground leading-snug md:text-sm">{ar ? "طلبات المختبرات ومستلزمات العيادة" : "Lab requests and clinic supplies"}</p>
                 </Link>
-                <Link to="/clinic/materials" className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-primary/20 transition md:p-5 md:shadow-none md:border-slate-200 md:hover:shadow-lg md:hover:-translate-y-0.5">
+                <Link to="/clinic/materials" className="flex flex-col bg-white border border-slate-100 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-primary/20 transition md:p-5 md:shadow-none md:border-slate-200 md:hover:shadow-lg md:hover:-translate-y-0.5">
                   <span className="size-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-3 md:size-14 md:mb-4"><Package className="size-5 md:size-6" /></span>
                   <p className="font-display font-bold text-sm text-slate-800 md:text-base md:leading-snug">{ar ? "مواد العيادة" : "Clinic Materials"}</p>
+                  <p className="mt-1 text-xs text-muted-foreground leading-snug md:text-sm">{ar ? "المخزون والمستهلكات والكيمياويات والمخدر" : "Inventory, consumables, chemicals and anesthesia"}</p>
                 </Link>
               </div>
             </div>
@@ -138,13 +243,15 @@ function ClinicHome() {
                 {ar ? "التقارير والإدارة" : "Reports & Management"}
               </h3>
               <div className="grid grid-cols-2 gap-3 md:gap-4">
-                <Link to="/clinic/reports" className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-primary/20 transition md:p-5 md:shadow-none md:border-slate-200 md:hover:shadow-lg md:hover:-translate-y-0.5">
+                <Link to="/clinic/reports" className="flex flex-col bg-white border border-slate-100 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-primary/20 transition md:p-5 md:shadow-none md:border-slate-200 md:hover:shadow-lg md:hover:-translate-y-0.5">
                   <span className="size-11 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-3 md:size-14 md:mb-4"><BarChart3 className="size-5 md:size-6" /></span>
                   <p className="font-display font-bold text-sm text-slate-800 md:text-base md:leading-snug">{ar ? "التقارير والإحصائيات" : "Reports & Statistics"}</p>
+                  <p className="mt-1 text-xs text-muted-foreground leading-snug md:text-sm">{ar ? "أداء شهري، ملخص العلاجات وتصدير التقارير" : "Monthly performance, treatment summary and report exports"}</p>
                 </Link>
-                <Link to="/clinic/doctors" className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-primary/20 transition md:p-5 md:shadow-none md:border-slate-200 md:hover:shadow-lg md:hover:-translate-y-0.5">
+                <Link to="/clinic/doctors" className="flex flex-col bg-white border border-slate-100 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-primary/20 transition md:p-5 md:shadow-none md:border-slate-200 md:hover:shadow-lg md:hover:-translate-y-0.5">
                   <span className="size-11 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mb-3 md:size-14 md:mb-4"><Stethoscope className="size-5 md:size-6" /></span>
                   <p className="font-display font-bold text-sm text-slate-800 md:text-base md:leading-snug">{ar ? "أطباء العيادة" : "Clinic Doctors"}</p>
+                  <p className="mt-1 text-xs text-muted-foreground leading-snug md:text-sm">{ar ? "الأطباء، الاختصاصات والدوام والحالات" : "Doctors, specialties, shifts and cases"}</p>
                 </Link>
               </div>
             </div>
@@ -153,6 +260,59 @@ function ClinicHome() {
       </div>
 
       {showAddAppointment && <AddAppointmentModal onClose={() => setShowAddAppointment(false)} />}
+
+      {formMode !== "closed" && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
+          <div className="fixed inset-0 bg-black/40" onClick={() => setFormMode("closed")} />
+          <div className="relative w-full max-w-md space-y-4 rounded-t-3xl bg-[#EBF3FA] p-5 sm:rounded-3xl">
+            <h3 className="font-display text-lg font-extrabold text-slate-800">
+              {formMode === "add" ? (ar ? "عيادة جديدة" : "New clinic") : ar ? "تعديل العيادة" : "Edit clinic"}
+            </h3>
+            <div>
+              <label className="mb-1.5 block text-xs font-bold text-slate-500">{ar ? "اسم العيادة" : "Clinic name"}</label>
+              <input
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+                placeholder={ar ? "مثال: عيادة الأسرة" : "e.g. Family Clinic"}
+                className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-bold text-slate-500">{ar ? "العنوان" : "Address"}</label>
+              <input
+                value={formAddress}
+                onChange={(e) => setFormAddress(e.target.value)}
+                placeholder={ar ? "المنطقة / الشارع" : "Area / Street"}
+                className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-bold text-slate-500">{ar ? "أيام العمل" : "Working days"}</label>
+              <input
+                value={formWorkDays}
+                onChange={(e) => setFormWorkDays(e.target.value)}
+                placeholder={ar ? "مثال: السبت-الخميس" : "e.g. Sat-Thu"}
+                className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={saveClinicForm}
+                disabled={!formName.trim()}
+                className="h-12 flex-1 rounded-2xl bg-primary text-sm font-bold text-primary-foreground disabled:opacity-50"
+              >
+                {ar ? "حفظ" : "Save"}
+              </button>
+              <button
+                onClick={() => setFormMode("closed")}
+                className="h-12 flex-1 rounded-2xl border border-slate-200 bg-white text-sm font-bold text-slate-600"
+              >
+                {ar ? "إلغاء" : "Cancel"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </MobileShell>
   );
 }

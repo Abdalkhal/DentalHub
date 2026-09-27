@@ -5,12 +5,12 @@ import { ClipboardList, FlaskConical, Package, Trash2 } from 'lucide-react-nativ
 import { Screen, Text } from '@/components/ui';
 import { useUserRole } from '@/lib/useAuth';
 import {
-  setClinicStoreUser,
   useClinic,
   removeOrder,
   setOrderStatus,
   type ClinicOrderStatus,
 } from '@/lib/clinicStore';
+import { setClinicsStoreUser } from '@/lib/clinicsStore';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
@@ -42,7 +42,7 @@ export default function ClinicOrdersScreen() {
   const ar = lang === 'ar';
   const { user } = useUserRole();
   useEffect(() => {
-    if (user?.uid) setClinicStoreUser(user.uid);
+    if (user?.uid) setClinicsStoreUser(user.uid);
   }, [user?.uid]);
 
   const { orders } = useClinic();

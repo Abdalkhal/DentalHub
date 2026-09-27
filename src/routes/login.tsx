@@ -24,7 +24,7 @@ function LoginPage() {
             role?: LabStaffRole;
             labId?: string;
           };
-          if (staffClaims.labId && ["DESIGNER", "TECHNICIAN"].includes(staffClaims.role ?? "")) {
+          if (staffClaims.labId && ["ADMIN", "DESIGNER", "TECHNICIAN"].includes(staffClaims.role ?? "")) {
             path = "/designer";
           }
         }

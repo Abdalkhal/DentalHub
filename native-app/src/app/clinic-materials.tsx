@@ -8,11 +8,11 @@ import {
   addMaterial,
   addOrder,
   removeMaterial,
-  setClinicStoreUser,
   updateMaterialQty,
   useClinic,
   type Material,
 } from '@/lib/clinicStore';
+import { setClinicsStoreUser } from '@/lib/clinicsStore';
 import { useUserRole } from '@/lib/useAuth';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
@@ -56,7 +56,7 @@ export default function ClinicMaterialsScreen() {
   const { user } = useUserRole();
 
   useEffect(() => {
-    if (user?.uid) setClinicStoreUser(user.uid);
+    if (user?.uid) setClinicsStoreUser(user.uid);
   }, [user?.uid]);
 
   const { materials } = useClinic();

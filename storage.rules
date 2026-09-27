@@ -85,32 +85,42 @@ service firebase.storage {
     // doc: any signed-in account could otherwise overwrite another company's
     // images. Uploads for a product that doesn't exist yet (new product form,
     // offer images reuse this prefix with their own id) are still allowed.
-    function productDoc(productId) {
-      return /databases/(default)/documents/products/$(productId);
-    }
-
     function isStorageAdmin() {
       return isSignedIn() && firestore.get(
         /databases/(default)/documents/user_roles/$(uid())).data.get('role', '') == 'admin';
     }
 
-    function ownsOrNewProduct(productId) {
-      return !firestore.exists(productDoc(productId))
-        || firestore.get(productDoc(productId)).data.get('companyId', '') == uid()
-        || isStorageAdmin();
-    }
-
+    // Ownership is proven by the `companyId` stamped into the file's own
+    // metadata at upload time, not by looking up the product doc: the doc
+    // usually doesn't exist yet when the first image for a brand-new product
+    // is uploaded (and ad/offer images reusing this prefix never get one at
+    // all), so a `firestore.exists()`/`get()` cross-service lookup here can't
+    // distinguish "new product, allow" from "someone else's product, deny".
     match /products/{productId}/{file} {
       allow read: if true;
-      allow create, update: if isSignedIn()
+      // Self-asserted `companyId` metadata alone only proves the uploader
+      // controls their own upload, not that they own `productId` — a fresh
+      // `crypto.randomUUID()` filename means every upload from the app hits
+      // `create`, never `update`, so a metadata-only check here let any
+      // signed-in account write into an EXISTING product they don't own.
+      // Falling back to the metadata check only when the product doc
+      // doesn't exist yet keeps the new-product case working (see the
+      // comment above) while closing that off for real products.
+      allow create: if isSignedIn()
         && request.resource.size < 10 * 1024 * 1024
         && isImage()
-        && ownsOrNewProduct(productId);
-      // No "new product" branch here: offer images live under this prefix
-      // with no product doc, and that branch would let anyone delete them.
+        && request.resource.metadata.get('companyId', '') == uid()
+        && (
+          !firestore.exists(/databases/(default)/documents/products/$(productId))
+          || firestore.get(/databases/(default)/documents/products/$(productId)).data.companyId == uid()
+        );
+      allow update: if isSignedIn()
+        && request.resource.size < 10 * 1024 * 1024
+        && isImage()
+        && resource.metadata.get('companyId', '') == uid()
+        && request.resource.metadata.get('companyId', '') == uid();
       allow delete: if isSignedIn() && (
-        (firestore.exists(productDoc(productId))
-          && firestore.get(productDoc(productId)).data.get('companyId', '') == uid())
+        resource.metadata.get('companyId', '') == uid()
         || isStorageAdmin()
       );
     }

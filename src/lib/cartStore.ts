@@ -14,6 +14,12 @@ export type CartItem = {
   unitPrice: number;
   currency: "USD" | "IQD";
   addedAt: string;
+  // Distinguishes multiple purchasable lines of the *same* productId — e.g.
+  // one implant sold in several diameter/length variants, or an accessory
+  // bundled under the implant's own id. Without this, adding "4 of the
+  // 3.1x10mm" then "2 of the 4x10mm" would merge into a single meaningless
+  // "6" line instead of staying two distinct order lines.
+  variantLabel?: string;
 };
 
 const CART_KEY = "dh_cart_v1";
@@ -69,7 +75,10 @@ export function addToCart(item: Omit<CartItem, "id" | "addedAt"> & { id?: string
   if (!initialized) { items = load(); initialized = true; }
 
   const existing = items.find(
-    (i) => i.productId === item.productId && i.officeId === item.officeId,
+    (i) =>
+      i.productId === item.productId &&
+      i.officeId === item.officeId &&
+      (i.variantLabel ?? "") === (item.variantLabel ?? ""),
   );
 
   if (existing) {

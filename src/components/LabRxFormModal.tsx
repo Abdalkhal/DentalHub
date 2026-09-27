@@ -5,6 +5,7 @@ import { useSession, useUserRole } from "@/lib/useAuth";
 import { submitDentistCase, attachOrderFile } from "@/lib/ordersStore";
 import { uploadOrderFile } from "@/lib/storagePipeline";
 import { createNotification } from "@/components/NotificationBell";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { FDI_UPPER, FDI_LOWER, UPPER_POS, LOWER_POS } from "@/components/DentalArch";
 import archUpper from "@/assets/arch-upper.png";
@@ -221,7 +222,6 @@ export function LabRxFormModal({
   const [patientGender, setPatientGender] = useState<"male" | "female" | "">("");
   const [patientPhone, setPatientPhone] = useState("");
   const [receivedDate, setReceivedDate] = useState(() => new Date().toISOString().split("T")[0]);
-  const [deliveryDate, setDeliveryDate] = useState("");
 
   const [activeWorkType, setActiveWorkType] = useState<WorkTypeKey | null>(null);
   const [teeth, setTeeth] = useState<Record<number, WorkTypeKey>>({});
@@ -373,7 +373,6 @@ export function LabRxFormModal({
         patient: patient.trim(),
         doctor: doctorName || (ar ? "غير محدد" : "Unspecified"),
         workType,
-        dueDate: deliveryDate || "",
         unitsCount: parseInt(unitsCount, 10) || 1,
         notes: notes.trim(),
         clinic: role?.clinicName || (ar ? "غير محدد" : "Unspecified"),
@@ -399,6 +398,38 @@ export function LabRxFormModal({
         },
       });
 
+      // Sent right after the case doc exists, and *before* the scan-file
+      // upload below — that upload can throw (bad network, storage rules,
+      // a huge file) and was previously in the same try block ahead of this,
+      // which silently skipped the notification entirely on failure, on top
+      // of the write itself being retried here since a lab depends on this
+      // to know a case arrived at all (see NotificationBell).
+      const notifyPayload = {
+        userId: labId,
+        title: ar ? "وصفة حالة جديدة (Rx)" : "New Rx Case Request",
+        body: ar
+          ? `قام د. ${order.doctor} بإرسال وصفة حالة للمريض ${order.patient}.`
+          : `Dr. ${order.doctor} sent an Rx case for patient ${order.patient}.`,
+        type: "order_new" as const,
+        orderId: order.id,
+      };
+      try {
+        await createNotification(notifyPayload);
+      } catch (notifyErr) {
+        console.warn("Failed to create case notification, retrying once:", notifyErr);
+        try {
+          await createNotification(notifyPayload);
+        } catch (retryErr) {
+          console.warn("Case notification retry also failed:", retryErr);
+          // Surfaced to the sender (not just the console) so a failure here
+          // is never silent again — the case itself is still saved
+          // regardless (see setDone(true) below).
+          toast.error(
+            ar ? "تم إرسال الحالة، لكن تعذر إشعار المختبر بها" : "Case sent, but couldn't notify the lab",
+          );
+        }
+      }
+
       if (scanFile) {
         const { path } = await uploadOrderFile({
           orderId: order.id,
@@ -412,20 +443,6 @@ export function LabRxFormModal({
           name: scanFile.name,
           path,
         });
-      }
-
-      try {
-        await createNotification({
-          userId: labId,
-          title: ar ? "وصفة حالة جديدة (Rx)" : "New Rx Case Request",
-          body: ar
-            ? `قام د. ${order.doctor} بإرسال وصفة حالة للمريض ${order.patient}.`
-            : `Dr. ${order.doctor} sent an Rx case for patient ${order.patient}.`,
-          type: "order_new",
-          orderId: order.id,
-        });
-      } catch {
-        /* notification is non-critical */
       }
 
       setDone(true);
@@ -564,24 +581,18 @@ export function LabRxFormModal({
                 </GenderChip>
               </div>
             </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label={ar ? "تاريخ الاستلام" : "Received date"}>
-                <input
-                  type="date"
-                  value={receivedDate}
-                  onChange={(e) => setReceivedDate(e.target.value)}
-                  className={inputCls}
-                />
-              </Field>
-              <Field label={ar ? "تاريخ التسليم" : "Delivery date"}>
-                <input
-                  type="date"
-                  value={deliveryDate}
-                  onChange={(e) => setDeliveryDate(e.target.value)}
-                  className={inputCls}
-                />
-              </Field>
-            </div>
+            {/* No delivery-date field here: only the lab knows its own
+                production timeline, so that date is set by the lab itself
+                when it confirms the case (CombinedLabOrderModal), not by
+                the referring doctor. */}
+            <Field label={ar ? "تاريخ الاستلام" : "Received date"}>
+              <input
+                type="date"
+                value={receivedDate}
+                onChange={(e) => setReceivedDate(e.target.value)}
+                className={inputCls}
+              />
+            </Field>
           </section>
 
           {/* Odontogram */}

@@ -1,11 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { db } from "@/integrations/firebase/client";
+import { app } from "@/integrations/firebase/config";
 import {
-  collection, getDocs, getDoc, query, where, Timestamp,
-  doc, setDoc, updateDoc, serverTimestamp,
+  collection, getDocs, query, where, Timestamp,
+  doc, updateDoc, serverTimestamp,
 } from "firebase/firestore";
-import type { OrderDoc, OrderStatus, InvoiceItem } from "@/integrations/firebase/types";
-import { getCart, clearCart, type CartItem } from "@/lib/cartStore";
+import { getFunctions, httpsCallable } from "firebase/functions";
+import { toast } from "@/lib/toast";
+import type { OrderDoc, OrderStatus } from "@/integrations/firebase/types";
+import { getCart, clearCart } from "@/lib/cartStore";
+
+const functions = getFunctions(app);
 
 function createdAtMs(v: unknown): number {
   if (!v) return 0;
@@ -48,15 +53,13 @@ const fromDoc = (id: string, data: Record<string, unknown>): OrderDoc => ({
 
 export const ordersQueryKey = ["orders"] as const;
 
-function generateOrderNumber(): string {
-  return `DNT-${Math.floor(1000 + Math.random() * 9000)}`;
-}
-
 /**
- * Checkout: groups cart items per supplier and, for each supplier, writes a
- * single Order document (status "pending") + a Notification in one place.
- * NO invoice is created here — invoices are created only upon confirmation.
- * Returns the number of orders created plus the first order id.
+ * Checkout: sends the cart to the `placeVerifiedOrder` Cloud Function, which
+ * re-reads every product's price/currency/supplier server-side (never
+ * trusting the client's cart for the billed amount), groups items per
+ * supplier, and writes the Order doc(s) + supplier notification. Stock is
+ * decremented on confirmation, not here — see `confirmOrder`. Returns the
+ * number of orders created plus the first order id.
  */
 export async function placeCartOrder(
   dentist: {
@@ -73,219 +76,49 @@ export async function placeCartOrder(
   },
 ): Promise<{ count: number; orderId?: string }> {
   const items = getCart();
+  const call = httpsCallable<
+    {
+      items: { productId: string; quantity: number }[];
+      dentist: typeof dentist;
+      note?: string;
+      discount?: OrderDoc["discount"];
+    },
+    { count: number; orderId?: string; skippedCount?: number }
+  >(functions, "placeVerifiedOrder");
 
-  const bySupplier = new Map<string, CartItem[]>();
-  for (const item of items) {
-    const list = bySupplier.get(item.officeId) ?? [];
-    list.push(item);
-    bySupplier.set(item.officeId, list);
-  }
+  const res = await call({
+    items: items.map((i) => ({ productId: i.productId, quantity: i.quantity || 1 })),
+    dentist,
+    note: opts?.note,
+    discount: opts?.discount,
+  });
 
-  let created = 0;
-  let firstOrderId: string | undefined;
-
-  let dentistPhotoURL = "";
-  try {
-    const dSnap = await getDoc(doc(db, "user_roles", dentist.id));
-    if (dSnap.exists()) {
-      dentistPhotoURL = ((dSnap.data() as Record<string, unknown>).photoURL as string) || "";
-    }
-  } catch {
-    // photo is best-effort
-  }
-
-  for (const [supplierId, supplierItems] of bySupplier) {
-    const orderId = doc(collection(db, "orders")).id;
-    const orderNumber = generateOrderNumber();
-    const orderItems: InvoiceItem[] = supplierItems.map((i) => ({
-      productId: i.productId,
-      name: i.productName,
-      quantity: i.quantity || 1,
-      price: i.unitPrice || 0,
-      currency: i.currency === "IQD" ? "IQD" : "USD",
-    }));
-    const total = supplierItems.reduce((s, i) => s + (i.unitPrice || 0) * (i.quantity || 1), 0);
-    const totalUSD = supplierItems
-      .filter((i) => i.currency !== "IQD")
-      .reduce((s, i) => s + (i.unitPrice || 0) * (i.quantity || 1), 0);
-    const totalIQD = supplierItems
-      .filter((i) => i.currency === "IQD")
-      .reduce((s, i) => s + (i.unitPrice || 0) * (i.quantity || 1), 0);
-
-    // 1) Persist the order (status pending). This is the supplier's "My Orders" record.
-    await setDoc(doc(db, "orders", orderId), {
-      id: orderId,
-      supplierId,
-      dentistId: dentist.id,
-      dentistName: dentist.name,
-      dentistPhone: dentist.phone || "",
-      dentistAddress: dentist.address || "",
-      clinicName: dentist.clinicName || dentist.name,
-      orderNumber,
-      items: orderItems,
-      total,
-      totalUSD,
-      totalIQD,
-      note: opts?.note || "",
-      discount: opts?.discount ?? null,
-      status: "pending",
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-
-    // 2) Notify the supplier (best-effort, non-blocking) with deep-link data.
-    try {
-      const itemLabel = orderItems.length === 1 ? "منتج" : "منتجات";
-      await setDoc(doc(db, "notifications", `${supplierId}_${Date.now()}_${created}`), {
-        id: `${supplierId}_${Date.now()}_${created}`,
-        userId: supplierId,
-        title: `طلب جديد من ${dentist.name}`,
-        body: dentist.address
-          ? `رقم الطلب ${orderNumber} · ${orderItems.length} ${itemLabel} — ${dentist.address}`
-          : `رقم الطلب ${orderNumber} · ${orderItems.length} ${itemLabel}`,
-        type: "order_new",
-        orderId,
-        senderName: dentist.name,
-        senderPhotoURL: dentistPhotoURL,
-        isRead: false,
-        createdAt: Date.now(),
-        expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
-      });
-    } catch {}
-
-    if (!firstOrderId) firstOrderId = orderId;
-    created++;
-  }
-
-  // Stock is decremented on confirmation (confirmOrder), not here: at this
-  // point the office hasn't reviewed the order yet, so an item can still end
-  // up rejected or marked unavailable — decrementing this early would wrongly
-  // reduce stock for something that may never actually ship.
   clearCart();
-  return { count: created, orderId: firstOrderId };
+  // A cart item whose product was deleted (or lost its supplier) between
+  // add-to-cart and checkout is dropped server-side rather than silently
+  // billed at a stale/forged price — tell the dentist instead of letting
+  // the order look complete when it isn't.
+  if (res.data.skippedCount) {
+    toast.error(
+      res.data.skippedCount === 1
+        ? 'تعذر طلب أحد المنتجات لأنه لم يعد متوفراً — تم استبعاده من الطلب'
+        : `تعذر طلب ${res.data.skippedCount} منتجات لأنها لم تعد متوفرة — تم استبعادها من الطلب`,
+    );
+  }
+  return res.data;
 }
 
 /**
- * Confirms an order: generates the Invoice document (status "confirmed"),
- * updates the order status to "confirmed", and notifies the dentist about any
- * products that could not be provided. Items marked "not_available" are
- * excluded from the final invoice. Returns the new invoice id.
+ * Confirms an order via the `confirmVerifiedOrder` Cloud Function, which
+ * recomputes the invoice total from the order's own (already
+ * server-verified) item prices, creates the Invoice doc, decrements stock
+ * for the items that made it in, notifies the dentist about any unavailable
+ * items, and marks the order "confirmed". Returns the new invoice id.
  */
 export async function confirmOrder(order: OrderDoc): Promise<string> {
-  const invoiceId = doc(collection(db, "invoices")).id;
-
-  // Always re-read the latest order so per-item availability set just before
-  // confirming is honoured (the in-memory order may be stale).
-  const snap = await getDoc(doc(db, "orders", order.id));
-  const latest = snap.exists() ? fromDoc(order.id, snap.data()) : order;
-
-  const availableItems = (latest.items ?? []).filter(
-    (i) => i.availability !== "not_available",
-  );
-  const unavailableItems = (latest.items ?? []).filter(
-    (i) => i.availability === "not_available",
-  );
-
-  const totalUSD = availableItems
-    .filter((i) => i.currency !== "IQD")
-    .reduce((s, i) => s + i.price * i.quantity, 0);
-  const totalIQD = availableItems
-    .filter((i) => i.currency === "IQD")
-    .reduce((s, i) => s + i.price * i.quantity, 0);
-  const total = totalUSD + totalIQD;
-
-  await setDoc(doc(db, "invoices", invoiceId), {
-    id: invoiceId,
-    orderNumber: latest.orderNumber || generateOrderNumber(),
-    officeId: latest.supplierId,
-    doctorId: latest.dentistId,
-    doctorName: latest.dentistName,
-    clinicName: latest.clinicName || latest.dentistName,
-    doctorPhone: latest.dentistPhone || "",
-    doctorAddress: latest.dentistAddress || "",
-    items: availableItems,
-    total,
-    totalUSD,
-    totalIQD,
-    note: latest.note || "",
-    discount: latest.discount ?? null,
-    status: "confirmed",
-    createdAt: serverTimestamp(),
-    confirmedAt: serverTimestamp(),
-    shippedAt: null,
-    deliveredAt: null,
-    rejectedAt: null,
-  });
-
-  // Decrement stock now that the office has actually confirmed the order —
-  // only for the items that made it into the invoice (an item marked
-  // "not_available" above must never touch stock). Best-effort: a failure
-  // here must never block the confirmation itself.
-  const byProduct = new Map<string, number>();
-  for (const item of availableItems) {
-    if (!item.productId) continue;
-    byProduct.set(item.productId, (byProduct.get(item.productId) ?? 0) + (item.quantity || 1));
-  }
-  for (const [productId, qty] of byProduct) {
-    try {
-      const pRef = doc(db, "products", productId);
-      const pSnap = await getDoc(pRef);
-      if (!pSnap.exists()) continue;
-      const current = Number((pSnap.data() as Record<string, unknown>).stock);
-      if (!Number.isFinite(current) || current <= 0) continue;
-      const next = Math.max(0, current - qty);
-      await updateDoc(pRef, { stock: next, inStock: next > 0 });
-    } catch {
-      // ignore — the invoice is already created
-    }
-  }
-
-  // Notify the dentist about products that could not be provided.
-  if (unavailableItems.length > 0 && latest.dentistId) {
-    const notifId = `${latest.dentistId}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    let senderName = "";
-    let senderPhotoURL = "";
-    try {
-      const sSnap = await getDoc(doc(db, "user_roles", latest.supplierId));
-      if (sSnap.exists()) {
-        const s = sSnap.data() as Record<string, unknown>;
-        senderName = (s.name as string) || "";
-        senderPhotoURL = (s.photoURL as string) || "";
-      }
-    } catch {
-      // sender info is best-effort
-    }
-    try {
-      await setDoc(doc(db, "notifications", notifId), {
-        id: notifId,
-        userId: latest.dentistId,
-        title: "تعذر توفير منتج في طلبك",
-        body:
-          unavailableItems.length === 1
-            ? `تعذر توفير المنتج "${unavailableItems[0].name}" في طلبك ${latest.orderNumber || ""}`
-            : `تعذر توفير المنتجات التالية في طلبك ${latest.orderNumber || ""}: ${unavailableItems
-                .map((i) => i.name)
-                .join("، ")}`,
-        type: "order_status",
-        orderId: latest.id,
-        senderName,
-        senderPhotoURL,
-        isRead: false,
-        createdAt: Date.now(),
-        expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
-      });
-    } catch {
-      // notification is best-effort
-    }
-  }
-
-  await updateDoc(doc(db, "orders", latest.id), {
-    status: "confirmed",
-    invoiceId,
-    updatedAt: serverTimestamp(),
-  });
-
-  return invoiceId;
+  const call = httpsCallable<{ orderId: string }, { invoiceId: string }>(functions, "confirmVerifiedOrder");
+  const res = await call({ orderId: order.id });
+  return res.data.invoiceId;
 }
 
 /** Marks an order as unavailable/rejected — no invoice is generated. */
@@ -296,19 +129,22 @@ export async function markOrderUnavailable(orderId: string): Promise<void> {
   });
 }
 
-/** Toggles the availability of a single item inside a pending order. */
+/**
+ * Toggles the availability of a single item inside a pending order via the
+ * `setOrderItemAvailability` Cloud Function — a direct client `updateDoc` on
+ * `items` can't be scoped to just this one sub-field, which would also let
+ * price/quantity be rewritten in the same write.
+ */
 export async function updateOrderItemAvailability(
   orderId: string,
   index: number,
   availability: "available" | "not_available",
 ): Promise<void> {
-  const snap = await getDoc(doc(db, "orders", orderId));
-  if (!snap.exists()) return;
-  const items = (snap.data().items as unknown[]) ?? [];
-  const next = items.map((it, i) =>
-    i === index ? { ...(it as Record<string, unknown>), availability } : it,
-  );
-  await updateDoc(doc(db, "orders", orderId), { items: next });
+  const call = httpsCallable<
+    { orderId: string; index: number; availability: "available" | "not_available" },
+    { ok: boolean }
+  >(functions, "setOrderItemAvailability");
+  await call({ orderId, index, availability });
 }
 
 export function useOrders(supplierId?: string) {

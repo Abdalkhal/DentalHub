@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { Building2, Calendar, Check, Gem, Pencil, PenTool, Palette, Plus, Stethoscope, Trash2, User, X } from 'lucide-react-native';
 
@@ -9,19 +9,21 @@ import { db } from '@/integrations/firebase/client';
 import { CalendarPickerModal, toDateStr } from '@/components/CalendarPickerModal';
 import {
   MATERIALS,
+  WORK_TYPES as DENTAL_WORK_TYPES,
   FRAMEWORK_CREATION,
   RULES,
   IMPLANT_WORK_TYPES,
   VITA_SHADES,
   VITA_3D_SHADES,
   VITA_BLEACH_SHADES,
+  classifyShade,
   type MaterialId,
   type WorkTypeId,
   type MaterialRules,
   type ShadeTab,
 } from '@/lib/dentalConfig';
 import { useLabCatalog, saveLabCatalog, type LabCatalog } from '@/lib/catalogStore';
-import { addOrder, buildInternalOrder } from '@/lib/ordersStore';
+import { addOrder, buildInternalOrder, connectLabOrders, updateOrder, useOrders, type Order } from '@/lib/ordersStore';
 import type { CombinedLabOrder, PricingItem } from '@/components/CombinedLabOrderModal';
 import { useLabMembers } from '@/lib/labMembersStore';
 import { useUserRole } from '@/lib/useAuth';
@@ -40,6 +42,89 @@ import { cn, normalizeName } from '@/lib/utils';
 // place the order.
 
 const USD_RATE = 1480;
+
+// Ported from the web app's `buildPrefillFromOrder` (src/routes/orders.tsx) —
+// a doctor-submitted case usually already carries `rxData.primaryMaterial` /
+// `primaryWorkType` (set by SendCaseModal from the Rx form), but these
+// text-based fallbacks cover older cases sent before that existed.
+const VALID_MATERIAL_IDS = new Set<string>(MATERIALS.map((m) => m.id));
+const VALID_WORK_TYPE_IDS = new Set<string>(DENTAL_WORK_TYPES.map((w) => w.id));
+
+function deriveMaterialFromCase(order: Order): MaterialId | undefined {
+  const source = [order.workType ?? '', ...(order.rxItems ?? [])].join(' ');
+  if (/زيركون|زركون|zircon/i.test(source)) return 'material.zirconia';
+  if (/إيماكس|ايماكس|e-?max/i.test(source)) return 'material.emax';
+  if (/سيراميك|ceramic/i.test(source)) return 'material.feldspathic';
+  if (/طقم|denture/i.test(source)) return 'material.pmma';
+  if (/تيتانيوم|titanium|بار/i.test(source)) return 'material.titanium_bar';
+  if (/تقويم|مصفف|aligner/i.test(source)) return 'material.clear_aligner';
+  if (/معدن|pfm/i.test(source)) return 'material.pfm';
+  return undefined;
+}
+
+function deriveWorkTypeFromCase(order: Order): WorkTypeId | undefined {
+  const teeth = order.rxTeeth ?? {};
+  const counts: Record<string, number> = {};
+  Object.values(teeth).forEach((t) => {
+    counts[t] = (counts[t] ?? 0) + 1;
+  });
+  const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0];
+  if (top && VALID_WORK_TYPE_IDS.has(top)) return top as WorkTypeId;
+  const source = [order.workType ?? '', ...(order.rxItems ?? [])].join(' ');
+  if (/جسر|bridge/i.test(source)) return 'bridge';
+  if (/فينير|veneer/i.test(source)) return 'veneer';
+  if (/حشوة|inlay|onlay/i.test(source)) return 'inlay';
+  if (/تاج|crown/i.test(source)) return 'crown';
+  return undefined;
+}
+
+/**
+ * One pricing row per distinct treatment label the doctor actually charted
+ * on the odontogram (not one row per tooth) — two teeth given the same
+ * label become a single row with quantity 2, matching how a real invoice
+ * line groups identical work. Each row's name carries its tooth number(s)
+ * so the lab can price it without cross-referencing the odontogram above.
+ * Returns null when the case has no per-tooth chart at all (a legacy case,
+ * or one sent before this existed), so the caller falls back to today's
+ * single-material prefill.
+ */
+function buildToothTaggedPricingItems(order: Order, ar: boolean): PricingItem[] | null {
+  const toothItems = (order.rxData?.toothItems as Record<string, string[]> | undefined) ?? {};
+  const teethKeys = Object.keys(toothItems);
+  if (teethKeys.length === 0) return null;
+
+  const itemMaterial = (order.rxData?.itemMaterial as Record<string, string> | undefined) ?? {};
+  const itemWorkType = (order.rxData?.itemWorkType as Record<string, string> | undefined) ?? {};
+
+  const labelToTeeth = new Map<string, string[]>();
+  for (const tooth of teethKeys) {
+    for (const label of toothItems[tooth] ?? []) {
+      const list = labelToTeeth.get(label) ?? [];
+      list.push(tooth);
+      labelToTeeth.set(label, list);
+    }
+  }
+
+  return Array.from(labelToTeeth.entries()).map(([label, teeth]) => {
+    const rawMaterial = itemMaterial[label];
+    const material = rawMaterial && VALID_MATERIAL_IDS.has(rawMaterial) ? (rawMaterial as MaterialId) : undefined;
+    const rawWorkType = itemWorkType[label];
+    const workType = rawWorkType && VALID_WORK_TYPE_IDS.has(rawWorkType) ? (rawWorkType as WorkTypeId) : undefined;
+    const rule = material ? (RULES as Record<string, MaterialRules | undefined>)[material] : undefined;
+    const manufacturingMethod = workType ? rule?.manufacturingRules[workType]?.[0] : undefined;
+    const teethLabel = teeth.map((t) => `#${t}`).join('، ');
+    return {
+      id: uid(),
+      name: `${label} — ${ar ? 'سن' : 'tooth'} ${teethLabel}`,
+      quantity: teeth.length,
+      unitPrice: 0,
+      currency: 'IQD',
+      material,
+      workType,
+      manufacturingMethod,
+    } as PricingItem;
+  });
+}
 
 function uid(): string {
   return Math.random().toString(36).slice(2, 10);
@@ -275,6 +360,20 @@ export default function NewLabOrderScreen() {
   const designers = members.filter((m) => m.department === 'cad_designer');
   const ceramists = members.filter((m) => m.department === 'ceramist');
 
+  // Opened from CaseDetailModal's "تأكيد الحالة" button on an incoming
+  // doctor case (see (tabs)/orders.tsx and (tabs)/labs-office.tsx) — the
+  // form below pre-fills from that case, and submit updates it in place
+  // (see handleSubmit) instead of creating a second, duplicate order.
+  const { confirmId } = useLocalSearchParams<{ confirmId?: string }>();
+  useEffect(() => {
+    if (labId) connectLabOrders(labId);
+  }, [labId]);
+  const allOrders = useOrders();
+  const confirmTarget = useMemo(
+    () => (confirmId ? (allOrders.find((o) => o.id === confirmId) ?? null) : null),
+    [confirmId, allOrders],
+  );
+
   const { catalog } = useLabCatalog(labId);
   const [editMode, setEditMode] = useState(false);
   const [draft, setDraft] = useState<LabCatalog | null>(null);
@@ -464,9 +563,27 @@ export default function NewLabOrderScreen() {
   const isImplantCase = isTitaniumBar || IMPLANT_WORK_TYPES.includes(workType as WorkTypeId);
   const materialIcon = (id: string) => MATERIALS.find((m) => m.id === id)?.icon ?? Gem;
 
+  // Remembers each material's own last work type / manufacturing method
+  // choice, so switching materials to compare options and back doesn't
+  // silently discard what was picked (e.g. Emax → Veneer, then checking
+  // Zirconia, then back to Emax must still show Veneer — not reset to
+  // Emax's default work type). Synced from state instead of written
+  // manually at each call site, so it also captures the prefill effect's
+  // and the manufacturing-method chips' direct `setManufacturingMethod`.
+  const lastChoiceByMaterial = useRef<Record<string, { workType: WorkTypeId | ''; manufacturingMethod: string }>>({});
+  useEffect(() => {
+    lastChoiceByMaterial.current[materialId] = { workType, manufacturingMethod };
+  }, [materialId, workType, manufacturingMethod]);
+
   const selectMaterial = (id: MaterialId) => {
     if (editMode) return;
     setMaterialId(id);
+    const remembered = lastChoiceByMaterial.current[id];
+    if (remembered?.workType) {
+      setWorkType(remembered.workType);
+      setManufacturingMethod(remembered.manufacturingMethod);
+      return;
+    }
     const rule = (RULES as Record<string, MaterialRules | undefined>)[id];
     const first = rule?.allowedWorkTypes[0] ?? (displayCatalog.workTypes[0]?.id as WorkTypeId | undefined);
     if (first) {
@@ -484,6 +601,53 @@ export default function NewLabOrderScreen() {
     const rule = (RULES as Record<string, MaterialRules | undefined>)[materialId];
     setManufacturingMethod(rule?.manufacturingRules[wt]?.[0] ?? '');
   };
+
+  // Applied once, the first time the confirmed case's data arrives — a ref
+  // (not state) so it doesn't re-run and clobber the lab's own edits every
+  // time the live `allOrders` snapshot re-fires.
+  const prefillApplied = useRef(false);
+  useEffect(() => {
+    if (!confirmTarget || prefillApplied.current) return;
+    prefillApplied.current = true;
+
+    setPatientName(confirmTarget.patient ?? '');
+    setDoctorName(confirmTarget.doctor ?? '');
+    setClinicName(confirmTarget.clinic ?? '');
+    if (confirmTarget.dentistId) setSelectedDentistId(confirmTarget.dentistId);
+
+    const rawMaterial = (confirmTarget.rxData?.primaryMaterial as string | undefined) ?? confirmTarget.material;
+    const material =
+      rawMaterial && VALID_MATERIAL_IDS.has(rawMaterial) ? (rawMaterial as MaterialId) : deriveMaterialFromCase(confirmTarget);
+    if (material) selectMaterial(material);
+
+    const rawWorkType = confirmTarget.rxData?.primaryWorkType as string | undefined;
+    const workTypeGuess =
+      rawWorkType && VALID_WORK_TYPE_IDS.has(rawWorkType) ? (rawWorkType as WorkTypeId) : deriveWorkTypeFromCase(confirmTarget);
+    if (workTypeGuess) {
+      // Not `selectWorkType(workTypeGuess)` — it reads `materialId` from
+      // this render's closure, which still holds the value from BEFORE
+      // `selectMaterial` above scheduled its update (state setters don't
+      // apply mid-render), so the manufacturing method would resolve
+      // against the wrong material's rule set. Use the just-resolved
+      // `material` directly instead.
+      setWorkType(workTypeGuess);
+      const rule = (RULES as Record<string, MaterialRules | undefined>)[material ?? materialId];
+      setManufacturingMethod(rule?.manufacturingRules[workTypeGuess]?.[0] ?? '');
+    }
+
+    const shadeVal = confirmTarget.shade?.trim();
+    if (shadeVal) {
+      setShadeTab(classifyShade(shadeVal));
+      setShade(shadeVal);
+    }
+    if (confirmTarget.notes) setNotes(confirmTarget.notes);
+
+    const taggedRows = buildToothTaggedPricingItems(confirmTarget, ar);
+    if (taggedRows) {
+      setPricingMode('mixed');
+      setPricingItems(taggedRows);
+    }
+  }, [confirmTarget]);
 
   const itemTotalIQD = (it: PricingItem) =>
     (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0) * (it.currency === 'IQD' ? 1 : USD_RATE);
@@ -598,16 +762,36 @@ export default function NewLabOrderScreen() {
     };
 
     try {
-      // "new" — the sensible initial status for a lab-created case. Web's own
-      // dashboard hardcodes "delayed" here (a pre-existing quirk in its
-      // separate, non-shared object-building code); this instead reuses the
-      // canonical `buildInternalOrder` the confirm-incoming-order flow uses,
-      // with the status that actually matches "جديد".
-      addOrder(buildInternalOrder(payload, 'new'));
-      toast.success(ar ? 'تمت إضافة الطلب' : 'Order added');
+      if (confirmTarget) {
+        // Update the existing incoming case in place instead of creating a
+        // duplicate order document, so the doctor's own case tracking still
+        // shows a single case — just moved to "قيد التنفيذ" with the lab's
+        // pricing/team now attached. Mirrors web's handleConfirmSubmit
+        // (src/routes/orders.tsx).
+        updateOrder(confirmTarget.id, {
+          ...buildInternalOrder(payload, 'in_progress', confirmTarget),
+          source: 'internal',
+          rxTeeth: confirmTarget.rxTeeth,
+          rxItems: confirmTarget.rxItems,
+          rxData: confirmTarget.rxData,
+        });
+        toast.success(ar ? 'تم تأكيد الحالة وتحويلها إلى قيد التنفيذ' : 'Case confirmed and moved to production');
+      } else {
+        // "new" — the sensible initial status for a lab-created case. Web's own
+        // dashboard hardcodes "delayed" here (a pre-existing quirk in its
+        // separate, non-shared object-building code); this instead reuses the
+        // canonical `buildInternalOrder` the confirm-incoming-order flow uses,
+        // with the status that actually matches "جديد".
+        addOrder(buildInternalOrder(payload, 'new'));
+        toast.success(ar ? 'تمت إضافة الطلب' : 'Order added');
+      }
       router.back();
     } catch {
-      toast.error(ar ? 'فشلت إضافة الطلب' : 'Failed to add the order');
+      toast.error(
+        confirmTarget
+          ? ar ? 'فشل تأكيد الحالة' : 'Failed to confirm the case'
+          : ar ? 'فشلت إضافة الطلب' : 'Failed to add the order',
+      );
     } finally {
       setSubmitting(false);
     }
@@ -1077,7 +1261,16 @@ export default function NewLabOrderScreen() {
           )}
         </Section>
 
-        <Button title={ar ? 'حفظ وإضافة الطلب' : 'Save & add order'} loading={submitting} disabled={editMode} onPress={handleSubmit} />
+        <Button
+          title={
+            confirmTarget
+              ? ar ? 'تأكيد الحالة' : 'Confirm case'
+              : ar ? 'حفظ وإضافة الطلب' : 'Save & add order'
+          }
+          loading={submitting}
+          disabled={editMode}
+          onPress={handleSubmit}
+        />
       </View>
 
       <CalendarPickerModal

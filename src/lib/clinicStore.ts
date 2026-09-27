@@ -65,14 +65,24 @@ export type ClinicState = {
 
 const KEY_PREFIX = "dh_clinic_v3:";
 let currentUserId = "";
+let currentClinicId = "";
 
-export function setClinicStoreUser(uid: string) {
+// Keyed by clinic, not just account — see patientsStore.ts's setPatientStoreUser
+// for why. Called by clinicsStore.ts's `pointStoresAt` whenever the active
+// clinic changes, not just on sign-in.
+export function setClinicStoreUser(uid: string, clinicId: string) {
   currentUserId = uid;
-  state = def();
+  currentClinicId = clinicId;
+  // `load()`, not `def()` — this used to reset to empty and then `emit()`
+  // immediately *saved* that empty state over whatever was actually stored
+  // under the new key, silently wiping it. Harmless with one clinic per
+  // account visited rarely; fatal now that switching clinics calls this on
+  // every switch, which would erase each clinic's data the moment you left it.
+  state = load();
   emit();
 }
 
-function getKey() { return KEY_PREFIX + (currentUserId || "guest"); }
+function getKey() { return KEY_PREFIX + (currentUserId || "guest") + ":" + (currentClinicId || "default"); }
 
 function def(): ClinicState {
   return { transactions: [], orders: [], materials: [], doctors: [] };

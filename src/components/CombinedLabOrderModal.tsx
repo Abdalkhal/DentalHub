@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   X,
   Building2,
@@ -51,6 +51,12 @@ export type OrderPrefill = {
   shadeTab?: ShadeTab;
   customShade?: string;
   notes?: string;
+  /** Set when the incoming case has a per-tooth odontogram chart — one row
+   * per distinct treatment actually charted, each name already carrying its
+   * tooth number(s) (see orders.tsx's buildPrefillFromOrder), so switches
+   * pricing straight to "mixed" instead of a single generic total. */
+  pricingItems?: PricingItem[];
+  pricingMode?: "single" | "mixed";
 };
 
 export type CombinedLabOrder = {
@@ -233,6 +239,10 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
         setSelectedManufacturingMethod("");
       }
     }
+    if (p.pricingItems?.length) {
+      setPricingMode(p.pricingMode ?? "mixed");
+      setPricingItems(p.pricingItems);
+    }
   };
 
   useEffect(() => {
@@ -381,8 +391,29 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
     setPricingItems((prev) => (prev.length > 1 ? prev.filter((it) => it.id !== id) : prev));
   };
 
+  // Remembers each material's own last work type / manufacturing method
+  // choice, so switching materials to compare options and back doesn't
+  // silently discard what was picked (e.g. Emax → Veneer, then checking
+  // Zirconia, then back to Emax must still show Veneer — not reset to
+  // Emax's default work type). Synced from state instead of written
+  // manually at each call site, so it also captures a prefill and the
+  // manufacturing-method chips' direct `setSelectedManufacturingMethod`.
+  const lastChoiceByMaterial = useRef<Record<string, { workType: WorkTypeId | ""; manufacturingMethod: string }>>({});
+  useEffect(() => {
+    lastChoiceByMaterial.current[selectedMaterialId] = {
+      workType: selectedWorkType,
+      manufacturingMethod: selectedManufacturingMethod,
+    };
+  }, [selectedMaterialId, selectedWorkType, selectedManufacturingMethod]);
+
   const selectMaterial = (id: MaterialId) => {
     setSelectedMaterialId(id);
+    const remembered = lastChoiceByMaterial.current[id];
+    if (remembered?.workType) {
+      setSelectedWorkType(remembered.workType);
+      setSelectedManufacturingMethod(remembered.manufacturingMethod);
+      return;
+    }
     const rule = (RULES as Record<string, MaterialRules | undefined>)[id];
     const firstWorkType = rule?.allowedWorkTypes[0] ?? displayCatalog.workTypes[0]?.id;
     if (firstWorkType) {

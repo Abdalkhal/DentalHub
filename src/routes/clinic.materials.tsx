@@ -1,10 +1,12 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { addMaterial, addOrder, removeMaterial, updateMaterialQty, useClinic, type Material } from "@/lib/clinicStore";
+import { setClinicsStoreUser } from "@/lib/clinicsStore";
+import { useSession } from "@/lib/useAuth";
 import { Boxes, Minus, Plus, Trash2, AlertTriangle, Truck } from "lucide-react";
 
 
@@ -33,6 +35,16 @@ const CATS = [
 function MaterialsPage() {
   const { lang } = useI18n();
   const ar = lang === "ar";
+  const { user } = useSession();
+
+  useEffect(() => {
+    // Defensive re-init for landing directly on this route (e.g. a reload)
+    // without passing through the home route's effect first — must resolve
+    // the full clinic context (list + active clinic), not just re-key this
+    // one store, or it could point at the wrong clinic's data.
+    setClinicsStoreUser(user?.uid || "");
+  }, [user?.uid]);
+
   const { materials } = useClinic();
   const navigate = useNavigate();
   const [cat, setCat] = useState("all");

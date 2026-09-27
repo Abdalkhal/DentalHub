@@ -150,7 +150,10 @@ function ProfilePage() {
     staleTime: 60_000,
   });
 
-  const { data: offers = [] } = useOffers(accountId);
+  // Public profile — a visitor must only ever see approved offers, never
+  // whatever's still pending review or was rejected.
+  const { data: rawOffers = [] } = useOffers(accountId);
+  const offers = useMemo(() => rawOffers.filter((o) => !o.status || o.status === "active"), [rawOffers]);
 
   const { data: allProducts = [] } = useProducts();
   const products = useMemo(

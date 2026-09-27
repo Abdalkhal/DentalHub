@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react';
-import { Image, Linking, Pressable, View } from 'react-native';
+import { Alert, Image, Linking, Pressable, View } from 'react-native';
 import { router } from 'expo-router';
 import {
+  Anchor,
   Bell,
   Bone,
   ChevronLeft,
   ChevronRight,
   CircleUser,
-  ClipboardList,
   Layers,
   MapPin,
   Megaphone,
@@ -23,7 +23,6 @@ import type { LucideIcon } from 'lucide-react-native';
 import { Screen, Text, Spinner } from '@/components/ui';
 import { ProductImage } from '@/components/ProductImage';
 import { OfficeOffers } from '@/components/OfficeOffers';
-import { OfficeOrders } from '@/components/OfficeOrders';
 import { AddSupplyProductModal, type SupplyProductDraft } from '@/components/AddSupplyProductModal';
 import { BoneGraftModal } from '@/components/BoneGraftModal';
 import { ImplantFormModal } from '@/components/ImplantFormModal';
@@ -41,13 +40,12 @@ import { useUnreadNotificationsCount } from '@/lib/notifications';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
-type TabKey = 'products' | 'implants' | 'offers' | 'orders';
+type TabKey = 'products' | 'implants' | 'offers';
 
 const TABS: { key: TabKey; ar: string; en: string; icon: LucideIcon }[] = [
   { key: 'products', ar: 'المنتجات', en: 'Products', icon: Package },
-  { key: 'implants', ar: 'الزرعات', en: 'Implants', icon: Bone },
+  { key: 'implants', ar: 'الزرعات', en: 'Implants', icon: Anchor },
   { key: 'offers', ar: 'العروض', en: 'Offers', icon: Megaphone },
-  { key: 'orders', ar: 'الطلبات', en: 'Orders', icon: ClipboardList },
 ];
 
 const STORE_LABEL: Record<string, { ar: string; en: string }> = {
@@ -73,6 +71,16 @@ export default function SuppliesOfficeScreen() {
   const { data: products = [], isLoading } = useProducts();
   const upsert = useUpsertProduct();
   const remove = useDeleteProduct();
+  const confirmDelete = (p: Product) => {
+    Alert.alert(
+      ar ? 'حذف المنتج' : 'Delete product',
+      p.ar || p.en || '',
+      [
+        { text: ar ? 'إلغاء' : 'Cancel', style: 'cancel' },
+        { text: ar ? 'حذف' : 'Delete', style: 'destructive', onPress: () => remove.mutate(p.id) },
+      ],
+    );
+  };
 
   const [tab, setTab] = useState<TabKey>('products');
   const [branchFilter, setBranchFilter] = useState('all');
@@ -287,7 +295,7 @@ export default function SuppliesOfficeScreen() {
                               >
                                 <Text className="text-[11px] font-bold text-slate-600">{ar ? 'تعديل' : 'Edit'}</Text>
                               </Pressable>
-                              <Pressable onPress={() => remove.mutate(p.id)} className="w-8 items-center justify-center rounded-lg bg-rose-50">
+                              <Pressable onPress={() => confirmDelete(p)} className="w-8 items-center justify-center rounded-lg bg-rose-50">
                                 <Trash2 size={13} color="#F43F5E" />
                               </Pressable>
                             </View>
@@ -425,7 +433,7 @@ export default function SuppliesOfficeScreen() {
                             <Pencil size={11} color="#475569" />
                             <Text className="text-[11px] font-bold text-slate-600">{ar ? 'تعديل' : 'Edit'}</Text>
                           </Pressable>
-                          <Pressable onPress={() => remove.mutate(p.id)} className="w-8 items-center justify-center rounded-lg bg-rose-50">
+                          <Pressable onPress={() => confirmDelete(p)} className="w-8 items-center justify-center rounded-lg bg-rose-50">
                             <Trash2 size={13} color="#F43F5E" />
                           </Pressable>
                         </View>
@@ -439,7 +447,6 @@ export default function SuppliesOfficeScreen() {
         )}
 
         {tab === 'offers' && !!user && <OfficeOffers supplierId={user.uid} />}
-        {tab === 'orders' && !!user && <OfficeOrders supplierId={user.uid} />}
       </View>
 
       {modal.open && (

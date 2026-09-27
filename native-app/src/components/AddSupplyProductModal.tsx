@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { Check, Minus, Package, Plus, ScanBarcode, X } from 'lucide-react-native';
+import { Calendar, Check, Minus, Package, Plus, ScanBarcode, X } from 'lucide-react-native';
 
 import { Select, Text } from '@/components/ui';
 import { CountrySelect } from '@/components/CountrySelect';
+import { DateWheelPicker } from '@/components/DateWheelPicker';
 import { BRANCH_CODE, BRANCH_OPTIONS, TECH_BRANCHES } from '@/data/branches';
 import { subcategoriesOf } from '@/data/subcategories';
 import { ALL_COUNTRIES } from '@/data/countries';
@@ -284,6 +285,7 @@ export function AddSupplyProductModal({
   const [country, setCountry] = useState(initial?.country ?? '');
   const [barcode, setBarcode] = useState(initial?.barcode ?? '');
   const [expiryDate, setExpiryDate] = useState(initial?.expiryDate ?? '');
+  const [expiryPickerOpen, setExpiryPickerOpen] = useState(false);
   const [specs, setSpecs] = useState<ProductSpecs>(initial?.specs ?? {});
   const [techSpecs, setTechSpecs] = useState<ProductSpecs>(initial?.technicalSpecifications ?? {});
   const [busy, setBusy] = useState(false);
@@ -709,13 +711,21 @@ export function AddSupplyProductModal({
                 </View>
               </View>
               <Field label={ar ? 'تاريخ انتهاء الصلاحية' : 'Expiry Date'}>
-                <TextInput
+                <Pressable
+                  onPress={() => setExpiryPickerOpen(true)}
+                  className={cn(inputCls, 'flex-row items-center justify-between')}
+                >
+                  <Text className={cn('text-sm', expiryDate ? 'text-slate-800' : 'text-slate-400')}>
+                    {expiryDate || (ar ? 'اختر تاريخاً' : 'Select date')}
+                  </Text>
+                  <Calendar size={16} color="#94A3B8" />
+                </Pressable>
+                <DateWheelPicker
+                  visible={expiryPickerOpen}
+                  onClose={() => setExpiryPickerOpen(false)}
                   value={expiryDate}
-                  onChangeText={setExpiryDate}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor="#94A3B8"
-                  className={inputCls}
-                  style={{ writingDirection: 'ltr', textAlign: 'left' }}
+                  onSelect={setExpiryDate}
+                  ar={ar}
                 />
               </Field>
               <Field label={ar ? 'المخزون الحالي' : 'Current stock'}>

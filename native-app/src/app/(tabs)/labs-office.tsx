@@ -81,6 +81,12 @@ function monthKey(d: Date): number {
   return d.getFullYear() * 12 + d.getMonth();
 }
 
+function activityTime(o: Order): number {
+  if (o.updatedAt) return o.updatedAt;
+  const t = new Date(o.receivedDate || o.dueDate || 0).getTime();
+  return Number.isNaN(t) ? 0 : t;
+}
+
 function trendLabel(t: { cur: number; prev: number }, ar: boolean): { text: string; up: boolean } | null {
   if (t.cur === 0 && t.prev === 0) return null;
   const delta = t.cur - t.prev;
@@ -112,8 +118,28 @@ export default function LabsOfficeScreen() {
     return () => disconnectLabOrders();
   }, [user?.uid]);
 
-  const counts: Record<string, number> = { all: orders.length };
-  for (const o of orders) counts[o.status] = (counts[o.status] ?? 0) + 1;
+  // A doctor-sent case the lab hasn't priced/confirmed yet (see
+  // CaseDetailModal's "تأكيد الحالة") only belongs in the incoming-orders
+  // screen, not here — it only counts/shows on the dashboard once confirm
+  // flips it to "internal". Mirrors web's labs.dashboard.tsx.
+  //
+  // Sorted by most-recently-touched instead of the Firestore query's
+  // `caseId` order: `caseId` is fixed at creation, so a case created long
+  // ago (a low number) that a doctor's incoming Rx used, then just now got
+  // confirmed/priced, would otherwise stay buried under every case with a
+  // higher number instead of surfacing as the most recent activity it is.
+  // `receivedDate`/`dueDate` is the fallback for pre-existing docs written
+  // before `updatedAt` existed.
+  const internalOrders = useMemo(
+    () =>
+      orders
+        .filter((o) => o.source !== 'incoming_doctor_case')
+        .sort((a, b) => activityTime(b) - activityTime(a)),
+    [orders],
+  );
+
+  const counts: Record<string, number> = { all: internalOrders.length };
+  for (const o of internalOrders) counts[o.status] = (counts[o.status] ?? 0) + 1;
 
   // Real month-over-month counts (from each order's receivedDate), used to
   // drive the stat cards' trend line below the count.
@@ -130,7 +156,7 @@ export default function LabsOfficeScreen() {
       delayed: { cur: 0, prev: 0 },
     };
 
-    for (const o of orders) {
+    for (const o of internalOrders) {
       const d = new Date(o.receivedDate || o.dueDate || '');
       if (isNaN(d.getTime())) continue;
       const k = monthKey(d);
@@ -140,10 +166,10 @@ export default function LabsOfficeScreen() {
       result[o.status][bucket]++;
     }
     return result;
-  }, [orders]);
+  }, [internalOrders]);
 
   const filtered = useMemo(() => {
-    let list = filter === 'all' ? orders : orders.filter((o) => o.status === filter);
+    let list = filter === 'all' ? internalOrders : internalOrders.filter((o) => o.status === filter);
     const q = search.trim().toLowerCase();
     if (q) {
       list = list.filter(
@@ -155,7 +181,7 @@ export default function LabsOfficeScreen() {
       );
     }
     return list;
-  }, [orders, filter, search]);
+  }, [internalOrders, filter, search]);
 
   const nextStatus = (s: OrderStatus): OrderStatus => {
     if (s === 'new' || s === 'delayed') return 'in_progress';
@@ -434,7 +460,17 @@ export default function LabsOfficeScreen() {
         </View>
       )}
 
-      {selected && <CaseDetailModal ar={ar} order={selected} onClose={() => setSelected(null)} labName={role?.name} />}
+      {/* No onConfirm here: the dashboard list is filtered to internalOrders
+          above, so a still-unconfirmed incoming case (the only case where
+          CaseDetailModal renders that button) can never be `selected`. */}
+      {selected && (
+        <CaseDetailModal
+          ar={ar}
+          order={selected}
+          onClose={() => setSelected(null)}
+          labName={role?.name}
+        />
+      )}
     </Screen>
   );
 }

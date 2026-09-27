@@ -1,33 +1,32 @@
-import { useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
+import { useState, type ReactNode } from 'react';
+import {
+  ActivityIndicator,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  TextInput,
+  View,
+  type ImageSourcePropType,
+  type TextInputProps,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect } from 'expo-router';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
 } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import {
-  ArrowLeft,
-  ArrowRight,
-  Check,
-  Cog,
-  Eye,
-  EyeOff,
-  FlaskConical,
-  Lock,
-  Mail,
-  Package,
-  Stethoscope,
-  User,
-} from 'lucide-react-native';
-import type { LucideIcon } from 'lucide-react-native';
+import { ArrowLeft, ArrowRight, Eye, EyeOff, Lock, Mail, Stethoscope, User } from 'lucide-react-native';
 
-import { Screen, Text } from '@/components/ui';
-import { Input } from '@/components/ui/Input';
+import { Text } from '@/components/ui';
 import { auth, db } from '@/integrations/firebase/client';
 import { fetchUserRoleDoc, getAccountDashboard, type AccountDashboardHref, type LabStaffRole } from '@/lib/useAuth';
 import { CITIES } from '@/data/offices';
 import { useI18n } from '@/lib/i18n';
+import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import type { AccountType } from '@/integrations/firebase/types';
 
@@ -35,65 +34,75 @@ type RoleMeta = {
   id: AccountType;
   ar: string;
   en: string;
-  arDesc: string;
-  enDesc: string;
-  icon: LucideIcon;
+  icon: ImageSourcePropType;
   iconHex: string;
   activeBg: string;
-  activeRing: string;
   activeText: string;
 };
 
 const ROLES: RoleMeta[] = [
   {
     id: 'dentist',
-    ar: 'طبيب أسنان',
+    ar: 'الطبيب',
     en: 'Dentist',
-    arDesc: 'تصفح المواد واطلب من المكاتب',
-    enDesc: 'Browse supplies & order',
-    icon: Stethoscope,
+    icon: require('../../assets/login/icon-dentist.png'),
     iconHex: '#0284C7',
     activeBg: 'bg-sky-50',
-    activeRing: 'border-sky-500',
     activeText: 'text-sky-700',
   },
   {
     id: 'supply',
-    ar: 'مكتب مستلزمات',
-    en: 'Supplies Office',
-    arDesc: 'أدر منتجاتك وعروضك',
-    enDesc: 'Manage products & offers',
-    icon: Package,
+    ar: 'مستلزمات الأسنان',
+    en: 'Dental Supplies',
+    icon: require('../../assets/login/icon-supply.png'),
     iconHex: '#059669',
     activeBg: 'bg-emerald-50',
-    activeRing: 'border-emerald-500',
     activeText: 'text-emerald-700',
   },
   {
     id: 'lab',
-    ar: 'مختبر',
-    en: 'Laboratory',
-    arDesc: 'استلم وتابع حالات الأطباء',
-    enDesc: 'Track dentist cases',
-    icon: FlaskConical,
+    ar: 'المختبرات',
+    en: 'Laboratories',
+    icon: require('../../assets/login/icon-lab.png'),
     iconHex: '#7C3AED',
     activeBg: 'bg-violet-50',
-    activeRing: 'border-violet-500',
     activeText: 'text-violet-700',
   },
   {
     id: 'implant',
-    ar: 'شركة زرعات',
-    en: 'Implant Company',
-    arDesc: 'أدر علامتك التجارية',
-    enDesc: 'Manage your brands',
-    icon: Cog,
+    ar: 'شركات الزراعة',
+    en: 'Implant Companies',
+    icon: require('../../assets/login/icon-implant.png'),
     iconHex: '#D97706',
     activeBg: 'bg-amber-50',
-    activeRing: 'border-amber-500',
     activeText: 'text-amber-700',
   },
 ];
+
+// A local pill-shaped field instead of the shared `@/components/ui/Input` —
+// that component's wrapper only takes additive layout classes (see its own
+// comment), not overrides, because `cn` here is plain `clsx` with no
+// tailwind-merge: passing `rounded-full` would just sit alongside its
+// built-in `rounded-xl` rather than replace it. Reimplementing the same
+// icon-row layout locally keeps this redesign scoped to the login screen
+// instead of changing a component every other screen also renders with.
+function LoginInput({
+  icon,
+  rightIcon,
+  ...props
+}: TextInputProps & { icon?: ReactNode; rightIcon?: ReactNode }) {
+  return (
+    <View className="h-14 w-full flex-row items-center rounded-full border border-slate-200 bg-slate-50 px-5">
+      {icon}
+      <TextInput
+        placeholderTextColor="#94A3B8"
+        className={cn('flex-1 text-sm font-medium text-slate-800', (icon || rightIcon) && 'mx-2.5')}
+        {...props}
+      />
+      {rightIcon}
+    </View>
+  );
+}
 
 export default function LoginScreen() {
   const { lang } = useI18n();
@@ -110,6 +119,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [resetBusy, setResetBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -214,266 +224,284 @@ export default function LoginScreen() {
     }
   };
 
+  const forgotPassword = async () => {
+    if (!email.trim()) {
+      setError(ar ? 'أدخل بريدك الإلكتروني أولاً' : 'Enter your email first');
+      return;
+    }
+    setResetBusy(true);
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+      toast.success(ar ? 'تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك' : 'Password reset link sent to your email');
+    } catch {
+      toast.error(ar ? 'تعذر إرسال رابط إعادة التعيين — تحقق من البريد الإلكتروني' : 'Could not send reset link — check the email');
+    } finally {
+      setResetBusy(false);
+    }
+  };
+
   if (next) return <Redirect href={next} />;
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={{ flex: 1 }}
-      className="bg-background"
-    >
-      <Screen>
-      {/* Brand */}
-      <View className="mt-2 items-center">
-        <View
-          className="h-16 w-16 items-center justify-center rounded-3xl"
-          style={{ backgroundColor: '#2563EB', shadowColor: '#2563EB', shadowOpacity: 0.35, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 6 }}
-        >
-          <Stethoscope size={30} color="#FFFFFF" strokeWidth={2.2} />
-        </View>
-        <Text className="mt-3 text-2xl font-extrabold tracking-tight">
-          <Text className="text-primary">Dent</Text>
-          <Text className="text-slate-900"> Hub</Text>
-        </Text>
-        <Text className="mt-1 text-xs text-slate-400">
-          {ar ? 'منصة الأطباء والمكاتب والمختبرات' : 'Platform for dentists, offices & labs'}
-        </Text>
-      </View>
-
-      {/* Account type */}
-      <View className="mt-7">
-        <Text className="mb-3 px-1 text-xs font-bold uppercase tracking-wide text-slate-400">
-          {ar ? 'نوع الحساب' : 'Account type'}
-        </Text>
-        <View className="flex-row flex-wrap justify-between gap-y-3">
-          {ROLES.map((opt) => {
-            const active = accountType === opt.id;
-            const Icon = opt.icon;
-            return (
-              <Pressable
-                key={opt.id}
-                onPress={() => {
-                  setAccountType(opt.id);
-                  setError('');
-                }}
-                className={cn(
-                  'w-[48.5%] flex-col items-center gap-2 rounded-3xl border-2 px-2 py-4',
-                  active ? cn(opt.activeBg, opt.activeRing) : 'border-transparent bg-slate-50',
-                )}
-                style={
-                  active
-                    ? { shadowColor: opt.iconHex, shadowOpacity: 0.18, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 3 }
-                    : undefined
-                }
-              >
-                {active && (
-                  <View
-                    className="absolute -end-1.5 -top-1.5 h-5 w-5 items-center justify-center rounded-full border-2 border-white"
-                    style={{ backgroundColor: opt.iconHex }}
-                  >
-                    <Check size={11} color="#FFFFFF" strokeWidth={3} />
-                  </View>
-                )}
-                <View className="h-12 w-12 flex-row items-center justify-center rounded-2xl bg-white">
-                  <Icon size={26} color={active ? opt.iconHex : '#94A3B8'} />
-                </View>
-                <Text className={cn('text-center text-xs font-bold leading-tight', active ? opt.activeText : 'text-slate-600')}>
-                  {ar ? opt.ar : opt.en}
-                </Text>
-                <Text className="text-center text-[10px] leading-tight text-slate-400">
-                  {ar ? opt.arDesc : opt.enDesc}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
-
-      {/* Sign in / Sign up tabs */}
-      <View className="mt-6 flex-row gap-1.5 rounded-full bg-slate-100/80 p-1.5">
-        {(['signin', 'signup'] as const).map((m) => {
-          const activeTab = mode === m;
-          return (
-            <Pressable
-              key={m}
-              onPress={() => {
-                setMode(m);
-                setError('');
-              }}
-              // No shadow at all — a transparent Pressable with elevation
-              // still paints a faint halo behind the inactive tab on Android.
-              // A solid fill marks the active tab instead (also sidesteps
-              // the NativeWind 4.2.6 + RN 0.86 crash from toggling shadow-*
-              // classes between renders — see labs-office.tsx).
-              className="h-11 flex-1 items-center justify-center rounded-full"
-              style={activeTab ? { backgroundColor: '#2563EB' } : undefined}
-            >
-              <Text className={cn('text-sm font-bold', activeTab ? 'text-white' : 'text-slate-500')}>
-                {m === 'signin' ? (ar ? 'تسجيل دخول' : 'Sign in') : ar ? 'إنشاء حساب' : 'Create account'}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      {/* Form */}
-      <View className="mt-4 gap-3 rounded-3xl border border-slate-100 bg-card p-4 shadow-sm">
-        {mode === 'signup' && (
-          <>
-            <Input
-              value={name}
-              onChangeText={(t) => {
-                setName(t);
-                setError('');
-              }}
-              placeholder={
-                accountType === 'dentist'
-                  ? ar
-                    ? 'الاسم الكامل'
-                    : 'Full name'
-                  : ar
-                    ? 'اسم المكتب / الشركة / المختبر'
-                    : 'Office / Company / Lab name'
-              }
-              leftIcon={<User size={18} color="#94A3B8" />}
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }} className="bg-background">
+      <SafeAreaView className="flex-1 bg-background" style={{ flex: 1 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+          {/* Hero */}
+          <View style={{ height: 260 }} className="w-full overflow-hidden">
+            <Image
+              source={require('../../assets/login/hero-bg.jpg')}
+              resizeMode="cover"
+              style={{ position: 'absolute', width: '100%', height: '100%' }}
             />
+            <View style={{ position: 'absolute', width: '100%', height: '100%', backgroundColor: 'rgba(30, 64, 175, 0.62)' }} />
+            <View className="flex-1 items-center justify-center px-8">
+              <View
+                className="h-[72px] w-[72px] items-center justify-center rounded-[26px] bg-white"
+                style={{ shadowColor: '#0F172A', shadowOpacity: 0.25, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 8 }}
+              >
+                <Stethoscope size={32} color="#2563EB" strokeWidth={2.2} />
+              </View>
+              <Text className="mt-3 text-base font-bold text-white/90">
+                {ar ? 'مرحباً بك في' : 'Welcome to'}
+              </Text>
+              <Text className="text-center text-xl font-extrabold text-white">
+                {ar ? 'منصة الأسنان المتكاملة' : 'The Integrated Dental Platform'}
+              </Text>
+              <Text className="mt-1 text-center text-xs font-medium text-white/80">
+                {ar ? 'حلول رقمية لمجتمع طب الأسنان' : 'Digital solutions for the dental community'}
+              </Text>
+            </View>
+          </View>
 
-            {accountType === 'dentist' && (
-              <>
-                <Input
-                  value={surname}
-                  onChangeText={setSurname}
-                  placeholder={ar ? 'اللقب (اختياري)' : 'Surname (optional)'}
+          {/* Sheet */}
+          <View
+            className="-mt-6 flex-1 rounded-t-[32px] bg-card px-5 pb-10 pt-7"
+            style={{ shadowColor: '#0F172A', shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: -6 }, elevation: 6 }}
+          >
+            {/* Account type */}
+            <Text className="mb-3 text-center text-xs font-bold text-slate-400">
+              {ar ? 'اختر نوع حسابك للمتابعة' : 'Choose your account type to continue'}
+            </Text>
+            <View className="mb-6 flex-row justify-between gap-2">
+              {ROLES.map((opt) => {
+                const active = accountType === opt.id;
+                return (
+                  <Pressable
+                    key={opt.id}
+                    onPress={() => {
+                      setAccountType(opt.id);
+                      setError('');
+                    }}
+                    className="flex-1 items-center gap-1.5"
+                  >
+                    <View
+                      className={cn('h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border-2', active ? opt.activeBg : 'border-transparent bg-slate-50')}
+                      style={active ? { borderColor: opt.iconHex } : undefined}
+                    >
+                      <Image source={opt.icon} style={{ width: 34, height: 34 }} resizeMode="contain" />
+                    </View>
+                    <Text numberOfLines={2} className={cn('text-center text-[10px] font-bold leading-tight', active ? opt.activeText : 'text-slate-500')}>
+                      {ar ? opt.ar : opt.en}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {mode === 'signup' && (
+              <View className="mb-3 gap-3">
+                <LoginInput
+                  value={name}
+                  onChangeText={(t) => {
+                    setName(t);
+                    setError('');
+                  }}
+                  placeholder={
+                    accountType === 'dentist'
+                      ? ar
+                        ? 'الاسم الكامل'
+                        : 'Full name'
+                      : ar
+                        ? 'اسم المكتب / الشركة / المختبر'
+                        : 'Office / Company / Lab name'
+                  }
+                  icon={<User size={18} color="#94A3B8" />}
                 />
+
+                {accountType === 'dentist' && (
+                  <>
+                    <LoginInput
+                      value={surname}
+                      onChangeText={setSurname}
+                      placeholder={ar ? 'اللقب (اختياري)' : 'Surname (optional)'}
+                    />
+                    <View>
+                      <Text className="mb-2 px-1 text-xs font-semibold text-slate-500">
+                        {ar ? 'الجنس' : 'Gender'}
+                      </Text>
+                      <View className="flex-row gap-2">
+                        {(['male', 'female'] as const).map((g) => (
+                          <Pressable
+                            key={g}
+                            onPress={() => {
+                              setGender(g);
+                              setError('');
+                            }}
+                            className={cn(
+                              'h-12 flex-1 items-center justify-center rounded-full border-2',
+                              gender === g ? 'border-sky-500 bg-sky-50' : 'border-transparent bg-slate-50',
+                            )}
+                          >
+                            <Text className={cn('text-sm font-semibold', gender === g ? 'text-sky-700' : 'text-slate-500')}>
+                              {g === 'male' ? (ar ? 'ذكر' : 'Male') : ar ? 'أنثى' : 'Female'}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </View>
+                    <LoginInput
+                      value={clinicName}
+                      onChangeText={setClinicName}
+                      placeholder={ar ? 'اسم العيادة (اختياري)' : 'Clinic name (optional)'}
+                    />
+                  </>
+                )}
+
                 <View>
                   <Text className="mb-2 px-1 text-xs font-semibold text-slate-500">
-                    {ar ? 'الجنس' : 'Gender'}
+                    {ar ? 'المحافظة / المدينة' : 'Governorate / City'}
                   </Text>
-                  <View className="flex-row gap-2">
-                    {(['male', 'female'] as const).map((g) => (
-                      <Pressable
-                        key={g}
-                        onPress={() => {
-                          setGender(g);
-                          setError('');
-                        }}
-                        className={cn(
-                          'h-11 flex-1 items-center justify-center rounded-xl border-2',
-                          gender === g ? 'border-sky-500 bg-sky-50' : 'border-transparent bg-slate-50',
-                        )}
-                      >
-                        <Text className={cn('text-sm font-semibold', gender === g ? 'text-sky-700' : 'text-slate-500')}>
-                          {g === 'male' ? (ar ? 'ذكر' : 'Male') : ar ? 'أنثى' : 'Female'}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <View className="flex-row gap-1.5 pb-1">
+                      {CITIES.map((c) => (
+                        <Pressable
+                          key={c.id}
+                          onPress={() => setCity(c.id)}
+                          className={cn(
+                            'h-8 items-center justify-center rounded-full border px-3',
+                            city === c.id ? 'border-sky-500 bg-sky-500' : 'border-slate-200 bg-white',
+                          )}
+                        >
+                          <Text className={cn('text-[11px] font-bold', city === c.id ? 'text-white' : 'text-slate-600')}>
+                            {ar ? c.ar : c.en}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </ScrollView>
                 </View>
-                <Input
-                  value={clinicName}
-                  onChangeText={setClinicName}
-                  placeholder={ar ? 'اسم العيادة (اختياري)' : 'Clinic name (optional)'}
-                />
-              </>
+              </View>
             )}
 
-            <View>
-              <Text className="mb-2 px-1 text-xs font-semibold text-slate-500">
-                {ar ? 'المحافظة / المدينة' : 'Governorate / City'}
-              </Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View className="flex-row gap-1.5 pb-1">
-                  {CITIES.map((c) => (
-                    <Pressable
-                      key={c.id}
-                      onPress={() => setCity(c.id)}
-                      className={cn(
-                        'h-8 items-center justify-center rounded-full border px-3',
-                        city === c.id ? 'border-sky-500 bg-sky-500' : 'border-slate-200 bg-white',
-                      )}
-                    >
-                      <Text className={cn('text-[11px] font-bold', city === c.id ? 'text-white' : 'text-slate-600')}>
-                        {ar ? c.ar : c.en}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </ScrollView>
+            <View className="gap-3">
+              <LoginInput
+                value={email}
+                onChangeText={(t) => {
+                  setEmail(t);
+                  setError('');
+                }}
+                placeholder={ar ? 'رقم الهاتف / البريد الإلكتروني' : 'Phone number / Email'}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoComplete="email"
+                icon={<Mail size={18} color="#94A3B8" />}
+              />
+              <LoginInput
+                value={password}
+                onChangeText={(t) => {
+                  setPassword(t);
+                  setError('');
+                }}
+                placeholder={ar ? 'كلمة المرور' : 'Password'}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                icon={<Lock size={18} color="#94A3B8" />}
+                rightIcon={
+                  <Pressable onPress={() => setShowPassword((s) => !s)} hitSlop={10}>
+                    {showPassword ? <Eye size={18} color="#94A3B8" /> : <EyeOff size={18} color="#94A3B8" />}
+                  </Pressable>
+                }
+              />
             </View>
-          </>
-        )}
 
-        <Input
-          value={email}
-          onChangeText={(t) => {
-            setEmail(t);
-            setError('');
-          }}
-          placeholder={ar ? 'رقم الهاتف / البريد الإلكتروني' : 'Phone number / Email'}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoComplete="email"
-          leftIcon={<Mail size={18} color="#94A3B8" />}
-        />
-        <Input
-          value={password}
-          onChangeText={(t) => {
-            setPassword(t);
-            setError('');
-          }}
-          placeholder={ar ? 'كلمة المرور' : 'Password'}
-          secureTextEntry={!showPassword}
-          autoCapitalize="none"
-          leftIcon={<Lock size={18} color="#94A3B8" />}
-          rightIcon={
-            <Pressable onPress={() => setShowPassword((s) => !s)} hitSlop={10}>
-              {showPassword ? (
-                <Eye size={18} color="#94A3B8" />
+            {mode === 'signin' && (
+              <View className="mt-3 flex-row justify-end">
+                <Pressable onPress={forgotPassword} disabled={resetBusy} hitSlop={8}>
+                  <Text className="text-xs font-bold text-primary">
+                    {resetBusy ? (ar ? 'جارٍ الإرسال...' : 'Sending...') : ar ? 'نسيت كلمة المرور؟' : 'Forgot password?'}
+                  </Text>
+                </Pressable>
+              </View>
+            )}
+
+            {!!error && (
+              <Text className="mt-3 rounded-xl bg-rose-50 px-4 py-2.5 text-center text-xs font-semibold leading-relaxed text-rose-600">
+                {error}
+              </Text>
+            )}
+
+            <Pressable
+              onPress={submit}
+              disabled={busy}
+              className={cn(
+                'mt-4 flex-row items-center justify-center gap-2 rounded-full',
+                busy ? 'bg-slate-300' : 'bg-[#2563EB] active:scale-[0.98]',
+              )}
+              style={{
+                height: 54,
+                shadowColor: '#2563EB',
+                shadowOpacity: busy ? 0 : 0.3,
+                shadowRadius: 14,
+                shadowOffset: { width: 0, height: 6 },
+                elevation: busy ? 0 : 5,
+              }}
+            >
+              {busy ? (
+                <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <EyeOff size={18} color="#94A3B8" />
+                <>
+                  <Text className="text-sm font-bold text-white">
+                    {mode === 'signin' ? (ar ? 'تسجيل الدخول' : 'Sign in') : ar ? 'إنشاء حساب' : 'Sign up'}
+                  </Text>
+                  {ar ? <ArrowLeft size={16} color="#FFFFFF" /> : <ArrowRight size={16} color="#FFFFFF" />}
+                </>
               )}
             </Pressable>
-          }
-        />
 
-        {!!error && (
-          <Text className="rounded-xl bg-rose-50 px-4 py-2.5 text-center text-xs font-semibold leading-relaxed text-rose-600">
-            {error}
-          </Text>
-        )}
+            <View className="my-5 flex-row items-center gap-3">
+              <View className="h-px flex-1 bg-slate-200" />
+              <Text className="text-xs font-semibold text-slate-400">{ar ? 'أو' : 'or'}</Text>
+              <View className="h-px flex-1 bg-slate-200" />
+            </View>
 
-        <Pressable
-          onPress={submit}
-          disabled={busy}
-          className={cn(
-            'flex-row items-center justify-center gap-2 rounded-full shadow-lg',
-            busy ? 'bg-slate-300' : 'bg-[#2563EB] active:scale-[0.98]',
-          )}
-          style={{ height: 52 }}
-        >
-          {busy ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <>
-              <Text className="text-sm font-bold text-white">
-                {mode === 'signin'
-                  ? ar
-                    ? 'تسجيل الدخول'
-                    : 'Sign in'
-                  : ar
-                    ? 'إنشاء حساب'
-                    : 'Sign up'}
-              </Text>
-              {ar ? (
-                <ArrowLeft size={16} color="#FFFFFF" />
-              ) : (
-                <ArrowRight size={16} color="#FFFFFF" />
-              )}
-            </>
-          )}
-        </Pressable>
-      </View>
-      </Screen>
+            {mode === 'signin' ? (
+              <Pressable
+                onPress={() => {
+                  setMode('signup');
+                  setError('');
+                }}
+                className="h-14 flex-row items-center justify-center gap-2 rounded-full border-2 border-primary/30"
+              >
+                <User size={16} color="#2563EB" />
+                <Text className="text-sm font-bold text-primary">{ar ? 'إنشاء حساب جديد' : 'Create new account'}</Text>
+              </Pressable>
+            ) : (
+              <Pressable
+                onPress={() => {
+                  setMode('signin');
+                  setError('');
+                }}
+                className="items-center py-2"
+              >
+                <Text className="text-xs font-semibold text-slate-500">
+                  {ar ? 'لديك حساب بالفعل؟ ' : 'Already have an account? '}
+                  <Text className="font-bold text-primary">{ar ? 'تسجيل الدخول' : 'Sign in'}</Text>
+                </Text>
+              </Pressable>
+            )}
+          </View>
+        </ScrollView>
+      </SafeAreaView>
     </KeyboardAvoidingView>
   );
 }

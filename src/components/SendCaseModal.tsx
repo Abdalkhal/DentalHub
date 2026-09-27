@@ -150,6 +150,32 @@ export function SendCaseModal({ labId, labName, open, onClose }: SendCaseModalPr
         material,
       });
 
+      // Sent right after the case doc exists, and *before* the file upload
+      // below — that upload can throw (bad network, storage rules, a huge
+      // file) and was previously in the same try block ahead of this, which
+      // silently skipped the notification entirely on failure, on top of the
+      // write itself being retried here since a lab depends on this to know
+      // a case arrived at all (see NotificationBell).
+      const notifyPayload = {
+        userId: labId,
+        title: ar ? "طلب حالة جديدة" : "New Case Request",
+        body: ar
+          ? `قام د. ${order.doctor} بطلب حالة جديدة للمريض ${order.patient}.`
+          : `Dr. ${order.doctor} requested a new case for patient ${order.patient}.`,
+        type: "order_new" as const,
+        orderId: order.id,
+      };
+      try {
+        await createNotification(notifyPayload);
+      } catch (notifyErr) {
+        console.warn("Failed to create case notification, retrying once:", notifyErr);
+        try {
+          await createNotification(notifyPayload);
+        } catch (retryErr) {
+          console.warn("Case notification retry also failed:", retryErr);
+        }
+      }
+
       const attachments = await uploadFiles(order.id);
 
       if (attachments.length > 0) {
@@ -161,18 +187,6 @@ export function SendCaseModal({ labId, labName, open, onClose }: SendCaseModalPr
           updatedAt: new Date().toISOString(),
         }, { merge: true });
       }
-
-      try {
-        await createNotification({
-          userId: labId,
-          title: ar ? "طلب حالة جديدة" : "New Case Request",
-          body: ar
-            ? `قام د. ${order.doctor} بطلب حالة جديدة للمريض ${order.patient}.`
-            : `Dr. ${order.doctor} requested a new case for patient ${order.patient}.`,
-          type: "order_new",
-          orderId: order.id,
-        });
-      } catch {}
 
       setDone(true);
     } catch (err) {

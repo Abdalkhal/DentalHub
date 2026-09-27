@@ -3,7 +3,7 @@ import {
   collection, query, where, orderBy, onSnapshot,
   updateDoc, doc, writeBatch, setDoc,
 } from "firebase/firestore";
-import { db } from "@/integrations/firebase/client";
+import { auth, db } from "@/integrations/firebase/client";
 import { Bell, CheckCheck, Package, Truck, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "@tanstack/react-router";
@@ -19,14 +19,19 @@ type Notification = {
   orderId?: string;
   invoiceId?: string;
   expiresAt?: number;
+  /** The account that triggered this notification — required by the
+   * `notifications` Firestore rule (must equal the writer's own uid) so an
+   * arbitrary signed-in account can't forge a notification into someone
+   * else's feed under a fake identity. */
+  senderId?: string;
   senderName?: string;
   senderPhotoURL?: string;
 };
 
-export function createNotification(data: Omit<Notification, "id" | "isRead" | "createdAt" | "expiresAt">) {
+export function createNotification(data: Omit<Notification, "id" | "isRead" | "createdAt" | "expiresAt" | "senderId">) {
   const id = `${data.userId}_${Date.now()}`;
   return setDoc(doc(db, "notifications", id), {
-    ...data, id, isRead: false, createdAt: Date.now(), expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+    ...data, id, senderId: auth.currentUser?.uid ?? "", isRead: false, createdAt: Date.now(), expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
   });
 }
 
