@@ -19,7 +19,7 @@ import {
   sendPasswordResetEmail,
 } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { ArrowLeft, ArrowRight, Eye, EyeOff, Lock, Mail, Stethoscope, User } from 'lucide-react-native';
+import { ArrowLeft, ArrowRight, Eye, EyeOff, Lock, Mail, User } from 'lucide-react-native';
 
 import { Text } from '@/components/ui';
 import { auth, db } from '@/integrations/firebase/client';
@@ -246,31 +246,15 @@ export default function LoginScreen() {
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }} className="bg-background">
       <SafeAreaView className="flex-1 bg-background" style={{ flex: 1 }}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
-          {/* Hero */}
+          {/* Hero — the banner image itself already carries the Dent Hub logo
+              and welcome text, so no text/icon is rendered on top of it here
+              (that used to duplicate the same message a second time). */}
           <View style={{ height: 260 }} className="w-full overflow-hidden">
             <Image
               source={require('../../assets/login/hero-bg.jpg')}
               resizeMode="cover"
-              style={{ position: 'absolute', width: '100%', height: '100%' }}
+              style={{ width: '100%', height: '100%' }}
             />
-            <View style={{ position: 'absolute', width: '100%', height: '100%', backgroundColor: 'rgba(30, 64, 175, 0.62)' }} />
-            <View className="flex-1 items-center justify-center px-8">
-              <View
-                className="h-[72px] w-[72px] items-center justify-center rounded-[26px] bg-white"
-                style={{ shadowColor: '#0F172A', shadowOpacity: 0.25, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 8 }}
-              >
-                <Stethoscope size={32} color="#2563EB" strokeWidth={2.2} />
-              </View>
-              <Text className="mt-3 text-base font-bold text-white/90">
-                {ar ? 'مرحباً بك في' : 'Welcome to'}
-              </Text>
-              <Text className="text-center text-xl font-extrabold text-white">
-                {ar ? 'منصة الأسنان المتكاملة' : 'The Integrated Dental Platform'}
-              </Text>
-              <Text className="mt-1 text-center text-xs font-medium text-white/80">
-                {ar ? 'حلول رقمية لمجتمع طب الأسنان' : 'Digital solutions for the dental community'}
-              </Text>
-            </View>
           </View>
 
           {/* Sheet */}

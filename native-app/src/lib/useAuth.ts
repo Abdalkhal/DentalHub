@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
-import { collection, query, where, onSnapshot, doc, getDoc } from "firebase/firestore";
+import { onSnapshot, doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/integrations/firebase/client";
 import type { UserRoleDoc, AppRole } from "@/integrations/firebase/types";
 
@@ -63,6 +63,16 @@ export function useUserRole() {
   // once and just kept it, with nothing to tell it the doc had changed. A
   // live `onSnapshot`, matching every other Firestore read in this app,
   // pushes the update to every mounted screen the moment the doc is saved.
+  //
+  // Reads the doc directly by id (== uid, by construction — every
+  // `user_roles` doc is written via `doc(db, "user_roles", uid)`) rather
+  // than a `where("userId", "==", uid)` collection query. The security rule
+  // for this collection is `request.auth.uid == userId` bound from the
+  // `{userId}` path segment (the doc id), which Firestore can only prove
+  // holds for a direct get-by-id — it cannot verify it for an arbitrary
+  // field-filtered query, so that query was being rejected outright
+  // ("Missing or insufficient permissions") for every signed-in user,
+  // silently landing everyone on the roleless fallback UI.
   useEffect(() => {
     if (!user) {
       setRole(null);
@@ -70,11 +80,10 @@ export function useUserRole() {
       return () => {};
     }
     setLoading(true);
-    const q = query(collection(db, "user_roles"), where("userId", "==", user.uid));
     const unsub = onSnapshot(
-      q,
+      doc(db, "user_roles", user.uid),
       (snap) => {
-        setRole(snap.empty ? null : (snap.docs[0].data() as UserRoleDoc));
+        setRole(snap.exists() ? (snap.data() as UserRoleDoc) : null);
         setLoading(false);
       },
       () => {

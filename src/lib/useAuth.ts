@@ -3,7 +3,7 @@ import type { User } from "firebase/auth";
 import { onAuthStateChanged } from "firebase/auth";
 import { useQuery } from "@tanstack/react-query";
 import { auth, db } from "@/integrations/firebase/client";
-import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import type { UserRoleDoc, AppRole } from "@/integrations/firebase/types";
 
 export function getAccountDashboard(role: AppRole): string {
@@ -45,15 +45,22 @@ export function useSession() {
 export function useUserRole() {
   const { user, loading: authLoading } = useSession();
   const userId = user?.uid;
+  // Reads the doc directly by id (== uid, by construction — every
+  // `user_roles` doc is written via `doc(db, "user_roles", uid)`) rather
+  // than a `where("userId", "==", uid)` collection query. The security rule
+  // for this collection is `request.auth.uid == userId` bound from the
+  // `{userId}` path segment (the doc id), which Firestore can only prove
+  // holds for a direct get-by-id — it cannot verify it for an arbitrary
+  // field-filtered query, so that query was being rejected outright
+  // ("Missing or insufficient permissions") for every signed-in user,
+  // silently landing everyone on the roleless fallback UI.
   const q = useQuery({
     queryKey: ["user-role", userId],
     enabled: !!userId,
     staleTime: 0,
     queryFn: async (): Promise<UserRoleDoc | null> => {
-      const q = query(collection(db, "user_roles"), where("userId", "==", userId!));
-      const snap = await getDocs(q);
-      if (snap.empty) return null;
-      return snap.docs[0].data() as UserRoleDoc;
+      const snap = await getDoc(doc(db, "user_roles", userId!));
+      return snap.exists() ? (snap.data() as UserRoleDoc) : null;
     },
   });
   return { user, role: q.data ?? null, loading: authLoading || q.isLoading };

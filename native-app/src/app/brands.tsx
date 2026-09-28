@@ -122,7 +122,13 @@ export default function BrandsScreen() {
   }, [filtered, ar]);
 
   return (
-    <Screen>
+    // `scroll={false}`: this page's own SectionList is a vertical
+    // VirtualizedList — nesting it inside Screen's default ScrollView (also
+    // vertical) triggers RN's "VirtualizedLists should never be nested
+    // inside plain ScrollViews with the same orientation" warning and breaks
+    // the list's windowing/virtualization. The SectionList below already
+    // scrolls itself (`flex-1` + its own contentContainerStyle).
+    <Screen scroll={false}>
       <Text className="text-xl font-extrabold text-slate-800">
         {ar ? 'البراندات' : 'Brands'}
       </Text>

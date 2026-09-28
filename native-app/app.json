@@ -55,9 +55,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "backgroundColor": "#EFF5FC",
+          "image": "./assets/images/splash-branded.png",
+          "resizeMode": "cover"
         }
       ],
       "expo-image",
@@ -81,7 +81,7 @@
         "projectId": "e631dca8-3a36-4416-82d8-9389cd4ad63b"
       }
     },
-    "owner": "khaliqedan",
+    "owner": "khaliqedans-team",
     "runtimeVersion": {
       "policy": "appVersion"
     },

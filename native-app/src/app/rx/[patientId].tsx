@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, Share, TextInput, View } from 'react-native';
+import { Alert, FlatList, Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, Share, TextInput, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import {
   Building2,
@@ -514,12 +514,28 @@ function AddMedicineSheet({
             })}
           </ScrollView>
 
-          <ScrollView className="mt-2" contentContainerClassName="gap-2.5 pb-2">
-            {list.map((m) => {
+          {/* FlatList, not a ScrollView.map() — the catalog is ~177 items,
+              each with its own remote image (KIN/LACALUT/WISDOM's own
+              sites). A plain ScrollView mounts every row (and so starts
+              every image's network fetch) the instant this sheet opens;
+              virtualizing means only the rows actually scrolled into view
+              ever mount, so only their images load. */}
+          <FlatList
+            className="mt-2"
+            data={list}
+            keyExtractor={(m) => m.id}
+            contentContainerClassName="gap-2.5 pb-2"
+            initialNumToRender={10}
+            maxToRenderPerBatch={10}
+            windowSize={7}
+            removeClippedSubviews
+            ListEmptyComponent={
+              <Text className="py-6 text-center text-xs text-slate-400">{ar ? 'لا نتائج' : 'No results'}</Text>
+            }
+            renderItem={({ item: m }) => {
               const fav = favs.includes(m.id);
               return (
                 <View
-                  key={m.id}
                   className="flex-row items-center gap-2 rounded-2xl border bg-white p-3"
                   style={fav ? { borderColor: 'rgba(59,130,246,0.4)' } : { borderColor: '#E2E8F0' }}
                 >
@@ -561,11 +577,8 @@ function AddMedicineSheet({
                   </Pressable>
                 </View>
               );
-            })}
-            {list.length === 0 && (
-              <Text className="py-6 text-center text-xs text-slate-400">{ar ? 'لا نتائج' : 'No results'}</Text>
-            )}
-          </ScrollView>
+            }}
+          />
         </View>
       </View>
       </KeyboardAvoidingView>

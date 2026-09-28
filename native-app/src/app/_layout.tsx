@@ -6,11 +6,13 @@ import { Urbanist_400Regular, Urbanist_500Medium, Urbanist_600SemiBold, Urbanist
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 
+import { StyleSheet, View } from 'react-native';
+
 import '@/global.css';
 import '@/lib/polyfills';
 import { hydrateStorage } from '@/lib/storage';
 import { LanguageProvider, useI18n, type DictKey } from '@/lib/i18n';
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
+import { AnimatedSplashOverlay, SplashArt } from '@/components/animated-icon';
 import { ToastHost } from '@/components/ToastHost';
 import { CartHeaderButton } from '@/components/CartHeaderButton';
 
@@ -127,7 +129,18 @@ export default function RootLayout() {
     }
   }, [ready, fontsLoaded, fontError]);
 
-  if (!ready || (!fontsLoaded && !fontError)) return null;
+  // The native splash (expo-splash-screen) is still held open at this point
+  // (preventAutoHideAsync above), but it only covers this if it hasn't
+  // already been dismissed for other reasons — rendering the same branded
+  // art here too means there's never a genuinely blank/black frame while
+  // storage hydrates and fonts load, whatever the native splash is doing.
+  if (!ready || (!fontsLoaded && !fontError)) {
+    return (
+      <View style={StyleSheet.absoluteFill}>
+        <SplashArt />
+      </View>
+    );
+  }
 
   // No <SafeAreaProvider> here: expo-router's ExpoRoot already wraps the
   // whole app in one (see node_modules/expo-router/build/ExpoRoot.js), so
