@@ -1,0 +1,66 @@
+# EAS Build looks for .easignore at the GIT REPO ROOT specifically
+# (it runs `git rev-parse --show-toplevel`, not the Expo project directory
+# — verified by reading eas-cli's own source, vcs/clients/git.js). When
+# present, it COMPLETELY REPLACES every .gitignore in the repo for what
+# gets uploaded to the build — it does not merge with them. So this file
+# is the union of the root .gitignore and native-app/.gitignore, with two
+# deliberate omissions: native-app/google-services.json and
+# native-app/GoogleService-Info.plist. Those two are (rightly) kept out of
+# git because this repo is public, but the build genuinely needs them
+# locally to configure Firebase natively — excluding them here makes the
+# Google Services config plugin throw ("Cannot copy google-services.json
+# ...") partway through the build instead of just degrading a feature.
+#
+# If you add a new .gitignore rule anywhere in the repo, mirror it here too
+# — this file does not fall back to .gitignore for anything.
+
+# --- from the repo root .gitignore ---
+node_modules
+dist
+dist-ssr
+.output
+.vinxi
+.tanstack/**
+.nitro
+*.local
+.wrangler/
+.dev.vars
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.env
+.firebase/
+*.lnk
+
+# --- from native-app/.gitignore (native-app/ prefix kept since some of
+#     these were anchored to that directory there) ---
+native-app/.expo/
+native-app/web-build/
+native-app/expo-env.d.ts
+native-app/.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+.metro-health-check*
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.pem
+*.tsbuildinfo
+native-app/example
+native-app/ios
+native-app/android
+
+# --- stray/unrelated directories not needed for this build ---
+branding/
+newcodebase/
+.opencode/
