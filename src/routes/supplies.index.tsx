@@ -1,7 +1,7 @@
 ﻿import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { collection, getDocs, updateDoc } from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 import { toast } from "sonner";
 import { db } from "@/integrations/firebase/client";
 import type { UserRoleDoc } from "@/integrations/firebase/types";
@@ -38,7 +38,6 @@ import {
   type SpecFieldDef,
   type SpecFieldId,
 } from "@/data/specs";
-import { useAdminStore } from "@/lib/adminStore";
 import {
   useProducts,
   useUpsertProduct,
@@ -3338,11 +3337,6 @@ type CompanyItem = {
   params: Record<string, string>;
 };
 
-function cityIdFromName(nameEn: string): string {
-  const match = CITIES.find((c) => c.en.toLowerCase() === nameEn.toLowerCase());
-  return match ? match.id : "baghdad";
-}
-
 function resolveCityId(cityValue: string | undefined | null): string {
   if (!cityValue) return "baghdad";
   const trimmed = cityValue.trim();
@@ -3361,11 +3355,12 @@ function getCityName(cityId: string, ar: boolean): string {
 function BrowseSupplies() {
   const { t, lang, dir } = useI18n();
   const Chevron = dir === "rtl" ? ChevronLeft : ChevronRight;
-  const { offices: OFFICES } = useAdminStore();
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<"default" | "rating" | "items">("default");
   const [city, setCity] = useState<string>("all");
 
+  // Only real registered supply accounts (same as native) — no admin-config
+  // demo listings mixed in.
   const { data: firestoreSupplies = [] } = useQuery({
     queryKey: ["supplies-firestore-supplies"],
     queryFn: async (): Promise<CompanyItem[]> => {
@@ -3376,15 +3371,10 @@ function BrowseSupplies() {
           const u = d.data() as UserRoleDoc;
           const matchesSupply =
             u.accountType === "supply" || (u.accountType as string) === "medical_supplies";
-          if (!matchesSupply) continue;
-
-          if (!u.city) {
-            updateDoc(d.ref, { city: DEFAULT_CITY }).catch(() => {});
-          }
-
+          if (!matchesSupply || !u.userId || !u.name) continue;
           results.push({
             id: u.userId,
-            name: { ar: u.name || "", en: u.name || "" },
+            name: { ar: u.name, en: u.name },
             category: "supplies" as CompanyCategory,
             cityId: resolveCityId(u.city || DEFAULT_CITY),
             rating: 0,
@@ -3402,24 +3392,14 @@ function BrowseSupplies() {
     staleTime: 30000,
   });
 
-  const suppliesCompanies: CompanyItem[] = useMemo(() => {
-    const fromOffices = OFFICES.map((o) => ({
-      id: o.id,
-      name: { ar: o.ar, en: o.en },
-      category: "supplies" as CompanyCategory,
-      cityId: cityIdFromName(o.city.en),
-      rating: o.rating,
-      itemsCount: o.itemsCount,
-      area: o.area,
-      route: "/supplies/$officeId",
-      params: { officeId: o.id },
-    }));
-    return [...fromOffices, ...firestoreSupplies];
-  }, [OFFICES, firestoreSupplies]);
-
+  const { data: allProducts = [] } = useProducts();
   const allCompanies = useMemo<CompanyItem[]>(() => {
-    return suppliesCompanies;
-  }, [suppliesCompanies]);
+    const counts = new Map<string, number>();
+    allProducts.forEach((p) => {
+      if (p.companyId) counts.set(p.companyId, (counts.get(p.companyId) ?? 0) + 1);
+    });
+    return firestoreSupplies.map((c) => ({ ...c, itemsCount: counts.get(c.id) ?? 0 }));
+  }, [firestoreSupplies, allProducts]);
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();

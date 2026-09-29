@@ -1,4 +1,4 @@
-import { createFileRoute, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { MobileShell } from "@/components/MobileShell";
@@ -35,10 +35,15 @@ import {
   Settings,
   FlaskConical,
   Heart,
+  MessageCircle,
+  MessageSquare,
+  Send,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsFavorited, toggleFavorite } from "@/lib/favoritesStore";
 import { addToCart } from "@/lib/cartStore";
+import { useUserRole } from "@/lib/useAuth";
+import { LabRxFormModal } from "@/components/LabRxFormModal";
 import imgGeneral from "@/assets/branch-general.png";
 import imgOperative from "@/assets/branch-operative.png";
 import imgEndodontic from "@/assets/branch-endodontic.png";
@@ -113,18 +118,21 @@ const ROLE_LABELS: Record<string, { ar: string; en: string }> = {
   dentist: { ar: "طبيب أسنان", en: "Dentist" },
   supply: { ar: "مكتب مستلزمات", en: "Supplies Office" },
   implant: { ar: "شركة زرعات", en: "Implant Company" },
+  lab: { ar: "مختبر", en: "Laboratory" },
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
   implant: "text-violet-600 bg-violet-50",
   supply: "text-emerald-600 bg-emerald-50",
   dentist: "text-amber-600 bg-amber-50",
+  lab: "text-sky-600 bg-sky-50",
 };
 
 const ACCOUNT_TYPE_LETTER: Record<string, string> = {
   implant: "ز",
   supply: "م",
   dentist: "ط",
+  lab: "خ",
 };
 
 function ProfilePage() {
@@ -133,6 +141,10 @@ function ProfilePage() {
   const ar = lang === "ar";
 
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [showSendCase, setShowSendCase] = useState(false);
+  const { user, role } = useUserRole();
+  const isDentistViewer = role?.accountType === "dentist";
+  const officeFavorited = useIsFavorited(accountId);
 
   const routerState = useRouterState({
     select: (s) => s.location.state as { openProductId?: string } | null,
@@ -270,7 +282,32 @@ function ProfilePage() {
               )}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="font-display font-bold text-xl text-slate-800">{displayName}</p>
+              <div className="flex items-start justify-between gap-2">
+                <p className="font-display font-bold text-xl text-slate-800">{displayName}</p>
+                {isDentistViewer && (
+                  <button
+                    onClick={() =>
+                      toggleFavorite(
+                        {
+                          id: accountId,
+                          title: displayName,
+                          vendor: displayRole,
+                          price: 0,
+                          currency: "USD",
+                          imageUrl: account.photoURL || undefined,
+                          addedAt: new Date().toISOString(),
+                          kind: "office",
+                        },
+                        lang,
+                      )
+                    }
+                    className="size-10 shrink-0 rounded-full bg-white/80 border border-slate-200 flex items-center justify-center hover:bg-white transition"
+                    aria-label={officeFavorited ? "Remove from favorites" : "Add to favorites"}
+                  >
+                    <Heart className={cn("size-[18px]", officeFavorited ? "fill-red-500 text-red-500" : "text-red-500")} />
+                  </button>
+                )}
+              </div>
               <span
                 className={`inline-block text-[11px] font-semibold px-2.5 py-1 rounded-full mt-1.5 ${categoryColor}`}
               >
@@ -297,12 +334,21 @@ function ProfilePage() {
           <div className="flex gap-2.5">
             {account.phone && (
               <a
+                href={`tel:${account.phone}`}
+                className="flex-1 h-12 rounded-2xl bg-emerald-500 text-white text-sm font-bold flex items-center justify-center gap-2 hover:bg-emerald-600 transition shadow-sm"
+              >
+                <Phone className="size-4" />
+                {ar ? "اتصال" : "Call"}
+              </a>
+            )}
+            {account.phone && (
+              <a
                 href={getWhatsAppLink(account.phone)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex-1 h-12 rounded-2xl bg-emerald-50 text-emerald-700 text-sm font-bold flex items-center justify-center gap-2 hover:bg-emerald-100 transition shadow-sm"
               >
-                <Phone className="size-4" />
+                <MessageCircle className="size-4" />
                 {ar ? "واتساب" : "WhatsApp"}
               </a>
             )}
@@ -319,6 +365,30 @@ function ProfilePage() {
             )}
           </div>
         )}
+
+        {(!!user && user.uid !== accountId) || (account.accountType === "lab" && isDentistViewer) ? (
+          <div className="flex flex-col gap-2.5 md:flex-row">
+            {!!user && user.uid !== accountId && (
+              <Link
+                to="/messages"
+                search={{ with: accountId, withName: displayName }}
+                className="flex-1 h-12 rounded-2xl bg-[#2563EB] text-white text-sm font-bold flex items-center justify-center gap-2 hover:bg-[#1D4ED8] transition shadow-sm"
+              >
+                <MessageSquare className="size-4" />
+                {ar ? "مراسلة" : "Message"}
+              </Link>
+            )}
+            {account.accountType === "lab" && isDentistViewer && (
+              <button
+                onClick={() => setShowSendCase(true)}
+                className="flex-1 h-12 rounded-2xl bg-emerald-500 text-white text-sm font-bold flex items-center justify-center gap-2 hover:bg-emerald-600 transition shadow-sm"
+              >
+                <Send className="size-4" />
+                {ar ? "إرسال حالة للمختبر" : "Send case to lab"}
+              </button>
+            )}
+          </div>
+        ) : null}
 
         {/* ── Offers ────────────────────────────── */}
         {offers.length > 0 && (
@@ -478,7 +548,7 @@ function ProfilePage() {
               {ar ? "المنتجات" : "Products"}
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4">
-              {products.slice(0, 6).map((p) => {
+              {products.map((p) => {
                 const urls = p.images.map((path) => filterUrls[path]).filter(Boolean);
                 return (
                   <div
@@ -508,13 +578,6 @@ function ProfilePage() {
                 );
               })}
             </div>
-            {products.length > 6 && (
-              <p className="text-xs text-muted-foreground text-center mt-2">
-                {ar
-                  ? `و ${products.length - 6} منتجات أخرى`
-                  : `And ${products.length - 6} more products`}
-              </p>
-            )}
           </div>
         )}
 
@@ -526,6 +589,17 @@ function ProfilePage() {
           </div>
         )}
       </div>
+      {account.accountType === "lab" && (
+        <LabRxFormModal
+          labId={accountId}
+          labName={displayName}
+          labPhone={account.phone || ""}
+          labAddress={account.address || ""}
+          labInstagram={(account as { instagram?: string }).instagram || ""}
+          open={showSendCase}
+          onClose={() => setShowSendCase(false)}
+        />
+      )}
       {selectedProduct && (
         <ProductDetailsModal
           product={selectedProduct}
@@ -595,6 +669,7 @@ function ProductCard({
             currency: (product.currency as "USD" | "IQD") || "USD",
             imageUrl: urls[0],
             addedAt: new Date().toISOString(),
+            kind: "product",
           }, ar ? "ar" : "en");
         }}
         className="absolute top-3 right-3 z-10 size-8 rounded-xl flex items-center justify-center transition bg-white/80 backdrop-blur border border-slate-200 hover:bg-slate-50 shadow-sm"

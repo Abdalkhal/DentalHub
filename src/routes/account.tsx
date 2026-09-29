@@ -18,27 +18,19 @@ import {
   Phone,
   Check,
   ReceiptText,
+  Globe,
+  Bell,
+  Heart,
+  Megaphone,
+  LifeBuoy,
 } from "lucide-react";
+import { SUPPORT_WHATSAPP_NUMBER } from "@/lib/constants/support";
 import { auth, db } from "@/integrations/firebase/client";
 import { signOut } from "firebase/auth";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { updateProfile } from "firebase/auth";
 import { storage } from "@/integrations/firebase/client";
 import { doc, updateDoc } from "firebase/firestore";
-
-function getMapsUrl(role: {
-  latitude?: number | null;
-  longitude?: number | null;
-  mapUrl?: string | null;
-  address?: string | null;
-}): string {
-  if (role.mapUrl) return role.mapUrl;
-  if (role.latitude != null && role.longitude != null) {
-    return `https://www.google.com/maps/search/?api=1&query=${role.latitude},${role.longitude}`;
-  }
-  const addr = role.address || "Mosul, Iraq";
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`;
-}
 
 export const Route = createFileRoute("/account")({
   component: Account,
@@ -52,13 +44,14 @@ const roleLabels: Record<string, { ar: string; en: string }> = {
 };
 
 function Account() {
-  const { t, lang, dir } = useI18n();
+  const { t, lang, dir, toggle } = useI18n();
   const { role } = useUserRole();
   const navigate = useNavigate();
   const Chevron = dir === "rtl" ? ChevronLeft : ChevronRight;
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [photoURL, setPhotoURL] = useState(role?.photoURL ?? "");
+  const [showContact, setShowContact] = useState(false);
 
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isOnAccountRoot = pathname === "/account";
@@ -97,6 +90,7 @@ function Account() {
   };
 
   const isSupplier = role?.accountType === "supply" || role?.accountType === "implant";
+  const accountType = role?.accountType ?? "dentist";
 
   const rows: Array<{
     icon: typeof Settings;
@@ -104,7 +98,43 @@ function Account() {
     tone: string;
     to?: string;
     onClick?: () => void;
+    right?: string;
   }> = [
+    {
+      icon: Globe,
+      label: lang === "ar" ? "اللغة" : "Language",
+      tone: "bg-sky-100 ring-sky-200 text-sky-600",
+      onClick: toggle,
+      right: lang === "ar" ? "العربية" : "English",
+    },
+    {
+      icon: Bell,
+      label: lang === "ar" ? "الإشعارات" : "Notifications",
+      tone: "bg-rose-100 ring-rose-200 text-rose-600",
+      to: "/notifications",
+    },
+    {
+      icon: MessageCircle,
+      label: lang === "ar" ? "الرسائل" : "Messages",
+      tone: "bg-emerald-100 ring-emerald-200 text-emerald-600",
+      to: "/messages",
+    },
+    {
+      icon: Heart,
+      label: lang === "ar" ? "المفضلة" : "Favorites",
+      tone: "bg-fuchsia-100 ring-fuchsia-200 text-fuchsia-600",
+      to: "/favorites",
+    },
+    ...(accountType !== "implant" && accountType !== "lab"
+      ? [
+          {
+            icon: Megaphone,
+            label: lang === "ar" ? "العروض" : "Offers",
+            tone: "bg-emerald-100 ring-emerald-200 text-emerald-600",
+            to: "/offers",
+          },
+        ]
+      : []),
     ...(isSupplier
       ? [
           {
@@ -126,6 +156,12 @@ function Account() {
         ]
       : []),
     {
+      icon: LifeBuoy,
+      label: lang === "ar" ? "المساعدة" : "Help",
+      tone: "bg-indigo-100 ring-indigo-200 text-indigo-600",
+      to: "/account/help",
+    },
+    {
       icon: Settings,
       label: t("settings"),
       tone: "bg-[oklch(0.93_0.06_250)] ring-[oklch(0.82_0.1_250)] text-[oklch(0.45_0.18_256)]",
@@ -133,7 +169,7 @@ function Account() {
     },
 
     {
-      icon: MessageCircle,
+      icon: Phone,
       label: lang === "ar" ? "تواصل معنا" : "Contact us",
       tone: "bg-[oklch(0.93_0.06_85)] ring-[oklch(0.82_0.1_85)] text-[oklch(0.5_0.16_75)]",
       onClick: () => {
@@ -147,24 +183,6 @@ function Account() {
       to: "/account/about",
     },
   ];
-
-  const [showContact, setShowContact] = useState(false);
-
-  const formatPhoneForDisplay = (raw: string | undefined | null): string => {
-    if (!raw) return "+964 770 000 0000";
-    const digits = raw.replace(/\D/g, "");
-    if (digits.startsWith("964") && digits.length >= 10) {
-      const local = digits.slice(3);
-      return `+964 ${local.slice(0, 3)} ${local.slice(3, 6)} ${local.slice(6)}`;
-    }
-    return `+${digits}`;
-  };
-
-  const getWhatsAppLink = (raw: string | undefined | null): string => {
-    if (!raw) return "https://wa.me/9647700000000";
-    const digits = raw.replace(/\D/g, "");
-    return `https://wa.me/${digits}`;
-  };
 
   return (
     <MobileShell wide>
@@ -235,6 +253,7 @@ function Account() {
                   <r.icon className="size-5 drop-shadow-sm md:size-6" strokeWidth={2.2} />
                 </span>
                 <span className="flex-1 text-sm font-semibold md:flex-none md:text-center md:text-base">{r.label}</span>
+                {r.right && <span className="text-xs font-bold text-slate-400 md:text-sm">{r.right}</span>}
                 <Chevron className="size-4 text-muted-foreground md:hidden" />
               </>
             );
@@ -285,7 +304,7 @@ function Account() {
 
             <div className="space-y-3">
               <a
-                href={getWhatsAppLink(role?.phone)}
+                href={`https://wa.me/${SUPPORT_WHATSAPP_NUMBER}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 p-3.5 rounded-2xl bg-green-50 hover:bg-green-100 transition"
@@ -294,29 +313,9 @@ function Account() {
                   <Phone className="size-5" />
                 </span>
                 <div>
-                  <p className="text-sm font-semibold">{formatPhoneForDisplay(role?.phone)}</p>
+                  <p className="text-sm font-semibold" dir="ltr">+{SUPPORT_WHATSAPP_NUMBER}</p>
                   <p className="text-[11px] text-muted-foreground">
-                    {lang === "ar" ? "افتح في واتساب" : "Open in WhatsApp"}
-                  </p>
-                </div>
-              </a>
-
-              <a
-                href={getMapsUrl(role ?? {})}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="flex items-center gap-3 p-3.5 rounded-2xl bg-slate-50 hover:bg-amber-50 transition-colors cursor-pointer z-50 pointer-events-auto"
-              >
-                <span className="size-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
-                  <MapPin className="size-5" />
-                </span>
-                <div>
-                  <p className="text-sm font-semibold">
-                    {role?.address || (lang === "ar" ? "الموصل، العراق" : "Mosul, Iraq")}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground">
-                    {lang === "ar" ? "الموقع الجغرافي للمكتب" : "Office location"}
+                    {lang === "ar" ? "دعم Dent Hub — افتح في واتساب" : "Dent Hub support — open in WhatsApp"}
                   </p>
                 </div>
               </a>

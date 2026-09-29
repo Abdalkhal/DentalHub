@@ -194,6 +194,7 @@ function BrandDetail() {
               currency: "USD",
               imageUrl: undefined,
               addedAt: new Date().toISOString(),
+              kind: "brand",
             }}
           />
           <div className="flex items-center gap-3 md:gap-7">

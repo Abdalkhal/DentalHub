@@ -52,7 +52,7 @@ function FavoriteHeart({
       onClick={(e) => {
         e.stopPropagation();
         toggleFavorite({
-          id: productId, title, vendor, price, currency, imageUrl,
+          id: productId, title, vendor, price, currency, imageUrl, kind: "product",
           addedAt: new Date().toISOString(),
         }, lang);
       }}

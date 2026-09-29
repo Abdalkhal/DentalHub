@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { MobileShell } from "@/components/MobileShell";
 import { useI18n } from "@/lib/i18n";
 import { useFavorites, removeFavorite, type FavItem } from "@/lib/favoritesStore";
@@ -12,6 +12,22 @@ function FavoritesPage() {
   const { lang } = useI18n();
   const ar = lang === "ar";
   const items = useFavorites();
+  const navigate = useNavigate();
+
+  const openFavorite = (f: FavItem) => {
+    switch (f.kind) {
+      case "product":
+      case "implant":
+        navigate({ to: "/products/$productId", params: { productId: f.id } });
+        return;
+      case "office":
+        navigate({ to: "/profile/$accountId", params: { accountId: f.id } });
+        return;
+      default:
+        // Entries saved before `kind` existed were brands only.
+        navigate({ to: "/brands/$brandId", params: { brandId: f.id } });
+    }
+  };
 
   return (
     <MobileShell wide>
@@ -30,14 +46,29 @@ function FavoritesPage() {
         ) : (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-5 xl:grid-cols-3">
             {items.map((item: FavItem) => (
-              <div key={item.id} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-start gap-3 md:p-5 md:shadow-none md:hover:shadow-lg md:hover:border-primary/30 md:transition">
+              <div
+                key={item.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => openFavorite(item)}
+                onKeyDown={(e) => { if (e.key === "Enter") openFavorite(item); }}
+                className="cursor-pointer bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-start gap-3 hover:border-primary/30 transition md:p-5 md:shadow-none md:hover:shadow-lg"
+              >
                 <span className="size-12 shrink-0 rounded-xl bg-slate-50 flex items-center justify-center overflow-hidden md:size-16 md:rounded-2xl">{item.imageUrl ? <img src={item.imageUrl} alt="" className="size-full object-cover" /> : <Package className="size-5 text-slate-400" />}</span>
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-sm truncate md:text-base">{item.title}</p>
                   <p className="text-[11px] text-slate-500 mt-0.5">{item.vendor}</p>
-                  <p className="font-extrabold text-sm text-primary mt-1 md:text-lg md:mt-2">{item.currency === "IQD" ? `${item.price.toLocaleString()} د.ع` : `$${item.price.toFixed(2)}`}</p>
+                  {item.price > 0 && (
+                    <p className="font-extrabold text-sm text-primary mt-1 md:text-lg md:mt-2">{item.currency === "IQD" ? `${item.price.toLocaleString()} د.ع` : `$${item.price.toFixed(2)}`}</p>
+                  )}
                 </div>
-                <button onClick={() => removeFavorite(item.id, lang)} className="size-8 rounded-lg bg-rose-50 text-rose-500 flex items-center justify-center hover:bg-rose-100 shrink-0"><Trash2 className="size-3.5" /></button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); removeFavorite(item.id, lang); }}
+                  className="size-8 rounded-lg bg-rose-50 text-rose-500 flex items-center justify-center hover:bg-rose-100 shrink-0"
+                  aria-label={ar ? "إزالة" : "Remove"}
+                >
+                  <Trash2 className="size-3.5" />
+                </button>
               </div>
             ))}
           </div>

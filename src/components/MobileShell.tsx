@@ -1,11 +1,13 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Home, ShoppingBag, User, Menu, Search, Heart, Tag, ShoppingCart } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { useUserRole, getAccountDashboard } from "@/lib/useAuth";
-import { useCart } from "@/lib/cartStore";
+import { useCart, onOpenCart } from "@/lib/cartStore";
 import { CartDrawer } from "@/components/CartDrawer";
+import { useDentistOrders, useOrders as useSupplierOrders } from "@/lib/orders";
+import { useSeenOrderIds } from "@/lib/orderSeen";
 import { LabBottomTabBar } from "@/components/LabBottomTabBar";
 
 export function MobileShell({
@@ -29,6 +31,7 @@ export function MobileShell({
   const isLab = role?.accountType === "lab";
   const isWide = wide || isLab;
   const [cartOpen, setCartOpen] = useState(false);
+  useEffect(() => onOpenCart(() => setCartOpen(true)), []);
   return (
     <div className="min-h-screen w-full bg-slate-50 overflow-x-hidden flex justify-center">
       <div
@@ -93,6 +96,13 @@ function BottomTabBar({
   const cart = useCart();
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
 
+  // Unseen orders (opening an order marks it seen), same as the native tab badge.
+  const uid = role?.userId;
+  const { data: dentistOrders = [] } = useDentistOrders(isDentist ? uid : undefined);
+  const { data: supplierOrders = [] } = useSupplierOrders(!isDentist ? uid : undefined);
+  const seenIds = useSeenOrderIds(uid);
+  const unseenOrders = (isDentist ? dentistOrders : supplierOrders).filter((o) => !seenIds.has(o.id)).length;
+
   const homeTo = role?.role ? getAccountDashboard(role.role) : "/";
 
   // The desktop header's accent follows the account type, so each account
@@ -152,13 +162,18 @@ function BottomTabBar({
                 >
                   <span
                     className={cn(
-                      "size-10 rounded-2xl flex items-center justify-center transition-all ring-1",
+                      "relative size-10 rounded-2xl flex items-center justify-center transition-all ring-1",
                       active
                         ? "bg-[oklch(0.93_0.06_250)] ring-[oklch(0.82_0.1_250)] shadow-sm text-[oklch(0.45_0.18_256)]"
                         : "bg-transparent ring-transparent",
                     )}
                   >
                     <Icon className={cn("size-5 drop-shadow-sm", active && "stroke-[2.4]")} />
+                    {to === "/orders" && unseenOrders > 0 && (
+                      <span className="absolute -top-0.5 -end-0.5 h-4 min-w-4 px-1 rounded-full bg-[#EF4444] text-white text-[10px] font-bold flex items-center justify-center">
+                        {unseenOrders > 9 ? "9+" : unseenOrders}
+                      </span>
+                    )}
                   </span>
                   {label}
                 </Link>
@@ -221,6 +236,11 @@ function BottomTabBar({
                   >
                     <Icon className={cn("size-4", active && "stroke-[2.4]")} />
                     {label}
+                    {to === "/orders" && unseenOrders > 0 && (
+                      <span className="h-5 min-w-5 px-1 rounded-full bg-[#EF4444] text-white text-[10px] font-bold flex items-center justify-center">
+                        {unseenOrders > 9 ? "9+" : unseenOrders}
+                      </span>
+                    )}
                   </Link>
                 );
               })}

@@ -16,9 +16,14 @@ import dentalBridge from "@/assets/dental-bridge.png";
 import clinicHero from "@/assets/clinic-hero.jpg";
 import { BRANDS } from "@/data/brands";
 import { BrandLogo } from "@/components/BrandLogo";
-import { useProductSearch } from "@/lib/search";
+import { AdDetailModal } from "@/components/AdDetailModal";
+import { useVendorAccounts } from "@/lib/search";
+import { useProducts, useSignedImageUrls } from "@/lib/products";
+import { useActiveAds, type Ad } from "@/lib/adsStore";
+import { useQuickOrderActions } from "@/lib/quickOrders";
+import { useCart, openCart } from "@/lib/cartStore";
 import {
-  Globe, Search, ChevronLeft, ChevronRight,
+  Globe, Search, ChevronLeft, ChevronRight, X, MapPin, FlaskConical, ShoppingCart,
   ClipboardList, Sparkles, Stethoscope, User, Package, Megaphone,
 } from "lucide-react";
 
@@ -34,8 +39,6 @@ const ROLE_META: Record<Role, { ar: string; en: string }> = {
   lab: { ar: "عروض المختبر", en: "Lab Offers" },
   implant: { ar: "عروض الزرعات", en: "Implant Offers" },
 };
-
-const DEFAULT_BANNER: Banner = { id: "default", role: "lab", title: "", subtitle: "", price: "" };
 
 function loadBanners(): Banner[] {
   if (typeof window === "undefined") return [];
@@ -71,13 +74,60 @@ function Home() {
     return () => window.removeEventListener("storage", on);
   }, []);
 
-  const banners = userBanners.length ? userBanners : [DEFAULT_BANNER];
-  const banner = banners[idx] ?? banners[0];
+  // Approved ads first (each slot opens its full Ad on click), then any
+  // legacy local promo banners — same order as the native home.
+  const { data: activeAds = [] } = useActiveAds();
+  const adImagePaths = useMemo(
+    () => activeAds.map((a) => a.images[0]).filter((p): p is string => !!p),
+    [activeAds],
+  );
+  const { data: adImageUrls } = useSignedImageUrls(adImagePaths);
+  const adsForBanner = useMemo(() => {
+    const urls = adImageUrls ?? {};
+    return activeAds.filter((a) => a.images[0] && urls[a.images[0]]);
+  }, [activeAds, adImageUrls]);
+  const banners: Banner[] = useMemo(() => {
+    const urls = adImageUrls ?? {};
+    const fromAds: Banner[] = adsForBanner.map((a) => ({
+      id: a.id,
+      role: "supply",
+      title: a.title,
+      subtitle: a.description,
+      price: "",
+      image: urls[a.images[0]],
+    }));
+    return [...fromAds, ...userBanners];
+  }, [adsForBanner, adImageUrls, userBanners]);
+  const [viewingAd, setViewingAd] = useState<Ad | null>(null);
+
+  const safeIdx = banners.length ? idx % banners.length : 0;
+  const banner = banners[safeIdx];
+  const bannerAd = safeIdx < adsForBanner.length ? adsForBanner[safeIdx] : null;
   const next = () => setIdx((i) => (i + 1) % banners.length);
   const prev = () => setIdx((i) => (i - 1 + banners.length) % banners.length);
 
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    const t = setInterval(() => setIdx((i) => (i + 1) % banners.length), 4000);
+    return () => clearInterval(t);
+  }, [banners.length]);
+
   const [searchQ, setSearchQ] = useState("");
-  const { results: searchResults, loading: searchLoading } = useProductSearch(searchQ);
+  const { data: allProducts = [] } = useProducts();
+  const { data: vendorAccounts = [] } = useVendorAccounts();
+  const searchTerm = searchQ.trim().toLowerCase();
+  const accountResults = useMemo(() => {
+    if (searchTerm.length < 2) return [];
+    return vendorAccounts
+      .filter((a) => [a.name, a.location].filter(Boolean).some((v) => v.toLowerCase().includes(searchTerm)))
+      .slice(0, 5);
+  }, [searchTerm, vendorAccounts]);
+  const productResults = useMemo(() => {
+    if (searchTerm.length < 2) return [];
+    return allProducts
+      .filter((p) => [p.en, p.ar, p.brand].filter(Boolean).some((v) => v!.toLowerCase().includes(searchTerm)))
+      .slice(0, 8);
+  }, [searchTerm, allProducts]);
   const { role } = useUserRole();
   const dentistName =
     role?.accountType === "dentist"
@@ -98,6 +148,8 @@ function Home() {
   const PrevIcon = dir === "rtl" ? ChevronRight : ChevronLeft;
 
   const quickItems = useQuickOrders();
+  const { reorder } = useQuickOrderActions(quickItems, lang === "ar");
+  const cartCount = useCart().length;
   const { offers: implantOffers = [] } = useImplantOffers();
   const latestOffer = implantOffers[0];
   const quickPages = quickItems.length > 0 ? Array.from({ length: Math.ceil(quickItems.length / 3) }, (_, i) => quickItems.slice(i * 3, i * 3 + 3)) : [];
@@ -118,6 +170,21 @@ function Home() {
       <header className="px-3 pt-4 pb-2 bg-gradient-to-b from-sky-50 to-transparent md:px-6 md:pt-6 md:pb-5 md:flex md:items-center md:gap-5 lg:px-8 lg:max-w-7xl lg:mx-auto lg:w-full">
         <div className="flex items-center justify-between gap-2 md:contents">
           <div className="flex items-center gap-2 md:order-3">
+            {role?.accountType === "dentist" && (
+              <button
+                type="button"
+                onClick={openCart}
+                className="relative size-10 rounded-xl border border-slate-200 bg-white shadow-sm hover:bg-slate-100 text-slate-600 flex items-center justify-center"
+                aria-label={lang === "ar" ? "السلة" : "Cart"}
+              >
+                <ShoppingCart className="size-[18px]" />
+                {cartCount > 0 && (
+                  <span className="absolute -top-1 -end-1 h-5 min-w-5 px-1 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center">
+                    {cartCount > 9 ? "9+" : cartCount}
+                  </span>
+                )}
+              </button>
+            )}
             <button onClick={toggle} className="h-9 px-2.5 rounded-full bg-white border border-slate-200 flex items-center gap-1 text-xs font-bold text-slate-700 shadow-sm md:h-10 md:px-3.5">
               <span>{lang === "ar" ? "EN" : "AR"}</span>
               <Globe className="size-3.5 text-slate-400" />
@@ -149,38 +216,70 @@ function Home() {
             placeholder={lang === "ar" ? "ابحث عن زراعة، مادة، مختبر..." : "Search implants, materials, labs..."}
             className="w-full h-12 rounded-2xl bg-white border border-slate-200 ps-4 pe-11 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-sm md:h-11 md:rounded-full md:text-[15px]"
           />
-          <Search className="size-4 absolute top-1/2 -translate-y-1/2 end-4 text-slate-400 pointer-events-none" />
+          {searchQ.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setSearchQ("")}
+              className="absolute top-1/2 -translate-y-1/2 end-3 size-6 rounded-full bg-slate-200 flex items-center justify-center hover:bg-slate-300"
+              aria-label={lang === "ar" ? "مسح" : "Clear"}
+            >
+              <X className="size-3 text-slate-600" />
+            </button>
+          ) : (
+            <Search className="size-4 absolute top-1/2 -translate-y-1/2 end-4 text-slate-400 pointer-events-none" />
+          )}
 
-          {searchQ.length >= 2 && (
-            <div className="absolute top-full start-0 end-0 mt-1 bg-white rounded-2xl border border-slate-200 shadow-xl z-40 max-h-72 overflow-y-auto">
-              {searchLoading ? (
-                <div className="p-4 text-center text-xs text-slate-400">{lang === "ar" ? "جارٍ البحث..." : "Searching..."}</div>
-              ) : searchResults.length === 0 ? (
+          {searchTerm.length >= 2 && (
+            <div className="absolute top-full start-0 end-0 mt-1 bg-white rounded-2xl border border-slate-200 shadow-xl z-40 max-h-96 overflow-y-auto">
+              {accountResults.length === 0 && productResults.length === 0 ? (
                 <div className="p-4 text-center text-xs text-slate-400">
                   {lang === "ar" ? "لا توجد نتائج" : "No results found"}
                 </div>
               ) : (
-                searchResults.map((r) => (
-                  <Link
-                    key={`${r.type}-${r.id}`}
-                    to={r.route}
-                    onClick={() => setSearchQ("")}
-                    className="flex items-center gap-3 px-4 py-3 hover:bg-sky-50/50 transition border-b border-slate-50 last:border-0"
-                  >
-                    <span className="size-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 text-xs font-bold text-slate-500">
-                      {r.type === "product" ? "P" : r.type === "lab" ? "L" : r.type === "office" ? "O" : "!"}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold text-slate-800 truncate">{lang === "ar" ? r.titleAr : r.titleEn}</p>
-                      {r.subtitle && <p className="text-[11px] text-slate-400">{r.subtitle}</p>}
-                    </div>
-                    <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 shrink-0">
-                      {r.type === "product" ? (lang === "ar" ? "منتج" : "Product") :
-                       r.type === "lab" ? (lang === "ar" ? "مختبر" : "Lab") :
-                       r.type === "office" ? (lang === "ar" ? "مكتب" : "Office") : r.type}
-                    </span>
-                  </Link>
-                ))
+                <>
+                  {accountResults.map((a) => (
+                    <Link
+                      key={`acc-${a.id}`}
+                      to="/profile/$accountId"
+                      params={{ accountId: a.id }}
+                      onClick={() => setSearchQ("")}
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-sky-50/50 transition border-b border-slate-50 last:border-0"
+                    >
+                      <span className="size-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                        {a.category === "labs" ? <Stethoscope className="size-[18px]" /> : a.category === "implants" ? <FlaskConical className="size-[18px]" /> : <Package className="size-[18px]" />}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-slate-800 truncate">{a.name}</p>
+                        {a.location && (
+                          <p className="text-[11px] text-slate-400 flex items-center gap-1 truncate">
+                            <MapPin className="size-2.5 shrink-0" />
+                            {a.location}
+                          </p>
+                        )}
+                      </div>
+                    </Link>
+                  ))}
+                  {productResults.map((p) => (
+                    <Link
+                      key={`prod-${p.id}`}
+                      to="/products/$productId"
+                      params={{ productId: p.id }}
+                      onClick={() => setSearchQ("")}
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-sky-50/50 transition border-b border-slate-50 last:border-0"
+                    >
+                      <span className="size-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
+                        <Package className="size-[18px] text-slate-500" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-slate-800 truncate">{lang === "ar" ? p.ar || p.en : p.en || p.ar}</p>
+                        <p className="text-[11px] text-slate-400 truncate">{p.brand || (lang === "ar" ? "المورد" : "Supplier")}</p>
+                      </div>
+                      <span className="text-sm font-extrabold text-primary shrink-0">
+                        {p.currency === "IQD" ? `${p.price.toLocaleString()} د.ع` : `$${p.price.toFixed(2)}`}
+                      </span>
+                    </Link>
+                  ))}
+                </>
               )}
             </div>
           )}
@@ -195,42 +294,51 @@ function Home() {
       <div className="md:px-3 lg:px-8 lg:max-w-7xl lg:mx-auto lg:w-full lg:grid lg:grid-cols-3 lg:gap-5 lg:mt-6 lg:items-start">
       {/* Hero banner */}
       <section className="px-3 mt-3 md:mt-4 lg:col-span-3 lg:px-0 lg:mt-0">
-        {banners.length > 1 || userBanners.length > 0 ? (
-          <div className="relative rounded-3xl overflow-hidden min-h-[190px] shadow-card md:min-h-[280px] lg:min-h-[340px] lg:rounded-[32px]" style={{ background: "linear-gradient(135deg, #6bb2ee 0%, #3d86dd 50%, #1f5fb8 100%)" }}>
-            <div className="absolute -top-16 -end-14 size-52 rounded-full bg-white/15 blur-2xl pointer-events-none md:size-96 md:-top-32 md:-end-24" />
-            <div className="absolute -bottom-20 -start-14 size-48 rounded-full bg-white/10 blur-2xl pointer-events-none md:size-80 md:-bottom-32" />
-            <div className="absolute top-3 end-3 z-10">
-              <span className="inline-flex items-center justify-center size-14 rounded-full bg-white/20 text-white text-[11px] font-extrabold text-center leading-tight shadow-lg ring-2 ring-white/40">
-                {lang === "ar" ? "خصم\nخاص" : "Special\nOffer"}
-              </span>
-            </div>
-            <div className="relative flex items-center gap-3 p-4 pt-5 md:p-10 md:gap-10 lg:px-16">
-              <div className="flex-1 min-w-0 text-white">
-                <h2 className="font-display font-extrabold text-[22px] leading-tight drop-shadow-sm md:text-[40px] lg:text-[52px] md:max-w-xl">
-                  {banner.title || (lang === "ar" ? ROLE_META[banner.role].ar : ROLE_META[banner.role].en)}
-                </h2>
-                <p className="mt-2 text-white/95 text-sm leading-snug md:mt-4 md:text-lg md:max-w-lg">
-                  {banner.subtitle || (lang === "ar" ? "خصم حتى 15% على أدوات المختبرات" : "Up to 15% off lab tools")}
-                </p>
-                {banner.price && <div className="mt-1 font-display font-extrabold text-2xl text-yellow-300 drop-shadow md:mt-3 md:text-4xl">{banner.price}</div>}
-                <Link to="/supplies" className="mt-3 inline-flex h-10 px-5 rounded-full bg-white/20 text-white text-sm font-bold shadow-md hover:bg-white/30 transition items-center md:mt-7 md:h-12 md:px-8 md:text-base md:bg-white md:text-blue-700 md:hover:bg-white/90">
-                  {lang === "ar" ? "تسوق الآن" : "Shop now"}
-                </Link>
-              </div>
-              <div className="shrink-0 w-[130px] h-[140px] flex items-center justify-center md:w-[300px] md:h-[300px] lg:w-[360px] lg:h-[340px]">
-                <img src={banner.image || dentalBridge} alt="" loading="lazy" className="max-w-full max-h-full object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.35)]" />
-              </div>
+        {banner ? (
+          <div
+            role={bannerAd ? "button" : undefined}
+            tabIndex={bannerAd ? 0 : undefined}
+            onClick={() => bannerAd && setViewingAd(bannerAd)}
+            onKeyDown={(e) => { if (e.key === "Enter" && bannerAd) setViewingAd(bannerAd); }}
+            className={cn(
+              "relative rounded-3xl overflow-hidden min-h-[190px] shadow-card bg-[#2563EB] flex items-end md:min-h-[280px] lg:min-h-[340px] lg:rounded-[32px]",
+              bannerAd && "cursor-pointer",
+            )}
+          >
+            {/* Ad image fills the whole card with a dark scrim, text on top —
+                same as the native home banner. */}
+            {banner.image ? (
+              <>
+                <img src={banner.image} alt="" className="absolute inset-0 size-full object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-900/75 via-slate-900/40 to-slate-900/20" />
+              </>
+            ) : (
+              <>
+                <div className="absolute -top-16 -end-14 size-52 rounded-full bg-white/15 pointer-events-none md:size-96 md:-top-32 md:-end-24" />
+                <div className="absolute -bottom-20 -start-14 size-48 rounded-full bg-white/10 pointer-events-none md:size-80 md:-bottom-32" />
+              </>
+            )}
+            <div className="relative w-full p-5 pb-8 text-white md:p-10 md:pb-12 lg:px-16">
+              <h2 className="font-display font-extrabold text-[22px] leading-tight drop-shadow line-clamp-2 md:text-[40px] lg:text-[48px] md:max-w-3xl">
+                {banner.title || (lang === "ar" ? ROLE_META[banner.role].ar : ROLE_META[banner.role].en)}
+              </h2>
+              {banner.price && <div className="mt-2 font-display font-extrabold text-lg text-yellow-300 drop-shadow md:mt-3 md:text-3xl">{banner.price}</div>}
+              {bannerAd && (
+                <span className="mt-3 inline-flex h-9 px-4 rounded-full bg-white/20 backdrop-blur text-white text-xs font-bold items-center md:mt-5 md:h-11 md:px-6 md:text-sm">
+                  {lang === "ar" ? "عرض التفاصيل" : "View details"}
+                </span>
+              )}
             </div>
             {banners.length > 1 && (
               <>
-                <button onClick={prev} className="absolute top-1/2 -translate-y-1/2 start-2 size-8 rounded-full bg-white/25 hover:bg-white/40 flex items-center justify-center text-white"><PrevIcon className="size-4" /></button>
-                <button onClick={next} className="absolute top-1/2 -translate-y-1/2 end-2 size-8 rounded-full bg-white/25 hover:bg-white/40 flex items-center justify-center text-white"><NextIcon className="size-4" /></button>
+                <button onClick={(e) => { e.stopPropagation(); prev(); }} className="absolute top-1/2 -translate-y-1/2 start-2 size-8 rounded-full bg-white/25 hover:bg-white/40 flex items-center justify-center text-white"><PrevIcon className="size-4" /></button>
+                <button onClick={(e) => { e.stopPropagation(); next(); }} className="absolute top-1/2 -translate-y-1/2 end-2 size-8 rounded-full bg-white/25 hover:bg-white/40 flex items-center justify-center text-white"><NextIcon className="size-4" /></button>
               </>
             )}
             {banners.length > 1 && (
               <div className="absolute bottom-2 inset-x-0 flex justify-center gap-1.5">
                 {banners.map((_, i) => (
-                  <button key={i} onClick={() => setIdx(i)} className={cn("h-1.5 rounded-full transition-all", i === idx ? "w-5 bg-white" : "w-1.5 bg-white/50")} />
+                  <button key={i} onClick={(e) => { e.stopPropagation(); setIdx(i); }} className={cn("h-1.5 rounded-full transition-all", i === safeIdx ? "w-5 bg-white" : "w-1.5 bg-white/50")} />
                 ))}
               </div>
             )}
@@ -247,9 +355,9 @@ function Home() {
                 <p className="mt-2 text-white/95 text-sm leading-snug md:mt-4 md:text-lg md:max-w-lg">
                   {lang === "ar" ? "أعلن معنا ليصل منتجك لجميع أطباء الأسنان" : "Advertise with us to reach all dentists"}
                 </p>
-                <a href={`https://wa.me/9647700000000`} target="_blank" rel="noreferrer" className="mt-3 inline-flex h-10 px-5 rounded-full bg-white/20 text-white text-sm font-bold shadow-md hover:bg-white/30 transition items-center md:mt-7 md:h-12 md:px-8 md:text-base md:bg-white md:text-blue-700 md:hover:bg-white/90">
+                <Link to="/my-ads" className="mt-3 inline-flex h-10 px-5 rounded-full bg-white/20 text-white text-sm font-bold shadow-md hover:bg-white/30 transition items-center md:mt-7 md:h-12 md:px-8 md:text-base md:bg-white md:text-blue-700 md:hover:bg-white/90">
                   {lang === "ar" ? "تواصل للإعلان" : "Contact to advertise"}
-                </a>
+                </Link>
               </div>
               <div className="shrink-0 w-[130px] h-[140px] flex items-center justify-center md:w-[300px] md:h-[300px] lg:w-[360px] lg:h-[340px]">
                 <Megaphone className="size-20 text-white/40 drop-shadow-[0_10px_20px_rgba(0,0,0,0.15)] md:size-44" strokeWidth={1.5} />
@@ -328,10 +436,12 @@ function Home() {
                     <ul key={pi} className="shrink-0 w-full snap-start flex items-start justify-around gap-1 px-1">
                       {page.map((it) => (
                         <li key={`${it.name}-${it.vendor}`} className="flex flex-col items-center gap-1 w-[31%]">
-                          {it.image ? <img src={it.image} alt="" loading="lazy" className="h-11 w-full object-contain" /> : <span className="h-11 w-full rounded-xl bg-slate-50 flex items-center justify-center"><Package className="size-5 text-slate-400" /></span>}
-                          <p className="text-[9px] font-semibold text-slate-700 text-center leading-tight h-6 overflow-hidden">{it.name}</p>
-                          <p className="text-[8px] text-slate-400 text-center leading-none truncate w-full">{it.brand}</p>
-                          <button className="rounded-full bg-sky-50 border border-primary/25 text-primary text-[9px] font-bold px-2 py-[3px] active:scale-95 transition">+ {lang === "ar" ? "إعادة" : "Reorder"}</button>
+                          <Link to="/products/$productId" params={{ productId: it.productId }} className="w-full flex flex-col items-center gap-1">
+                            {it.image ? <img src={it.image} alt="" loading="lazy" className="h-11 w-full object-contain" /> : <span className="h-11 w-full rounded-xl bg-slate-50 flex items-center justify-center"><Package className="size-5 text-slate-400" /></span>}
+                            <p className="text-[9px] font-semibold text-slate-700 text-center leading-tight h-6 overflow-hidden">{it.name}</p>
+                            <p className="text-[8px] text-slate-400 text-center leading-none truncate w-full">{it.brand}</p>
+                          </Link>
+                          <button type="button" onClick={() => reorder(it)} className="rounded-full bg-sky-50 border border-primary/25 text-primary text-[9px] font-bold px-2 py-[3px] active:scale-95 transition hover:bg-sky-100">+ {lang === "ar" ? "إعادة" : "Reorder"}</button>
                         </li>
                       ))}
                     </ul>
@@ -377,6 +487,7 @@ function Home() {
         </div>
       </section>
       </div>
+      {viewingAd && <AdDetailModal ad={viewingAd} ar={lang === "ar"} onClose={() => setViewingAd(null)} />}
     </MobileShell>
   );
 }

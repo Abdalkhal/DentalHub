@@ -22,6 +22,7 @@ import {
   Star,
   Stethoscope,
   X,
+  Trash2,
 } from "lucide-react";
 
 export const Route = createFileRoute("/patients/rx/$patientId")({
@@ -62,6 +63,7 @@ const COMPANY_LOGOS: Record<string, string> = {
 };
 
 const FAV_KEY = "dh:rx:favs:v1";
+const HIDDEN_KEY = "dh:rx:hidden:v1";
 
 const PRESETS: RxItem[] = RX_CATALOG;
 
@@ -412,15 +414,38 @@ function AddMedicineSheet({
   const [company, setCompany] = useState<Company | "ALL">("ALL");
   const [q, setQ] = useState("");
   const [favs, setFavs] = useState<string[]>([]);
+  const [hidden, setHidden] = useState<string[]>([]);
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem(FAV_KEY);
       if (raw) setFavs(JSON.parse(raw));
+      const rawHidden = localStorage.getItem(HIDDEN_KEY);
+      const parsed = rawHidden ? JSON.parse(rawHidden) : [];
+      setHidden(Array.isArray(parsed) ? parsed : []);
     } catch {
       /* ignore */
     }
   }, []);
+
+  // Let a doctor permanently drop medicines they never prescribe from their
+  // own list (after confirming) — same as the native app.
+  const confirmHide = (m: RxItem) => {
+    const ok = window.confirm(
+      ar ? `هل تريد حذف "${m.nameAr || m.name}" وصورته من هذه القائمة؟` : `Delete "${m.name}" and its image from this list?`,
+    );
+    if (!ok) return;
+    setHidden((prev) => {
+      if (prev.includes(m.id)) return prev;
+      const next = [...prev, m.id];
+      try {
+        localStorage.setItem(HIDDEN_KEY, JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
 
   const toggleFav = (id: string) => {
     setFavs((prev) => {
@@ -438,11 +463,12 @@ function AddMedicineSheet({
     const needle = q.trim().toLowerCase();
     return PRESETS.filter(
       (m) =>
+        !hidden.includes(m.id) &&
         (cat === "الكل" || m.category === cat) &&
         (company === "ALL" || m.company === company) &&
         `${m.name} ${m.nameAr ?? ""}`.toLowerCase().includes(needle)
     ).sort((a, b) => Number(favs.includes(b.id)) - Number(favs.includes(a.id)));
-  }, [cat, company, q, favs]);
+  }, [cat, company, q, favs, hidden]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={onClose}>
@@ -547,6 +573,13 @@ function AddMedicineSheet({
                   <Star
                     className={cn("size-6", fav ? "fill-amber-400 text-amber-400" : "text-muted-foreground/50")}
                   />
+                </button>
+                <button
+                  onClick={() => confirmHide(m)}
+                  aria-label={ar ? "حذف من القائمة" : "Remove from list"}
+                  className="shrink-0 p-1 text-slate-300 hover:text-rose-500 transition"
+                >
+                  <Trash2 className="size-[18px]" />
                 </button>
                 <button
                   onClick={() => onPick(m)}

@@ -16,6 +16,7 @@ import {
   uploadProductImage,
   useSignedImageUrls,
   COUNTRY_CODE_TO_SLUG,
+  COUNTRY_SLUG_TO_CODE,
   type Product,
   type ProductAccessory,
 } from "@/lib/products";
@@ -1620,34 +1621,129 @@ function ImplantOrdersPanel({ companyId }: { companyId: string }) {
   );
 }
 
+const LEN_BOUNDS: [number, number] = [5, 18];
+const DIA_BOUNDS: [number, number] = [3, 7];
+const clampTo = (n: number, [min, max]: [number, number]) => Math.min(max, Math.max(min, n));
+
 function BrowseImplants() {
   const { lang } = useI18n();
   const ar = lang === "ar";
+  const navigate = useNavigate();
   const [searchQ, setSearchQ] = useState("");
   const [showFilter, setShowFilter] = useState(false);
-  const [lenRange, setLenRange] = useState([5, 18]);
-  const [diaRange, setDiaRange] = useState([3, 7]);
+  // Applied range filters the list; the panel edits a draft that only takes
+  // effect on "Apply" (same as native).
+  const [lenRange, setLenRange] = useState<[number, number]>(LEN_BOUNDS);
+  const [diaRange, setDiaRange] = useState<[number, number]>(DIA_BOUNDS);
+  const [draft, setDraft] = useState({
+    lenMin: String(LEN_BOUNDS[0]),
+    lenMax: String(LEN_BOUNDS[1]),
+    diaMin: String(DIA_BOUNDS[0]),
+    diaMax: String(DIA_BOUNDS[1]),
+  });
   const { data: products = [] } = useProducts();
 
-  const countryCounts = useMemo(() => {
+  const openFilter = () => {
+    setDraft({
+      lenMin: String(lenRange[0]),
+      lenMax: String(lenRange[1]),
+      diaMin: String(diaRange[0]),
+      diaMax: String(diaRange[1]),
+    });
+    setShowFilter(true);
+  };
+  const applyFilter = () => {
+    const lo = clampTo(Number(draft.lenMin) || LEN_BOUNDS[0], LEN_BOUNDS);
+    const hi = clampTo(Number(draft.lenMax) || LEN_BOUNDS[1], LEN_BOUNDS);
+    const dlo = clampTo(Number(draft.diaMin) || DIA_BOUNDS[0], DIA_BOUNDS);
+    const dhi = clampTo(Number(draft.diaMax) || DIA_BOUNDS[1], DIA_BOUNDS);
+    setLenRange(lo <= hi ? [lo, hi] : [hi, lo]);
+    setDiaRange(dlo <= dhi ? [dlo, dhi] : [dhi, dlo]);
+    setShowFilter(false);
+  };
+  const clearFilter = () => {
+    setLenRange(LEN_BOUNDS);
+    setDiaRange(DIA_BOUNDS);
+    setShowFilter(false);
+  };
+
+  const rangeActive =
+    lenRange[0] !== LEN_BOUNDS[0] ||
+    lenRange[1] !== LEN_BOUNDS[1] ||
+    diaRange[0] !== DIA_BOUNDS[0] ||
+    diaRange[1] !== DIA_BOUNDS[1];
+  const term = searchQ.trim().toLowerCase();
+  const filterIsActive = rangeActive || !!term;
+
+  const countryCards = useMemo(() => {
+    const matches = (p: (typeof products)[number]) => {
+      const spec = p.implantSpec;
+      if (term) {
+        const hay = [p.brand, ...(spec?.diameters ?? []).map(String), ...(spec?.lengths ?? []).map(String)]
+          .join(" ")
+          .toLowerCase();
+        if (!hay.includes(term)) return false;
+      }
+      if (!rangeActive) return true;
+      const diams = spec?.diameters ?? [];
+      const lens = spec?.lengths ?? [];
+      if (diams.length > 0 && !diams.some((d) => d >= diaRange[0] && d <= diaRange[1])) return false;
+      if (lens.length > 0 && !lens.some((l) => l >= lenRange[0] && l <= lenRange[1])) return false;
+      return true;
+    };
     const counts: Record<string, number> = {};
     for (const p of products) {
       if (p.category !== "implant" || p.branch === "bone_graft") continue;
-      const c = p.country || p.implantSpec?.country;
-      if (!c) continue;
-      const slug = COUNTRY_CODE_TO_SLUG[c] ?? c.toLowerCase();
-      counts[slug] = (counts[slug] || 0) + 1;
+      if (!matches(p)) continue;
+      const code = (p.country || p.implantSpec?.country || "").toUpperCase();
+      if (!code) continue;
+      counts[code] = (counts[code] || 0) + 1;
     }
-    return counts;
-  }, [products]);
+    const base = COUNTRIES.map((c) => {
+      const code = COUNTRY_SLUG_TO_CODE[c.slug] ?? c.slug.toUpperCase();
+      return { slug: c.slug, ar: c.ar, en: c.en, code, count: counts[code] || 0 };
+    });
+    const known = new Set(base.map((c) => c.code));
+    // Any other country an implant company actually lists gets its own card.
+    const extra = Object.keys(counts)
+      .filter((code) => !known.has(code))
+      .map((code) => {
+        const entry = ALL_COUNTRIES.find((c) => c.code === code);
+        return {
+          slug: COUNTRY_CODE_TO_SLUG[code] ?? code.toLowerCase(),
+          ar: entry?.ar ?? code,
+          en: entry?.en ?? code,
+          code,
+          count: counts[code],
+        };
+      })
+      .sort((a, b) => b.count - a.count);
+    return [...base, ...extra];
+  }, [products, term, rangeActive, lenRange, diaRange]);
 
-  const countryCodeMap: Record<string, string> = { korean: "kr", swiss: "ch", italian: "it", german: "de", brazilian: "br" };
+  const openCountry = (slug: string) =>
+    navigate({
+      to: "/implants/$country",
+      params: { country: slug },
+      search: filterIsActive
+        ? {
+            lenMin: lenRange[0],
+            lenMax: lenRange[1],
+            diaMin: diaRange[0],
+            diaMax: diaRange[1],
+            q: searchQ.trim() || undefined,
+          }
+        : {},
+    });
 
   const categories = [
     { to: "/bone-grafts" as const, img: "/photo/bonecraft.jpg", title: ar ? "البون كرافت" : "Bone Graft" },
     { to: "/surgical-guide" as const, img: "/photo/surgecalguid.jpg", title: ar ? "الدليل الجراحي" : "Surgical Guide" },
     { to: "/specialized-implants" as const, img: specializedImplantImg, title: ar ? "الزرعات المتخصصة" : "Specialized Implants" },
   ];
+
+  const numInput =
+    "w-full h-11 rounded-xl bg-white border border-slate-200 px-3 text-sm outline-none focus:ring-2 focus:ring-primary/20";
 
   return (
     <MobileShell wide>
@@ -1656,23 +1752,58 @@ function BrowseImplants() {
         {/* Search + Filter */}
         <div className="flex gap-2 md:gap-3">
           <div className="relative flex-1">
-            <Search className="size-4 absolute top-1/2 -translate-y-1/2 start-3 text-slate-400 md:size-4.5" />
-            <input type="search" value={searchQ} onChange={(e) => setSearchQ(e.target.value)} placeholder={ar ? "ابحث حسب الشركة أو الطول أو القطر..." : "Search by company, length, diameter..."} className="w-full h-11 rounded-2xl bg-white border border-slate-200 ps-10 pe-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 md:h-12 md:rounded-full md:text-base" />
+            <Search className="size-4 absolute top-1/2 -translate-y-1/2 start-3 text-slate-400" />
+            <input
+              type="search"
+              value={searchQ}
+              onChange={(e) => setSearchQ(e.target.value)}
+              placeholder={ar ? "ابحث حسب الشركة أو الطول أو القطر..." : "Search by company, length, diameter..."}
+              className="w-full h-11 rounded-2xl bg-white border border-slate-200 ps-10 pe-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 md:h-12 md:rounded-full md:text-base"
+            />
           </div>
-          <button onClick={() => setShowFilter(!showFilter)} className={cn("size-11 rounded-2xl border flex items-center justify-center transition md:size-12 md:rounded-full shrink-0", showFilter ? "bg-primary text-white border-primary" : "bg-white text-slate-500 border-slate-200")}><SlidersHorizontal className="size-5" /></button>
+          <button
+            onClick={() => (showFilter ? setShowFilter(false) : openFilter())}
+            className={cn(
+              "size-11 rounded-2xl border flex items-center justify-center transition md:size-12 md:rounded-full shrink-0",
+              filterIsActive ? "bg-primary text-white border-primary" : "bg-white text-slate-500 border-slate-200",
+            )}
+            aria-label={ar ? "فلترة" : "Filter"}
+          >
+            <SlidersHorizontal className="size-5" />
+          </button>
         </div>
 
         {showFilter && (
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 md:p-6 md:grid md:grid-cols-2 md:gap-8 md:space-y-0">
-            <div>
-              <div className="flex items-center justify-between mb-1"><span className="text-xs font-bold text-slate-500">{ar ? "الطول (مم)" : "Length (mm)"}</span><span className="text-xs font-bold text-primary">{lenRange[0]} - {lenRange[1]}</span></div>
-              <input type="range" min={5} max={18} value={lenRange[0]} onChange={(e) => setLenRange([+e.target.value, lenRange[1]])} className="w-full accent-primary" />
-              <input type="range" min={5} max={18} value={lenRange[1]} onChange={(e) => setLenRange([lenRange[0], +e.target.value])} className="w-full accent-primary" />
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 md:p-6">
+            <div className="space-y-3 md:grid md:grid-cols-2 md:gap-8 md:space-y-0">
+              <div>
+                <p className="mb-1.5 text-xs font-bold text-slate-500">
+                  {ar ? `الطول (مم) ${LEN_BOUNDS[0]}–${LEN_BOUNDS[1]}` : `Length (mm) ${LEN_BOUNDS[0]}–${LEN_BOUNDS[1]}`}
+                </p>
+                <div className="flex items-center gap-2" dir="ltr">
+                  <input inputMode="decimal" value={draft.lenMin} onChange={(e) => setDraft({ ...draft, lenMin: e.target.value })} placeholder={ar ? "من" : "Min"} className={numInput} />
+                  <span className="text-slate-400">–</span>
+                  <input inputMode="decimal" value={draft.lenMax} onChange={(e) => setDraft({ ...draft, lenMax: e.target.value })} placeholder={ar ? "إلى" : "Max"} className={numInput} />
+                </div>
+              </div>
+              <div>
+                <p className="mb-1.5 text-xs font-bold text-slate-500">
+                  {ar ? `القطر (مم) ${DIA_BOUNDS[0]}–${DIA_BOUNDS[1]}` : `Diameter (mm) ${DIA_BOUNDS[0]}–${DIA_BOUNDS[1]}`}
+                </p>
+                <div className="flex items-center gap-2" dir="ltr">
+                  <input inputMode="decimal" value={draft.diaMin} onChange={(e) => setDraft({ ...draft, diaMin: e.target.value })} placeholder={ar ? "من" : "Min"} className={numInput} />
+                  <span className="text-slate-400">–</span>
+                  <input inputMode="decimal" value={draft.diaMax} onChange={(e) => setDraft({ ...draft, diaMax: e.target.value })} placeholder={ar ? "إلى" : "Max"} className={numInput} />
+                </div>
+              </div>
             </div>
-            <div>
-              <div className="flex items-center justify-between mb-1"><span className="text-xs font-bold text-slate-500">{ar ? "القطر (مم)" : "Diameter (mm)"}</span><span className="text-xs font-bold text-primary">{diaRange[0]} - {diaRange[1]}</span></div>
-              <input type="range" min={3} max={7} step={0.5} value={diaRange[0]} onChange={(e) => setDiaRange([+e.target.value, diaRange[1]])} className="w-full accent-primary" />
-              <input type="range" min={3} max={7} step={0.5} value={diaRange[1]} onChange={(e) => setDiaRange([diaRange[0], +e.target.value])} className="w-full accent-primary" />
+            <div className="flex gap-2 pt-1 md:max-w-md md:ms-auto">
+              <button onClick={clearFilter} className="h-11 flex-1 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-600 hover:bg-slate-50">
+                {ar ? "إلغاء الفلترة" : "Clear filter"}
+              </button>
+              <button onClick={applyFilter} className="h-11 flex-1 rounded-xl bg-primary text-xs font-extrabold text-primary-foreground hover:bg-primary/90">
+                {ar ? "تأكيد الفلترة" : "Apply filter"}
+              </button>
             </div>
           </div>
         )}
@@ -1695,12 +1826,7 @@ function BrowseImplants() {
                 className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition cursor-pointer md:shadow-none md:hover:shadow-lg md:hover:-translate-y-0.5 md:hover:border-primary/30"
               >
                 <div className="h-24 bg-slate-50 flex items-center justify-center p-2 md:h-48 md:p-3">
-                  <img
-                    src={c.img}
-                    alt={c.title}
-                    className="size-full object-cover rounded-lg"
-                    loading="lazy"
-                  />
+                  <img src={c.img} alt={c.title} className="size-full object-cover rounded-lg" loading="lazy" />
                 </div>
                 <p className="p-2 text-[11px] font-bold text-center md:p-4 md:text-base">{c.title}</p>
               </Link>
@@ -1712,23 +1838,24 @@ function BrowseImplants() {
         <div>
           <h3 className="font-bold text-sm mb-3 md:text-xl md:mb-5">{ar ? "زرعات حسب الدول" : "Implants by country"}</h3>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-5 lg:grid-cols-5">
-            {COUNTRIES.map((c) => {
-              const count = countryCounts[c.slug] || 0;
-              const flagUrl = `https://flagcdn.com/w80/${countryCodeMap[c.slug] || c.slug}.png`;
-              return (
-                <Link key={c.slug} to="/implants/$country" params={{ country: c.slug }} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition group md:p-6 md:shadow-none md:hover:shadow-lg md:hover:-translate-y-0.5 md:hover:border-primary/30">
-                  <div className="relative w-20 h-20 rounded-full bg-sky-50 mx-auto mb-3 flex items-center justify-center md:w-24 md:h-24 md:mb-4">
-                    <img src="/photo/implant.jpg" alt="" className="w-14 h-14 object-contain" loading="lazy" />
-                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full overflow-hidden shadow-sm border-2 border-white bg-white">
-                      <img src={flagUrl} alt={c.en} className="w-full h-full object-cover" loading="lazy" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; (e.target as HTMLImageElement).parentElement!.textContent = c.flag; }} />
-                      <span style={{ display: "none" }}>{c.flag}</span>
-                    </span>
-                  </div>
-                  <p className="font-bold text-sm text-center md:text-base">زرعات {ar ? c.ar : c.en}</p>
-                  <p className="text-[11px] text-slate-500 text-center mt-0.5 md:text-sm md:mt-1.5">{count} {ar ? "منتج" : "products"}</p>
-                </Link>
-              );
-            })}
+            {countryCards.map((c) => (
+              <button
+                key={c.slug}
+                onClick={() => openCountry(c.slug)}
+                className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition group md:p-6 md:shadow-none md:hover:shadow-lg md:hover:-translate-y-0.5 md:hover:border-primary/30"
+              >
+                <div className="relative w-20 h-20 rounded-full bg-sky-50 mx-auto mb-3 flex items-center justify-center md:w-24 md:h-24 md:mb-4">
+                  <img src="/photo/implant.jpg" alt="" className="w-14 h-14 object-contain" loading="lazy" />
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full overflow-hidden shadow-sm border-2 border-white bg-white">
+                    <img src={countryFlagUrl(c.code)} alt={c.en} className="w-full h-full object-cover" loading="lazy" />
+                  </span>
+                </div>
+                <p className="font-bold text-sm text-center md:text-base">{ar ? `زرعات ${c.ar}` : `${c.en} Implants`}</p>
+                <p className="text-[11px] text-slate-500 text-center mt-0.5 md:text-sm md:mt-1.5">
+                  {c.count} {ar ? "منتج" : "products"}
+                </p>
+              </button>
+            ))}
           </div>
         </div>
       </div>

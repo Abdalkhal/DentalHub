@@ -31,23 +31,34 @@ function BrandsIndex() {
   const { lang } = useI18n();
   const [q, setQ] = useState("");
 
-  const groups = useMemo(() => {
+  // Sorted and grouped by the label actually shown (Arabic names in Arabic
+  // mode), same as native — Arabic-script labels first, then Latin.
+  const { groups, total } = useMemo(() => {
+    const ar = lang === "ar";
     const term = q.trim().toLowerCase();
-    const list = BRANDS.filter((b) =>
-      !term || `${b.name} ${b.ar}`.toLowerCase().includes(term)
-    ).sort((a, b) => a.name.localeCompare(b.name));
+    const label = (b: (typeof BRANDS)[number]) => (ar ? b.ar : b.name).trim();
+    const isArabic = (s: string) => /^[؀-ۿ]/.test(s);
+    const list = BRANDS.filter((b) => !term || `${b.name} ${b.ar}`.toLowerCase().includes(term)).sort((a, b) => {
+      const la = label(a);
+      const lb = label(b);
+      if (isArabic(la) !== isArabic(lb)) return isArabic(la) ? -1 : 1;
+      return la.localeCompare(lb, isArabic(la) ? "ar" : "en", { sensitivity: "base" });
+    });
     const map = new Map<string, typeof BRANDS>();
     for (const b of list) {
-      const letter = b.name[0].toUpperCase();
+      const letter = (label(b).charAt(0) || "#").toUpperCase();
       map.set(letter, [...(map.get(letter) ?? []), b]);
     }
-    return [...map.entries()];
-  }, [q]);
+    return { groups: [...map.entries()], total: list.length };
+  }, [q, lang]);
 
   return (
     <MobileShell wide>
       <TopBar title={lang === "ar" ? "البراندات" : "Brands"} showBack wide maxW="6xl" />
       <div className="px-4 pt-4 pb-8 md:px-6 md:pt-8 md:pb-14 lg:px-8 lg:max-w-6xl lg:mx-auto">
+        <p className="mb-3 text-xs text-muted-foreground">
+          {total} {lang === "ar" ? "علامة تجارية" : "brands"}
+        </p>
         <div className="relative md:max-w-md">
           <Search className="size-4 absolute top-1/2 -translate-y-1/2 start-4 text-muted-foreground pointer-events-none" />
           <input

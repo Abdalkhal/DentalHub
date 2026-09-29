@@ -34,6 +34,7 @@ import { listOrders } from "@/lib/ordersStore";
 import { useClinic } from "@/lib/clinicStore";
 import { setClinicsStoreUser } from "@/lib/clinicsStore";
 import { useSession } from "@/lib/useAuth";
+import { patientRecordHtml, printHtml } from "@/lib/print";
 import {
   Baby,
   Brush,
@@ -57,7 +58,6 @@ import {
   Pencil,
   Phone,
   Plus,
-  Printer,
   RotateCcw,
   Scan,
   Share2,
@@ -248,12 +248,7 @@ function PatientProfile() {
 
       {/* Quick actions */}
       <div className="px-4 pt-3 flex items-center gap-1.5 md:px-6 md:pt-6 md:gap-2 md:flex-wrap lg:px-8 lg:max-w-6xl lg:mx-auto">
-        <IconBtn onClick={() => typeof window !== "undefined" && window.print()}><Printer className="size-4" /></IconBtn>
-        <IconBtn
-          onClick={() => {
-            if (typeof navigator !== "undefined" && navigator.share) navigator.share({ title: p.name, url: window.location.href });
-          }}
-        >
+        <IconBtn onClick={() => exportPatientRecord(p, ar)} title={ar ? "تصدير ملف المريض (PDF)" : "Export patient record (PDF)"}>
           <Share2 className="size-4" />
         </IconBtn>
         <Link to="/patients/rx/$patientId" params={{ patientId: p.id }}>
@@ -325,10 +320,79 @@ function PatientProfile() {
 
 type P = ReturnType<typeof usePatients>[number];
 
-function IconBtn({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) {
+const TOOTH_HEX: Record<string, string> = {
+  healthy: "#10B981",
+  caries: "#EF4444",
+  filled: "#F59E0B",
+  crown: "#EAB308",
+  missing: "#94A3B8",
+  implant: "#3B82F6",
+  rct: "#F97316",
+  bridge: "#A855F7",
+  unerupted: "#D1D5DB",
+};
+const PLAN_HEX: Record<PlanStatus, string> = { done: "#047857", active: "#1D4ED8", planned: "#64748B" };
+
+// Full patient record (info, complaint/notes, visits, teeth, plan) as a
+// printable document — the web counterpart of the native app's PDF share.
+function exportPatientRecord(p: P, ar: boolean) {
+  const genderLabel = p.gender === "male" ? (ar ? "ذكر" : "Male") : ar ? "أنثى" : "Female";
+  const sym = p.feeCurrency === "IQD" ? (ar ? "د.ع" : "IQD") : "$";
+  const teeth = Object.entries(p.teeth)
+    .map(([tooth, status]) => ({ tooth: Number(tooth), status: String(status) }))
+    .sort((a, b) => a.tooth - b.tooth)
+    .map((x) => ({
+      tooth: x.tooth,
+      status: TOOTH_META[x.status] ? (ar ? TOOTH_META[x.status].ar : TOOTH_META[x.status].en) : x.status,
+      color: TOOTH_HEX[x.status] ?? "#64748B",
+    }));
+  const plan = getPlan(p).map((s) => {
+    const dept = s.dept ? BRANCHES.find((b) => b.key === s.dept) : undefined;
+    return {
+      title: s.title,
+      tooth: s.tooth,
+      dept: dept ? (ar ? dept.ar : dept.en) : undefined,
+      cost: s.cost ? `${sym}${s.cost}` : undefined,
+      status: ar ? PLAN_META[s.status].ar : PLAN_META[s.status].en,
+      statusColor: PLAN_HEX[s.status],
+      note: s.note,
+    };
+  });
+  printHtml(
+    patientRecordHtml({
+      ar,
+      title: p.name,
+      meta: [
+        { label: ar ? "اسم المريض" : "Patient name", value: p.name },
+        { label: ar ? "رقم الملف" : "File #", value: p.fileNo },
+        { label: ar ? "العمر" : "Age", value: p.age ? `${p.age} ${ar ? "سنة" : "y"}` : "—" },
+        { label: ar ? "الجنس" : "Gender", value: genderLabel },
+        { label: ar ? "الهاتف" : "Phone", value: p.phone || "—" },
+        { label: ar ? "الحالة" : "Status", value: ar ? STATUS_META[p.status].ar : STATUS_META[p.status].en },
+        { label: ar ? "آخر زيارة" : "Last visit", value: p.lastVisit || "—" },
+      ],
+      complaint: p.complaint,
+      doctorNotes: p.doctorNote,
+      visits: p.visits.map((v) => ({
+        date: v.date,
+        time: v.time,
+        procedure: v.procedure,
+        doctor: v.doctor,
+        status: v.status ? v.status : v.upcoming ? (ar ? "موعد قادم" : "Upcoming") : ar ? "منجزة" : "Done",
+        note: v.note,
+      })),
+      teeth,
+      plan,
+    }),
+  );
+}
+
+function IconBtn({ children, onClick, title }: { children: React.ReactNode; onClick?: () => void; title?: string }) {
   return (
     <button
       onClick={onClick}
+      title={title}
+      aria-label={title}
       className="size-9 rounded-full bg-card border border-border flex items-center justify-center text-muted-foreground shadow-sm"
     >
       {children}

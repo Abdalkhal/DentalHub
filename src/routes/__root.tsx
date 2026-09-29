@@ -13,6 +13,9 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { LanguageProvider } from "../lib/i18n";
 import { Toaster } from "../components/ui/sonner";
+import { useSession } from "../lib/useAuth";
+import { setFavoritesStoreUser } from "../lib/favoritesStore";
+import { setQuickOrdersStoreUser } from "../lib/quickOrders";
 
 function NotFoundComponent() {
   return (
@@ -118,12 +121,25 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+// Scopes the per-account local stores to whoever is signed in, on every
+// page (not just home) since any route can be the entry point on the web.
+function StoreUserScope() {
+  const { user } = useSession();
+  useEffect(() => {
+    const uid = user?.uid || "";
+    setFavoritesStoreUser(uid);
+    setQuickOrdersStoreUser(uid);
+  }, [user?.uid]);
+  return null;
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   return (
     <QueryClientProvider client={queryClient}>
       <LanguageProvider>
+        <StoreUserScope />
         <Outlet />
         <Toaster position="top-center" richColors />
       </LanguageProvider>

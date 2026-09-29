@@ -150,3 +150,15 @@ export function cartByOffice(): Record<string, CartItem[]> {
     return acc;
   }, {} as Record<string, CartItem[]>);
 }
+
+const OPEN_CART_EVENT = "dh:open-cart";
+
+/** Opens the cart drawer rendered by MobileShell, from anywhere. */
+export function openCart() {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(OPEN_CART_EVENT));
+}
+
+export function onOpenCart(cb: () => void): () => void {
+  window.addEventListener(OPEN_CART_EVENT, cb);
+  return () => window.removeEventListener(OPEN_CART_EVENT, cb);
+}

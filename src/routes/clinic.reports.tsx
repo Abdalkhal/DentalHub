@@ -48,18 +48,25 @@ function ReportsPage() {
 
   const data = useClinic();
   const patients = usePatients();
-  const { income, expense, net } = clinicTotals(data);
+  const { expense } = clinicTotals(data);
   const [doctorFilter, setDoctorFilter] = useState("all");
   const [periodFilter, setPeriodFilter] = useState("month");
 
   const month = new Date().toISOString().slice(0, 7);
-  const monthTx = data.transactions.filter((t) => t.date.startsWith(month));
-  const monthIncome = monthTx.filter((t) => t.kind === "income").reduce((s, t) => s + t.amount, 0);
-  const monthExpense = monthTx.filter((t) => t.kind === "expense").reduce((s, t) => s + t.amount, 0);
+  // Revenue is what patients actually paid (each patient's billing tab), not
+  // the clinic-wide manual "income" ledger — same definition as the native app.
+  const income = patients.reduce((s, p) => s + p.payments.reduce((ps, pay) => ps + pay.amount, 0), 0);
+  const monthIncome = patients.reduce(
+    (s, p) => s + p.payments.filter((pay) => pay.date.startsWith(month)).reduce((ps, pay) => ps + pay.amount, 0),
+    0,
+  );
+  const net = income - expense;
+  const monthExpense = data.transactions
+    .filter((t) => t.kind === "expense" && t.date.startsWith(month))
+    .reduce((s, t) => s + t.amount, 0);
   const completed = patients.filter((p) => p.status === "completed").length;
   const inTreatment = patients.filter((p) => p.status === "in_treatment").length;
   const newPatients = patients.filter((p) => p.status === "new").length;
-  const delivered = data.orders.filter((o) => o.status === "delivered").length;
 
   const { doctors } = useClinic();
 
@@ -119,11 +126,12 @@ function ReportsPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4 md:gap-4 lg:col-span-2">
+        <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 md:gap-4 lg:col-span-2">
           <Stat label={ar ? "إجمالي الإيرادات" : "Total revenue"} value={fmtIQD(income)} tone="good" />
           <Stat label={ar ? "إجمالي المصاريف" : "Total expenses"} value={fmtIQD(expense)} tone="bad" />
-          <Stat label={ar ? "صافي الربح" : "Net profit"} value={fmtIQD(net)} tone={net >= 0 ? "good" : "bad"} />
-          <Stat label={ar ? "طلبيات مسلّمة" : "Delivered orders"} value={String(delivered)} />
+          <div className="col-span-2 md:col-span-1">
+            <Stat label={ar ? "صافي الربح" : "Net profit"} value={fmtIQD(net)} tone={net >= 0 ? "good" : "bad"} />
+          </div>
         </div>
 
         {/* Month performance */}
@@ -148,6 +156,9 @@ function ReportsPage() {
         <div className="rounded-2xl bg-card border border-border p-3.5 shadow-soft md:p-5 lg:h-full">
           <p className="font-display font-extrabold text-sm mb-3 md:text-base">{ar ? "ملخص أداء الأطباء والمستحقات" : "Doctor Performance & Dues"}</p>
           <div className="space-y-2.5">
+            {doctorPerformance.length === 0 && (
+              <p className="text-xs text-slate-400">{ar ? "لا يوجد أطباء بعد" : "No doctors yet"}</p>
+            )}
             {doctorPerformance.map((d) => (
               <div key={d.id} className="flex items-start gap-3 rounded-xl bg-muted/50 p-3">
                 <span className="size-10 shrink-0 rounded-2xl bg-sky-100 text-sky-600 flex items-center justify-center font-bold text-sm">

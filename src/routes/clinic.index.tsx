@@ -1,9 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { MobileShell } from "@/components/MobileShell";
 import { useI18n } from "@/lib/i18n";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePatients } from "@/lib/patientsStore";
-import { useClinics, addClinic, updateClinic, setActiveClinic, type Clinic } from "@/lib/clinicsStore";
+import { useClinics, addClinic, updateClinic, setActiveClinic, setClinicsStoreUser, type Clinic } from "@/lib/clinicsStore";
+import { useClinic, clinicTotals } from "@/lib/clinicStore";
+import { useAppointments } from "@/lib/appointmentsStore";
+import { useSession } from "@/lib/useAuth";
 import { AddAppointmentModal } from "@/components/AddAppointmentModal";
 import { cn } from "@/lib/utils";
 import clinicHero from "@/assets/clinic-hero.jpg";
@@ -23,7 +26,17 @@ function ClinicHome() {
   const navigate = useNavigate();
   const BackIcon = dir === "rtl" ? ArrowRight : ArrowLeft;
 
+  const { user } = useSession();
+  useEffect(() => {
+    setClinicsStoreUser(user?.uid || "");
+  }, [user?.uid]);
+
   const patients = usePatients();
+  const appointments = useAppointments();
+  const totals = clinicTotals(useClinic());
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const todayCount = appointments.filter((a) => a.date === todayStr).length;
   const [showAddAppointment, setShowAddAppointment] = useState(false);
 
   const { clinics, activeClinicId } = useClinics();
@@ -187,7 +200,7 @@ function ClinicHome() {
                       className="w-full h-10 rounded-xl bg-blue-700/40 text-white text-xs font-bold hover:bg-blue-700/60 transition flex items-center justify-center gap-1.5 md:w-auto md:h-12 md:px-7 md:text-sm md:rounded-full md:bg-white/15 md:hover:bg-white/25"
                     >
                       <Calendar className="size-3.5 md:size-4" />
-                      {ar ? "مواعيد اليوم" : "Today's Visits"}
+                      {ar ? `مواعيد اليوم (${todayCount})` : `Today's Visits (${todayCount})`}
                     </button>
                   </div>
                 </div>
@@ -207,7 +220,7 @@ function ClinicHome() {
                   <span className="size-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-3 md:size-14 md:mb-4"><CreditCard className="size-5 md:size-6" /></span>
                   <p className="font-display font-bold text-sm text-slate-800 md:text-base md:leading-snug">{ar ? "المالية والحسابات" : "Finance & Accounts"}</p>
                   <p className="mt-1 text-xs text-muted-foreground leading-snug md:text-sm">{ar ? "الإيرادات، المصاريف، الفواتير والمدفوعات" : "Income, expenses, invoices and payments"}</p>
-                  <span className="inline-block w-fit mt-auto pt-2 text-[10px] font-semibold bg-emerald-50 text-emerald-600 px-2 py-1 rounded-lg md:mt-3 md:text-xs md:px-2.5">{ar ? "إيرادات اليوم $0" : "Today's revenue $0"}</span>
+                  <span className="inline-block w-fit mt-auto pt-2 text-[10px] font-semibold bg-emerald-50 text-emerald-600 px-2 py-1 rounded-lg md:mt-3 md:text-xs md:px-2.5">{ar ? `إيرادات اليوم ${totals.income.toLocaleString()}` : `Today's revenue ${totals.income.toLocaleString()}`}</span>
                 </Link>
                 <Link to="/patients" className="flex flex-col bg-white border border-slate-100 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-primary/20 transition md:p-5 md:shadow-none md:border-slate-200 md:hover:shadow-lg md:hover:-translate-y-0.5">
                   <span className="size-11 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center mb-3 md:size-14 md:mb-4"><Users className="size-5 md:size-6" /></span>

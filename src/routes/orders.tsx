@@ -1,6 +1,5 @@
 import { createFileRoute, Link, useSearch } from "@tanstack/react-router";
 import { useState, useMemo, useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import type { OrderDoc } from "@/integrations/firebase/types";
 import { MobileShell } from "@/components/MobileShell";
@@ -31,9 +30,9 @@ import {
   type ShadeTab,
 } from "@/lib/dentalConfig";
 import { useCaseUnreadCount } from "@/lib/caseMessages";
-import { useCart } from "@/lib/cartStore";
+import { useCart, openCart } from "@/lib/cartStore";
+import { useMarkOrderSeen } from "@/lib/orderSeen";
 import {
-  placeCartOrder,
   useOrders as useSupplierOrders,
   useDentistOrders,
 } from "@/lib/orders";
@@ -49,6 +48,7 @@ import {
   Loader2,
   Plus,
   Check,
+  ChevronDown,
 } from "lucide-react";
 
 const ordersSearchSchema = z.object({
@@ -489,39 +489,27 @@ function LabOrders() {
 
 /* ── Dentist Orders View ─────────────────────────── */
 
+const DENTIST_ORDER_FILTERS = [
+  { id: "all", ar: "الكل", en: "All" },
+  { id: "pending", ar: "قيد الانتظار", en: "Pending" },
+  { id: "confirmed", ar: "تم التأكيد", en: "Confirmed" },
+  { id: "rejected", ar: "غير متوفر", en: "Unavailable" },
+] as const;
+
 function DentistOrders() {
   const { lang } = useI18n();
   const ar = lang === "ar";
   const { user } = useSession();
-  const { role } = useUserRole();
   const cart = useCart();
-  const queryClient = useQueryClient();
-  const [placing, setPlacing] = useState(false);
-
-  const handlePlaceOrder = async () => {
-    if (!user || cart.length === 0) return;
-    setPlacing(true);
-    try {
-      const { count } = await placeCartOrder({
-        id: user.uid,
-        name: role?.name || (ar ? "طبيب أسنان" : "Dentist"),
-        phone: role?.phone,
-        address: role?.address,
-        city: role?.city,
-        clinicName: role?.clinicName,
-      });
-      await queryClient.invalidateQueries({ queryKey: ["orders", "dentist", user.uid] });
-      toast.success(
-        ar ? `تم إرسال ${count} طلب بنجاح` : `${count} order(s) placed successfully`,
-      );
-    } catch (e: any) {
-      toast.error(ar ? `فشل إرسال الطلب: ${e?.message || e}` : `Order failed: ${e?.message || e}`);
-    } finally {
-      setPlacing(false);
-    }
-  };
 
   const { data: myOrders = [], isLoading } = useDentistOrders(user?.uid);
+  const markSeen = useMarkOrderSeen(user?.uid);
+  const [filter, setFilter] = useState<(typeof DENTIST_ORDER_FILTERS)[number]["id"]>("all");
+  const [openId, setOpenId] = useState<string | null>(null);
+  const shownOrders = useMemo(
+    () => (filter === "all" ? myOrders : myOrders.filter((o) => (o.status || "pending") === filter)),
+    [myOrders, filter],
+  );
 
   if (!user) {
     return (
@@ -559,25 +547,42 @@ function DentistOrders() {
             </div>
 
             <button
-              onClick={handlePlaceOrder}
-              disabled={placing}
-              className="w-full h-11 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-bold text-sm flex items-center justify-center gap-2 transition disabled:opacity-60 md:w-auto md:px-7 md:h-12 md:rounded-full md:shrink-0"
+              onClick={openCart}
+              className="w-full h-11 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-bold text-sm flex items-center justify-center gap-2 transition md:w-auto md:px-7 md:h-12 md:rounded-full md:shrink-0"
             >
-              {placing ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
-              {placing ? (ar ? "جارٍ الإرسال..." : "Placing...") : ar ? "إتمام الطلب" : "Complete order"}
+              <Plus className="size-4" />
+              {ar ? "إتمام الطلب" : "Complete order"}
             </button>
           </div>
         )}
 
-        <h3 className="font-bold text-sm text-slate-600 md:text-2xl md:pt-2">
-          {ar ? "سجل الطلبات السابقة" : "Past orders"}
-        </h3>
+        <div className="flex items-center justify-between md:pt-2">
+          <h3 className="font-bold text-sm text-slate-600 md:text-2xl">{ar ? "طلباتي" : "My Orders"}</h3>
+          <span className="text-xs text-slate-400">{myOrders.length}</span>
+        </div>
+
+        <div className="flex flex-wrap gap-1.5">
+          {DENTIST_ORDER_FILTERS.map((f) => (
+            <button
+              key={f.id}
+              onClick={() => setFilter(f.id)}
+              className={cn(
+                "px-3 h-8 rounded-full text-[11px] font-bold border transition",
+                filter === f.id
+                  ? "bg-[#2563EB] text-white border-[#2563EB]"
+                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50",
+              )}
+            >
+              {ar ? f.ar : f.en}
+            </button>
+          ))}
+        </div>
 
         {isLoading ? (
           <div className="flex justify-center py-16">
             <Loader2 className="size-6 text-primary animate-spin" />
           </div>
-        ) : myOrders.length === 0 ? (
+        ) : shownOrders.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center md:py-28 md:rounded-3xl md:border md:border-dashed md:border-slate-200 md:bg-card">
             <div className="size-20 rounded-full bg-slate-100 flex items-center justify-center mb-4 md:size-24 md:mb-6">
               <Package className="size-9 text-slate-400" />
@@ -591,13 +596,29 @@ function DentistOrders() {
           </div>
         ) : (
           <div className="space-y-2 md:space-y-0 md:grid md:grid-cols-2 md:gap-5 md:items-start">
-            {myOrders.map((o) => {
+            {shownOrders.map((o) => {
               const s = (o.status as string) || "pending";
               const itemCount = (o.items || []).reduce((sum, i) => sum + (i.quantity || 1), 0);
               const hasUnavailable = (o.items || []).some((i) => i.availability === "not_available");
               const { usd, iqd } = availableTotals(o.items || []);
+              const open = openId === o.id;
               return (
-                <div key={o.id} className="bg-card border border-border rounded-2xl p-4 shadow-soft md:h-full md:flex md:flex-col md:p-5 md:shadow-none md:hover:shadow-lg md:transition">
+                <div
+                  key={o.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    markSeen(o.id);
+                    setOpenId(open ? null : o.id);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      markSeen(o.id);
+                      setOpenId(open ? null : o.id);
+                    }
+                  }}
+                  className="cursor-pointer bg-card border border-border rounded-2xl p-4 shadow-soft md:flex md:flex-col md:p-5 md:shadow-none md:hover:shadow-lg md:transition"
+                >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2.5">
                       <span className="size-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
@@ -627,14 +648,51 @@ function DentistOrders() {
 
                   <div className="flex items-center justify-between text-xs text-slate-500">
                     <span>{itemCount} {ar ? "منتجات" : "products"}</span>
-                    <span className="font-display font-extrabold text-sm text-foreground">
-                      {fmtOrderMoney(usd, iqd, ar)}
+                    <span className="flex items-center gap-1.5">
+                      <span className="font-display font-extrabold text-sm text-foreground">
+                        {fmtOrderMoney(usd, iqd, ar)}
+                      </span>
+                      <ChevronDown className={cn("size-4 text-slate-400 transition-transform", open && "rotate-180")} />
                     </span>
                   </div>
                   {hasUnavailable && (
                     <p className="mt-1 text-[10px] font-bold text-rose-500">
                       {ar ? "يتضمن منتجاً غير متوفر، تم استبعاده من الإجمالي" : "Includes an unavailable item, excluded from the total"}
                     </p>
+                  )}
+                  {open && (
+                    <div className="mt-3 -mx-4 -mb-4 px-4 py-3 space-y-2 border-t border-slate-100 bg-slate-50/50 rounded-b-2xl md:-mx-5 md:-mb-5 md:px-5">
+                      {(o.items || []).length === 0 ? (
+                        <p className="text-center text-xs text-slate-400">{ar ? "لا توجد تفاصيل" : "No details"}</p>
+                      ) : (
+                        (o.items || []).map((it, i) => {
+                          const unavailable = it.availability === "not_available";
+                          const img = (it as { productImage?: string }).productImage;
+                          return (
+                            <div key={i} className={cn("flex items-center gap-2", unavailable && "opacity-40")}>
+                              {img ? (
+                                <img src={img} alt="" className="size-10 rounded-lg object-cover bg-slate-100" />
+                              ) : (
+                                <span className="size-10 rounded-lg bg-slate-100 flex items-center justify-center">
+                                  <Package className="size-4 text-slate-400" />
+                                </span>
+                              )}
+                              <div className="min-w-0 flex-1">
+                                <p className={cn("text-xs font-semibold truncate", unavailable ? "text-slate-400 line-through" : "text-slate-700")}>
+                                  {it.name || "—"}
+                                </p>
+                                {unavailable && (
+                                  <p className="text-[10px] font-bold text-rose-500">{ar ? "غير متوفر" : "Not available"}</p>
+                                )}
+                              </div>
+                              <span className={cn("text-xs font-bold", unavailable ? "text-slate-300" : "text-slate-500")}>
+                                × {it.quantity ?? 1}
+                              </span>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
                   )}
                 </div>
               );
@@ -653,6 +711,7 @@ function SupplierOrders() {
   const ar = lang === "ar";
   const { role } = useUserRole();
   const supplierId = role?.userId ?? "";
+  const markSeen = useMarkOrderSeen(supplierId || undefined);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "confirmed" | "rejected">("all");
@@ -751,7 +810,10 @@ function SupplierOrders() {
               return (
                 <div
                   key={o.id}
-                  onClick={() => setSelectedOrder(o)}
+                  onClick={() => {
+                    markSeen(o.id);
+                    setSelectedOrder(o);
+                  }}
                   className="bg-card border border-border rounded-2xl p-4 shadow-soft cursor-pointer hover:shadow-card transition md:flex md:flex-col"
                 >
                   <div className="flex items-start justify-between gap-3 mb-2">

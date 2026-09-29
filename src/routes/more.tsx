@@ -24,8 +24,12 @@ import {
   LifeBuoy,
   FileText,
   ShieldAlert,
+  ShieldCheck,
   ChevronRight,
+  Bell,
+  ShoppingCart,
 } from "lucide-react";
+import { openCart } from "@/lib/cartStore";
 
 export const Route = createFileRoute("/more")({
   component: More,
@@ -240,7 +244,29 @@ function More() {
     return accountType === r || isAdmin;
   };
 
-  const links = allLinks.filter((l) => l.roles.some((r) => isRole(r)));
+  // Dentists get exactly the native app's menu (same items, same order).
+  const dentistLinks: MoreLink[] = [
+    { to: "/clinic", icon: Stethoscope, label: ar ? "عيادتي" : "My Clinic", tone: "", roles: ["dentist"] },
+    { to: "/patients", icon: Users, label: ar ? "المرضى" : "Patients", tone: "", roles: ["dentist"] },
+    { to: "/track-cases", icon: ListChecks, label: ar ? "تتبع الحالات" : "Track Cases", tone: "", roles: ["dentist"] },
+    { to: "/favorites", icon: Heart, label: ar ? "المفضلة" : "Favorites", tone: "", roles: ["dentist"] },
+    { to: "/brands", icon: Crown, label: ar ? "البراندات" : "Brands", tone: "", roles: ["dentist"] },
+    { to: "/supplies", icon: ShoppingBag, label: ar ? "المستلزمات" : "Supplies", tone: "", roles: ["dentist"] },
+    { to: "/my-ads", icon: Megaphone, label: ar ? "إعلاناتي" : "My Ads", tone: "", roles: ["dentist"] },
+    { to: "/messages", icon: MessageSquare, label: ar ? "الرسائل" : "Messages", tone: "", roles: ["dentist"] },
+    { to: "/notifications", icon: Bell, label: ar ? "الإشعارات" : "Notifications", tone: "", roles: ["dentist"] },
+    { to: "/account/settings", icon: Cog, label: ar ? "الإعدادات" : "Settings", tone: "", roles: ["dentist"] },
+    { to: "/account/help", icon: LifeBuoy, label: ar ? "المساعدة" : "Help", tone: "", roles: ["dentist"] },
+    { to: "/privacy", icon: ShieldCheck, label: ar ? "سياسة الخصوصية" : "Privacy Policy", tone: "", roles: ["dentist"] },
+  ];
+  const adminLink = allLinks.find((l) => l.to === "/admin")!;
+  const isDentist = accountType === "dentist";
+
+  const links = isDentist
+    ? isAdmin
+      ? [adminLink, ...dentistLinks]
+      : dentistLinks
+    : allLinks.filter((l) => l.roles.some((r) => isRole(r)));
 
   return (
     <MobileShell wide>
@@ -277,6 +303,21 @@ function More() {
               </Link>
             </li>
           ))}
+          {isDentist && (
+            <li className="md:bg-card md:border md:border-border md:rounded-2xl md:shadow-soft md:overflow-hidden">
+              <button
+                type="button"
+                onClick={openCart}
+                className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-accent transition-colors text-start md:flex-col md:justify-center md:gap-2.5 md:py-6 md:text-center"
+              >
+                <span className="size-10 rounded-2xl ring-1 shadow-sm flex items-center justify-center shrink-0 md:size-12" style={{ backgroundColor: "oklch(0.98 0.01 240)" }}>
+                  <ShoppingCart className="size-5 drop-shadow-sm md:size-6" strokeWidth={2} />
+                </span>
+                <span className="flex-1 text-sm font-semibold text-slate-700 md:flex-none md:text-base">{ar ? "السلة" : "Cart"}</span>
+                <ChevronRight className="size-4 text-slate-300 md:hidden" />
+              </button>
+            </li>
+          )}
         </ul>
 
         <button

@@ -13,7 +13,9 @@ import {
   Plus,
   Check,
   Phone,
+  Heart,
 } from "lucide-react";
+import { useIsFavorited, toggleFavorite } from "@/lib/favoritesStore";
 import { doc, getDoc } from "firebase/firestore";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
@@ -32,6 +34,7 @@ export function ProductDetailsModal({
   onClose,
   isDoctorView = false,
   cart,
+  asPage = false,
 }: {
   product: Product;
   onClose: () => void;
@@ -42,6 +45,9 @@ export function ProductDetailsModal({
     officeCity?: string;
     inStock: boolean;
   } | null;
+  /** Render inline as a full page (the /products/$productId route) instead
+   * of an overlay sheet — same content either way. */
+  asPage?: boolean;
 }) {
   const { lang } = useI18n();
   const ar = lang === "ar";
@@ -49,6 +55,8 @@ export function ProductDetailsModal({
   const [activeImg, setActiveImg] = useState(0);
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
+  const favorited = useIsFavorited(product.id);
+  const maxQty = typeof product.stock === "number" ? Math.max(1, product.stock) : Infinity;
 
   const { data: supplier } = useQuery({
     queryKey: ["product-detail-supplier", product.companyId],
@@ -187,15 +195,44 @@ export function ProductDetailsModal({
     }, 1500);
   };
 
+  const toggleFav = () => {
+    const name = ar ? product.ar || product.en : product.en || product.ar;
+    toggleFavorite(
+      {
+        id: product.id,
+        title: name,
+        vendor: supplier?.name || cart?.officeName || "",
+        price: product.price,
+        currency: product.currency,
+        imageUrl: images[0],
+        addedAt: new Date().toISOString(),
+        kind: product.category === "implant" ? "implant" : "product",
+      },
+      lang,
+    );
+  };
+
   return (
-    <div className="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:p-6">
-      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
+    <div
+      className={cn(
+        asPage
+          ? "flex justify-center md:px-6 md:py-8"
+          : "fixed inset-0 z-[70] flex items-end justify-center md:items-center md:p-6",
+      )}
+    >
+      {!asPage && <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />}
       {/* Phone: full-height bottom sheet (the flex parent + h-calc reproduce
           the previous inset-x-0/bottom-0/top-6 box exactly). md:+ : a centered
           dialog, since a bottom sheet is a phone idiom. */}
-      <div className="relative w-full max-w-md h-[calc(100%-1.5rem)] flex flex-col rounded-t-3xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom bg-white md:h-auto md:max-h-[88vh] md:max-w-2xl md:rounded-3xl">
+      <div
+        className={cn(
+          asPage
+            ? "relative w-full flex flex-col bg-white md:max-w-3xl md:rounded-3xl md:border md:border-slate-200 md:overflow-hidden"
+            : "relative w-full max-w-md h-[calc(100%-1.5rem)] flex flex-col rounded-t-3xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom bg-white md:h-auto md:max-h-[88vh] md:max-w-2xl md:rounded-3xl",
+        )}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 pt-4 pb-3 shrink-0 border-b border-slate-100 md:px-6 md:pt-5 md:pb-4">
+        <div className={cn("flex items-center justify-between px-4 pt-4 pb-3 shrink-0 border-b border-slate-100 md:px-6 md:pt-5 md:pb-4", asPage && "hidden")}>
           <h3 className="font-display font-extrabold text-base text-slate-900">
             {ar ? "تفاصيل المنتج" : "Product Details"}
           </h3>
@@ -208,7 +245,7 @@ export function ProductDetailsModal({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto flex flex-col gap-4">
+        <div className={cn("flex-1 flex flex-col gap-4", !asPage && "overflow-y-auto")}>
           {/* Supplier contact card */}
           {supplier && (
             <div className="mx-4 mt-4 rounded-2xl bg-white border border-slate-200 shadow-sm p-3 flex items-center gap-3">
@@ -243,6 +280,16 @@ export function ProductDetailsModal({
 
           {/* Image gallery */}
           <div className="relative bg-slate-100">
+            {isDoctorView && (
+              <button
+                type="button"
+                onClick={toggleFav}
+                className="absolute end-3 top-3 z-10 size-9 rounded-full bg-white shadow-sm flex items-center justify-center hover:bg-slate-50 transition"
+                aria-label={favorited ? "Remove from favorites" : "Add to favorites"}
+              >
+                <Heart className={cn("size-[17px] text-red-500", favorited && "fill-red-500")} />
+              </button>
+            )}
             {images.length > 0 ? (
               <>
                 <img src={images[activeImg]} alt="" className="w-full h-64 object-contain md:h-80" />
@@ -563,7 +610,7 @@ export function ProductDetailsModal({
 
         {/* Cart footer (doctor view only) */}
         {isDoctorView && cart && (
-          <div className="shrink-0 border-t border-slate-200 bg-white p-4 space-y-3">
+          <div className={cn("shrink-0 border-t border-slate-200 bg-white p-4 space-y-3", asPage && "sticky bottom-0 z-10")}>
             {/* Quantity + Add to cart */}
             <div className="flex items-center gap-3">
               <div className="flex items-center justify-between rounded-2xl bg-slate-100 border border-slate-200 h-12 px-1 w-32 shrink-0">
@@ -578,8 +625,9 @@ export function ProductDetailsModal({
                 <span className="text-sm font-bold text-slate-800 min-w-6 text-center">{qty}</span>
                 <button
                   type="button"
-                  onClick={() => setQty((q) => q + 1)}
-                  className="size-9 flex items-center justify-center text-slate-600 hover:text-emerald-700 transition"
+                  onClick={() => setQty((q) => Math.min(maxQty, q + 1))}
+                  disabled={qty >= maxQty}
+                  className="size-9 flex items-center justify-center text-slate-600 hover:text-emerald-700 transition disabled:opacity-30"
                 >
                   <Plus className="size-4" />
                 </button>

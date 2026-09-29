@@ -1,45 +1,50 @@
 import { useState, useEffect, useRef } from "react";
-import {
-  collection, query, where, orderBy, onSnapshot,
-  updateDoc, doc, writeBatch, setDoc,
-} from "firebase/firestore";
-import { auth, db } from "@/integrations/firebase/client";
-import { Bell, CheckCheck, Package, Truck, CheckCircle2 } from "lucide-react";
+import { updateDoc, doc, writeBatch } from "firebase/firestore";
+import { db } from "@/integrations/firebase/client";
+import { Bell, CheckCheck, Package, Truck, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useNavigate } from "@tanstack/react-router";
-
-type Notification = {
-  id: string;
-  userId: string;
-  title: string;
-  body: string;
-  type: "order_new" | "order_status" | "message";
-  isRead: boolean;
-  createdAt: number;
-  orderId?: string;
-  invoiceId?: string;
-  expiresAt?: number;
-  /** The account that triggered this notification — required by the
-   * `notifications` Firestore rule (must equal the writer's own uid) so an
-   * arbitrary signed-in account can't forge a notification into someone
-   * else's feed under a fake identity. */
-  senderId?: string;
-  senderName?: string;
-  senderPhotoURL?: string;
-};
-
-export function createNotification(data: Omit<Notification, "id" | "isRead" | "createdAt" | "expiresAt" | "senderId">) {
-  const id = `${data.userId}_${Date.now()}`;
-  return setDoc(doc(db, "notifications", id), {
-    ...data, id, senderId: auth.currentUser?.uid ?? "", isRead: false, createdAt: Date.now(), expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
-  });
-}
+import { Link, useNavigate } from "@tanstack/react-router";
+import { useNotifications, type Notification } from "@/lib/notifications";
+import { useI18n } from "@/lib/i18n";
 
 const TYPE_ICONS: Record<string, typeof Package> = {
   order_new: Package,
   order_status: Truck,
-  message: CheckCircle2,
+  message: MessageCircle,
 };
+
+/** Same destinations as the native notifications screen. */
+export function notificationTarget(n: Notification):
+  | { to: "/messages"; search: { with: string } }
+  | { to: "/doctor-invoices/$invoiceId"; params: { invoiceId: string } }
+  | { to: "/orders" }
+  | null {
+  if (n.type === "message" && n.chatWith) return { to: "/messages", search: { with: n.chatWith } };
+  if (n.invoiceId) return { to: "/doctor-invoices/$invoiceId", params: { invoiceId: n.invoiceId } };
+  if (n.orderId || n.type === "order_new") return { to: "/orders" };
+  return null;
+}
+
+export function markNotificationRead(id: string) {
+  return updateDoc(doc(db, "notifications", id), { isRead: true }).catch(() => {});
+}
+
+export function markAllNotificationsRead(notes: Notification[]) {
+  const batch = writeBatch(db);
+  notes.filter((n) => !n.isRead).forEach((n) => batch.update(doc(db, "notifications", n.id), { isRead: true }));
+  return batch.commit().catch(() => {});
+}
+
+export function notificationTimeAgo(ts: number | undefined, ar: boolean): string {
+  if (!ts) return "";
+  const seconds = Math.floor((Date.now() - ts) / 1000);
+  if (seconds < 60) return ar ? "الآن" : "now";
+  const mins = Math.floor(seconds / 60);
+  if (mins < 60) return ar ? `منذ ${mins} د` : `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return ar ? `منذ ${hours} س` : `${hours}h ago`;
+  return ar ? `منذ ${Math.floor(hours / 24)} يوم` : `${Math.floor(hours / 24)}d ago`;
+}
 
 export function NotificationBell({
   userId,
@@ -54,9 +59,11 @@ export function NotificationBell({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const { notes: notifications } = useNotifications(userId || undefined);
   const ref = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const { lang } = useI18n();
+  const ar = lang === "ar";
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -66,53 +73,20 @@ export function NotificationBell({
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
-  useEffect(() => {
-    if (!userId) return;
-    const q = query(collection(db, "notifications"), where("userId", "==", userId), orderBy("createdAt", "desc"));
-    return onSnapshot(q, (snap) => {
-      const now = Date.now();
-      setNotifications(
-        snap.docs
-          .map((d) => ({ ...d.data(), id: d.id } as Notification))
-          .filter((n) => !n.expiresAt || n.expiresAt > now),
-      );
-    });
-  }, [userId]);
-
   const unread = notifications.filter((n) => !n.isRead).length;
 
-  const markRead = async (id: string) => {
-    await updateDoc(doc(db, "notifications", id), { isRead: true });
-  };
-
   const handleItemClick = (n: Notification) => {
-    markRead(n.id);
-    if (n.invoiceId) {
+    markNotificationRead(n.id);
+    const target = notificationTarget(n);
+    if (target) {
       setOpen(false);
-      navigate({ to: "/doctor-invoices/$invoiceId", params: { invoiceId: n.invoiceId } });
-      return;
-    }
-    if (n.orderId || n.type === "order_new") {
-      setOpen(false);
-      navigate({ to: "/orders" });
+      navigate(target);
     }
   };
 
-  const markAllRead = async () => {
-    const batch = writeBatch(db);
-    notifications.filter((n) => !n.isRead).forEach((n) => batch.update(doc(db, "notifications", n.id), { isRead: true }));
-    await batch.commit();
-  };
+  const markAllRead = () => markAllNotificationsRead(notifications);
 
-  const timeAgo = (ts: number) => {
-    const seconds = Math.floor((Date.now() - ts) / 1000);
-    if (seconds < 60) return "الآن";
-    const mins = Math.floor(seconds / 60);
-    if (mins < 60) return `منذ ${mins} د`;
-    const hours = Math.floor(mins / 60);
-    if (hours < 24) return `منذ ${hours} س`;
-    return `منذ ${Math.floor(hours / 24)} يوم`;
-  };
+  const timeAgo = (ts: number) => notificationTimeAgo(ts, ar);
 
   return (
     <div ref={ref} className="relative">
@@ -137,19 +111,25 @@ export function NotificationBell({
       {open && (
         <div className="absolute top-full end-0 mt-2 w-[22rem] sm:w-[26rem] bg-white rounded-3xl shadow-2xl border border-slate-100 z-50 overflow-hidden">
           <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-gradient-to-r from-sky-50/60 to-transparent">
-            <h3 className="font-display font-extrabold text-sm text-slate-800">الإشعارات</h3>
-            {unread > 0 && (
-              <button onClick={markAllRead} className="text-[11px] font-semibold text-primary hover:underline flex items-center gap-1">
-                <CheckCheck className="size-3" />تحديد الكل كمقروء
-              </button>
-            )}
+            <h3 className="font-display font-extrabold text-sm text-slate-800">{ar ? "الإشعارات" : "Notifications"}</h3>
+            <div className="flex items-center gap-3">
+              {unread > 0 && (
+                <button onClick={markAllRead} className="text-[11px] font-semibold text-primary hover:underline flex items-center gap-1">
+                  <CheckCheck className="size-3" />
+                  {ar ? "تحديد الكل كمقروء" : "Mark all read"}
+                </button>
+              )}
+              <Link to="/notifications" onClick={() => setOpen(false)} className="text-[11px] font-semibold text-slate-500 hover:text-primary hover:underline">
+                {ar ? "عرض الكل" : "View all"}
+              </Link>
+            </div>
           </div>
 
           <div className="max-h-80 overflow-y-auto">
             {notifications.length === 0 ? (
               <div className="py-10 text-center text-sm text-slate-400">
                 <Bell className="size-8 mx-auto mb-2 text-slate-300" />
-                لا توجد إشعارات حالياً
+                {ar ? "لا توجد إشعارات حالياً" : "No notifications yet"}
               </div>
             ) : (
               notifications.map((n) => {

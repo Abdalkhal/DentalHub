@@ -1,6 +1,8 @@
 import { createLocalStore } from "./createLocalStore";
 import { toast } from "sonner";
 
+export type FavKind = "brand" | "product" | "implant" | "office";
+
 export type FavItem = {
   id: string;
   title: string;
@@ -9,6 +11,9 @@ export type FavItem = {
   currency: "USD" | "IQD";
   imageUrl?: string;
   addedAt: string;
+  /** What `id` refers to, so the favorites page knows where a tap goes.
+   * Absent on older saved entries. */
+  kind?: FavKind;
 };
 
 const favorites = createLocalStore<FavItem[]>("dh:favorites", [], {
@@ -17,6 +22,12 @@ const favorites = createLocalStore<FavItem[]>("dh:favorites", [], {
 
 export function useFavorites() {
   return favorites.useStore();
+}
+
+/** Scopes favorites to the signed-in account, so switching accounts on one
+ * browser doesn't show the previous account's favorites. */
+export function setFavoritesStoreUser(uid: string): void {
+  favorites.setUser(uid);
 }
 
 export function isFavorited(id: string): boolean {

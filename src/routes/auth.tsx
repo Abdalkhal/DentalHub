@@ -12,7 +12,6 @@ import { toast } from "sonner";
 import { Loader2, Mail, Lock, ArrowRight, Eye, EyeOff, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CITIES } from "@/data/offices";
-import { DENTAL_SPECIALITIES } from "@/lib/constants/dentalSpecialities";
 
 export const Route = createFileRoute("/auth")({
   component: AuthPage,
@@ -242,10 +241,8 @@ export function AuthPage() {
   const [name, setName] = useState("");
   const [title, setTitle] = useState("");
   const [gender, setGender] = useState<"male" | "female" | "">("");
-  const [dob, setDob] = useState("");
   const [city, setCity] = useState("");
   const [clinicName, setClinicName] = useState("");
-  const [speciality, setSpeciality] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -264,10 +261,6 @@ export function AuthPage() {
     }
     if (mode === "signup" && accountType === "dentist" && !gender) {
       setError(ar ? "الرجاء اختيار الجنس" : "Please select your gender");
-      return;
-    }
-    if (mode === "signup" && accountType === "dentist" && !dob.trim()) {
-      setError(ar ? "الرجاء إدخال تاريخ الميلاد" : "Please enter your date of birth");
       return;
     }
     if (mode === "signup" && password.trim().length < 6) {
@@ -333,11 +326,9 @@ export function AuthPage() {
           createdAt: serverTimestamp(),
         };
         if (accountType === "dentist") {
-          roleData.surname = title.trim();
+          roleData.surname = title.trim() || null;
           roleData.gender = gender;
-          roleData.dob = dob;
           roleData.clinicName = clinicName.trim() || null;
-          roleData.speciality = speciality || null;
         }
         await setDoc(doc(db, "user_roles", cred.user.uid), roleData);
         navigate({ to: getAccountDashboard(accountType) });
@@ -560,21 +551,6 @@ export function AuthPage() {
                     </div>
                   </div>
 
-                  <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                    <label className="text-xs font-semibold text-muted-foreground mb-2 block px-1">
-                      {ar ? "تاريخ الميلاد" : "Date of birth"}
-                    </label>
-                    <input
-                      type="date"
-                      value={dob}
-                      onChange={(e) => {
-                        setDob(e.target.value);
-                        clearError();
-                      }}
-                      className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition"
-                    />
-                  </div>
-
                   <div className="relative animate-in fade-in slide-in-from-top-2 duration-300">
                     <input
                       value={clinicName}
@@ -587,23 +563,6 @@ export function AuthPage() {
                     />
                   </div>
 
-                  <div className="relative animate-in fade-in slide-in-from-top-2 duration-300">
-                    <select
-                      value={speciality}
-                      onChange={(e) => {
-                        setSpeciality(e.target.value);
-                        clearError();
-                      }}
-                      className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition appearance-none"
-                    >
-                      <option value="">{ar ? "التخصص" : "Speciality"}</option>
-                      {DENTAL_SPECIALITIES.map((s, i) => (
-                        <option key={i} value={s.en}>
-                          {ar ? s.ar : s.en}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
                 </>
               )}
 

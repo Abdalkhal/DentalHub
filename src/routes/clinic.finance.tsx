@@ -53,10 +53,10 @@ function FinancePage() {
       <TopBar title={ar ? "المالية والحسابات" : "Finance & Accounts"} showBack wide />
       <div className="px-3 pt-3 pb-6 md:px-6 md:pt-6 md:pb-12 lg:px-8 lg:max-w-5xl lg:mx-auto">
         <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4 md:gap-5">
-          <Stat label={ar ? "الإيرادات" : "Revenue"} value={`${income} د.ع`} tone="good" />
-          <Stat label={ar ? "المصاريف" : "Expenses"} value={`${expense} د.ع`} tone="bad" />
-          <Stat label={ar ? "الصافي" : "Net"} value={`${net} د.ع`} tone={net >= 0 ? "good" : "bad"} />
-          <Stat label={ar ? "متبقي للموردين" : "Outstanding"} value={`${dueOrders} د.ع`} tone="warn" />
+          <Stat label={ar ? "الإيرادات" : "Revenue"} value={`${income.toLocaleString()} د.ع`} tone="good" />
+          <Stat label={ar ? "المصاريف" : "Expenses"} value={`${expense.toLocaleString()} د.ع`} tone="bad" />
+          <Stat label={ar ? "الصافي" : "Net"} value={`${net.toLocaleString()} د.ع`} tone={net >= 0 ? "good" : "bad"} />
+          <Stat label={ar ? "متبقي للموردين" : "Outstanding"} value={`${dueOrders.toLocaleString()} د.ع`} tone="warn" />
         </div>
 
         <button

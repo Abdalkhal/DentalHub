@@ -1,12 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMemo } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
-import { useQuickOrders, addToPurchaseHistory } from "@/lib/quickOrders";
-import { useProducts, useSignedImageUrls } from "@/lib/products";
-import { addToCart } from "@/lib/cartStore";
-import { toast } from "sonner";
+import { useQuickOrders, useQuickOrderActions } from "@/lib/quickOrders";
 import { Package, ShoppingBag, RotateCcw } from "lucide-react";
 
 export const Route = createFileRoute("/quick-orders")({
@@ -22,65 +18,12 @@ function QuickOrdersPage() {
   const ar = lang === "ar";
   const navigate = useNavigate();
   const items = useQuickOrders();
-  const { data: products = [] } = useProducts();
-
-  const productsById = useMemo(
-    () => Object.fromEntries(products.map((p) => [p.id, p])),
-    [products],
-  );
-
-  const imagePaths = useMemo(
-    () => items.map((it) => productsById[it.productId]?.images?.[0]).filter(Boolean) as string[],
-    [items, productsById],
-  );
-  const { data: urlMap = {} } = useSignedImageUrls(imagePaths);
-
-  const handleReorder = (item: (typeof items)[number]) => {
-    const p = productsById[item.productId];
-    if (!p) {
-      toast.error(ar ? "المنتج غير متوفر حالياً" : "Product is currently unavailable");
-      return;
-    }
-    const imageUrl = p.images[0] ? urlMap[p.images[0]] : undefined;
-    const productName = ar ? p.ar || p.en : p.en || p.ar;
-    addToCart({
-      productId: p.id,
-      productName,
-      productImage: imageUrl,
-      officeId: p.companyId || "",
-      officeName: item.vendor || p.brand || (ar ? "المكتب" : "Office"),
-      brand: p.brand,
-      category: p.branch,
-      unitPrice: p.price,
-      currency: p.currency,
-      quantity: 1,
-    });
-    addToPurchaseHistory({
-      productId: p.id,
-      productName,
-      vendor: item.vendor || p.brand,
-      brand: p.brand,
-      unitPrice: p.price,
-      image: imageUrl,
-      qty: 1,
-    });
-    toast.success(ar ? "تمت إضافة المنتج إلى السلة" : "Added to cart");
-  };
+  const { productsById, urlMap, reorder: handleReorder } = useQuickOrderActions(items, ar);
 
   const goToProduct = (item: (typeof items)[number]) => {
     const p = productsById[item.productId];
-    if (!p?.companyId) return;
-    (
-      navigate as unknown as (opts: {
-        to: string;
-        params: Record<string, string>;
-        state: Record<string, unknown>;
-      }) => void
-    )({
-      to: "/profile/$accountId",
-      params: { accountId: p.companyId },
-      state: { openProductId: p.id },
-    });
+    if (!p) return;
+    navigate({ to: "/products/$productId", params: { productId: p.id } });
   };
 
   return (

@@ -4,7 +4,7 @@ import { useI18n } from "@/lib/i18n";
 import { useSession, useUserRole } from "@/lib/useAuth";
 import { submitDentistCase, attachOrderFile } from "@/lib/ordersStore";
 import { uploadOrderFile } from "@/lib/storagePipeline";
-import { createNotification } from "@/components/NotificationBell";
+import { createNotification } from "@/lib/notifications";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { FDI_UPPER, FDI_LOWER, UPPER_POS, LOWER_POS } from "@/components/DentalArch";

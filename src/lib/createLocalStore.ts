@@ -9,6 +9,8 @@ export interface LocalStoreApi<T> {
   useStore: () => T;
   set: (val: T | Updater<T>) => void;
   reset: () => void;
+  /** Scope the store to a signed-in user (own `key:uid` slot). "" = unscoped. */
+  setUser: (uid: string) => void;
 }
 
 export function createLocalStore<T>(
@@ -18,12 +20,28 @@ export function createLocalStore<T>(
 ): LocalStoreApi<T> {
   let state: T = defaultValue;
   let initialized = false;
+  let userId: string | null = null;
   const listeners = new Set<() => void>();
+
+  function storageKey(): string {
+    return userId ? `${key}:${userId}` : key;
+  }
 
   function load(): T {
     if (typeof window === "undefined") return defaultValue;
     try {
-      const raw = localStorage.getItem(key);
+      let raw = localStorage.getItem(storageKey());
+      // Data saved before per-user scoping lives under the bare key. The
+      // first account to sign in on this browser claims it once, so an
+      // existing user doesn't lose it — and it can't then leak to others.
+      if (!raw && userId) {
+        const legacy = localStorage.getItem(key);
+        if (legacy) {
+          localStorage.setItem(storageKey(), legacy);
+          localStorage.removeItem(key);
+          raw = legacy;
+        }
+      }
       if (!raw) return defaultValue;
       const parsed = JSON.parse(raw);
       if (options?.migrate) return options.migrate(parsed);
@@ -39,7 +57,7 @@ export function createLocalStore<T>(
   function persist() {
     if (typeof window === "undefined") return;
     try {
-      localStorage.setItem(key, JSON.stringify(state));
+      localStorage.setItem(storageKey(), JSON.stringify(state));
     } catch {}
   }
 
@@ -84,5 +102,14 @@ export function createLocalStore<T>(
     emit();
   }
 
-  return { getSnapshot, getServerSnapshot, subscribe, useStore, set, reset };
+  function setUser(uid: string) {
+    const next = uid || null;
+    if (next === userId) return;
+    userId = next;
+    state = typeof window === "undefined" ? defaultValue : load();
+    initialized = typeof window !== "undefined";
+    listeners.forEach((l) => l());
+  }
+
+  return { getSnapshot, getServerSnapshot, subscribe, useStore, set, reset, setUser };
 }

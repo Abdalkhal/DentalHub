@@ -10,7 +10,7 @@ import {
   type SurgicalGuideCompany,
 } from "@/lib/surgicalGuides";
 import { useSignedImageUrls } from "@/lib/products";
-import { Plus, MapPin, Phone, X, Package, Loader2, Layers } from "lucide-react";
+import { Plus, MapPin, Phone, X, Package, Loader2, Layers, MessageCircle } from "lucide-react";
 
 export const Route = createFileRoute("/surgical-guide/")({
   component: SurgicalGuideDirectory,
@@ -191,6 +191,27 @@ function SurgicalGuideDirectory() {
                   )}
                 </div>
               </div>
+
+              {selected.phone && (
+                <div className="flex gap-2">
+                  <a
+                    href={`tel:${selected.phone}`}
+                    className="flex-1 h-11 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-emerald-100 transition"
+                  >
+                    <Phone className="size-4" />
+                    {ar ? "اتصال" : "Call"}
+                  </a>
+                  <a
+                    href={`https://wa.me/${selected.phone.replace(/\D/g, "")}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 h-11 rounded-xl bg-[#25D366] text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-90 transition"
+                  >
+                    <MessageCircle className="size-4" />
+                    WhatsApp
+                  </a>
+                </div>
+              )}
 
               {selected.description && (
                 <div className="rounded-2xl bg-slate-50 border border-slate-100 p-3">

@@ -4,7 +4,7 @@ import { MobileShell } from "@/components/MobileShell";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { useImplantOffers } from "@/lib/implantOffers";
+import { useAllOffers } from "@/lib/offers";
 import {
   Plus, X, Phone, MapPin, User, Briefcase, Upload, Megaphone,
   ChevronRight, ChevronLeft, Send, MessageCircle,
@@ -54,7 +54,9 @@ function OffersPage() {
   const [classifieds, setClassifieds] = useState<Classified[]>(loadClassifieds);
   const [showForm, setShowForm] = useState(false);
   const [selectedAd, setSelectedAd] = useState<Classified | null>(null);
-  const { offers: realOffers = [], isLoading } = useImplantOffers();
+  // All suppliers' approved offers (not just implant companies) — same as native.
+  const { data: allOffers = [], isLoading } = useAllOffers();
+  const realOffers = useMemo(() => allOffers.filter((o) => !o.status || o.status === "active"), [allOffers]);
 
   const filtered = useMemo(() => {
     return cat === "all" ? classifieds : classifieds.filter((c) => c.category === cat);

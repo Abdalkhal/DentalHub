@@ -3,8 +3,10 @@ import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
 import { useMemo, useState } from "react";
-import { MessageCircle, Phone, Mail, ChevronDown, Search } from "lucide-react";
-import { helpTopics } from "@/data/help-topics";
+import { MessageCircle, ChevronDown, Search } from "lucide-react";
+import { helpTopicsFor } from "@/data/help-topics";
+import { useUserRole } from "@/lib/useAuth";
+import { SUPPORT_WHATSAPP_NUMBER } from "@/lib/constants/support";
 
 export const Route = createFileRoute("/account/help")({
   component: HelpPage,
@@ -13,27 +15,19 @@ export const Route = createFileRoute("/account/help")({
 function HelpPage() {
   const { lang } = useI18n();
   const ar = lang === "ar";
+  const { role } = useUserRole();
+  // Only the topics written for this account type (same as native).
+  const helpTopics = useMemo(() => helpTopicsFor(role?.accountType), [role?.accountType]);
   const [open, setOpen] = useState<number | null>(0);
   const [q, setQ] = useState("");
 
   const channels = [
     {
       icon: MessageCircle,
-      label: ar ? "محادثة مباشرة" : "Live chat",
-      sub: ar ? "متاح الآن" : "Available now",
+      label: ar ? "تواصل معنا على واتساب" : "Contact us on WhatsApp",
+      sub: `+${SUPPORT_WHATSAPP_NUMBER}`,
       tone: "bg-emerald-100 text-emerald-600",
-    },
-    {
-      icon: Phone,
-      label: ar ? "اتصال هاتفي" : "Call us",
-      sub: "+964 770 000 0000",
-      tone: "bg-blue-100 text-blue-600",
-    },
-    {
-      icon: Mail,
-      label: ar ? "البريد الإلكتروني" : "Email",
-      sub: "support@dentalhub.app",
-      tone: "bg-violet-100 text-violet-600",
+      href: `https://wa.me/${SUPPORT_WHATSAPP_NUMBER}`,
     },
   ];
 
@@ -45,7 +39,7 @@ function HelpPage() {
       const txt = `${t.title.ar} ${t.title.en} ${t.intro.ar} ${t.intro.en}`.toLowerCase();
       return txt.includes(query);
     });
-  }, [query]);
+  }, [query, helpTopics]);
 
   const allFaqs = useMemo(
     () =>
@@ -57,7 +51,7 @@ function HelpPage() {
           a: ar ? f.a.ar : f.a.en,
         })),
       ),
-    [ar],
+    [ar, helpTopics],
   );
 
   const filteredFaqs = useMemo(() => {
@@ -88,7 +82,12 @@ function HelpPage() {
             <ul className="bg-card border border-border rounded-2xl divide-y divide-border overflow-hidden shadow-soft">
               {channels.map((c, i) => (
                 <li key={i}>
-                  <button className="w-full flex items-center gap-3 px-4 py-3.5 text-start hover:bg-accent transition">
+                  <a
+                    href={c.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full flex items-center gap-3 px-4 py-3.5 text-start hover:bg-accent transition"
+                  >
                     <span
                       className={`size-9 rounded-xl flex items-center justify-center ${c.tone}`}
                     >
@@ -96,10 +95,10 @@ function HelpPage() {
                     </span>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold">{c.label}</p>
-                      <p className="text-[11px] text-muted-foreground truncate">{c.sub}</p>
+                      <p className="text-[11px] text-muted-foreground truncate" dir="ltr">{c.sub}</p>
                     </div>
                     <span className="text-muted-foreground">›</span>
-                  </button>
+                  </a>
                 </li>
               ))}
             </ul>

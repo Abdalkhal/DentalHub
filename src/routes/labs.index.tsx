@@ -9,7 +9,7 @@ import { TopBar } from "@/components/TopBar";
 import { CITIES } from "@/data/offices";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { Star, MapPin, SearchX } from "lucide-react";
+import { Star, MapPin, SearchX, Phone } from "lucide-react";
 
 export const Route = createFileRoute("/labs/")({
   component: LabsIndex,
@@ -23,6 +23,7 @@ type LabItem = {
   rating: number;
   itemsCount: number;
   area: string;
+  phone: string;
 };
 
 function resolveCityId(cityValue: string | undefined | null): string {
@@ -41,7 +42,6 @@ function LabsIndex() {
   const { t, lang } = useI18n();
   const ar = lang === "ar";
   const [city, setCity] = useState("all");
-  const [sort, setSort] = useState<"default" | "rating" | "items">("default");
 
   const { data: labs = [] } = useQuery({
     queryKey: ["labs-directory"],
@@ -58,20 +58,17 @@ function LabsIndex() {
           rating: 0,
           itemsCount: 0,
           area: u.address || "",
-        }));
+          phone: u.phone || "",
+        }))
+        .filter((i) => i.id && i.name.ar);
     },
     staleTime: 30_000,
   });
 
-  const filtered = useMemo(() => {
-    let list = labs.filter((item) => {
-      if (city !== "all" && item.cityId !== city) return false;
-      return true;
-    });
-    if (sort === "rating") list = [...list].sort((a, b) => b.rating - a.rating);
-    if (sort === "items") list = [...list].sort((a, b) => b.itemsCount - a.itemsCount);
-    return list;
-  }, [labs, city, sort]);
+  const filtered = useMemo(
+    () => (city === "all" ? labs : labs.filter((item) => item.cityId === city)),
+    [labs, city],
+  );
 
   return (
     <MobileShell wide>
@@ -85,17 +82,6 @@ function LabsIndex() {
           ))}
         </div>
 
-        {/* Sort chips */}
-        <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 mb-1 md:flex-wrap md:overflow-visible md:gap-2.5">
-          {([
-            { key: "default", ar: "الكل", en: "All" },
-            { key: "rating", ar: "الأعلى تقييماً", en: "Top rated" },
-            { key: "items", ar: "الأكثر تنوعاً", en: "Most items" },
-          ] as const).map((c) => (
-            <button key={c.key} onClick={() => setSort(c.key)} className={cn("shrink-0 h-8 px-3 rounded-full text-xs font-semibold border transition", sort === c.key ? "bg-primary text-primary-foreground border-primary" : "bg-card text-foreground border-border hover:bg-accent")}>{ar ? c.ar : c.en}</button>
-          ))}
-        </div>
-
         <h2 className="font-display font-bold text-base mb-3 md:text-2xl md:mt-6 md:mb-5">{ar ? "المختبرات" : "Laboratories"}</h2>
         {filtered.length === 0 ? (
           <div className="py-12 flex flex-col items-center text-center text-muted-foreground md:col-span-full">
@@ -105,7 +91,7 @@ function LabsIndex() {
         ) : (
           <ul className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-4 lg:grid-cols-3 xl:grid-cols-4">
             {filtered.map((item) => (
-              <li key={item.id}>
+              <li key={item.id} className="relative">
                 <Link to="/labs/$labId" params={{ labId: item.id }} className="flex items-center gap-3 bg-card border border-border rounded-2xl p-3.5 shadow-soft hover:shadow-card transition md:h-full md:flex-col md:items-center md:text-center md:gap-3 md:p-6 md:shadow-none md:hover:shadow-lg md:hover:border-primary/30 md:hover:-translate-y-0.5">
                   <span className="size-12 rounded-2xl bg-[oklch(0.95_0.05_250)] text-[oklch(0.45_0.18_250)] flex items-center justify-center font-display font-extrabold text-lg shrink-0 md:size-16 md:text-2xl md:rounded-3xl">{(ar ? item.name.ar : item.name.en).charAt(0)}</span>
                   <div className="flex-1 min-w-0 md:flex-none md:w-full">
@@ -115,7 +101,17 @@ function LabsIndex() {
                       {item.rating > 0 && <span className="inline-flex items-center gap-1 text-amber-500"><Star className="size-3 fill-current" /><span className="font-semibold">{item.rating}</span></span>}
                     </div>
                   </div>
+                  {item.phone && <span className="size-10 shrink-0 md:hidden" />}
                 </Link>
+                {item.phone && (
+                  <a
+                    href={`tel:${item.phone}`}
+                    className="absolute top-1/2 -translate-y-1/2 end-3.5 size-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 md:static md:translate-y-0 md:mt-2 md:w-full md:h-9"
+                    aria-label={ar ? "اتصال" : "Call"}
+                  >
+                    <Phone className="size-[18px]" />
+                  </a>
+                )}
               </li>
             ))}
           </ul>

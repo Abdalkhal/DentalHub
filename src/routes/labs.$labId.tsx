@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useMemo, useEffect } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/integrations/firebase/client";
@@ -8,11 +8,21 @@ import { TopBar } from "@/components/TopBar";
 import { LabRxFormModal } from "@/components/LabRxFormModal";
 import { useI18n } from "@/lib/i18n";
 import { useUserRole } from "@/lib/useAuth";
+import { useIsFavorited, toggleFavorite } from "@/lib/favoritesStore";
 import { cn } from "@/lib/utils";
 import {
   Clock, Crown, Stethoscope, MapPin, Phone, Loader2,
-  ShoppingCart, Send,
+  ShoppingCart, Send, Heart, MessageCircle, MessageSquare,
 } from "lucide-react";
+
+function mapsUrl(p: UserRoleDoc): string {
+  if (p.mapUrl) return p.mapUrl;
+  if (p.latitude != null && p.longitude != null) {
+    return `https://www.google.com/maps/search/?api=1&query=${p.latitude},${p.longitude}`;
+  }
+  const addr = p.address || p.city || "Mosul, Iraq";
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`;
+}
 
 export const Route = createFileRoute("/labs/$labId")({
   component: LabPage,
@@ -30,7 +40,8 @@ function LabPage() {
   const { labId } = Route.useParams();
   const { lang } = useI18n();
   const ar = lang === "ar";
-  const { role } = useUserRole();
+  const { user, role } = useUserRole();
+  const favorited = useIsFavorited(labId);
 
   const [profile, setProfile] = useState<UserRoleDoc | null>(null);
   const [services, setServices] = useState<Service[]>([]);
@@ -94,7 +105,32 @@ function LabPage() {
               {labName.charAt(0)}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="font-bold text-lg text-slate-800 md:text-3xl">{labName}</p>
+              <div className="flex items-start justify-between gap-2">
+                <p className="font-bold text-lg text-slate-800 md:text-3xl">{labName}</p>
+                {role?.accountType === "dentist" && (
+                  <button
+                    onClick={() =>
+                      toggleFavorite(
+                        {
+                          id: labId,
+                          title: labName,
+                          vendor: ar ? "مختبر" : "Laboratory",
+                          price: 0,
+                          currency: "USD",
+                          imageUrl: profile.photoURL || undefined,
+                          addedAt: new Date().toISOString(),
+                          kind: "office",
+                        },
+                        lang,
+                      )
+                    }
+                    className="size-10 shrink-0 rounded-full bg-white/80 border border-slate-200 flex items-center justify-center hover:bg-white transition"
+                    aria-label={favorited ? "Remove from favorites" : "Add to favorites"}
+                  >
+                    <Heart className={cn("size-[18px] text-red-500", favorited && "fill-red-500")} />
+                  </button>
+                )}
+              </div>
               <span className="inline-block text-[11px] font-semibold px-2.5 py-1 rounded-full mt-1.5 bg-sky-50 text-sky-600">{ar ? "مختبر أسنان" : "Dental Lab"}</span>
               {phone && <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-2.5"><Phone className="size-3.5" />{phone.replace(/\D/g, "").replace(/^964/, "+964 ")}</p>}
             </div>
@@ -111,6 +147,49 @@ function LabPage() {
             </button>
           )}
         </div>
+
+        {/* Contact actions — same set as the native profile screen */}
+        <div className="flex gap-2">
+          {phone && (
+            <a
+              href={`tel:${phone}`}
+              className="flex-1 h-11 rounded-xl bg-emerald-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-emerald-600 transition"
+            >
+              <Phone className="size-4" />
+              {ar ? "اتصال" : "Call"}
+            </a>
+          )}
+          {phone && (
+            <a
+              href={`https://wa.me/${phone.replace(/\D/g, "")}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 h-11 rounded-xl bg-[#25D366] text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-90 transition"
+            >
+              <MessageCircle className="size-4" />
+              WhatsApp
+            </a>
+          )}
+          <a
+            href={mapsUrl(profile)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-1 h-11 rounded-xl bg-sky-100 text-sky-700 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-sky-200 transition"
+          >
+            <MapPin className="size-4" />
+            {ar ? "الخريطة" : "Map"}
+          </a>
+        </div>
+        {!!user && user.uid !== labId && (
+          <Link
+            to="/messages"
+            search={{ with: labId, withName: labName }}
+            className="h-11 rounded-xl bg-[#2563EB] text-white text-sm font-bold flex items-center justify-center gap-2 hover:bg-[#1D4ED8] transition md:max-w-sm"
+          >
+            <MessageSquare className="size-4" />
+            {ar ? "مراسلة" : "Message"}
+          </Link>
+        )}
 
         {/* Filter pills */}
         {services.length > 0 && (
@@ -143,9 +222,14 @@ function LabPage() {
                       <span className="font-bold text-sm text-blue-600">{fmt}</span>
                     </div>
                     {s.category && <p className="text-[10px] text-slate-400 mt-1.5">{ar ? `الفئة: ${s.category}` : `Category: ${s.category}`}</p>}
-                    <button className="w-full h-7 mt-2 rounded-lg bg-primary/10 text-primary text-[11px] font-bold flex items-center justify-center gap-1 hover:bg-primary/20 transition">
-                      <ShoppingCart className="size-3" />{ar ? "طلب" : "Order"}
-                    </button>
+                    {role?.accountType === "dentist" && (
+                      <button
+                        onClick={() => setShowSendCase(true)}
+                        className="w-full h-7 mt-2 rounded-lg bg-primary/10 text-primary text-[11px] font-bold flex items-center justify-center gap-1 hover:bg-primary/20 transition"
+                      >
+                        <ShoppingCart className="size-3" />{ar ? "طلب" : "Order"}
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -159,7 +243,7 @@ function LabPage() {
         labName={labName}
         labPhone={phone}
         labAddress={address}
-        labInstagram={(profile as any).instagram || ""}
+        labInstagram={(profile as { instagram?: string }).instagram || ""}
         open={showSendCase}
         onClose={() => setShowSendCase(false)}
       />

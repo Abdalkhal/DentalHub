@@ -4,8 +4,10 @@ import { useQuery } from "@tanstack/react-query";
 import { collection, getDocs } from "firebase/firestore";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
+import { z } from "zod";
 import { COUNTRIES } from "@/data/implants";
-import { useProductsByCountry, useSignedImageUrls, type Product } from "@/lib/products";
+import { ALL_COUNTRIES, countryFlagUrl } from "@/data/countries";
+import { useProductsByCountry, useSignedImageUrls, COUNTRY_SLUG_TO_CODE, type Product } from "@/lib/products";
 import { useImplantCompanyNames } from "@/lib/implantOffers";
 import { addToCart } from "@/lib/cartStore";
 import { addToPurchaseHistory } from "@/lib/quickOrders";
@@ -457,10 +459,31 @@ function ImplantCard({
   );
 }
 
+// Size range + search carried over from the implants home (same as native).
+const countrySearchSchema = z.object({
+  lenMin: z.coerce.number().optional().catch(undefined),
+  lenMax: z.coerce.number().optional().catch(undefined),
+  diaMin: z.coerce.number().optional().catch(undefined),
+  diaMax: z.coerce.number().optional().catch(undefined),
+  q: z.string().optional().catch(undefined),
+});
+
+// Known starter countries keep their slug; any other country an implant
+// company lists uses its lowercased ISO code as the slug.
+function resolveCountry(slug: string) {
+  const known = COUNTRIES.find((c) => c.slug === slug);
+  if (known) return { slug, ar: known.ar, en: known.en, flag: known.flag, code: COUNTRY_SLUG_TO_CODE[slug] ?? slug.toUpperCase() };
+  const code = slug.toUpperCase();
+  const entry = ALL_COUNTRIES.find((c) => c.code === code);
+  if (!entry) return null;
+  return { slug, ar: entry.ar, en: entry.en, flag: "", code };
+}
+
 export const Route = createFileRoute("/implants/$country")({
+  validateSearch: countrySearchSchema,
   component: CountryPage,
   loader: ({ params }) => {
-    const country = COUNTRIES.find((c) => c.slug === params.country);
+    const country = resolveCountry(params.country);
     if (!country) throw notFound();
     return { country };
   },
@@ -468,6 +491,7 @@ export const Route = createFileRoute("/implants/$country")({
 
 function CountryPage() {
   const { country } = Route.useLoaderData();
+  const { lenMin, lenMax, diaMin, diaMax, q } = Route.useSearch();
   const { t, lang } = useI18n();
   const ar = lang === "ar";
   const [filter, setFilter] = useState<ImplantFilter>("all");
@@ -482,10 +506,32 @@ function CountryPage() {
   const companies = useImplantCompanies();
   const navigate = useNavigate();
 
+  const sizeFiltered = useMemo(() => {
+    const hasRange = lenMin != null && lenMax != null && diaMin != null && diaMax != null;
+    const term = (q ?? "").trim().toLowerCase();
+    if (!hasRange && !term) return products;
+    return products.filter((p) => {
+      const spec = p.implantSpec;
+      if (term) {
+        const hay = [p.brand, ...(spec?.diameters ?? []).map(String), ...(spec?.lengths ?? []).map(String)]
+          .join(" ")
+          .toLowerCase();
+        if (!hay.includes(term)) return false;
+      }
+      if (hasRange) {
+        const diams = spec?.diameters ?? [];
+        const lens = spec?.lengths ?? [];
+        if (diams.length > 0 && !diams.some((d) => d >= diaMin! && d <= diaMax!)) return false;
+        if (lens.length > 0 && !lens.some((l) => l >= lenMin! && l <= lenMax!)) return false;
+      }
+      return true;
+    });
+  }, [products, lenMin, lenMax, diaMin, diaMax, q]);
+
   const filtered = useMemo(() => {
-    if (filter === "all") return products;
-    return products.filter((p) => implantCategoryOf(p.implantSpec) === filter);
-  }, [products, filter]);
+    if (filter === "all") return sizeFiltered;
+    return sizeFiltered.filter((p) => implantCategoryOf(p.implantSpec) === filter);
+  }, [sizeFiltered, filter]);
 
   const allPaths = useMemo(() => {
     const productPaths = products.flatMap((p) => p.images);
@@ -516,9 +562,13 @@ function CountryPage() {
       )}
       <div className="px-4 pt-4 md:px-6 md:pt-8 md:pb-12 lg:px-8 lg:max-w-5xl lg:mx-auto">
         <div className="flex items-center gap-3 mb-4 md:gap-5 md:mb-7">
-          <div className="text-5xl md:text-7xl">{country.flag}</div>
+          {country.flag ? (
+            <div className="text-5xl md:text-7xl">{country.flag}</div>
+          ) : (
+            <img src={countryFlagUrl(country.code)} alt="" className="h-12 w-16 rounded-lg object-cover md:h-16 md:w-24" />
+          )}
           <div>
-            <p className="text-xs text-muted-foreground md:text-sm">{t("brands")}</p>
+            <p className="text-xs text-muted-foreground md:text-sm">{ar ? "زرعات" : "Implants"}</p>
             <p className="font-display font-extrabold text-xl md:text-4xl">{filtered.length}</p>
           </div>
         </div>

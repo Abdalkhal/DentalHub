@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
 import { db } from "@/integrations/firebase/client";
-import { createNotification } from "@/components/NotificationBell";
+import { createNotification } from "@/lib/notifications";
 import type { Order } from "@/lib/ordersStore";
 
 export function useDentistCases(dentistId: string) {

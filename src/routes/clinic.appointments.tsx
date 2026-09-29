@@ -18,7 +18,10 @@ import {
   Bell,
   Sun,
   Moon,
+  Plus,
 } from "lucide-react";
+import { AddAppointmentModal } from "@/components/AddAppointmentModal";
+import { AppointmentDetailModal } from "@/components/AppointmentDetailModal";
 import {
   ToothIcon,
   CrownToothIcon,
@@ -29,10 +32,8 @@ import {
   ExtractionIcon,
 } from "@/components/DentalIcons";
 
-const TIME_SLOTS = [
-  "08:00", "09:00", "10:00", "11:00", "12:00",
-  "13:00", "14:00", "15:00", "16:00", "17:00", "18:00",
-];
+const MORNING_SLOTS = ["06:00", "07:00", "08:00", "09:00", "10:00", "11:00"];
+const EVENING_SLOTS = ["12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00", "21:00"];
 
 const DAY_LABELS = [
   { key: 0, ar: "الأحد", en: "Sun" },
@@ -173,6 +174,15 @@ function AppointmentsPage() {
 
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const [showCalendar, setShowCalendar] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
+  const [selectedAppt, setSelectedAppt] = useState<Appointment | null>(null);
+  // Which half of the day the timeline shows: defaults to whichever half has
+  // more of the day's appointments; tapping Morning/Evening overrides it
+  // until the selected date changes (same as native).
+  const [manualPeriod, setManualPeriod] = useState<"AM" | "PM" | null>(null);
+  useEffect(() => {
+    setManualPeriod(null);
+  }, [selectedDate]);
   const [calMonth, setCalMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
 
   const selectedDateObj = useMemo(() => new Date(selectedDate + "T00:00:00"), [selectedDate]);
@@ -209,6 +219,10 @@ function AppointmentsPage() {
     const reminders = dayAppointments.filter((a) => a.reminder).length;
     return { total, morning, evening, reminders };
   }, [dayAppointments]);
+
+  const defaultPeriod: "AM" | "PM" = stats.evening > stats.morning ? "PM" : "AM";
+  const periodFilter = manualPeriod ?? defaultPeriod;
+  const activeSlots = periodFilter === "AM" ? MORNING_SLOTS : EVENING_SLOTS;
 
   const changeMonth = (dir: -1 | 1) => {
     setSelectedDate((prev) => {
@@ -248,10 +262,6 @@ function AppointmentsPage() {
   };
 
   const nowHour = new Date().getHours();
-  const nowMin = new Date().getMinutes();
-  const currentTimePercent = ((nowHour - 8 + nowMin / 60) / 10) * 100;
-  const nowTimeStr = `${String(nowHour).padStart(2, "0")}:${String(nowMin).padStart(2, "0")}`;
-  const currentTime12h = format12h(nowTimeStr, ar);
 
   return (
     <MobileShell wide>
@@ -325,8 +335,24 @@ function AppointmentsPage() {
         {/* Stats cards */}
         <div className="grid grid-cols-4 gap-2 md:gap-4">
           <StatCard ar={ar} label={{ ar: "الإجمالي", en: "Total" }} value={stats.total} color="bg-sky-50 text-sky-700" icon={Users} />
-          <StatCard ar={ar} label={{ ar: "صباحاً", en: "Morning" }} value={stats.morning} color="bg-amber-50 text-amber-700" icon={Sun} />
-          <StatCard ar={ar} label={{ ar: "مساءً", en: "Evening" }} value={stats.evening} color="bg-indigo-50 text-indigo-700" icon={Moon} />
+          <StatCard
+            ar={ar}
+            label={{ ar: "صباحاً", en: "Morning" }}
+            value={stats.morning}
+            color="bg-amber-50 text-amber-700"
+            icon={Sun}
+            onClick={() => setManualPeriod("AM")}
+            active={periodFilter === "AM"}
+          />
+          <StatCard
+            ar={ar}
+            label={{ ar: "مساءً", en: "Evening" }}
+            value={stats.evening}
+            color="bg-indigo-50 text-indigo-700"
+            icon={Moon}
+            onClick={() => setManualPeriod("PM")}
+            active={periodFilter === "PM"}
+          />
           <StatCard ar={ar} label={{ ar: "تذكير", en: "Reminders" }} value={stats.reminders} color="bg-rose-50 text-rose-700" icon={Bell} />
         </div>
 
@@ -338,7 +364,7 @@ function AppointmentsPage() {
           </h3>
 
           <div className="relative bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
-            {TIME_SLOTS.map((slot) => {
+            {activeSlots.map((slot) => {
               const slotAppts = sorted.filter((a) => hourSlot(a.time) === slot);
               const isCurrentHour = selectedDate === todayStr && parseInt(slot.split(":")[0]) === nowHour;
 
@@ -357,26 +383,13 @@ function AppointmentsPage() {
                       <div className="h-6" />
                     ) : (
                       slotAppts.map((a) => (
-                        <AppointmentCard key={a.id} appt={a} ar={ar} />
+                        <AppointmentCard key={a.id} appt={a} ar={ar} onClick={() => setSelectedAppt(a)} />
                       ))
                     )}
                   </div>
                 </div>
               );
             })}
-
-            {/* Current time indicator */}
-            {selectedDate === todayStr && currentTimePercent > 0 && currentTimePercent < 100 && (
-              <div
-                className="absolute inset-x-0 z-10 flex items-center pointer-events-none"
-                style={{ top: `${currentTimePercent}%` }}
-              >
-                <span className="bg-[#007AFF] text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm shrink-0 -translate-y-1/2">
-                  {currentTime12h}
-                </span>
-                <span className="flex-1 h-px bg-[#007AFF]" />
-              </div>
-            )}
           </div>
         </div>
 
@@ -444,21 +457,40 @@ function AppointmentsPage() {
           </div>
         </div>
       )}
+
+      {/* Floating add button */}
+      <button
+        type="button"
+        onClick={() => setShowAdd(true)}
+        className="fixed bottom-24 end-5 z-40 size-14 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:bg-primary/90 transition lg:bottom-8 lg:end-8"
+        aria-label={ar ? "إضافة موعد" : "Add appointment"}
+      >
+        <Plus className="size-6" />
+      </button>
+
+      {showAdd && <AddAppointmentModal onClose={() => setShowAdd(false)} />}
+      <AppointmentDetailModal appointment={selectedAppt} onClose={() => setSelectedAppt(null)} />
     </MobileShell>
   );
 }
 
-function AppointmentCard({ appt, ar }: { appt: Appointment; ar: boolean }) {
+function AppointmentCard({ appt, ar, onClick }: { appt: Appointment; ar: boolean; onClick?: () => void }) {
   const theme = statusTheme(appt);
   const initial = appt.patientName.trim().charAt(0) || "؟";
   const StatusIcon = theme.icon;
   const TreatmentIcon = treatmentIcon(appt.treatment);
   return (
-    <div className={cn(
-      "flex items-center gap-3 py-2.5 px-4 rounded-2xl border transition",
-      theme.bg,
-      theme.border,
-    )}>
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={(e) => { if (e.key === "Enter") onClick?.(); }}
+      className={cn(
+        "flex items-center gap-3 py-2.5 px-4 rounded-2xl border transition cursor-pointer hover:shadow-sm",
+        theme.bg,
+        theme.border,
+      )}
+    >
       {/* Right: avatar */}
       <span className="size-10 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 text-slate-700 flex items-center justify-center font-bold text-sm shrink-0">
         {initial}
@@ -487,20 +519,33 @@ function StatCard({
   value,
   color,
   icon: Icon,
+  onClick,
+  active,
 }: {
   ar: boolean;
   label: { ar: string; en: string };
   value: number;
   color: string;
   icon: typeof Users;
+  onClick?: () => void;
+  active?: boolean;
 }) {
   return (
-    <div className="bg-white border border-slate-100 rounded-2xl p-3 text-center shadow-sm">
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!onClick}
+      className={cn(
+        "rounded-2xl p-3 text-center shadow-sm border transition",
+        active ? "border-primary bg-primary/5" : "bg-white border-slate-100",
+        onClick && "hover:border-primary/40",
+      )}
+    >
       <span className={`inline-flex size-8 rounded-xl items-center justify-center mb-1.5 ${color}`}>
         <Icon className="size-4" />
       </span>
       <p className="font-display font-extrabold text-lg leading-none text-slate-800">{value}</p>
-      <p className="text-[10px] font-bold text-slate-400 mt-0.5">{ar ? label.ar : label.en}</p>
-    </div>
+      <p className={cn("text-[10px] font-bold mt-0.5", active ? "text-primary" : "text-slate-400")}>{ar ? label.ar : label.en}</p>
+    </button>
   );
 }
