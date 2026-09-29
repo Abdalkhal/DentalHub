@@ -11,7 +11,10 @@
       "icon": "./assets/images/icon.png",
       "bundleIdentifier": "com.khazer.denthub",
       "supportsTablet": false,
-      "googleServicesFile": "./GoogleService-Info.plist"
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.khazer.denthub",
