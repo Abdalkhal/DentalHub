@@ -21,6 +21,8 @@ import { Route as MyAdsRouteImport } from './routes/my-ads'
 import { Route as MoreRouteImport } from './routes/more'
 import { Route as MessagesRouteImport } from './routes/messages'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as LabPatientsRouteImport } from './routes/lab-patients'
+import { Route as LabDoctorsRouteImport } from './routes/lab-doctors'
 import { Route as FinanceRouteImport } from './routes/finance'
 import { Route as ExploreRouteImport } from './routes/explore'
 import { Route as DoctorsRouteImport } from './routes/doctors'
@@ -134,6 +136,16 @@ const MessagesRoute = MessagesRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LabPatientsRoute = LabPatientsRouteImport.update({
+  id: '/lab-patients',
+  path: '/lab-patients',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LabDoctorsRoute = LabDoctorsRouteImport.update({
+  id: '/lab-doctors',
+  path: '/lab-doctors',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FinanceRoute = FinanceRouteImport.update({
@@ -420,6 +432,8 @@ export interface FileRoutesByFullPath {
   '/doctors': typeof DoctorsRoute
   '/explore': typeof ExploreRoute
   '/finance': typeof FinanceRoute
+  '/lab-doctors': typeof LabDoctorsRoute
+  '/lab-patients': typeof LabPatientsRoute
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
   '/more': typeof MoreRoute
@@ -488,6 +502,8 @@ export interface FileRoutesByTo {
   '/doctors': typeof DoctorsRoute
   '/explore': typeof ExploreRoute
   '/finance': typeof FinanceRoute
+  '/lab-doctors': typeof LabDoctorsRoute
+  '/lab-patients': typeof LabPatientsRoute
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
   '/more': typeof MoreRoute
@@ -557,6 +573,8 @@ export interface FileRoutesById {
   '/doctors': typeof DoctorsRoute
   '/explore': typeof ExploreRoute
   '/finance': typeof FinanceRoute
+  '/lab-doctors': typeof LabDoctorsRoute
+  '/lab-patients': typeof LabPatientsRoute
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
   '/more': typeof MoreRoute
@@ -627,6 +645,8 @@ export interface FileRouteTypes {
     | '/doctors'
     | '/explore'
     | '/finance'
+    | '/lab-doctors'
+    | '/lab-patients'
     | '/login'
     | '/messages'
     | '/more'
@@ -695,6 +715,8 @@ export interface FileRouteTypes {
     | '/doctors'
     | '/explore'
     | '/finance'
+    | '/lab-doctors'
+    | '/lab-patients'
     | '/login'
     | '/messages'
     | '/more'
@@ -763,6 +785,8 @@ export interface FileRouteTypes {
     | '/doctors'
     | '/explore'
     | '/finance'
+    | '/lab-doctors'
+    | '/lab-patients'
     | '/login'
     | '/messages'
     | '/more'
@@ -832,6 +856,8 @@ export interface RootRouteChildren {
   DoctorsRoute: typeof DoctorsRoute
   ExploreRoute: typeof ExploreRoute
   FinanceRoute: typeof FinanceRoute
+  LabDoctorsRoute: typeof LabDoctorsRoute
+  LabPatientsRoute: typeof LabPatientsRoute
   LoginRoute: typeof LoginRoute
   MessagesRoute: typeof MessagesRoute
   MoreRoute: typeof MoreRoute
@@ -970,6 +996,20 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lab-patients': {
+      id: '/lab-patients'
+      path: '/lab-patients'
+      fullPath: '/lab-patients'
+      preLoaderRoute: typeof LabPatientsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lab-doctors': {
+      id: '/lab-doctors'
+      path: '/lab-doctors'
+      fullPath: '/lab-doctors'
+      preLoaderRoute: typeof LabDoctorsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/finance': {
@@ -1403,6 +1443,8 @@ const rootRouteChildren: RootRouteChildren = {
   DoctorsRoute: DoctorsRoute,
   ExploreRoute: ExploreRoute,
   FinanceRoute: FinanceRoute,
+  LabDoctorsRoute: LabDoctorsRoute,
+  LabPatientsRoute: LabPatientsRoute,
   LoginRoute: LoginRoute,
   MessagesRoute: MessagesRoute,
   MoreRoute: MoreRoute,

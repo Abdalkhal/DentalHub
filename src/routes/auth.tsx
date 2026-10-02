@@ -1,7 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
-import { MobileShell } from "@/components/MobileShell";
-import { TopBar } from "@/components/TopBar";
+import { useState, type ReactNode } from "react";
 import { useI18n } from "@/lib/i18n";
 import { auth, db } from "@/integrations/firebase/client";
 import { fetchUserRoleDoc, getAccountDashboard, type LabStaffRole } from "@/lib/useAuth";
@@ -9,223 +7,73 @@ import type { AccountType } from "@/integrations/firebase/types";
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { toast } from "sonner";
-import { Loader2, Mail, Lock, ArrowRight, Eye, EyeOff, User } from "lucide-react";
+import { ArrowLeft, ArrowRight, Eye, EyeOff, Loader2, Lock, Mail, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CITIES } from "@/data/offices";
+import heroBg from "@/assets/login/hero-bg.jpg";
+import iconDentist from "@/assets/login/icon-dentist.png";
+import iconSupply from "@/assets/login/icon-supply.png";
+import iconLab from "@/assets/login/icon-lab.png";
+import iconImplant from "@/assets/login/icon-implant.png";
 
 export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
 
-const ACCOUNT_OPTIONS: {
+// Same look as the app's login screen (native login.tsx).
+const ROLES: {
   id: AccountType;
-  arLabel: string;
-  enLabel: string;
-  arDesc: string;
-  enDesc: string;
-  color: string;
+  ar: string;
+  en: string;
+  icon: string;
+  iconHex: string;
+  activeBg: string;
+  activeText: string;
 }[] = [
-  {
-    id: "dentist",
-    arLabel: "طبيب أسنان",
-    enLabel: "Dentist",
-    arDesc: "تصفح المواد واطلب من المكاتب",
-    enDesc: "Browse supplies & order from offices",
-    color: "sky",
-  },
-  {
-    id: "supply",
-    arLabel: "مكتب مستلزمات",
-    enLabel: "Supplies Office",
-    arDesc: "أدر منتجاتك وعروضك وطلباتك",
-    enDesc: "Manage your products, offers & orders",
-    color: "emerald",
-  },
-  {
-    id: "lab",
-    arLabel: "مختبر",
-    enLabel: "Laboratory",
-    arDesc: "استلم وتابع حالات الأطباء",
-    enDesc: "Receive & track dentist cases",
-    color: "violet",
-  },
-  {
-    id: "implant",
-    arLabel: "شركة زرعات",
-    enLabel: "Implant Company",
-    arDesc: "أدر علاماتك التجارية ومنتجاتك",
-    enDesc: "Manage your brands & products",
-    color: "amber",
-  },
+  { id: "dentist", ar: "الطبيب", en: "Dentist", icon: iconDentist, iconHex: "#0284C7", activeBg: "bg-sky-50", activeText: "text-sky-700" },
+  { id: "supply", ar: "مستلزمات الأسنان", en: "Dental Supplies", icon: iconSupply, iconHex: "#059669", activeBg: "bg-emerald-50", activeText: "text-emerald-700" },
+  { id: "lab", ar: "المختبرات", en: "Laboratories", icon: iconLab, iconHex: "#7C3AED", activeBg: "bg-violet-50", activeText: "text-violet-700" },
+  { id: "implant", ar: "شركات الزراعة", en: "Implant Companies", icon: iconImplant, iconHex: "#D97706", activeBg: "bg-amber-50", activeText: "text-amber-700" },
 ];
 
-const COLOR_MAP: Record<
-  string,
-  { bg: string; ring: string; text: string; border: string; icon: string; glow: string }
-> = {
-  sky: {
-    bg: "bg-sky-50",
-    ring: "ring-sky-500",
-    text: "text-sky-700",
-    border: "border-sky-500",
-    icon: "text-sky-500",
-    glow: "shadow-sky-500/20",
-  },
-  emerald: {
-    bg: "bg-emerald-50",
-    ring: "ring-emerald-500",
-    text: "text-emerald-700",
-    border: "border-emerald-500",
-    icon: "text-emerald-500",
-    glow: "shadow-emerald-500/20",
-  },
-  violet: {
-    bg: "bg-violet-50",
-    ring: "ring-violet-500",
-    text: "text-violet-700",
-    border: "border-violet-500",
-    icon: "text-violet-500",
-    glow: "shadow-violet-500/20",
-  },
-  amber: {
-    bg: "bg-amber-50",
-    ring: "ring-amber-500",
-    text: "text-amber-700",
-    border: "border-amber-500",
-    icon: "text-amber-500",
-    glow: "shadow-amber-500/20",
-  },
-};
-
-function ToothIcon({ className }: { className?: string }) {
+function LoginInput({
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+  autoComplete,
+  icon,
+  rightIcon,
+  onEnter,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  type?: string;
+  autoComplete?: string;
+  icon?: ReactNode;
+  rightIcon?: ReactNode;
+  onEnter?: () => void;
+}) {
   return (
-    <svg viewBox="0 0 32 32" fill="none" className={className}>
-      <ellipse
-        cx="16"
-        cy="15"
-        rx="6.5"
-        ry="9"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        fill="currentColor"
-        fillOpacity="0.08"
+    <div className="flex h-14 w-full items-center gap-2.5 rounded-full border border-slate-200 bg-slate-50 px-5 focus-within:border-sky-500 focus-within:ring-2 focus-within:ring-sky-500/20 transition">
+      {icon}
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && onEnter) onEnter();
+        }}
+        placeholder={placeholder}
+        autoComplete={autoComplete}
+        dir={type === "email" || type === "password" ? "ltr" : undefined}
+        className="min-w-0 flex-1 bg-transparent text-sm font-medium text-slate-800 placeholder:text-slate-400 outline-none"
       />
-      <path
-        d="M16 6c-3.2 0-5.3 1-6.5 2.3-1.2 1.3-1.6 2.7-1.6 3.7 0 1.5.3 2.5.6 3.7.3 1.2.5 2.3.6 3.7.2 1.8.4 3.7 1 5.3.3.8.7 1.5 1.1 1.9.4.4.9.6 1.5.6.6 0 1.1-.3 1.4-.8.3-.5.6-1.2.7-2 .2-.8.3-1.7.6-2.3.2-.7.7-1 1.3-1s1.1.3 1.3 1c.3.6.4 1.5.6 2.3.1.8.4 1.5.7 2 .3.5.8.8 1.4.8.6 0 1.1-.2 1.5-.6.4-.4.8-1.1 1.1-1.9.6-1.6.9-3.5 1-5.3.1-1.4.3-2.5.6-3.7.3-1.2.6-2.2.6-3.7 0-1-.4-2.4-1.6-3.7C21.3 7 19.2 6 16 6z"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-      />
-      <path
-        d="M12 13c1-.7 2.3-1 4-1s2.8.3 4 1"
-        stroke="currentColor"
-        strokeWidth="1.3"
-        strokeLinecap="round"
-        opacity="0.5"
-      />
-    </svg>
+      {rightIcon}
+    </div>
   );
 }
-
-function SupplyIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 32 32" fill="none" className={className}>
-      <rect
-        x="5"
-        y="10"
-        width="22"
-        height="17"
-        rx="2.5"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        fill="currentColor"
-        fillOpacity="0.08"
-      />
-      <path
-        d="M9 10V7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v3"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-      <path d="M16 15v6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-      <path d="M12 18h8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function LabIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 32 32" fill="none" className={className}>
-      <path
-        d="M3 24h26"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        opacity="0.4"
-      />
-      <path
-        d="M7 24c-1.1 0-1.7-.8-1.7-1.7 0-1.1.4-1.9.4-3 0-1-.3-1.6-.3-2.5 0-1.7 1.6-3 3.5-3s3.5 1.3 3.5 3c0 .9-.3 1.5-.3 2.5 0 1.1.4 1.9.4 3 0 .9-.6 1.7-1.7 1.7"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="currentColor"
-        fillOpacity="0.06"
-      />
-      <path
-        d="M13.5 24c-1.2 0-1.8-.8-1.8-1.8 0-1.2.5-2 .5-3.2 0-1.1-.4-1.8-.4-2.8 0-1.8 1.8-3.2 3.8-3.2s3.8 1.4 3.8 3.2c0 1-.4 1.7-.4 2.8 0 1.2.5 2 .5 3.2 0 1-.6 1.8-1.8 1.8"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="currentColor"
-        fillOpacity="0.04"
-      />
-      <path
-        d="M20.5 24c-1.1 0-1.7-.8-1.7-1.7 0-1.1.4-1.9.4-3 0-1-.3-1.6-.3-2.5 0-1.7 1.6-3 3.5-3s3.5 1.3 3.5 3c0 .9-.3 1.5-.3 2.5 0 1.1.4 1.9.4 3 0 .9-.6 1.7-1.7 1.7"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="currentColor"
-        fillOpacity="0.04"
-      />
-    </svg>
-  );
-}
-
-function ImplantIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 32 32" fill="none" className={className}>
-      <path
-        d="M10.5 11c0-2.8 2.2-5 5-5h1c2.8 0 5 2.2 5 5 0 1.2-.3 2-.3 3 0 .9.3 1.5-.2 2-.5.5-1.3.4-2 .4h-5c-.7 0-1.5.1-2-.4-.5-.5-.2-1.1-.2-2 0-1-.3-1.8-.3-3z"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        fill="currentColor"
-        fillOpacity="0.08"
-      />
-      <path d="M12.5 17h7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-      <path
-        d="M13 18.5l-1 9.5c-.1.8.4 1.5 1.2 1.5h7.1c.8 0 1.3-.7 1.2-1.5L20.5 18.5"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path d="M13 23h6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-      <path d="M13.4 27h5.2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-const ICONS: Record<AccountType, (p: { className?: string }) => React.JSX.Element> = {
-  dentist: ToothIcon,
-  supply: SupplyIcon,
-  lab: LabIcon,
-  implant: ImplantIcon,
-};
 
 export function AuthPage() {
   const { lang } = useI18n();
@@ -386,27 +234,21 @@ export function AuthPage() {
   };
 
   return (
-    <MobileShell hideBottomNav wide>
-      <TopBar title={ar ? "تسجيل الدخول" : "Sign in"} showBack wide maxW="3xl" />
-      <div className="px-4 pt-2 md:px-6 md:pt-8 lg:px-8 lg:max-w-3xl lg:mx-auto">
-        <p className="text-xs text-muted-foreground text-center leading-relaxed bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3">
-          {ar
-            ? "يمكنك تسجيل الدخول باستخدام رقم الهاتف أو البريد الإلكتروني"
-            : "You can sign in using your phone number or email"}
-        </p>
-      </div>
-      <div className="px-4 pt-4 pb-8 space-y-5 md:px-6 md:pb-12 lg:px-8 lg:max-w-3xl lg:mx-auto">
-        {/* Account type selector — 4 cards */}
-        <div>
-          <p className="text-xs font-bold text-muted-foreground mb-3 px-1 flex items-center gap-1.5">
-            <span className="size-1.5 rounded-full bg-sky-400" />
-            {ar ? "نوع الحساب" : "Account type"}
+    <div className="min-h-svh bg-white md:bg-slate-100 md:flex md:items-center md:justify-center md:p-8" dir={ar ? "rtl" : "ltr"}>
+      <div className="w-full md:max-w-[440px] md:overflow-hidden md:rounded-[32px] md:shadow-2xl bg-white">
+        {/* Hero — the banner already carries the logo and welcome text. */}
+        <div className="h-[260px] w-full overflow-hidden">
+          <img src={heroBg} alt="Dent Hub" className="size-full object-cover" />
+        </div>
+
+        {/* Sheet */}
+        <div className="relative -mt-6 rounded-t-[32px] bg-white px-5 pb-10 pt-7 shadow-[0_-6px_16px_rgba(15,23,42,0.08)]">
+          <p className="mb-3 text-center text-xs font-bold text-slate-400">
+            {ar ? "اختر نوع حسابك للمتابعة" : "Choose your account type to continue"}
           </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-            {ACCOUNT_OPTIONS.map((opt) => {
+          <div className="mb-6 flex justify-between gap-2">
+            {ROLES.map((opt) => {
               const active = accountType === opt.id;
-              const c = COLOR_MAP[opt.color];
-              const Icon = ICONS[opt.id];
               return (
                 <button
                   key={opt.id}
@@ -415,120 +257,59 @@ export function AuthPage() {
                     setAccountType(opt.id);
                     clearError();
                   }}
-                  className={cn(
-                    "group flex flex-col items-center gap-2 rounded-2xl px-2 py-4 border-2 transition-all duration-300 ease-out",
-                    active
-                      ? `${c.bg} ${c.border} shadow-md scale-[1.03]`
-                      : "border-transparent bg-slate-50 hover:bg-slate-100 hover:border-slate-200 hover:scale-[1.02]",
-                  )}
+                  className="flex flex-1 flex-col items-center gap-1.5"
                 >
-                  <div
-                    className={cn(
-                      "size-11 rounded-xl flex items-center justify-center transition-all duration-300",
-                      active
-                        ? `${c.bg} ring-2 ${c.ring} ${c.glow} shadow-lg`
-                        : "bg-white ring-1 ring-slate-200 group-hover:ring-slate-300",
-                    )}
-                  >
-                    <Icon
-                      className={cn(
-                        "size-7 transition-all duration-300",
-                        active ? `${c.icon}` : "text-slate-400 group-hover:text-slate-600",
-                      )}
-                    />
-                  </div>
                   <span
                     className={cn(
-                      "text-xs font-bold leading-tight text-center transition-colors duration-300",
-                      active ? `${c.text}` : "text-slate-600",
+                      "size-14 flex items-center justify-center overflow-hidden rounded-2xl border-2 transition",
+                      active ? opt.activeBg : "border-transparent bg-slate-50 hover:bg-slate-100",
+                    )}
+                    style={active ? { borderColor: opt.iconHex } : undefined}
+                  >
+                    <img src={opt.icon} alt="" className="size-[34px] object-contain" />
+                  </span>
+                  <span
+                    className={cn(
+                      "text-center text-[10px] font-bold leading-tight",
+                      active ? opt.activeText : "text-slate-500",
                     )}
                   >
-                    {ar ? opt.arLabel : opt.enLabel}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground/70 leading-tight text-center">
-                    {ar ? opt.arDesc : opt.enDesc}
+                    {ar ? opt.ar : opt.en}
                   </span>
                 </button>
               );
             })}
           </div>
-        </div>
 
-        {/* Sign in / Sign up tabs */}
-        <div className="flex gap-1.5 p-1.5 bg-slate-100/80 rounded-2xl">
-          {(["signin", "signup"] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => {
-                setMode(m);
-                clearError();
-              }}
-              className={cn(
-                "flex-1 h-11 rounded-xl text-sm font-bold transition-all duration-300",
-                mode === m
-                  ? "bg-white text-slate-900 shadow-md scale-[1.02]"
-                  : "text-slate-500 hover:text-slate-700 hover:bg-white/50",
-              )}
-            >
-              {m === "signin"
-                ? ar
-                  ? "تسجيل دخول"
-                  : "Sign in"
-                : ar
-                  ? "إنشاء حساب"
-                  : "Create account"}
-            </button>
-          ))}
-        </div>
-
-        {/* Form */}
-        <div className="bg-card border border-border rounded-2xl p-4 shadow-soft space-y-3">
           {mode === "signup" && (
-            <>
-              <div className="relative">
-                <User className="absolute start-3.5 top-1/2 -translate-y-1/2 size-4.5 text-slate-400 pointer-events-none" />
-                <input
-                  value={name}
-                  onChange={(e) => {
-                    setName(e.target.value);
-                    clearError();
-                  }}
-                  placeholder={
-                    accountType === "dentist"
-                      ? ar
-                        ? "الاسم الكامل"
-                        : "Full name"
-                      : ar
-                        ? "اسم المكتب / الشركة / المختبر"
-                        : "Office / Company / Lab name"
-                  }
-                  className="w-full h-12 rounded-xl bg-slate-50 border border-border ps-10 pe-4 text-sm font-medium placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition"
-                />
-              </div>
+            <div className="mb-3 space-y-3">
+              <LoginInput
+                value={name}
+                onChange={(v) => {
+                  setName(v);
+                  clearError();
+                }}
+                placeholder={
+                  accountType === "dentist"
+                    ? ar
+                      ? "الاسم الكامل"
+                      : "Full name"
+                    : ar
+                      ? "اسم المكتب / الشركة / المختبر"
+                      : "Office / Company / Lab name"
+                }
+                icon={<User className="size-[18px] text-slate-400" />}
+              />
 
               {accountType === "dentist" && (
                 <>
-                  <div className="relative animate-in fade-in slide-in-from-top-2 duration-300">
-                    <input
-                      value={title}
-                      onChange={(e) => {
-                        setTitle(e.target.value);
-                        clearError();
-                      }}
-                      placeholder={
-                        ar
-                          ? "اللقب (اختياري) - أدخل اللقب أو اسم العشيرة"
-                          : "Last name (optional) — enter surname or family name"
-                      }
-                      className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm font-medium placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition"
-                    />
-                  </div>
-
-                  <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                    <label className="text-xs font-semibold text-muted-foreground mb-2 block px-1">
-                      {ar ? "الجنس" : "Gender"}
-                    </label>
+                  <LoginInput
+                    value={title}
+                    onChange={setTitle}
+                    placeholder={ar ? "اللقب (اختياري)" : "Surname (optional)"}
+                  />
+                  <div>
+                    <p className="mb-2 px-1 text-xs font-semibold text-slate-500">{ar ? "الجنس" : "Gender"}</p>
                     <div className="flex gap-2">
                       {(["male", "female"] as const).map((g) => (
                         <button
@@ -539,10 +320,10 @@ export function AuthPage() {
                             clearError();
                           }}
                           className={cn(
-                            "flex-1 h-11 rounded-xl text-sm font-semibold border-2 transition-all duration-300",
+                            "h-12 flex-1 rounded-full border-2 text-sm font-semibold transition",
                             gender === g
-                              ? "border-sky-500 bg-sky-50 text-sky-700 shadow-sm scale-[1.02]"
-                              : "border-transparent bg-slate-50 text-slate-500 hover:bg-sky-50/30 hover:border-sky-200",
+                              ? "border-sky-500 bg-sky-50 text-sky-700"
+                              : "border-transparent bg-slate-50 text-slate-500 hover:bg-slate-100",
                           )}
                         >
                           {g === "male" ? (ar ? "ذكر" : "Male") : ar ? "أنثى" : "Female"}
@@ -550,93 +331,77 @@ export function AuthPage() {
                       ))}
                     </div>
                   </div>
-
-                  <div className="relative animate-in fade-in slide-in-from-top-2 duration-300">
-                    <input
-                      value={clinicName}
-                      onChange={(e) => {
-                        setClinicName(e.target.value);
-                        clearError();
-                      }}
-                      placeholder={ar ? "اسم العيادة" : "Clinic name"}
-                      className="w-full h-12 rounded-xl bg-slate-50 border border-border px-4 text-sm font-medium placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition"
-                    />
-                  </div>
-
+                  <LoginInput
+                    value={clinicName}
+                    onChange={setClinicName}
+                    placeholder={ar ? "اسم العيادة (اختياري)" : "Clinic name (optional)"}
+                  />
                 </>
               )}
 
-              <div className="relative">
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  className="absolute start-3.5 top-1/2 -translate-y-1/2 size-4.5 text-slate-400 pointer-events-none"
-                >
-                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" />
-                  <circle cx="12" cy="10" r="3" />
-                </svg>
-                <select
-                  value={city}
-                  onChange={(e) => {
-                    setCity(e.target.value);
-                    clearError();
-                  }}
-                  className="w-full h-12 rounded-xl bg-slate-50 border border-border ps-10 pe-4 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition appearance-none"
-                >
-                  <option value="">{ar ? "المحافظة / المدينة" : "Governorate / City"}</option>
+              <div>
+                <p className="mb-2 px-1 text-xs font-semibold text-slate-500">
+                  {ar ? "المحافظة / المدينة" : "Governorate / City"}
+                </p>
+                <div className="flex gap-1.5 overflow-x-auto pb-1">
                   {CITIES.map((c) => (
-                    <option key={c.id} value={c.id}>
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => setCity(c.id)}
+                      className={cn(
+                        "h-8 shrink-0 rounded-full border px-3 text-[11px] font-bold transition",
+                        city === c.id
+                          ? "border-sky-500 bg-sky-500 text-white"
+                          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
+                      )}
+                    >
                       {ar ? c.ar : c.en}
-                    </option>
+                    </button>
                   ))}
-                </select>
+                </div>
               </div>
-            </>
+            </div>
           )}
 
-          <div className="relative">
-            <Mail className="absolute start-3.5 top-1/2 -translate-y-1/2 size-4.5 text-slate-400 pointer-events-none" />
-            <input
+          <div className="space-y-3">
+            <LoginInput
               type="email"
-              dir="ltr"
               value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
+              onChange={(v) => {
+                setEmail(v);
                 clearError();
               }}
               placeholder={ar ? "رقم الهاتف / البريد الإلكتروني" : "Phone number / Email"}
-              className="w-full h-12 rounded-xl bg-slate-50 border border-border ps-10 pe-4 text-sm font-medium placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition"
               autoComplete="email"
+              icon={<Mail className="size-[18px] text-slate-400" />}
             />
-          </div>
-
-          <div className="relative">
-            <Lock className="absolute start-3.5 top-1/2 -translate-y-1/2 size-4.5 text-slate-400 pointer-events-none" />
-            <input
+            <LoginInput
               type={showPassword ? "text" : "password"}
-              dir="ltr"
               value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
+              onChange={(v) => {
+                setPassword(v);
                 clearError();
               }}
+              onEnter={handleSubmit}
               placeholder={ar ? "كلمة المرور" : "Password"}
-              className="w-full h-12 rounded-xl bg-slate-50 border border-border ps-10 pe-10 text-sm font-medium placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition"
               autoComplete={mode === "signin" ? "current-password" : "new-password"}
+              icon={<Lock className="size-[18px] text-slate-400" />}
+              rightIcon={
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((s) => !s)}
+                  aria-label={ar ? "إظهار كلمة المرور" : "Show password"}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  {showPassword ? <Eye className="size-[18px]" /> : <EyeOff className="size-[18px]" />}
+                </button>
+              }
             />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute end-2.5 top-1/2 -translate-y-1/2 size-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 transition"
-            >
-              {showPassword ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
-            </button>
           </div>
 
           {mode === "signin" && (
-            <div className="flex justify-end -mt-1">
+            <div className="mt-3 flex justify-end">
               <button
                 type="button"
                 onClick={forgotPassword}
@@ -649,19 +414,7 @@ export function AuthPage() {
           )}
 
           {error && (
-            <p
-              className={cn(
-                "text-xs font-semibold text-center rounded-xl px-4 py-2.5 leading-relaxed",
-                error.includes("خطأ") ||
-                  error.includes("غير") ||
-                  error.includes("Invalid") ||
-                  error.includes("incorrect") ||
-                  error.includes("weak") ||
-                  error.includes("registered")
-                  ? "bg-rose-50 text-rose-700"
-                  : "bg-amber-50 text-amber-700",
-              )}
-            >
+            <p className="mt-3 rounded-xl bg-rose-50 px-4 py-2.5 text-center text-xs font-semibold leading-relaxed text-rose-600">
               {error}
             </p>
           )}
@@ -671,35 +424,55 @@ export function AuthPage() {
             onClick={handleSubmit}
             disabled={busy}
             className={cn(
-              "w-full h-12 rounded-xl font-display font-bold text-sm transition-all duration-300 flex items-center justify-center gap-2",
+              "mt-4 flex h-[54px] w-full items-center justify-center gap-2 rounded-full text-sm font-bold text-white transition",
               busy
-                ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                : "bg-gradient-to-r from-sky-500 to-blue-600 text-white hover:from-sky-600 hover:to-blue-700 active:scale-[0.98] shadow-lg shadow-sky-500/25",
+                ? "bg-slate-300"
+                : "bg-[#2563EB] shadow-[0_6px_14px_rgba(37,99,235,0.3)] hover:bg-[#1D4ED8] active:scale-[0.98]",
             )}
           >
-            {busy ? <Loader2 className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}
-            {busy
-              ? ar
-                ? "جارٍ المعالجة…"
-                : "Working…"
-              : mode === "signin"
-                ? ar
-                  ? "تسجيل الدخول"
-                  : "Sign in"
-                : ar
-                  ? "إنشاء حساب"
-                  : "Sign up"}
+            {busy ? (
+              <Loader2 className="size-5 animate-spin" />
+            ) : (
+              <>
+                {mode === "signin" ? (ar ? "تسجيل الدخول" : "Sign in") : ar ? "إنشاء حساب" : "Sign up"}
+                {ar ? <ArrowLeft className="size-4" /> : <ArrowRight className="size-4" />}
+              </>
+            )}
           </button>
 
-          {mode === "signup" && (
-            <p className="text-[11px] text-muted-foreground text-center">
-              {ar
-                ? "أول حساب يتم إنشاؤه يصبح مدير النظام تلقائياً."
-                : "The first account created becomes the system admin automatically."}
-            </p>
+          <div className="my-5 flex items-center gap-3">
+            <span className="h-px flex-1 bg-slate-200" />
+            <span className="text-xs font-semibold text-slate-400">{ar ? "أو" : "or"}</span>
+            <span className="h-px flex-1 bg-slate-200" />
+          </div>
+
+          {mode === "signin" ? (
+            <button
+              type="button"
+              onClick={() => {
+                setMode("signup");
+                clearError();
+              }}
+              className="flex h-14 w-full items-center justify-center gap-2 rounded-full border-2 border-primary/30 text-sm font-bold text-primary hover:bg-primary/5 transition"
+            >
+              <User className="size-4" />
+              {ar ? "إنشاء حساب جديد" : "Create new account"}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setMode("signin");
+                clearError();
+              }}
+              className="w-full py-2 text-center text-xs font-semibold text-slate-500"
+            >
+              {ar ? "لديك حساب بالفعل؟ " : "Already have an account? "}
+              <span className="font-bold text-primary">{ar ? "تسجيل الدخول" : "Sign in"}</span>
+            </button>
           )}
         </div>
       </div>
-    </MobileShell>
+    </div>
   );
 }

@@ -1,9 +1,9 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { MobileShell } from "@/components/MobileShell";
 import { useI18n } from "@/lib/i18n";
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
-import { useSession, useUserRole } from "@/lib/useAuth";
+import { useSession, useUserRole, useLabStaffClaim } from "@/lib/useAuth";
 import { setClinicsStoreUser } from "@/lib/clinicsStore";
 import { NotificationBell } from "@/components/NotificationBell";
 import { useOrders } from "@/lib/ordersStore";
@@ -54,7 +54,33 @@ function loadBanners(): Banner[] {
   return out;
 }
 
+// Same as native's Home tab: a vendor lands on its own dashboard, not the
+// dentist marketplace.
+const VENDOR_HOME: Partial<Record<string, "/supplies" | "/implants" | "/labs/dashboard">> = {
+  supply: "/supplies",
+  implant: "/implants",
+  lab: "/labs/dashboard",
+};
+
 function Home() {
+  const { role } = useUserRole();
+  const { claim: labStaff } = useLabStaffClaim();
+  const navigate = useNavigate();
+  // Invited lab staff have no user_roles doc, only a claim — they land on
+  // their design-cases screen, as on native.
+  const vendorHome = labStaff
+    ? "/designer"
+    : role?.accountType
+      ? VENDOR_HOME[role.accountType]
+      : undefined;
+  useEffect(() => {
+    if (vendorHome) navigate({ to: vendorHome, replace: true });
+  }, [vendorHome, navigate]);
+  if (vendorHome) return null;
+  return <DentistHome />;
+}
+
+function DentistHome() {
   const { lang, dir, toggle } = useI18n();
   const { user } = useSession();
   const [userBanners, setUserBanners] = useState<Banner[]>([]);

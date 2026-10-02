@@ -289,7 +289,7 @@ export function OrderInvoiceModal({ order, labName, labAddress, labPhone, onClos
 
   return (
     <div
-      className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm"
+      className="fixed inset-0 z-[70] overflow-y-auto bg-slate-900/60 backdrop-blur-sm"
       onClick={onClose}
     >
       <div className="min-h-full flex items-start sm:items-center justify-center p-3 sm:p-6">

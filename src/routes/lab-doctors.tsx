@@ -1,23 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
-import { LabStaffPanel } from "@/components/LabStaffPanel";
+import { LabOrdersGroupList } from "@/components/LabOrdersGroupList";
 import { useI18n } from "@/lib/i18n";
-import { useSession } from "@/lib/useAuth";
 
-export const Route = createFileRoute("/labs/staff")({
-  component: StaffPage,
+export const Route = createFileRoute("/lab-doctors")({
+  component: LabDoctorsPage,
 });
 
-function StaffPage() {
+function LabDoctorsPage() {
   const { lang } = useI18n();
   const ar = lang === "ar";
-  const { user } = useSession();
   return (
     <MobileShell wide>
-      <TopBar title={ar ? "كادر المختبر" : "Lab Staff"} showBack wide maxW="6xl" />
+      <TopBar title={ar ? "الأطباء" : "Doctors"} showBack wide maxW="6xl" />
       <div className="px-4 pt-4 pb-8 md:px-6 md:pt-6 lg:px-8 lg:max-w-6xl lg:mx-auto">
-        <LabStaffPanel labId={user?.uid || ""} ar={ar} />
+        <LabOrdersGroupList groupBy="doctor" ar={ar} />
       </div>
     </MobileShell>
   );

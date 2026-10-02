@@ -1,6 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { RoleGuard } from "@/components/RoleGuard";
@@ -13,22 +12,21 @@ import { COUNTRIES } from "@/data/implants";
 import {
   useProducts,
   useDeleteProduct,
-  uploadProductImage,
   useSignedImageUrls,
   COUNTRY_CODE_TO_SLUG,
   COUNTRY_SLUG_TO_CODE,
   type Product,
   type ProductAccessory,
 } from "@/lib/products";
-import { useOffers, useUpsertOffer, useDeleteOffer, type Offer } from "@/lib/offers";
-import { useOrders, confirmOrder, markOrderUnavailable } from "@/lib/orders";
-import type { OrderDoc } from "@/integrations/firebase/types";
+import { useOffers } from "@/lib/offers";
+import { useOrders } from "@/lib/orders";
 import { useUserRole } from "@/lib/useAuth";
 import { auth } from "@/integrations/firebase/client";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
 import { ALL_COUNTRIES, countryFlagUrl } from "@/data/countries";
+import { SPECIALIZED_FIELDS } from "@/data/specializedImplants";
+import { OfficeOffers } from "@/components/OfficeOffers";
 import {
   Search,
   UserCircle2,
@@ -39,12 +37,8 @@ import {
   ClipboardList,
   Plus,
   X,
-  Upload,
   Trash2,
-  Loader2,
-  DollarSign,
   Pencil,
-  Calendar,
   ArrowLeft,
   SlidersHorizontal,
   ChevronLeft,
@@ -110,7 +104,6 @@ function ImplantCompanyDashboard() {
   const ar = lang === "ar";
   const { role } = useUserRole();
   const companyId = auth.currentUser?.uid ?? role?.userId ?? "";
-  const [activeTab, setActiveTab] = useState<"products" | "offers" | "orders">("products");
 
   const mapsUrl = getMapsUrl(role ?? {});
 
@@ -221,36 +214,15 @@ function ImplantCompanyDashboard() {
           ))}
         </div>
 
-        <div className="px-4 md:px-0">
-          <div className="flex bg-slate-100 rounded-2xl p-1 mt-2 md:bg-transparent md:rounded-none md:p-0 md:mt-8 md:border-b md:border-border md:gap-6">
-            {[
-              { key: "products" as const, ar: "المنتجات", en: "Products", icon: Package },
-              { key: "offers" as const, ar: "العروض", en: "Offers", icon: Megaphone },
-              { key: "orders" as const, ar: "الطلبات", en: "Orders", icon: ClipboardList },
-            ].map((tab) => (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => setActiveTab(tab.key)}
-                className={cn(
-                  "flex-1 h-11 rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 transition-all",
-                  "md:flex-none md:h-auto md:rounded-none md:pb-3 md:border-b-2 md:border-transparent",
-                  activeTab === tab.key
-                    ? "bg-white text-slate-900 shadow-sm md:bg-transparent md:shadow-none md:text-primary md:border-primary"
-                    : "text-slate-500 hover:text-slate-700 md:hover:border-border",
-                )}
-              >
-                <tab.icon className="size-4" />
-                {ar ? tab.ar : tab.en}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="px-4 md:px-0 pt-4 pb-6 md:pt-6">
-          {activeTab === "products" && <ImplantProductsPanel />}
-          {activeTab === "offers" && <OffersPanel companyId={companyId} />}
-          {activeTab === "orders" && <ImplantOrdersPanel companyId={companyId} />}
+        {/* Same as native: products first, then the offers list beneath —
+            no tabs (incoming orders live in the bottom-bar Orders tab). */}
+        <div className="px-4 md:px-0 pt-5 pb-6 md:pt-8">
+          <ImplantProductsPanel />
+          {companyId && (
+            <div className="mt-7 rounded-3xl border border-violet-100 bg-violet-50/40 p-3.5 md:p-5">
+              <OfficeOffers supplierId={companyId} />
+            </div>
+          )}
         </div>
       </div>
     </MobileShell>
@@ -384,7 +356,6 @@ function ImplantProductsPanel() {
 
   const openEdit = (p: Product) => {
     setEditingImplant(p);
-    setShowImplantForm(true);
   };
 
 
@@ -405,11 +376,6 @@ function ImplantProductsPanel() {
   }, [implantProducts]);
   const { data: imageUrlMap = {} } = useSignedImageUrls(allImagePaths);
 
-
-  const groupedProducts = useMemo(
-    () => implantProducts.filter((p) => !p.productType || p.productType === "main_implant"),
-    [implantProducts],
-  );
 
   if (selectedProduct) {
     return (
@@ -490,7 +456,7 @@ function ImplantProductsPanel() {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 xl:grid-cols-4">
-            {groupedProducts.map((product) => (
+            {implantProducts.map((product) => (
               <div key={product.id}>
                 <div
                   onClick={() =>
@@ -570,9 +536,13 @@ function ImplantProductsPanel() {
                     <p className="font-display font-extrabold text-lg text-primary">
                       {fmtPrice(product)}
                     </p>
-                    {product.stock > 0 && (
+                    {product.stock > 0 ? (
                       <span className="text-[10px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md">
                         {ar ? "متوفر" : "In Stock"}: {product.stock}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-medium text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded-md">
+                        {ar ? "نفد" : "Out"}
                       </span>
                     )}
                   </div>
@@ -716,6 +686,31 @@ function ImplantDetailView({
   const [selectedDiameter, setSelectedDiameter] = useState<number | null>(null);
   const [selectedLength, setSelectedLength] = useState<number | null>(null);
   const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
+
+  // Only one size to pick from — select it instead of asking for a tap.
+  useEffect(() => {
+    if (diameters.length === 1) setSelectedDiameter(diameters[0]);
+    if (lengths.length === 1) setSelectedLength(lengths[0]);
+  }, [diameters, lengths]);
+
+  const specializedSpec = product.specializedImplant;
+  const specializedRows = useMemo(() => {
+    if (!specializedSpec) return [];
+    const rows: { label: string; value: string }[] = [];
+    for (const f of SPECIALIZED_FIELDS[specializedSpec.category] ?? []) {
+      const raw = specializedSpec.fields?.[f.id];
+      if (raw == null) continue;
+      const label = (v: string) => (ar ? (f.options?.find((o) => o.value === v)?.ar ?? v) : v);
+      if (Array.isArray(raw)) {
+        if (raw.length === 0) continue;
+        rows.push({ label: ar ? f.ar : f.en, value: raw.map(label).join("، ") });
+      } else if (raw) {
+        rows.push({ label: ar ? f.ar : f.en, value: label(raw) });
+      }
+    }
+    return rows;
+  }, [specializedSpec, ar]);
+  const { data: clinicalUrlMap = {} } = useSignedImageUrls(specializedSpec?.clinicalImages ?? []);
 
   const selectedStock = useMemo(() => {
     if (selectedDiameter == null || selectedLength == null) return null;
@@ -909,6 +904,25 @@ function ImplantDetailView({
         </div>
       </div>
 
+      {specializedRows.length > 0 && (
+        <div className="bg-card border border-border rounded-3xl p-5 shadow-card">
+          <h3 className="font-display font-bold text-base mb-3">
+            {ar ? "المواصفات الخاصة" : "Category Specifications"}
+          </h3>
+          <div className="rounded-2xl border border-slate-200 overflow-hidden">
+            {specializedRows.map((r, i) => (
+              <div
+                key={r.label}
+                className={cn("flex items-start justify-between gap-3 px-3 py-2.5", i % 2 === 0 ? "bg-white" : "bg-slate-50")}
+              >
+                <span className="w-1/2 text-xs font-semibold text-slate-500">{r.label}</span>
+                <span className="flex-1 text-end text-xs text-slate-800">{r.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Sizes: select diameter & length to view availability */}
       {diameters.length > 0 || lengths.length > 0 ? (
         <div className="bg-card border border-border rounded-3xl p-5 shadow-card space-y-4">
@@ -1065,7 +1079,22 @@ function ImplantDetailView({
         </div>
       )}
 
-
+      {(specializedSpec?.clinicalImages?.length ?? 0) > 0 && (
+        <div className="space-y-2.5">
+          <h3 className="font-display font-bold text-base">{ar ? "صور حالات العمل" : "Clinical Cases"}</h3>
+          <div className="grid grid-cols-3 gap-2 md:grid-cols-4">
+            {specializedSpec!.clinicalImages!.map((path) => (
+              <div key={path} className="aspect-square rounded-xl bg-slate-100 overflow-hidden flex items-center justify-center">
+                {clinicalUrlMap[path] ? (
+                  <img src={clinicalUrlMap[path]} alt="" className="size-full object-cover" />
+                ) : (
+                  <Package className="size-6 text-slate-300" />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Zoom preview */}
       {zoomOpen && urls.length > 0 && (
@@ -1081,540 +1110,6 @@ function ImplantDetailView({
           >
             <X className="size-5" />
           </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function OffersPanel({ companyId }: { companyId: string }) {
-  const { lang } = useI18n();
-  const ar = lang === "ar";
-  const { data: offers = [], isLoading } = useOffers(companyId);
-  const upsertOffer = useUpsertOffer();
-  const deleteOffer = useDeleteOffer();
-
-  const [showForm, setShowForm] = useState(false);
-  const [editing] = useState<Offer | null>(null);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [expiryDate, setExpiryDate] = useState("");
-  const [price, setPrice] = useState("");
-  const [currency, setCurrency] = useState<string>("USD");
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [formError, setFormError] = useState("");
-
-  const handleFile = (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    const file = files[0];
-    setImageFile(file);
-    setImagePreview(URL.createObjectURL(file));
-  };
-
-  const submit = async () => {
-    setFormError("");
-    if (!title.trim()) {
-      setFormError(ar ? "الرجاء إدخال عنوان العرض" : "Please enter an offer title");
-      return;
-    }
-
-    setBusy(true);
-    try {
-      const offerId = editing?.id ?? crypto.randomUUID();
-      let imageUrl = editing?.imageUrl ?? "";
-
-      if (imageFile) {
-        try {
-          imageUrl = await uploadProductImage(offerId, imageFile);
-        } catch (uploadErr: any) {
-          alert(
-            ar
-              ? `فشل رفع الصورة: ${uploadErr.message || uploadErr}`
-              : `Image upload failed: ${uploadErr.message || uploadErr}`,
-          );
-          setBusy(false);
-          return;
-        }
-      }
-
-      await upsertOffer.mutateAsync({
-        id: offerId,
-        supplierId: companyId,
-        title: title.trim(),
-        description: description.trim(),
-        imageUrl,
-        expiryDate,
-        price: price ? Number(price) : undefined,
-        currency,
-      });
-
-      toast.success(
-        editing
-          ? ar
-            ? "تم حفظ التعديل — سيُعرض بعد مراجعة الإدارة"
-            : "Changes saved — pending admin review"
-          : ar
-            ? "تم إرسال العرض للمراجعة"
-            : "Offer submitted for review",
-      );
-      setShowForm(false);
-    } catch (e: any) {
-      alert(ar ? `فشل حفظ العرض: ${e.message || e}` : `Failed to save offer: ${e.message || e}`);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleDelete = async (offer: Offer) => {
-    if (!confirm(ar ? "حذف هذا العرض؟" : "Delete this offer?")) return;
-    await deleteOffer.mutateAsync(offer.id);
-  };
-
-  const allPaths = offers.filter((o) => o.imageUrl).map((o) => o.imageUrl);
-  const { data: urlMap = {} } = useSignedImageUrls(allPaths);
-
-  return (
-    <>
-      {showForm && (
-        <div className="bg-card border border-border rounded-3xl p-5 shadow-card space-y-4 md:max-w-xl md:p-7">
-          <div className="flex items-center justify-between">
-            <h3 className="font-display font-bold text-lg">
-              {editing ? (ar ? "تعديل عرض" : "Edit offer") : ar ? "عرض جديد" : "New offer"}
-            </h3>
-            <button
-              onClick={() => setShowForm(false)}
-              className="size-9 rounded-xl bg-muted hover:bg-slate-200 flex items-center justify-center transition"
-            >
-              <X className="size-4" />
-            </button>
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-              {ar ? "العنوان" : "Title"}
-            </label>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder={ar ? "مثال: خصم 20% على الزرعات" : "e.g. 20% off implants"}
-              className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-              {ar ? "الوصف" : "Description"}
-            </label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder={ar ? "تفاصيل العرض..." : "Offer details..."}
-              rows={3}
-              className="w-full rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition resize-none"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-              {ar ? "تاريخ الانتهاء" : "Expiry date"}
-            </label>
-            <div className="relative">
-              <input
-                type="date"
-                value={expiryDate}
-                onChange={(e) => setExpiryDate(e.target.value)}
-                className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
-              />
-              <Calendar className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-              {ar ? "السعر والعملة" : "Price and Currency"}
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                placeholder="0"
-                min="0"
-                step="0.01"
-                dir="ltr"
-                className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
-              />
-              <div className="flex rounded-xl bg-[#F5FAFE] border-[#D3E8F7] overflow-hidden shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setCurrency("USD")}
-                  className={cn(
-                    "px-4 py-2.5 text-sm font-bold transition",
-                    currency === "USD"
-                      ? "bg-primary text-primary-foreground"
-                      : "text-slate-500 hover:text-slate-700",
-                  )}
-                >
-                  $
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCurrency("IQD")}
-                  className={cn(
-                    "px-4 py-2.5 text-sm font-bold transition",
-                    currency === "IQD"
-                      ? "bg-primary text-primary-foreground"
-                      : "text-slate-500 hover:text-slate-700",
-                  )}
-                >
-                  {ar ? "د.ع" : "IQD"}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-              {ar ? "صورة العرض" : "Offer image"}
-            </label>
-            {imagePreview ? (
-              <div className="relative w-full h-40 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] overflow-hidden">
-                <img src={imagePreview} alt="" className="size-full object-cover" />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setImageFile(null);
-                    setImagePreview("");
-                  }}
-                  className="absolute top-2 end-2 size-7 rounded-full bg-black/60 text-white flex items-center justify-center"
-                >
-                  <X className="size-3.5" />
-                </button>
-              </div>
-            ) : editing?.imageUrl ? (
-              <div className="relative w-full h-40 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] overflow-hidden">
-                {urlMap[editing.imageUrl] ? (
-                  <img src={urlMap[editing.imageUrl]} alt="" className="size-full object-cover" />
-                ) : (
-                  <div className="size-full flex items-center justify-center">
-                    <Package className="size-8 text-slate-300" />
-                  </div>
-                )}
-              </div>
-            ) : (
-              <label className="w-full h-32 rounded-xl border-2 border-dashed border-[#D3E8F7] bg-[#F5FAFE] flex flex-col items-center justify-center gap-1.5 cursor-pointer hover:border-primary/40 hover:bg-sky-50/30 transition group">
-                <Upload className="size-6 text-slate-400 group-hover:text-primary transition" />
-                <p className="text-xs text-slate-400 group-hover:text-primary transition font-medium">
-                  {ar ? "اضغط لرفع صورة" : "Tap to upload image"}
-                </p>
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  className="hidden"
-                  onChange={(e) => handleFile(e.target.files)}
-                />
-              </label>
-            )}
-          </div>
-
-          {formError && (
-            <p className="text-sm text-rose-600 bg-rose-50 rounded-xl px-4 py-2.5 text-center font-semibold">
-              {formError}
-            </p>
-          )}
-
-          <button
-            type="button"
-            onClick={submit}
-            disabled={busy}
-            className={cn(
-              "w-full h-14 rounded-2xl font-display font-bold flex items-center justify-center gap-2 transition shadow-card",
-              busy
-                ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                : "bg-primary text-primary-foreground hover:opacity-90",
-            )}
-          >
-            {busy ? <Loader2 className="size-5 animate-spin" /> : null}
-            {busy
-              ? ar
-                ? "جارٍ الحفظ..."
-                : "Saving..."
-              : editing
-                ? ar
-                  ? "حفظ التعديلات"
-                  : "Save changes"
-                : ar
-                  ? "إضافة العرض"
-                  : "Add offer"}
-          </button>
-        </div>
-      )}
-
-      {isLoading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="size-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-        </div>
-      ) : offers.length === 0 ? (
-        <div className="py-20 flex flex-col items-center text-center text-muted-foreground">
-          <Megaphone className="size-14 mb-4 opacity-20 md:size-16" />
-          <p className="font-display font-bold text-lg text-slate-400 md:text-xl">
-            {ar ? "لا توجد عروض بعد" : "No offers yet"}
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-4 xl:grid-cols-3">
-          {offers.map((offer) => (
-            <div
-              key={offer.id}
-              className="bg-card border border-border rounded-2xl p-3.5 shadow-soft md:p-4 md:flex md:flex-col"
-            >
-              <div className="flex gap-3 md:flex-col md:gap-0">
-                <div className="size-16 rounded-xl bg-slate-100 overflow-hidden shrink-0 md:size-full md:aspect-[16/9] md:mb-3">
-                  {offer.imageUrl && urlMap[offer.imageUrl] ? (
-                    <img src={urlMap[offer.imageUrl]} alt="" className="size-full object-cover" />
-                  ) : (
-                    <div className="size-full flex items-center justify-center">
-                      <Megaphone className="size-6 text-slate-300 md:size-8" />
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <p className="font-display font-bold text-sm md:text-base">{offer.title}</p>
-                    {offer.status && offer.status !== "active" && (
-                      <span
-                        className={cn(
-                          "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold",
-                          offer.status === "pending" && "bg-amber-100 text-amber-700",
-                          offer.status === "rejected" && "bg-rose-100 text-rose-700",
-                          offer.status === "expired" && "bg-slate-100 text-slate-500",
-                        )}
-                      >
-                        {offer.status === "pending"
-                          ? ar
-                            ? "قيد المراجعة"
-                            : "Pending"
-                          : offer.status === "rejected"
-                            ? ar
-                              ? "مرفوض"
-                              : "Rejected"
-                            : ar
-                              ? "منتهي"
-                              : "Expired"}
-                      </span>
-                    )}
-                  </div>
-                  {offer.status === "rejected" && offer.rejectReason && (
-                    <p className="text-[11px] text-rose-600 mt-0.5">{offer.rejectReason}</p>
-                  )}
-                  {offer.description && (
-                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                      {offer.description}
-                    </p>
-                  )}
-                  {offer.price != null && (
-                    <p className="text-sm font-display font-bold text-primary mt-1 flex items-center gap-0.5">
-                      <DollarSign className="size-3.5" />
-                      {offer.price.toLocaleString(ar ? "ar" : "en-US", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </p>
-                  )}
-                  {offer.expiryDate && (
-                    <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
-                      <Calendar className="size-3" />
-                      {ar ? "ينتهي:" : "Expires:"} {offer.expiryDate}
-                    </p>
-                  )}
-                </div>
-              </div>
-              <div className="flex gap-1 mt-2.5 pt-2.5 border-t border-border md:mt-auto">
-                <button
-                  type="button"
-                  onClick={() => handleDelete(offer)}
-                  className="flex-1 h-8 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-rose-100 hover:text-rose-600 flex items-center justify-center gap-1 transition md:h-9"
-                >
-                  <Trash2 className="size-3" />
-                  {ar ? "حذف" : "Delete"}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </>
-  );
-}
-
-function ImplantOrdersPanel({ companyId }: { companyId: string }) {
-  const { lang } = useI18n();
-  const ar = lang === "ar";
-  const queryClient = useQueryClient();
-  const { data: orders = [], isLoading } = useOrders(companyId);
-  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "confirmed" | "rejected">("all");
-  const [busyId, setBusyId] = useState<string | null>(null);
-
-  const statusOptions: { id: "all" | "pending" | "confirmed" | "rejected"; ar: string; en: string }[] = [
-    { id: "all", ar: "الكل", en: "All" },
-    { id: "pending", ar: "قيد الانتظار", en: "Pending" },
-    { id: "confirmed", ar: "تم التأكيد", en: "Confirmed" },
-    { id: "rejected", ar: "غير متوفر", en: "Unavailable" },
-  ];
-
-  const filtered = statusFilter === "all" ? orders : orders.filter((o) => o.status === statusFilter);
-
-  const handleConfirm = async (o: OrderDoc) => {
-    setBusyId(o.id);
-    try {
-      await confirmOrder(o);
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-      toast.success(ar ? "تم تأكيد الطلب وتحويله إلى فاتورة" : "Order confirmed and converted to invoice");
-    } catch (e: any) {
-      toast.error(ar ? `فشل التأكيد: ${e?.message || e}` : `Confirm failed: ${e?.message || e}`);
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  const handleUnavailable = async (o: OrderDoc) => {
-    setBusyId(o.id);
-    try {
-      await markOrderUnavailable(o.id);
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-      toast.success(ar ? "تم تحديد الطلب كغير متوفر" : "Order marked as unavailable");
-    } catch (e: any) {
-      toast.error(ar ? `فشل التحديث: ${e?.message || e}` : `Update failed: ${e?.message || e}`);
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  const fmtTotal = (o: OrderDoc) => {
-    const usd = o.totalUSD ?? 0;
-    const iqd = o.totalIQD ?? 0;
-    if (iqd > 0 && usd > 0) return ar ? `${iqd.toLocaleString()} د.ع + $${usd.toFixed(2)}` : `${iqd.toLocaleString()} IQD + $${usd.toFixed(2)}`;
-    if (iqd > 0) return `${iqd.toLocaleString()} د.ع`;
-    return `$${(o.total || 0).toFixed(2)}`;
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="size-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (orders.length === 0) {
-    return (
-      <div className="py-20 flex flex-col items-center text-center text-muted-foreground">
-        <ClipboardList className="size-14 mb-4 opacity-20 md:size-16" />
-        <p className="font-display font-bold text-lg text-slate-400 md:text-xl">
-          {ar ? "لا توجد طلبات بعد" : "No orders yet"}
-        </p>
-        <p className="text-sm mt-1 max-w-xs text-slate-400">
-          {ar ? "ستظهر الطلبات هنا عند استلامها" : "Orders will appear here when received"}
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 md:overflow-visible md:gap-3">
-        {statusOptions.map((s) => (
-          <button
-            key={s.id}
-            onClick={() => setStatusFilter(s.id)}
-            className={cn(
-              "shrink-0 h-8 px-3.5 rounded-full text-xs font-bold border transition whitespace-nowrap",
-              "md:h-9 md:px-4 md:text-sm",
-              statusFilter === s.id
-                ? "bg-primary text-primary-foreground border-primary"
-                : "bg-card text-foreground border-border hover:bg-accent",
-            )}
-          >
-            {ar ? s.ar : s.en}
-          </button>
-        ))}
-      </div>
-
-      {filtered.length === 0 ? (
-        <div className="py-16 text-center text-sm text-muted-foreground">
-          {ar ? "لا توجد طلبات مطابقة" : "No matching orders"}
-        </div>
-      ) : (
-        <div className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-4 xl:grid-cols-3">
-          {filtered.map((o) => {
-            const itemCount = (o.items || []).reduce((sum, i) => sum + (i.quantity || 1), 0);
-            const firstItem = o.items?.[0]?.name || (ar ? "منتج" : "Product");
-            const isPending = o.status === "pending";
-            return (
-              <div key={o.id} className="bg-card border border-border rounded-2xl p-4 shadow-soft md:flex md:flex-col">
-                <div className="flex items-start justify-between gap-3 mb-2">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="size-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
-                      <Package className="size-4" />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="font-mono text-xs font-bold text-muted-foreground">
-                        {o.orderNumber || `#${o.id.slice(0, 8).toUpperCase()}`}
-                      </p>
-                      <p className="font-display font-bold text-sm truncate">
-                        {o.dentistName || (ar ? "طبيب" : "Doctor")}
-                        {o.clinicName ? ` · ${o.clinicName}` : ""}
-                      </p>
-                    </div>
-                  </div>
-                  <span
-                    className={cn(
-                      "text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0",
-                      o.status === "confirmed" ? "bg-emerald-100 text-emerald-700" :
-                      o.status === "rejected" ? "bg-rose-100 text-rose-700" :
-                      "bg-amber-100 text-amber-700",
-                    )}
-                  >
-                    {o.status === "pending" ? (ar ? "قيد الانتظار" : "Pending") :
-                     o.status === "confirmed" ? (ar ? "تم التأكيد" : "Confirmed") :
-                     ar ? "غير متوفر" : "Unavailable"}
-                  </span>
-                </div>
-
-                <p className="text-xs text-slate-500 mb-2 truncate">
-                  {firstItem}{itemCount > 1 ? ` +${itemCount - 1}` : ""}
-                </p>
-
-                <div className="flex items-center justify-between text-xs text-slate-500 border-t border-dashed border-border pt-2.5">
-                  <span>{itemCount} {ar ? "منتج" : "products"}</span>
-                  <span className="font-display font-extrabold text-sm">{fmtTotal(o)}</span>
-                </div>
-
-                {isPending && (
-                  <div className="flex gap-2 mt-3 pt-3 border-t border-border md:mt-auto">
-                    <button
-                      onClick={() => handleConfirm(o)}
-                      disabled={busyId === o.id}
-                      className="flex-1 h-10 rounded-xl bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-90 transition disabled:opacity-60"
-                    >
-                      {busyId === o.id ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
-                      {ar ? "تأكيد الطلب" : "Confirm"}
-                    </button>
-                    <button
-                      onClick={() => handleUnavailable(o)}
-                      disabled={busyId === o.id}
-                      className="flex-1 h-10 rounded-xl bg-card border border-border text-muted-foreground text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-rose-50 hover:text-rose-600 transition disabled:opacity-60"
-                    >
-                      <X className="size-4" />
-                      {ar ? "الطلب غير متوفر" : "Unavailable"}
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
         </div>
       )}
     </div>

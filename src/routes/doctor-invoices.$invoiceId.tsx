@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { RoleGuard } from "@/components/RoleGuard";
@@ -6,7 +6,7 @@ import { useI18n } from "@/lib/i18n";
 import { useInvoice } from "@/lib/invoices";
 import { useUserRole } from "@/lib/useAuth";
 import { OfficialInvoiceView } from "@/components/OfficialInvoiceView";
-import { Loader2, ReceiptText, Printer, Share2 } from "lucide-react";
+import { Loader2, ReceiptText, Printer, Share2, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/doctor-invoices/$invoiceId")({
@@ -25,7 +25,7 @@ function fmtUsd(n: number): string {
 
 function InvoiceDetail() {
   return (
-    <RoleGuard allowedRoles={["supply", "implant"]}>
+    <RoleGuard allowedRoles={["supply", "implant", "lab"]}>
       <InvoiceDetailInner />
     </RoleGuard>
   );
@@ -130,6 +130,17 @@ function InvoiceDetailInner() {
             {ar ? "مشاركة" : "Share"}
           </button>
         </div>
+
+        {inv.doctorId && (
+          <Link
+            to="/messages"
+            search={{ with: inv.doctorId, withName: inv.doctorName }}
+            className="no-print h-11 rounded-xl bg-[#2563EB] text-white font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition"
+          >
+            <MessageSquare className="size-4" />
+            {ar ? "مراسلة الطبيب" : "Message doctor"}
+          </Link>
+        )}
 
         <div id="invoice-print" className="space-y-4">
           <OfficialInvoiceView

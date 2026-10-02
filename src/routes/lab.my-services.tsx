@@ -2,9 +2,9 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { db, auth } from "@/integrations/firebase/client";
+import { db } from "@/integrations/firebase/client";
+import { useSession } from "@/lib/useAuth";
 import { MobileShell } from "@/components/MobileShell";
-import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -43,21 +43,8 @@ function LabMyServices() {
   const queryClient = useQueryClient();
   const BackIcon = dir === "rtl" ? ChevronLeft : ChevronRight;
 
-  const labId = auth.currentUser?.uid;
-
-  if (!labId) {
-    return (
-      <MobileShell wide>
-        <TopBar title={ar ? "خدمات المختبر" : "Lab Services"} showBack wide maxW="6xl" />
-        <div className="p-6 text-center space-y-3 md:py-24">
-          <Stethoscope className="size-10 text-slate-300 mx-auto" />
-          <p className="font-bold text-slate-600">
-            {ar ? "يجب تسجيل الدخول كمختبر" : "Please sign in as a lab"}
-          </p>
-        </div>
-      </MobileShell>
-    );
-  }
+  const { user, loading: sessionLoading } = useSession();
+  const labId = user?.uid;
 
   const { data: services = [], isLoading } = useQuery({
     queryKey: ["lab-services", labId],
@@ -118,7 +105,7 @@ function LabMyServices() {
     queryClient.invalidateQueries({ queryKey: ["lab-services", labId] });
   };
 
-  if (!labId) {
+  if (sessionLoading || !labId) {
     return <MobileShell wide><div className="flex items-center justify-center min-h-svh"><Loader2 className="size-8 animate-spin text-primary" /></div></MobileShell>;
   }
 
@@ -164,7 +151,7 @@ function LabMyServices() {
                   <div className="p-4">
                     <div className="flex items-start justify-between gap-2">
                       <p className="font-bold text-sm leading-snug line-clamp-2 flex-1">{ar ? s.titleAr : s.titleEn}</p>
-                      <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition shrink-0">
+                      <div className="flex gap-1 shrink-0">
                         <button onClick={() => openEdit(s)} className="size-7 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center hover:bg-sky-100"><Pencil className="size-3" /></button>
                         <button onClick={() => remove(s.id)} className="size-7 rounded-lg bg-rose-50 text-rose-500 flex items-center justify-center hover:bg-rose-100"><Trash2 className="size-3" /></button>
                       </div>
@@ -184,7 +171,7 @@ function LabMyServices() {
 
       {/* Modal */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowForm(false)} />
           <div className="relative w-full max-w-md md:max-w-2xl md:p-7 bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl p-5 space-y-3 max-h-[90svh] overflow-y-auto animate-in slide-in-from-bottom duration-300">
             <div className="flex items-center justify-between"><h3 className="font-bold text-lg">{editingId ? (ar ? "تعديل" : "Edit") : ar ? "إضافة خدمة" : "Add Service"}</h3><button onClick={() => setShowForm(false)} className="size-8 rounded-xl hover:bg-slate-100 flex items-center justify-center"><X className="size-4" /></button></div>

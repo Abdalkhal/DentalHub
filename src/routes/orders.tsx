@@ -753,7 +753,7 @@ function SupplierOrders() {
 
   return (
     <MobileShell wide>
-      <TopBar title={ar ? "طلباتي" : "My Orders"} showBack wide />
+      <TopBar title={ar ? "الطلبات الواردة" : "Incoming Orders"} showBack wide />
       <div className="px-4 pt-4 pb-6 space-y-4 md:px-6 md:pt-8 lg:px-4 lg:max-w-6xl lg:mx-auto lg:pt-10">
         <div className="md:flex md:items-center md:gap-4 md:space-y-0">
           <div className="relative md:flex-1 lg:max-w-xl">

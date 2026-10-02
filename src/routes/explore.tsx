@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
+import { useState, useMemo, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/integrations/firebase/client";
@@ -18,9 +18,19 @@ type ResultItem = {
   name: { ar: string; en: string };
   category: Category;
   location: { ar: string; en: string };
+  photoURL: string;
   route: string;
   params: Record<string, string>;
 };
+
+// Falls back to the category icon if the photo is missing or fails to load.
+function ResultAvatar({ photoURL, className, children }: { photoURL: string; className: string; children: ReactNode }) {
+  const [failed, setFailed] = useState(false);
+  if (photoURL && !failed) {
+    return <img src={photoURL} alt="" onError={() => setFailed(true)} className={cn(className, "object-cover")} />;
+  }
+  return <span className={className}>{children}</span>;
+}
 
 const CATEGORIES: { id: Category; ar: string; en: string }[] = [
   { id: "all", ar: "الكل", en: "All" },
@@ -86,6 +96,7 @@ function Explore() {
           name: { ar: name, en: name },
           category: cat,
           location: { ar: city, en: city },
+          photoURL: typeof u.photoURL === "string" ? u.photoURL : "",
           route,
           params,
         });
@@ -186,7 +197,8 @@ function Explore() {
                   onClick={() => handleSelect(item)}
                   className="w-full text-start bg-card border border-border rounded-2xl p-4 shadow-soft hover:shadow-md hover:bg-slate-50 hover:border-primary/30 transition-all cursor-pointer flex items-start gap-3 md:flex-col md:items-center md:text-center md:gap-2.5 md:p-6"
                 >
-                  <span
+                  <ResultAvatar
+                    photoURL={item.photoURL}
                     className={cn(
                       "size-11 rounded-2xl flex items-center justify-center shrink-0",
                       "lg:size-14",
@@ -194,7 +206,7 @@ function Explore() {
                     )}
                   >
                     <Icon className="size-5 lg:size-6" />
-                  </span>
+                  </ResultAvatar>
                   <div className="flex-1 min-w-0 md:flex-none md:w-full">
                     <p className="font-display font-bold text-sm truncate lg:text-base">
                       {ar ? item.name.ar : item.name.en}

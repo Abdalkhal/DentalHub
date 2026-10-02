@@ -1,4 +1,4 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { Home, ShoppingBag, User, Menu, Search, Heart, Tag, ShoppingCart } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useI18n } from "@/lib/i18n";
@@ -8,7 +8,6 @@ import { useCart, onOpenCart } from "@/lib/cartStore";
 import { CartDrawer } from "@/components/CartDrawer";
 import { useDentistOrders, useOrders as useSupplierOrders } from "@/lib/orders";
 import { useSeenOrderIds } from "@/lib/orderSeen";
-import { LabBottomTabBar } from "@/components/LabBottomTabBar";
 
 export function MobileShell({
   children,
@@ -27,11 +26,31 @@ export function MobileShell({
   wide?: boolean;
   className?: string;
 }) {
-  const { role } = useUserRole();
+  const { user, role, loading } = useUserRole();
   const isLab = role?.accountType === "lab";
   const isWide = wide || isLab;
   const [cartOpen, setCartOpen] = useState(false);
   useEffect(() => onOpenCart(() => setCartOpen(true)), []);
+
+  // Guard every screen that renders inside this shell, same as native's
+  // app-tabs.tsx (`!loading && !user ? <Redirect href="/login" /> : null`) —
+  // web had no equivalent, so a signed-out visitor (e.g. someone who just
+  // received a shared link) saw the real dashboard shell instead of the
+  // login page. `/auth` and `/login` render themselves inside this same
+  // shell, so they're excluded to avoid redirecting the login page away
+  // from itself. `/privacy` is excluded too — it must stay reachable
+  // without an account (App Store/Play Store require a public privacy
+  // policy URL) and is static text with no user data.
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const isPublicRoute = pathname === "/auth" || pathname === "/login" || pathname === "/privacy";
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (!loading && !user && !isPublicRoute) {
+      navigate({ to: "/auth", replace: true });
+    }
+  }, [loading, user, isPublicRoute, navigate]);
+  if (!isPublicRoute && !loading && !user) return null;
+
   return (
     <div className="min-h-screen w-full bg-slate-50 overflow-x-hidden flex justify-center">
       <div
@@ -50,27 +69,23 @@ export function MobileShell({
           className={cn(
             "flex-1",
             hideBottomNav ? "pb-0" : isWide ? "pb-24 lg:pb-0" : "pb-24",
-            // Clears the fixed lg:+ top nav BottomTabBar renders when `wide`
-            // is set explicitly (lab pages use LabBottomTabBar instead and
-            // never get that top nav, so this is scoped to `wide` only).
-            // Applies even with `hideBottomNav`, because such a page still
-            // gets the top nav at lg:+ — see the render condition below.
-            wide && "lg:pt-16",
+            // Clears the fixed lg:+ top nav BottomTabBar renders on wide
+            // pages. Applies even with `hideBottomNav`, because such a page
+            // still gets the top nav at lg:+ — see the render condition below.
+            isWide && "lg:pt-16",
           )}
         >
           {children}
         </div>
-        {(!hideBottomNav || wide) && isLab && (
-          <LabBottomTabBar className="lg:hidden" wide={wide} hideBottomNav={hideBottomNav} />
-        )}
         {/* `hideBottomNav` used to suppress both bars. A wide page still needs
             desktop navigation, so it now renders BottomTabBar and lets the
             bottom bar itself stay hidden — the phone keeps exactly today's
-            (bar-less) layout while lg:+ gains the top nav. */}
-        {(!hideBottomNav || wide) && !isLab && (
+            (bar-less) layout while lg:+ gains the top nav. Labs get the same
+            vendor tabs as native (Home/Explore/Orders/Account/More). */}
+        {(!hideBottomNav || isWide) && (
           <BottomTabBar
             onCartClick={() => setCartOpen(true)}
-            wide={wide}
+            wide={isWide}
             hideBottomNav={hideBottomNav}
           />
         )}

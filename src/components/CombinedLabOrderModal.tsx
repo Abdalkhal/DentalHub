@@ -582,7 +582,7 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 text-right"
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 text-right"
       dir="rtl"
     >
       <div className="bg-white w-full max-w-6xl rounded-2xl shadow-2xl overflow-hidden border border-gray-100 max-h-[95vh] flex flex-col">

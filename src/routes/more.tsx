@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
-import { useUserRole, useIsAdmin } from "@/lib/useAuth";
+import { useUserRole, useIsAdmin, useLabStaffClaim } from "@/lib/useAuth";
 import {
   ShoppingBag,
   FlaskConical,
@@ -28,6 +28,7 @@ import {
   ChevronRight,
   Bell,
   ShoppingCart,
+  PenTool,
 } from "lucide-react";
 import { openCart } from "@/lib/cartStore";
 
@@ -47,6 +48,7 @@ function More() {
   const { t, lang, toggle } = useI18n();
   const { role } = useUserRole();
   const { isAdmin } = useIsAdmin();
+  const { claim: labStaff } = useLabStaffClaim();
   const accountType = role?.accountType ?? "dentist";
   const ar = lang === "ar";
 
@@ -259,13 +261,63 @@ function More() {
     { to: "/account/help", icon: LifeBuoy, label: ar ? "المساعدة" : "Help", tone: "", roles: ["dentist"] },
     { to: "/privacy", icon: ShieldCheck, label: ar ? "سياسة الخصوصية" : "Privacy Policy", tone: "", roles: ["dentist"] },
   ];
+  const supplyLinks: MoreLink[] = [
+    { to: "/supplies", icon: Store, label: ar ? "لوحة المورد" : "Supplier Dashboard", tone: "", roles: ["supply"] },
+    { to: "/doctor-invoices", icon: FileText, label: ar ? "فواتير الأطباء" : "Doctor Invoices", tone: "", roles: ["supply"] },
+    { to: "/my-ads", icon: Megaphone, label: ar ? "إعلاناتي" : "My Ads", tone: "", roles: ["supply"] },
+    { to: "/messages", icon: MessageSquare, label: ar ? "الرسائل" : "Messages", tone: "", roles: ["supply"] },
+    { to: "/notifications", icon: Bell, label: ar ? "الإشعارات" : "Notifications", tone: "", roles: ["supply"] },
+    { to: "/account/settings", icon: Cog, label: ar ? "الإعدادات" : "Settings", tone: "", roles: ["supply"] },
+    { to: "/account/help", icon: LifeBuoy, label: ar ? "المساعدة" : "Help", tone: "", roles: ["supply"] },
+    { to: "/privacy", icon: ShieldCheck, label: ar ? "سياسة الخصوصية" : "Privacy Policy", tone: "", roles: ["supply"] },
+  ];
+  const implantLinks: MoreLink[] = [
+    { to: "/implants", icon: FlaskConical, label: ar ? "لوحة الزرعات" : "Implant Dashboard", tone: "", roles: ["implant"] },
+    { to: "/my-ads", icon: Megaphone, label: ar ? "إعلاناتي" : "My Ads", tone: "", roles: ["implant"] },
+    { to: "/messages", icon: MessageSquare, label: ar ? "الرسائل" : "Messages", tone: "", roles: ["implant"] },
+    { to: "/notifications", icon: Bell, label: ar ? "الإشعارات" : "Notifications", tone: "", roles: ["implant"] },
+    { to: "/account/settings", icon: Cog, label: ar ? "الإعدادات" : "Settings", tone: "", roles: ["implant"] },
+    { to: "/account/help", icon: LifeBuoy, label: ar ? "المساعدة" : "Help", tone: "", roles: ["implant"] },
+    { to: "/privacy", icon: ShieldCheck, label: ar ? "سياسة الخصوصية" : "Privacy Policy", tone: "", roles: ["implant"] },
+  ];
+  const labLinks: MoreLink[] = [
+    { to: "/labs/dashboard", icon: FlaskConical, label: ar ? "لوحة المختبر" : "Lab Dashboard", tone: "", roles: ["lab"] },
+    { to: "/designer", icon: PenTool, label: ar ? "حالات التصميم" : "Design Cases", tone: "", roles: ["lab"] },
+    { to: "/doctors", icon: Stethoscope, label: ar ? "الأطباء" : "Doctors", tone: "", roles: ["lab"] },
+    { to: "/doctor-invoices", icon: FileText, label: ar ? "فواتير الأطباء" : "Doctor Invoices", tone: "", roles: ["lab"] },
+    { to: "/my-ads", icon: Megaphone, label: ar ? "إعلاناتي" : "My Ads", tone: "", roles: ["lab"] },
+    { to: "/messages", icon: MessageSquare, label: ar ? "الرسائل" : "Messages", tone: "", roles: ["lab"] },
+    { to: "/notifications", icon: Bell, label: ar ? "الإشعارات" : "Notifications", tone: "", roles: ["lab"] },
+    { to: "/account/settings", icon: Cog, label: ar ? "الإعدادات" : "Settings", tone: "", roles: ["lab"] },
+    { to: "/account/help", icon: LifeBuoy, label: ar ? "المساعدة" : "Help", tone: "", roles: ["lab"] },
+    { to: "/privacy", icon: ShieldCheck, label: ar ? "سياسة الخصوصية" : "Privacy Policy", tone: "", roles: ["lab"] },
+  ];
   const adminLink = allLinks.find((l) => l.to === "/admin")!;
   const isDentist = accountType === "dentist";
+  // Invited lab staff have a claim but no user_roles doc (so accountType
+  // falls back to "dentist") — they get native's short staff menu instead.
+  const designerLinks: MoreLink[] = [
+    { to: "/designer", icon: PenTool, label: ar ? "حالاتي كمصمم" : "My Design Cases", tone: "", roles: ["lab"] },
+    { to: "/notifications", icon: Bell, label: ar ? "الإشعارات" : "Notifications", tone: "", roles: ["lab"] },
+    { to: "/account/help", icon: LifeBuoy, label: ar ? "المساعدة" : "Help", tone: "", roles: ["lab"] },
+    { to: "/privacy", icon: ShieldCheck, label: ar ? "سياسة الخصوصية" : "Privacy Policy", tone: "", roles: ["lab"] },
+  ];
+  const nativeLinks = labStaff
+    ? designerLinks
+    : isDentist
+    ? dentistLinks
+    : accountType === "supply"
+      ? supplyLinks
+      : accountType === "implant"
+        ? implantLinks
+        : accountType === "lab"
+          ? labLinks
+          : null;
 
-  const links = isDentist
+  const links = nativeLinks
     ? isAdmin
-      ? [adminLink, ...dentistLinks]
-      : dentistLinks
+      ? [adminLink, ...nativeLinks]
+      : nativeLinks
     : allLinks.filter((l) => l.roles.some((r) => isRole(r)));
 
   return (
@@ -303,7 +355,7 @@ function More() {
               </Link>
             </li>
           ))}
-          {isDentist && (
+          {isDentist && !labStaff && (
             <li className="md:bg-card md:border md:border-border md:rounded-2xl md:shadow-soft md:overflow-hidden">
               <button
                 type="button"

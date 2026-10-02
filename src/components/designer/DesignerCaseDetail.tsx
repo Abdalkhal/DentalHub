@@ -10,7 +10,7 @@ import { useDesignerCases, useDesignerCase } from "@/lib/designerStore";
 import { uploadCaseFile } from "@/lib/storagePipeline";
 import type { OrderAttachment } from "@/lib/ordersStore";
 import { cn } from "@/lib/utils";
-import { Loader2, Upload, User, Stethoscope, Hash, PenTool, Palette } from "lucide-react";
+import { Loader2, Upload, User, Stethoscope, Hash, PenTool, Palette, MessageCircle } from "lucide-react";
 import { CaseFileLink } from "@/components/CaseFileLink";
 
 export function DesignerCaseDetail({ caseId }: { caseId: string }) {
@@ -113,6 +113,16 @@ export function DesignerCaseDetail({ caseId }: { caseId: string }) {
             <Hash className="size-4" />
             <span dir="ltr">{order.id}</span>
           </div>
+          {order.dentistId && (
+            <Link
+              to="/messages"
+              search={{ with: order.dentistId, withName: order.doctor }}
+              className="mt-1 flex items-center justify-center gap-2 rounded-xl bg-primary/10 py-2.5 text-xs font-bold text-primary hover:bg-primary/15 transition"
+            >
+              <MessageCircle className="size-4" />
+              {ar ? "مراسلة الطبيب" : "Message the doctor"}
+            </Link>
+          )}
         </div>
 
         {/* Assigned staff — who this case was assigned to at "طلب جديد" */}

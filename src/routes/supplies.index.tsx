@@ -2,7 +2,6 @@
 import { useMemo, useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { collection, getDocs } from "firebase/firestore";
-import { toast } from "sonner";
 import { db } from "@/integrations/firebase/client";
 import type { UserRoleDoc } from "@/integrations/firebase/types";
 import { MobileShell } from "@/components/MobileShell";
@@ -48,7 +47,7 @@ import {
   MAX_PRODUCT_IMAGES,
   type Product,
 } from "@/lib/products";
-import { useOffers, useUpsertOffer, useDeleteOffer, type Offer } from "@/lib/offers";
+import { OfficeOffers } from "@/components/OfficeOffers";
 import { useOrders as useSupplierOrders } from "@/lib/orders";
 import type { OrderDoc } from "@/integrations/firebase/types";
 import { SupplierOrderDetailModal } from "@/components/SupplierOrderDetailModal";
@@ -81,7 +80,6 @@ import {
   Megaphone,
   ClipboardList,
   Calendar,
-  ImageOff,
   UserCircle2,
   LogOut,
   Phone,
@@ -99,7 +97,7 @@ import {
   Percent,
   ScanBarcode,
   Tag,
-  Bone,
+  Anchor,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Currency } from "@/lib/products";
@@ -248,7 +246,7 @@ function SupplyDashboard() {
   const ar = lang === "ar";
   const { role } = useUserRole();
   const supplierId = role?.userId ?? "";
-  const [activeTab, setActiveTab] = useState<"products" | "implants" | "offers" | "orders">("products");
+  const [activeTab, setActiveTab] = useState<"products" | "implants" | "offers">("products");
 
   const mapsUrl = getMapsUrl(role ?? {});
 
@@ -262,7 +260,7 @@ function SupplyDashboard() {
     : { ar: "", en: "" };
 
   return (
-    <MobileShell hideBottomNav wide className="md:bg-[#F7F9FA]">
+    <MobileShell wide className="md:bg-[#F7F9FA]">
       {/* A flat grey canvas looked unfinished, so the top of the page carries
           a soft wash in the account's own accent that fades into the neutral
           background — the supply equivalent of the implants' icy blue.
@@ -360,9 +358,8 @@ function SupplyDashboard() {
         <div className="flex bg-slate-100 rounded-2xl p-1 mt-2 md:bg-transparent md:rounded-none md:p-0 md:mt-7 md:gap-7 md:border-b md:border-slate-200">
           {[
             { key: "products" as const, ar: "المنتجات", en: "Products", icon: Package },
-            { key: "implants" as const, ar: "الزرعات", en: "Implants", icon: Bone },
+            { key: "implants" as const, ar: "الزرعات", en: "Implants", icon: Anchor },
             { key: "offers" as const, ar: "العروض", en: "Offers", icon: Megaphone },
-            { key: "orders" as const, ar: "الطلبات", en: "Orders", icon: ClipboardList },
           ].map((tab) => (
             <button
               key={tab.key}
@@ -388,8 +385,7 @@ function SupplyDashboard() {
       <div className={shellCls + " pt-4 pb-6 md:pt-6 md:pb-12"}>
         {activeTab === "products" && <ProductsPanel />}
         {activeTab === "implants" && <ImplantsBoneGraftPanel />}
-        {activeTab === "offers" && <OffersPanel supplierId={supplierId} />}
-        {activeTab === "orders" && <OrdersPanel supplierId={supplierId} />}
+        {activeTab === "offers" && <OfficeOffers supplierId={supplierId} />}
       </div>
     </MobileShell>
   );
@@ -1981,344 +1977,6 @@ function ImplantsBoneGraftPanel() {
   );
 }
 
-function OffersPanel({ supplierId }: { supplierId: string }) {
-  const { lang } = useI18n();
-  const ar = lang === "ar";
-  const { data: offers = [], isLoading } = useOffers(supplierId);
-  const upsertOffer = useUpsertOffer();
-  const deleteOffer = useDeleteOffer();
-
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<Offer | null>(null);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [expiryDate, setExpiryDate] = useState("");
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [formError, setFormError] = useState("");
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  const openAdd = () => {
-    setEditing(null);
-    setTitle("");
-    setDescription("");
-    setExpiryDate("");
-    setImageFile(null);
-    setImagePreview("");
-    setFormError("");
-    setShowForm(true);
-  };
-
-  const handleFile = (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    const file = files[0];
-    setImageFile(file);
-    setImagePreview(URL.createObjectURL(file));
-  };
-
-  const submit = async () => {
-    setFormError("");
-    if (!title.trim()) {
-      setFormError(ar ? "الرجاء إدخال عنوان العرض" : "Please enter an offer title");
-      return;
-    }
-
-    setBusy(true);
-    try {
-      const offerId = editing?.id ?? crypto.randomUUID();
-      let imageUrl = editing?.imageUrl ?? "";
-
-      if (imageFile) {
-        try {
-          const path = await uploadProductImage(offerId, imageFile);
-          imageUrl = path;
-        } catch (uploadErr: any) {
-          alert(
-            ar
-              ? `فشل رفع الصورة: ${uploadErr.message || uploadErr}`
-              : `Image upload failed: ${uploadErr.message || uploadErr}`,
-          );
-          setBusy(false);
-          return;
-        }
-      }
-
-      await upsertOffer.mutateAsync({
-        id: offerId,
-        supplierId,
-        title: title.trim(),
-        description: description.trim(),
-        imageUrl,
-        expiryDate,
-      });
-
-      toast.success(
-        editing
-          ? ar
-            ? "تم حفظ التعديل — سيُعرض بعد مراجعة الإدارة"
-            : "Changes saved — pending admin review"
-          : ar
-            ? "تم إرسال العرض للمراجعة"
-            : "Offer submitted for review",
-      );
-      setShowForm(false);
-    } catch (e: any) {
-      alert(ar ? `فشل حفظ العرض: ${e.message || e}` : `Failed to save offer: ${e.message || e}`);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleDelete = async (offer: Offer) => {
-    if (!confirm(ar ? "حذف هذا العرض؟" : "Delete this offer?")) return;
-    await deleteOffer.mutateAsync(offer.id);
-  };
-
-  const allPaths = offers.filter((o) => o.imageUrl).map((o) => o.imageUrl);
-  const { data: urlMap = {} } = useSignedImageUrls(allPaths);
-
-  return (
-    <>
-      {!showForm && (
-        <button
-          onClick={openAdd}
-          className="relative w-full h-14 rounded-2xl text-white font-display font-bold flex items-center justify-center gap-2 hover:opacity-95 transition shadow-lg md:w-auto md:h-11 md:px-5 md:text-sm md:rounded-xl md:bg-[#0E6E66] md:hover:bg-[#0B5952] md:hover:opacity-100 md:shadow-sm md:shadow-[#0E6E66]/25"
-        >
-          <span
-            className="absolute inset-0 rounded-2xl md:hidden"
-            style={{ background: "linear-gradient(to right, #2AA6D1, #4FC3E8)" }}
-          />
-          <span className="relative flex items-center justify-center gap-2">
-            <Plus className="size-5 md:size-4" />
-            <Megaphone className="size-5 md:size-4" />
-            {ar ? "إضافة عرض / إعلان" : "Add Offer / Ad"}
-          </span>
-        </button>
-      )}
-
-      {showForm && (
-        <div className="bg-white border border-[#D3E8F7] rounded-3xl p-5 shadow-card space-y-4 md:max-w-xl md:p-6 md:rounded-2xl md:border-slate-200 md:shadow-none">
-          <div className="flex items-center justify-between">
-            <h3 className="font-display font-bold text-lg text-[#1C6FB5] flex items-center gap-1.5">
-              <span className="size-1.5 rounded-full bg-[#1C6FB5]" />
-              {editing ? (ar ? "تعديل عرض" : "Edit offer") : ar ? "عرض جديد" : "New offer"}
-            </h3>
-            <button
-              onClick={() => setShowForm(false)}
-              className="size-9 rounded-xl bg-[#E7F4FE] hover:bg-[#DCEEFB] text-[#1C6FB5] flex items-center justify-center transition"
-            >
-              <X className="size-4" />
-            </button>
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-              {ar ? "العنوان" : "Title"}
-            </label>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder={ar ? "مثال: خصم 20% على الكومبوزيت" : "e.g. 20% off composites"}
-              className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-              {ar ? "الوصف" : "Description"}
-            </label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder={ar ? "تفاصيل العرض..." : "Offer details..."}
-              rows={3}
-              className="w-full rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition resize-none"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-              {ar ? "تاريخ الانتهاء" : "Expiry date"}
-            </label>
-            <div className="relative">
-              <input
-                type="date"
-                value={expiryDate}
-                onChange={(e) => setExpiryDate(e.target.value)}
-                className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
-              />
-              <Calendar className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
-              {ar ? "صورة العرض" : "Offer image"}
-            </label>
-            {imagePreview ? (
-              <div className="relative w-full h-40 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] overflow-hidden">
-                <img src={imagePreview} alt="" className="size-full object-cover" />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setImageFile(null);
-                    setImagePreview("");
-                  }}
-                  className="absolute top-2 end-2 size-7 rounded-full bg-black/60 text-white flex items-center justify-center"
-                >
-                  <X className="size-3.5" />
-                </button>
-              </div>
-            ) : editing?.imageUrl ? (
-              <div className="relative w-full h-40 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] overflow-hidden">
-                {urlMap[editing.imageUrl] ? (
-                  <img src={urlMap[editing.imageUrl]} alt="" className="size-full object-cover" />
-                ) : (
-                  <div className="size-full flex items-center justify-center">
-                    <ImageOff className="size-8 text-slate-300" />
-                  </div>
-                )}
-              </div>
-            ) : (
-              <label className="w-full h-32 rounded-xl border-2 border-dashed border-[#D3E8F7] bg-[#F5FAFE] flex flex-col items-center justify-center gap-1.5 cursor-pointer hover:border-primary/40 hover:bg-sky-50/30 transition group">
-                <Upload className="size-6 text-slate-400 group-hover:text-primary transition" />
-                <p className="text-xs text-slate-400 group-hover:text-primary transition font-medium">
-                  {ar ? "اضغط لرفع صورة" : "Tap to upload image"}
-                </p>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  className="hidden"
-                  onChange={(e) => handleFile(e.target.files)}
-                />
-              </label>
-            )}
-          </div>
-
-          {formError && (
-            <p className="text-sm text-rose-600 bg-rose-50 rounded-xl px-4 py-2.5 text-center font-semibold">
-              {formError}
-            </p>
-          )}
-
-          <button
-            type="button"
-            onClick={submit}
-            disabled={busy}
-            className={cn(
-              "w-full h-14 rounded-2xl font-display font-bold flex items-center justify-center gap-2 transition shadow-card",
-              busy
-                ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                : "text-white hover:opacity-95",
-            )}
-            style={busy ? undefined : { background: "linear-gradient(to right, #2AA6D1, #4FC3E8)" }}
-          >
-            {busy ? <Loader2 className="size-5 animate-spin" /> : null}
-            {busy
-              ? ar
-                ? "جارٍ الحفظ..."
-                : "Saving..."
-              : editing
-                ? ar
-                  ? "حفظ التعديلات"
-                  : "Save changes"
-                : ar
-                  ? "إضافة العرض"
-                  : "Add offer"}
-          </button>
-        </div>
-      )}
-
-      {isLoading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="size-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-        </div>
-      ) : offers.length === 0 ? (
-        <div className="py-20 flex flex-col items-center text-center text-muted-foreground">
-          <Megaphone className="size-14 mb-4 opacity-20" />
-          <p className="font-display font-bold text-lg text-slate-400">
-            {ar ? "لا توجد عروض بعد" : "No offers yet"}
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-4 lg:grid-cols-3">
-          {offers.map((offer) => (
-            <div
-              key={offer.id}
-              className="bg-card border border-border rounded-2xl p-3.5 shadow-soft md:flex md:flex-col md:p-4 md:shadow-none md:hover:shadow-md md:hover:border-[#0E6E66]/40 md:transition"
-            >
-              <div className="flex gap-3 md:flex-col md:gap-0">
-                <div className="size-16 rounded-xl bg-slate-100 overflow-hidden shrink-0 md:w-full md:h-auto md:aspect-[16/9] md:mb-3.5">
-                  {offer.imageUrl && urlMap[offer.imageUrl] ? (
-                    <img src={urlMap[offer.imageUrl]} alt="" className="size-full object-cover" />
-                  ) : (
-                    <div className="size-full flex items-center justify-center">
-                      <Megaphone className="size-6 text-slate-300" />
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <p className="font-display font-bold text-sm md:text-base">{offer.title}</p>
-                    {offer.status && offer.status !== "active" && (
-                      <span
-                        className={cn(
-                          "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold",
-                          offer.status === "pending" && "bg-amber-100 text-amber-700",
-                          offer.status === "rejected" && "bg-rose-100 text-rose-700",
-                          offer.status === "expired" && "bg-slate-100 text-slate-500",
-                        )}
-                      >
-                        {offer.status === "pending"
-                          ? ar
-                            ? "قيد المراجعة"
-                            : "Pending"
-                          : offer.status === "rejected"
-                            ? ar
-                              ? "مرفوض"
-                              : "Rejected"
-                            : ar
-                              ? "منتهي"
-                              : "Expired"}
-                      </span>
-                    )}
-                  </div>
-                  {offer.status === "rejected" && offer.rejectReason && (
-                    <p className="text-[11px] text-rose-600 mt-0.5">{offer.rejectReason}</p>
-                  )}
-                  {offer.description && (
-                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                      {offer.description}
-                    </p>
-                  )}
-                  {offer.expiryDate && (
-                    <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
-                      <Calendar className="size-3" />
-                      {ar ? "ينتهي:" : "Expires:"} {offer.expiryDate}
-                    </p>
-                  )}
-                </div>
-              </div>
-              <div className="flex gap-1 mt-2.5 pt-2.5 border-t border-border md:mt-auto">
-                <button
-                  type="button"
-                  onClick={() => handleDelete(offer)}
-                  className="flex-1 h-8 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-rose-100 hover:text-rose-600 flex items-center justify-center gap-1 transition"
-                >
-                  <Trash2 className="size-3" />
-                  {ar ? "حذف" : "Delete"}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </>
-  );
-}
-
 function OrdersPanel({ supplierId }: { supplierId: string }) {
   const { lang } = useI18n();
   const ar = lang === "ar";
@@ -2528,7 +2186,7 @@ function ImplantDashboard() {
       {/* Tab content */}
       <div className="px-4 pt-4 pb-6">
         {activeTab === "products" && <ImplantProductsPanel />}
-        {activeTab === "offers" && <OffersPanel supplierId={companyId} />}
+        {activeTab === "offers" && <OfficeOffers supplierId={companyId} />}
         {activeTab === "orders" && <OrdersPanel supplierId={companyId} />}
       </div>
       </div>

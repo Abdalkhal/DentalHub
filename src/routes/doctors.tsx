@@ -1,211 +1,116 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/integrations/firebase/client";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
-import { ChevronDown, ChevronUp, Stethoscope } from "lucide-react";
-
-const ORDERS_KEY = "dental_hub_orders";
-
-type OrderData = {
-  id: string;
-  orderNumber: string;
-  patient: string;
-  doctor: string;
-  workType: string;
-  receivedDate: string;
-  status: string;
-};
-
-type DoctorEntry = {
-  name: string;
-  orderCount: number;
-  orders: OrderData[];
-};
-
-const normalizeStr = (str: string) =>
-  str
-    .replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, "")
-    .replace(/[أإآ]/g, "ا")
-    .replace(/ى/g, "ي")
-    .trim()
-    .toLowerCase();
-
-function loadOrders(): OrderData[] {
-  try {
-    const saved = localStorage.getItem(ORDERS_KEY);
-    if (saved) return JSON.parse(saved);
-    const old = localStorage.getItem("dental_orders");
-    if (old) {
-      const parsed = JSON.parse(old) as OrderData[];
-      localStorage.setItem(ORDERS_KEY, JSON.stringify(parsed));
-      return parsed;
-    }
-    return [];
-  } catch {
-    return [];
-  }
-}
-
-function buildDoctors(orders: OrderData[]): DoctorEntry[] {
-  const map = new Map<string, OrderData[]>();
-  for (const o of orders) {
-    if (!o.doctor) continue;
-    const existing = map.get(o.doctor) ?? [];
-    existing.push(o);
-    map.set(o.doctor, existing);
-  }
-  return Array.from(map.entries())
-    .map(([name, orders]) => ({ name, orders, orderCount: orders.length }))
-    .sort((a, b) => b.orderCount - a.orderCount);
-}
-
-function formatDate(dateStr: string) {
-  try {
-    const d = new Date(dateStr);
-    return d.toLocaleDateString("en-GB");
-  } catch {
-    return dateStr;
-  }
-}
-
-const STATUS_LABELS: Record<string, { ar: string; en: string; color: string }> = {
-  in_progress: { ar: "قيد التنفيذ", en: "In Progress", color: "text-amber-600 bg-amber-50" },
-  completed: { ar: "مكتملة", en: "Completed", color: "text-emerald-600 bg-emerald-50" },
-  delayed: { ar: "متأخرة", en: "Delayed", color: "text-rose-600 bg-rose-50" },
-};
+import { Loader2, MapPin, Phone, Stethoscope } from "lucide-react";
 
 export const Route = createFileRoute("/doctors")({
   component: DoctorsPage,
 });
 
+type Doctor = { id: string; name: string; city: string; phone?: string; clinic?: string };
+
+// Directory of dentists on the platform, grouped by city — same as native's
+// doctors screen. (The lab's own cases grouped by doctor live at /lab-doctors.)
 function DoctorsPage() {
   const { lang } = useI18n();
   const ar = lang === "ar";
-  const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<DoctorEntry | null>(null);
 
-  const doctors = useMemo(() => {
-    const orders = loadOrders();
-    return buildDoctors(orders);
-  }, []);
+  const { data: doctors = [], isLoading } = useQuery({
+    queryKey: ["doctors-directory"],
+    queryFn: async (): Promise<Doctor[]> => {
+      const snap = await getDocs(collection(db, "public_profiles"));
+      return snap.docs
+        .map((d) => d.data() as Record<string, unknown>)
+        .filter((u) => u.accountType === "dentist")
+        .map((u) => ({
+          id: String(u.userId ?? ""),
+          name: [u.name, u.surname].filter(Boolean).join(" "),
+          city: String(u.city || ""),
+          phone: typeof u.phone === "string" ? u.phone : undefined,
+          clinic: typeof u.clinicName === "string" ? u.clinicName : undefined,
+        }))
+        .filter((d) => d.id && d.name);
+    },
+    staleTime: 60_000,
+  });
 
-  const filtered = useMemo(() => {
-    if (!search.trim()) return doctors;
-    const q = normalizeStr(search);
-    return doctors.filter((d) => normalizeStr(d.name).includes(q));
-  }, [search, doctors]);
-
-  if (selected) {
-    return (
-      <MobileShell wide>
-        <TopBar title={selected.name} showBack wide maxW="5xl" />
-        <div className="px-4 pt-4 space-y-3 md:px-6 md:pt-6 md:pb-12 md:space-y-5 lg:px-8 lg:max-w-5xl lg:mx-auto">
-          <div className="bg-card border border-border rounded-2xl p-4 shadow-soft flex items-center gap-3">
-            <span className="size-12 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0 text-blue-600 font-display font-extrabold text-lg">
-              {selected.name.charAt(0)}
-            </span>
-            <div>
-              <p className="font-display font-bold text-base">{selected.name}</p>
-              <p className="text-xs text-muted-foreground">
-                {selected.orderCount} {ar ? "طلب" : "order"}
-                {selected.orderCount !== 1 ? (ar ? "ات" : "s") : ""}
-              </p>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            {selected.orders.map((o) => (
-              <div
-                key={o.id}
-                className="bg-card border border-border rounded-2xl p-3.5 shadow-soft"
-              >
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="font-mono text-xs font-bold text-muted-foreground">
-                    {o.orderNumber}
-                  </span>
-                  <span
-                    className={cn(
-                      "text-[11px] font-bold px-2 py-0.5 rounded-full",
-                      STATUS_LABELS[o.status]?.color ?? "bg-slate-50 text-slate-600",
-                    )}
-                  >
-                    {ar
-                      ? (STATUS_LABELS[o.status]?.ar ?? o.status)
-                      : (STATUS_LABELS[o.status]?.en ?? o.status)}
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <span className="text-muted-foreground">{ar ? "المريض" : "Patient"}</span>
-                    <p className="font-semibold">{o.patient}</p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">{ar ? "التاريخ" : "Date"}</span>
-                    <p className="font-semibold">{formatDate(o.receivedDate)}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <button
-            onClick={() => setSelected(null)}
-            className="w-full flex items-center justify-center gap-2 h-11 rounded-2xl bg-card border border-border text-sm font-semibold text-foreground hover:bg-accent"
-          >
-            <ChevronUp className="size-4" />
-            {ar ? "العودة إلى القائمة" : "Back to list"}
-          </button>
-        </div>
-      </MobileShell>
-    );
-  }
+  const otherLabel = ar ? "أخرى" : "Other";
+  const byCity = useMemo(() => {
+    const m: Record<string, number> = {};
+    doctors.forEach((d) => {
+      const k = d.city || otherLabel;
+      m[k] = (m[k] ?? 0) + 1;
+    });
+    return m;
+  }, [doctors, otherLabel]);
 
   return (
     <MobileShell wide>
-      <TopBar
-        title={ar ? "الأطباء" : "Doctors & Clinics"}
-        showBack
-        wide
-        maxW="6xl"
-        showSearch
-        searchValue={search}
-        onSearchChange={setSearch}
-        searchPlaceholder={ar ? "ابحث عن طبيب…" : "Search by doctor…"}
-      />
-      <div className="px-4 pt-4 md:px-6 md:pt-6 md:pb-12 lg:px-8 lg:max-w-6xl lg:mx-auto">
-        {filtered.length === 0 ? (
-          <div className="py-16 flex flex-col items-center text-center text-muted-foreground">
-            <Stethoscope className="size-10 mb-3 text-muted-foreground/40" />
-            <p className="text-sm">{ar ? "لا يوجد أطباء مطابقون" : "No matching doctors"}</p>
-            <p className="text-xs mt-1">
-              {ar ? "حاول تغيير كلمة البحث" : "Try a different search term"}
-            </p>
+      <TopBar title={ar ? "الأطباء" : "Doctors"} showBack wide maxW="6xl" />
+      <div className="px-4 pt-4 pb-8 md:px-6 md:pt-6 lg:px-8 lg:max-w-6xl lg:mx-auto">
+        <p className="text-xs text-slate-500">
+          {doctors.length} {ar ? "طبيب" : "doctors"}
+        </p>
+
+        {isLoading ? (
+          <div className="flex justify-center py-16">
+            <Loader2 className="size-6 animate-spin text-primary" />
+          </div>
+        ) : doctors.length === 0 ? (
+          <div className="flex flex-col items-center py-16">
+            <Stethoscope className="size-12 text-slate-300" />
+            <p className="mt-3 text-sm text-slate-400">{ar ? "لا يوجد أطباء بعد" : "No doctors yet"}</p>
           </div>
         ) : (
-          <ul className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-5 xl:grid-cols-3 md:items-start">
-            {filtered.map((d) => (
-              <li key={d.name}>
-                <button
-                  onClick={() => setSelected(d)}
-                  className="w-full text-start bg-card border border-border rounded-2xl p-3.5 shadow-soft hover:shadow-card transition flex items-start gap-3"
-                >
-                  <span className="size-12 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0 text-blue-600 font-display font-extrabold text-lg">
-                    {d.name.charAt(0)}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-display font-bold truncate">{d.name}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {d.orderCount} {ar ? "طلب" : "order"}
-                      {d.orderCount !== 1 ? (ar ? "ات" : "s") : ""}
-                    </p>
-                  </div>
-                  <ChevronDown className="size-4 text-muted-foreground shrink-0 mt-1" />
-                </button>
-              </li>
+          <div className="mt-4 space-y-4">
+            {Object.entries(byCity).map(([city, count]) => (
+              <section key={city}>
+                <p className="mb-2 text-xs font-bold text-slate-500">
+                  {city} · {count}
+                </p>
+                <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
+                  {doctors
+                    .filter((d) => (d.city || otherLabel) === city)
+                    .map((d) => (
+                      <div
+                        key={d.id}
+                        className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm"
+                      >
+                        <span className="size-11 rounded-2xl bg-sky-100 text-sky-700 flex items-center justify-center text-base font-extrabold shrink-0">
+                          {d.name.charAt(0)}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-bold text-slate-800">{d.name}</p>
+                          <div className="mt-0.5 flex items-center gap-3">
+                            {d.city && (
+                              <span className="flex items-center gap-1 text-[11px] text-slate-500">
+                                <MapPin className="size-3 text-slate-400" />
+                                {d.city}
+                              </span>
+                            )}
+                            {d.clinic && <span className="truncate text-[11px] text-slate-400">{d.clinic}</span>}
+                          </div>
+                        </div>
+                        {d.phone && (
+                          <a
+                            href={`tel:${d.phone}`}
+                            aria-label={ar ? "اتصال" : "Call"}
+                            className="size-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 transition shrink-0"
+                          >
+                            <Phone className="size-4" />
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                </div>
+              </section>
             ))}
-          </ul>
+          </div>
         )}
       </div>
     </MobileShell>

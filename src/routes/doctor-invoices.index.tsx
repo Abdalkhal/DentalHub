@@ -31,7 +31,7 @@ function fmtDate(ts: { toDate?: () => Date } | undefined): string {
 
 function DoctorInvoicesList() {
   return (
-    <RoleGuard allowedRoles={["supply", "implant"]}>
+    <RoleGuard allowedRoles={["supply", "implant", "lab"]}>
       <DoctorInvoicesListInner />
     </RoleGuard>
   );
