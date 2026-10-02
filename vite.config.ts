@@ -5,7 +5,8 @@
 //     error logger plugins, and sandbox detection (port/host/strictPort).
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig as lovableDefineConfig } from "@lovable.dev/vite-tanstack-config";
-import type { ConfigEnv, Plugin, UserConfig } from "vite";
+import { loadEnv, type ConfigEnv, type Plugin, type UserConfig } from "vite";
+import { sentryVitePlugin } from "@sentry/vite-plugin";
 
 const lovableConfig = lovableDefineConfig({
   tanstackStart: {
@@ -38,5 +39,34 @@ export default async function config(env: ConfigEnv): Promise<UserConfig> {
   resolved.plugins = (resolved.plugins ?? []).filter(
     (p) => !p || (p as Plugin).name !== "vite-tsconfig-paths",
   );
+
+  // Upload source maps to Sentry so error stack traces show real file names and
+  // lines. Only runs on builds where SENTRY_AUTH_TOKEN is set (a secret kept in
+  // .env — never prefix it with VITE_ or it ships to the browser). The maps are
+  // "hidden" (no sourceMappingURL comment) and deleted after upload, so they are
+  // never published to Firebase Hosting.
+  const vars = loadEnv(env.mode, process.cwd(), "");
+  if (env.command === "build" && vars.SENTRY_AUTH_TOKEN) {
+    const client = resolved.environments?.client ?? {};
+    resolved.environments = {
+      ...resolved.environments,
+      client: { ...client, build: { ...client.build, sourcemap: "hidden" } },
+    };
+    const sentry = sentryVitePlugin({
+      org: "khazer",
+      project: "denthub-web",
+      authToken: vars.SENTRY_AUTH_TOKEN,
+      telemetry: false,
+      sourcemaps: {
+        assets: ["./dist/client/**"],
+        filesToDeleteAfterUpload: ["./dist/**/*.map"],
+      },
+    });
+    // Browser bundle only — the SSR pass (which just renders the SPA shell)
+    // would otherwise re-upload the already-processed client files.
+    for (const p of [sentry].flat() as Plugin[]) {
+      resolved.plugins.push({ ...p, applyToEnvironment: (e) => e.name === "client" });
+    }
+  }
   return resolved;
 }

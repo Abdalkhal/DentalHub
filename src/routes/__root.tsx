@@ -16,6 +16,7 @@ import { Toaster } from "../components/ui/sonner";
 import { useSession } from "../lib/useAuth";
 import { setFavoritesStoreUser } from "../lib/favoritesStore";
 import { setQuickOrdersStoreUser } from "../lib/quickOrders";
+import { captureError, setSentryUser } from "../lib/sentry";
 
 function NotFoundComponent() {
   return (
@@ -44,6 +45,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   const router = useRouter();
   useEffect(() => {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
+    captureError(error);
   }, [error]);
 
   return (
@@ -55,6 +57,13 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
         <p className="mt-2 text-sm text-muted-foreground">
           Something went wrong on our end. You can try refreshing or head back home.
         </p>
+        {import.meta.env.DEV && (
+          <pre className="mt-4 max-h-64 overflow-auto rounded-lg bg-slate-900 p-3 text-start text-[11px] leading-relaxed text-rose-200 whitespace-pre-wrap" dir="ltr">
+            {error.message}
+            {"\n\n"}
+            {error.stack?.split("\n").slice(0, 8).join("\n")}
+          </pre>
+        )}
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => {
@@ -129,6 +138,7 @@ function StoreUserScope() {
     const uid = user?.uid || "";
     setFavoritesStoreUser(uid);
     setQuickOrdersStoreUser(uid);
+    setSentryUser(uid || null);
   }, [user?.uid]);
   return null;
 }
