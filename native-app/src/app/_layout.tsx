@@ -1,4 +1,4 @@
-import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { DefaultTheme, Stack, ThemeProvider, router, usePathname, useRootNavigationState } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
 import { Cairo_400Regular, Cairo_500Medium, Cairo_600SemiBold, Cairo_700Bold, Cairo_800ExtraBold, Cairo_900Black } from '@expo-google-fonts/cairo';
@@ -15,6 +15,8 @@ import { LanguageProvider, useI18n, type DictKey } from '@/lib/i18n';
 import { AnimatedSplashOverlay, SplashArt } from '@/components/animated-icon';
 import { ToastHost } from '@/components/ToastHost';
 import { CartHeaderButton } from '@/components/CartHeaderButton';
+import { isGuestRoute } from '@/lib/guestAccess';
+import { useSession } from '@/lib/useAuth';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -76,6 +78,19 @@ const TITLED_SCREENS: { name: string; title: DictKey; cart?: boolean }[] = [
  */
 function RootStack() {
   const { t } = useI18n();
+  const pathname = usePathname();
+  const { user, loading } = useSession();
+  const navigationKey = useRootNavigationState()?.key;
+
+  // Signed-out visitors may browse the catalog (see lib/guestAccess.ts);
+  // any account-based route sends them to sign in. `replace` rather than
+  // `push`, so going back from the login screen returns to the screen they
+  // were browsing instead of the gated one.
+  const needsSignIn = !loading && !user && !isGuestRoute(pathname);
+  useEffect(() => {
+    if (navigationKey && needsSignIn) router.replace('/login');
+  }, [navigationKey, needsSignIn]);
+
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />

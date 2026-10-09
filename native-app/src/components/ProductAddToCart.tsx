@@ -4,6 +4,7 @@ import { Check, Minus, Plus, ShoppingCart } from 'lucide-react-native';
 
 import { Text } from '@/components/ui';
 import { addToCart } from '@/lib/cartStore';
+import { requireSignIn } from '@/lib/guestAccess';
 import { addToPurchaseHistory } from '@/lib/quickOrders';
 import { cn } from '@/lib/utils';
 
@@ -46,6 +47,7 @@ export function ProductAddToCart({
   const [added, setAdded] = useState(false);
 
   const handleAdd = () => {
+    if (requireSignIn()) return;
     addToCart({
       productId,
       productName,

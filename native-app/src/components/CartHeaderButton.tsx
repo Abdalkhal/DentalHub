@@ -4,6 +4,7 @@ import { ShoppingCart } from 'lucide-react-native';
 
 import { Text } from '@/components/ui';
 import { useCart } from '@/lib/cartStore';
+import { useSession } from '@/lib/useAuth';
 
 // Persistent cart entry point for shopping screens (product detail, an
 // office's profile, the supplies/brands directories) — mirrors web's
@@ -12,6 +13,10 @@ import { useCart } from '@/lib/cartStore';
 // way to actually get to the cart short of digging into the "المزيد" menu.
 export function CartHeaderButton() {
   const count = useCart().length;
+  const { user } = useSession();
+  // The cart is account based — guests are prompted to sign in when they try
+  // to add something instead (see lib/guestAccess.ts).
+  if (!user) return null;
   return (
     <Pressable
       onPress={() => router.push('/cart')}

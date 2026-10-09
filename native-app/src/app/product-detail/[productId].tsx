@@ -10,6 +10,7 @@ import { ProductImage } from '@/components/ProductImage';
 import { db } from '@/integrations/firebase/client';
 import { useProducts, useSignedImageUrls, type Product } from '@/lib/products';
 import { addToCart } from '@/lib/cartStore';
+import { requireSignIn } from '@/lib/guestAccess';
 import { addToPurchaseHistory } from '@/lib/quickOrders';
 import { useIsFavorited, toggleFavorite } from '@/lib/favoritesStore';
 import { ALL_COUNTRIES, countryFlagUrl } from '@/data/countries';
@@ -180,6 +181,7 @@ export default function ProductDetailScreen() {
     );
 
   const handleAdd = () => {
+    if (requireSignIn()) return;
     addToCart({
       productId: product.id,
       productName: name,
