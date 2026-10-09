@@ -12,7 +12,7 @@ import {
   type TextInputProps,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Redirect } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -483,6 +483,18 @@ export default function LoginScreen() {
                 </Text>
               </Pressable>
             )}
+
+            {/* Guest browsing (App Store guideline 5.1.1(v)) — the catalog
+                doesn't need an account; see lib/guestAccess.ts. Back when the
+                visitor came here from a screen, otherwise to Home. */}
+            <Pressable
+              onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+              className="mt-4 items-center py-2"
+            >
+              <Text className="text-sm font-bold text-slate-500 underline">
+                {ar ? 'تصفح بدون حساب' : 'Browse without an account'}
+              </Text>
+            </Pressable>
           </View>
         </ScrollView>
       </SafeAreaView>

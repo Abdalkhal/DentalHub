@@ -248,7 +248,6 @@ export default function HomeScreen() {
   }, [dentistCases, localOrdersAll, dentistNameForCases]);
 
   if (loading || claimLoading) return <Spinner />;
-  if (!user) return <Redirect href="/login" />;
 
   // Invited lab staff have no `user_roles` document — only a custom claim — so
   // route them from the claim before falling through to the account-type logic,
@@ -282,7 +281,11 @@ export default function HomeScreen() {
   if (role?.role === 'implant') return <ImplantsOfficeScreen />;
   if (role?.role === 'lab') return <LabsOfficeScreen />;
 
-  const isDentist = role?.accountType === 'dentist';
+  // Signed-out visitors get the dentist marketplace minus its account-based
+  // parts (notifications, cart, case tracking, quick orders) — see
+  // lib/guestAccess.ts.
+  const isGuest = !user;
+  const isDentist = role?.accountType === 'dentist' || isGuest;
   const isSupply = role?.accountType === 'supply';
   const isImplant = role?.accountType === 'implant';
   const isLab = role?.accountType === 'lab';
@@ -309,17 +312,19 @@ export default function HomeScreen() {
 
         <View className="flex-row items-center gap-2">
           {isDentist && <CartHeaderButton />}
-          <Pressable
-            onPress={() => router.push('/notifications')}
-            className="relative h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm"
-          >
-            <Bell size={17} color="#334155" />
-            {unreadCount > 0 && (
-              <View className="absolute -end-1 -top-1 h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1">
-                <Text className="text-[9px] font-bold text-white">{unreadCount > 9 ? '9+' : unreadCount}</Text>
-              </View>
-            )}
-          </Pressable>
+          {!isGuest && (
+            <Pressable
+              onPress={() => router.push('/notifications')}
+              className="relative h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm"
+            >
+              <Bell size={17} color="#334155" />
+              {unreadCount > 0 && (
+                <View className="absolute -end-1 -top-1 h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1">
+                  <Text className="text-[9px] font-bold text-white">{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                </View>
+              )}
+            </Pressable>
+          )}
           <Pressable
             onPress={toggle}
             className="h-9 flex-row items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 shadow-sm"
@@ -526,7 +531,9 @@ export default function HomeScreen() {
               {CATEGORY_TILES.map((c) => (
                 <Pressable
                   key={c.en}
-                  onPress={() => router.push(c.to)}
+                  // Supplies is a directory of supplier accounts, which guests
+                  // can't read — send them to the brand catalog instead.
+                  onPress={() => router.push(isGuest && c.to === '/supplies' ? '/brands' : c.to)}
                   style={{ minHeight: 100 }}
                   className="flex-1 items-center justify-between rounded-2xl border border-slate-200 bg-white p-2.5 shadow-sm"
                 >
@@ -569,44 +576,48 @@ export default function HomeScreen() {
           {/* 6 — Track cases (moved here from the Recent-orders slot to match
               web's home; "Recent orders" itself now lives only under
               طلباتي/My Orders, not on Home). */}
-          <View className="mt-6">
-            <Pressable
-              onPress={() => router.push('/track-cases')}
-              className="flex-row items-center gap-3 rounded-2xl border border-sky-100 bg-sky-50 p-3.5"
-            >
-              <View className="h-11 w-11 items-center justify-center rounded-2xl bg-sky-100" style={{ borderWidth: 1, borderColor: '#BAE6FD' }}>
-                <ClipboardList size={20} color="#0284C7" strokeWidth={2.2} />
-              </View>
-              <View className="min-w-0 flex-1">
-                <Text className="text-sm font-extrabold text-slate-800">{ar ? 'تتبع حالاتك' : 'Track your cases'}</Text>
-                <Text className="text-[11px] text-slate-500">
-                  {ar ? 'تابع حالة الطلبات من المختبر' : 'Follow your lab order status'}
-                </Text>
-                <Text className="mt-0.5 text-[11px] font-bold text-primary">
-                  {ar ? 'عرض جميع الحالات ›' : 'View all cases ›'}
-                </Text>
-              </View>
-              <View className="shrink-0 items-center rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
-                <Text className="text-xl font-extrabold text-slate-800">{caseCount}</Text>
-                <Text className="text-[10px] text-slate-500">{ar ? 'حالات' : 'cases'}</Text>
-              </View>
-            </Pressable>
-          </View>
+          {!isGuest && (
+            <View className="mt-6">
+              <Pressable
+                onPress={() => router.push('/track-cases')}
+                className="flex-row items-center gap-3 rounded-2xl border border-sky-100 bg-sky-50 p-3.5"
+              >
+                <View className="h-11 w-11 items-center justify-center rounded-2xl bg-sky-100" style={{ borderWidth: 1, borderColor: '#BAE6FD' }}>
+                  <ClipboardList size={20} color="#0284C7" strokeWidth={2.2} />
+                </View>
+                <View className="min-w-0 flex-1">
+                  <Text className="text-sm font-extrabold text-slate-800">{ar ? 'تتبع حالاتك' : 'Track your cases'}</Text>
+                  <Text className="text-[11px] text-slate-500">
+                    {ar ? 'تابع حالة الطلبات من المختبر' : 'Follow your lab order status'}
+                  </Text>
+                  <Text className="mt-0.5 text-[11px] font-bold text-primary">
+                    {ar ? 'عرض جميع الحالات ›' : 'View all cases ›'}
+                  </Text>
+                </View>
+                <View className="shrink-0 items-center rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+                  <Text className="text-xl font-extrabold text-slate-800">{caseCount}</Text>
+                  <Text className="text-[10px] text-slate-500">{ar ? 'حالات' : 'cases'}</Text>
+                </View>
+              </Pressable>
+            </View>
+          )}
 
           {/* 7 + 8 — Quick shortcuts */}
           <View className="mt-6 flex-row gap-2.5">
-            <Pressable
-              onPress={() => router.push('/quick-orders')}
-              className="flex-1 rounded-2xl bg-[#2563EB] p-4 shadow-lg"
-            >
-              <History size={24} color="#FFFFFF" />
-              <Text className="mt-2 text-sm font-extrabold text-white">
-                {ar ? 'الطلبات السريعة' : 'Quick Orders'}
-              </Text>
-              <View className="mt-2 self-start rounded-full bg-white/20 px-2.5 py-0.5">
-                <Text className="text-[11px] font-bold text-white">{quickItems.length}</Text>
-              </View>
-            </Pressable>
+            {!isGuest && (
+              <Pressable
+                onPress={() => router.push('/quick-orders')}
+                className="flex-1 rounded-2xl bg-[#2563EB] p-4 shadow-lg"
+              >
+                <History size={24} color="#FFFFFF" />
+                <Text className="mt-2 text-sm font-extrabold text-white">
+                  {ar ? 'الطلبات السريعة' : 'Quick Orders'}
+                </Text>
+                <View className="mt-2 self-start rounded-full bg-white/20 px-2.5 py-0.5">
+                  <Text className="text-[11px] font-bold text-white">{quickItems.length}</Text>
+                </View>
+              </Pressable>
+            )}
             <Pressable
               onPress={() => router.push('/offers')}
               className="flex-1 rounded-2xl bg-indigo-500 p-4 shadow-lg"

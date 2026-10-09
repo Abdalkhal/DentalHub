@@ -10,6 +10,7 @@ import {
   Globe,
   Heart,
   LifeBuoy,
+  LogIn,
   ListChecks,
   Megaphone,
   MessageSquare,
@@ -35,6 +36,7 @@ const ROLE_AR: Record<string, string> = {
   lab: 'مختبر طبي',
   implant: 'شركة زرعات',
   admin: 'مدير النظام',
+  guest: 'زائر',
 };
 const ROLE_EN: Record<string, string> = {
   dentist: 'Dentist',
@@ -42,6 +44,7 @@ const ROLE_EN: Record<string, string> = {
   lab: 'Lab',
   implant: 'Implant Company',
   admin: 'Admin',
+  guest: 'Guest',
 };
 
 type Item = { icon: LucideIcon; ar: string; en: string; to: string };
@@ -104,6 +107,15 @@ const ITEMS: Record<string, Item[]> = {
     { icon: LifeBuoy, ar: 'المساعدة', en: 'Help', to: '/help' },
     { icon: ShieldCheck, ar: 'سياسة الخصوصية', en: 'Privacy Policy', to: '/privacy' },
   ],
+  // Signed-out visitors: only the catalog screens they can open without an
+  // account (see lib/guestAccess.ts).
+  guest: [
+    { icon: Crown, ar: 'البراندات', en: 'Brands', to: '/brands' },
+    { icon: FlaskConical, ar: 'زراعة الأسنان', en: 'Implants', to: '/implants' },
+    { icon: Megaphone, ar: 'العروض', en: 'Offers', to: '/offers' },
+    { icon: LifeBuoy, ar: 'المساعدة', en: 'Help', to: '/help' },
+    { icon: ShieldCheck, ar: 'سياسة الخصوصية', en: 'Privacy Policy', to: '/privacy' },
+  ],
   admin: [
     { icon: Shield, ar: 'لوحة الإدارة', en: 'Admin Panel', to: '/admin' },
     { icon: Bell, ar: 'الإشعارات', en: 'Notifications', to: '/notifications' },
@@ -113,7 +125,7 @@ const ITEMS: Record<string, Item[]> = {
 export default function MoreScreen() {
   const { lang, toggle } = useI18n();
   const ar = lang === 'ar';
-  const { role } = useUserRole();
+  const { user, role, loading } = useUserRole();
   const { claim: labStaff } = useLabStaffClaim();
   const { isAdmin } = useIsAdmin();
 
@@ -125,9 +137,11 @@ export default function MoreScreen() {
   // doc), mislabeling a staff member's own More screen as a dentist account
   // with the wrong menu.
   const type =
-    labStaff?.role === 'DESIGNER' || labStaff?.role === 'TECHNICIAN' || labStaff?.role === 'ADMIN'
-      ? 'designer'
-      : (role?.accountType ?? 'dentist');
+    !loading && !user
+      ? 'guest'
+      : labStaff?.role === 'DESIGNER' || labStaff?.role === 'TECHNICIAN' || labStaff?.role === 'ADMIN'
+        ? 'designer'
+        : (role?.accountType ?? 'dentist');
   // `isAdmin` reflects the real `role: 'admin'` auth claim, independent of
   // `accountType` (an admin is usually still a real dentist/etc. account
   // underneath) — so the admin link is added on top of the normal menu
@@ -143,6 +157,16 @@ export default function MoreScreen() {
           <Text className="text-xs font-bold text-sky-700">{roleLabel}</Text>
         </View>
       </View>
+
+      {type === 'guest' && (
+        <Pressable
+          onPress={() => router.push('/login')}
+          className="mt-4 h-12 flex-row items-center justify-center gap-2 rounded-2xl bg-primary"
+        >
+          <LogIn size={17} color="#FFFFFF" />
+          <Text className="text-sm font-bold text-white">{ar ? 'تسجيل الدخول / إنشاء حساب' : 'Sign in / Create account'}</Text>
+        </Pressable>
+      )}
 
       <View className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-card shadow-sm">
         {items.map((it, i) => {

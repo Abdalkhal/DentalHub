@@ -14,6 +14,7 @@ import { useProductsByCountry, useSignedImageUrls, COUNTRY_SLUG_TO_CODE, type Im
 import { useImplantCompanyNames } from '@/lib/implantOffers';
 import { useIsFavorited, toggleFavorite } from '@/lib/favoritesStore';
 import { addToCart } from '@/lib/cartStore';
+import { requireSignIn } from '@/lib/guestAccess';
 import { addToPurchaseHistory } from '@/lib/quickOrders';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
@@ -334,6 +335,7 @@ function ImplantDetailModal({
   const canAdd = variants.length > 0 ? variantTotal + accTotal > 0 : (product.inStock ?? true) || accTotal > 0;
 
   const handleAdd = () => {
+    if (requireSignIn()) return;
     const officeId = product.companyId || '';
     if (variants.length > 0) {
       for (const v of variants) {

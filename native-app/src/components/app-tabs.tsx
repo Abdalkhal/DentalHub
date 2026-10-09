@@ -1,5 +1,5 @@
 import { Pressable } from 'react-native';
-import { Tabs, Redirect, router } from 'expo-router';
+import { Tabs, router } from 'expo-router';
 import { ArrowLeft, ArrowRight, Home, Heart, Menu, Search, ShoppingBag, Tag, User } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 
@@ -41,6 +41,9 @@ const LABELS: Record<(typeof ALL_NAMES)[number], { ar: string; en: string }> = {
 
 const DENTIST_TABS: readonly (typeof ALL_NAMES)[number][] = ['index', 'favorites', 'orders', 'offers', 'more'];
 const VENDOR_TABS: readonly (typeof ALL_NAMES)[number][] = ['index', 'explore', 'orders', 'account', 'more'];
+// Signed-out visitors browse the catalog (see lib/guestAccess.ts). Account
+// shows them a sign-in prompt; orders/favorites/explore need an account.
+const GUEST_TABS: readonly (typeof ALL_NAMES)[number][] = ['index', 'offers', 'account', 'more'];
 
 // Unlike stack screens, tabs never get an automatic back button — but these
 // two are usually reached via a push (e.g. from the account menu) rather
@@ -81,69 +84,60 @@ export default function AppTabs() {
   const seenIds = useSeenOrderIds(user?.uid);
 
   const isDentist = role?.accountType === 'dentist';
-  const visible = isDentist ? DENTIST_TABS : VENDOR_TABS;
+  const isGuest = !loading && !user;
+  const visible = isGuest ? GUEST_TABS : isDentist ? DENTIST_TABS : VENDOR_TABS;
   // Badge shows *unseen* orders, not the total — opening an order (see
   // orders.tsx) marks it seen, so the count drops as the user reviews orders
   // instead of staying pinned at the all-time total.
   const orders = isDentist ? dentistOrders : supplierOrders;
   const ordersCount = orders.filter((o) => !seenIds.has(o.id)).length;
 
-  // This component *is* the (tabs) layout route, so it must always render its
-  // navigator. Returning `null` or a bare <Redirect> here unmounts the Tabs
-  // navigator while expo-router is still mounting the tab screens beneath it,
-  // which leaves them without navigation context —
-  // "Couldn't find a navigation context. Have you wrapped your app with
-  // 'NavigationContainer'?" — thrown on every render of the child route.
-  // Render the redirect *alongside* the navigator instead of in place of it.
   return (
-    <>
-      {!loading && !user ? <Redirect href="/login" /> : null}
-      <Tabs
-        // Android detaches inactive tab screens from the view hierarchy by
-        // default (to save memory) by asking react-native-screens to
-        // remove/reattach their native Fragments. Under Fabric that
-        // detach-then-reattach handoff is buggy (a screen can get told to
-        // attach to a new parent before the old one finished detaching it),
-        // which throws "addViewAt: ... The specified child already has a
-        // parent" — reproduced here on every tab switch away from a vendor
-        // dashboard (a hidden tab reached via redirect) to Explore. Keeping
-        // screens attached (just hidden) sidesteps that native race entirely.
-        // See https://github.com/react-navigation/react-navigation/issues/11384
-        detachInactiveScreens={false}
-        screenOptions={{
-          tabBarActiveTintColor: '#3B82F6',
-          tabBarInactiveTintColor: '#64748B',
-          tabBarStyle: { borderTopColor: '#E2E8F0' },
-        }}
-      >
-        {ALL_NAMES.map((name) => {
-          const shown = visible.includes(name);
-          const Icon = ICONS[name];
-          const label = LABELS[name];
-          return (
-            <Tabs.Screen
-              key={name}
-              name={name}
-              options={
-                shown
-                  ? {
-                      title: ar ? label.ar : label.en,
-                      headerShown: name !== 'index',
-                      headerLeft: BACK_BUTTON_TABS.has(name) ? () => <HeaderBack /> : undefined,
-                      tabBarIcon: ({ color, size }) => <Icon color={color} size={size} strokeWidth={2.2} />,
-                      tabBarBadge: name === 'orders' && ordersCount > 0 ? ordersCount : undefined,
-                      tabBarBadgeStyle: { backgroundColor: '#EF4444', color: '#FFFFFF', fontSize: 10 },
-                    }
-                  : { href: null }
-              }
-            />
-          );
-        })}
+    <Tabs
+      // Android detaches inactive tab screens from the view hierarchy by
+      // default (to save memory) by asking react-native-screens to
+      // remove/reattach their native Fragments. Under Fabric that
+      // detach-then-reattach handoff is buggy (a screen can get told to
+      // attach to a new parent before the old one finished detaching it),
+      // which throws "addViewAt: ... The specified child already has a
+      // parent" — reproduced here on every tab switch away from a vendor
+      // dashboard (a hidden tab reached via redirect) to Explore. Keeping
+      // screens attached (just hidden) sidesteps that native race entirely.
+      // See https://github.com/react-navigation/react-navigation/issues/11384
+      detachInactiveScreens={false}
+      screenOptions={{
+        tabBarActiveTintColor: '#3B82F6',
+        tabBarInactiveTintColor: '#64748B',
+        tabBarStyle: { borderTopColor: '#E2E8F0' },
+      }}
+    >
+      {ALL_NAMES.map((name) => {
+        const shown = visible.includes(name);
+        const Icon = ICONS[name];
+        const label = LABELS[name];
+        return (
+          <Tabs.Screen
+            key={name}
+            name={name}
+            options={
+              shown
+                ? {
+                    title: ar ? label.ar : label.en,
+                    headerShown: name !== 'index',
+                    headerLeft: BACK_BUTTON_TABS.has(name) ? () => <HeaderBack /> : undefined,
+                    tabBarIcon: ({ color, size }) => <Icon color={color} size={size} strokeWidth={2.2} />,
+                    tabBarBadge: name === 'orders' && ordersCount > 0 ? ordersCount : undefined,
+                    tabBarBadgeStyle: { backgroundColor: '#EF4444', color: '#FFFFFF', fontSize: 10 },
+                  }
+                : { href: null }
+            }
+          />
+        );
+      })}
 
-        {HIDDEN_NAMES.map((name) => (
-          <Tabs.Screen key={name} name={name} options={{ href: null, headerShown: false }} />
-        ))}
-      </Tabs>
-    </>
+      {HIDDEN_NAMES.map((name) => (
+        <Tabs.Screen key={name} name={name} options={{ href: null, headerShown: false }} />
+      ))}
+    </Tabs>
   );
 }
