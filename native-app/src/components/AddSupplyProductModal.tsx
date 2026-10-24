@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { KeyboardAwareScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import * as ImagePicker from 'expo-image-picker';
 import { Calendar, Check, Minus, Package, Plus, ScanBarcode, X } from 'lucide-react-native';
 
@@ -522,7 +523,7 @@ export function AddSupplyProductModal({
 
   return (
     <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>
       <View className="flex-1 justify-end bg-black/40">
         <View className="max-h-[92%] rounded-t-3xl bg-white">
           <View className="flex-row items-center justify-between border-b border-slate-100 px-4 pb-2.5 pt-4">
@@ -539,7 +540,7 @@ export function AddSupplyProductModal({
             </Pressable>
           </View>
 
-          <ScrollView className="px-4" contentContainerClassName="gap-3.5 py-4">
+          <KeyboardAwareScrollView bottomOffset={24} keyboardShouldPersistTaps="handled" className="px-4" contentContainerClassName="gap-3.5 py-4">
             <SectionCard title={ar ? 'معلومات أساسية' : 'Basic Info'}>
               <Field label={ar ? 'اسم المنتج' : 'Product name'}>
                 <TextInput
@@ -772,10 +773,10 @@ export function AddSupplyProductModal({
                 {busy ? (ar ? 'جارٍ الحفظ...' : 'Saving...') : initial ? (ar ? 'حفظ التعديلات' : 'Save changes') : ar ? '+ حفظ المنتج' : '+ Save product'}
               </Text>
             </Pressable>
-          </ScrollView>
+          </KeyboardAwareScrollView>
         </View>
       </View>
-      </KeyboardAvoidingView>
+      </View>
 
       {showScanner && (
         <BarcodeScannerModal

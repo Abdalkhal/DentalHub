@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Linking, Modal, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { KeyboardAwareScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import { useLocalSearchParams, router } from 'expo-router';
 import {
   Activity,
@@ -317,7 +318,7 @@ export default function PatientDetailScreen() {
         })}
       </View>
 
-      <ScrollView className="mt-4 flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+      <KeyboardAwareScrollView bottomOffset={24} keyboardShouldPersistTaps="handled" className="mt-4 flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
         {tab === 'info' && (
           <View className="gap-3">
             <Card>
@@ -362,7 +363,7 @@ export default function PatientDetailScreen() {
         {tab === 'plan' && <PlanCard p={p} ar={ar} />}
 
         {tab === 'fees' && <BillingTab p={p} ar={ar} />}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </Screen>
   );
 }

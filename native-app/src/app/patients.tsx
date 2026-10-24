@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, TextInput, View } from 'react-native';
+import { KeyboardAwareScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import { router } from 'expo-router';
 import { CalendarDays, ChevronLeft, ChevronRight, Phone, Plus, Search, Users, X } from 'lucide-react-native';
 
@@ -250,7 +251,7 @@ function AddPatientModal({ open, onClose, ar }: { open: boolean; onClose: () => 
           </Pressable>
         </View>
 
-        <ScrollView contentContainerClassName="gap-3 px-4 py-4">
+        <KeyboardAwareScrollView bottomOffset={24} keyboardShouldPersistTaps="handled" contentContainerClassName="gap-3 px-4 py-4">
           <View>
             <Text className="mb-1.5 text-[11px] font-bold text-slate-500">{ar ? 'الاسم الكامل' : 'Full name'}</Text>
             <TextInput
@@ -369,7 +370,7 @@ function AddPatientModal({ open, onClose, ar }: { open: boolean; onClose: () => 
               {ar ? 'حفظ المريض' : 'Save patient'}
             </Text>
           </Pressable>
-        </ScrollView>
+        </KeyboardAwareScrollView>
       </View>
     </View>
   );

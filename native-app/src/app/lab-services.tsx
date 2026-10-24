@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, View } from 'react-native';
+import { KeyboardAwareScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import * as ImagePicker from 'expo-image-picker';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -205,9 +206,9 @@ export default function LabServicesScreen() {
       </ScrollView>
 
       <Modal visible={showForm} transparent animationType="fade">
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <View style={{ flex: 1 }}>
         <View className="flex-1 justify-end bg-black/40">
-          <ScrollView className="max-h-[90%] rounded-t-3xl bg-white p-5" contentContainerClassName="gap-3 pb-8">
+          <KeyboardAwareScrollView bottomOffset={24} keyboardShouldPersistTaps="handled" className="max-h-[90%] rounded-t-3xl bg-white p-5" contentContainerClassName="gap-3 pb-8">
             <View className="flex-row items-center justify-between">
               <Text className="text-lg font-extrabold text-slate-900">{editingId ? (ar ? 'تعديل' : 'Edit') : ar ? 'إضافة خدمة' : 'Add Service'}</Text>
               <Pressable onPress={() => setShowForm(false)} className="h-8 w-8 items-center justify-center rounded-xl bg-slate-100">
@@ -254,9 +255,9 @@ export default function LabServicesScreen() {
               disabled={!form.titleAr.trim()}
               onPress={save}
             />
-          </ScrollView>
+          </KeyboardAwareScrollView>
         </View>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
     </Screen>
   );

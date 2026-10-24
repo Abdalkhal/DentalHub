@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Modal, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { KeyboardAwareScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import { router } from 'expo-router';
 import { AlertTriangle, Boxes, Minus, Plus, Trash2, Truck, X } from 'lucide-react-native';
 
@@ -294,7 +295,7 @@ function AddMaterialSheet({ ar, onClose }: { ar: boolean; onClose: () => void })
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>
       <View className="flex-1 justify-end bg-black/40">
         <View className="max-h-[92%] rounded-t-3xl bg-white">
           <View className="flex-row items-center justify-between border-b border-slate-100 px-4 pb-2.5 pt-4">
@@ -304,7 +305,7 @@ function AddMaterialSheet({ ar, onClose }: { ar: boolean; onClose: () => void })
             </Pressable>
           </View>
 
-          <ScrollView className="px-4" contentContainerClassName="gap-3.5 py-4">
+          <KeyboardAwareScrollView bottomOffset={24} keyboardShouldPersistTaps="handled" className="px-4" contentContainerClassName="gap-3.5 py-4">
             <Field label={ar ? 'اسم المادة' : 'Material name'}>
               <TextInput
                 autoFocus
@@ -418,10 +419,10 @@ function AddMaterialSheet({ ar, onClose }: { ar: boolean; onClose: () => void })
             <Pressable onPress={submit} className="h-12 items-center justify-center rounded-2xl bg-primary">
               <Text className="text-sm font-extrabold text-primary-foreground">{ar ? 'حفظ' : 'Save'}</Text>
             </Pressable>
-          </ScrollView>
+          </KeyboardAwareScrollView>
         </View>
       </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }

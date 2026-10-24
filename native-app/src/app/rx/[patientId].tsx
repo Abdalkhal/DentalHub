@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, FlatList, Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, Share, TextInput, View } from 'react-native';
+import { Alert, FlatList, Image, Linking, Modal, Pressable, ScrollView, Share, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useLocalSearchParams } from 'expo-router';
 import {
   Building2,
@@ -346,7 +347,7 @@ function HeaderDialog({
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
       <View className="flex-1 items-center justify-center bg-black/40 p-4">
         <View className="w-full max-w-sm gap-3 rounded-2xl bg-white p-4">
           <Text className="text-sm font-extrabold text-slate-900">
@@ -454,7 +455,7 @@ function AddMedicineSheet({
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
       <View className="flex-1 justify-end bg-black/40">
         <View className="max-h-[88%] rounded-t-3xl bg-white px-4 pb-4 pt-3">
           <View className="mb-1 h-1 w-10 self-center rounded-full bg-slate-200" />
