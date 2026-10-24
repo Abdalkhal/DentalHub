@@ -176,7 +176,7 @@ function OdontogramArch({
     // being mirrored under forced Arabic RTL layout — otherwise Android
     // flips every `left`/`top` offset in this subtree and swaps each tooth
     // onto the wrong side (e.g. #18 rendering on the patient-left side).
-    <View style={{ width: '100%', aspectRatio: 4 / 3, direction: 'ltr' }}>
+    <View style={{ width: '100%', maxWidth: 480, alignSelf: 'center', aspectRatio: 4 / 3, direction: 'ltr' }}>
       <Image source={archSrc} style={{ position: 'absolute', width: '100%', height: '100%' }} resizeMode="contain" />
       {fdiList.map((n) => {
         const pos = posMap[n];
