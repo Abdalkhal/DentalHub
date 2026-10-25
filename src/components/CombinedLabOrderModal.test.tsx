@@ -1,6 +1,6 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { vi } from "vitest";
+import { expect, it, vi } from "vitest";
 
 vi.mock("@/lib/labMembersStore", () => ({ useLabMembers: () => ({ members: [] }) }));
 vi.mock("@/lib/catalogStore", async () => {

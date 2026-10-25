@@ -247,6 +247,16 @@ export function LabRxFormModal({
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Case already created by a send whose later step (notification / scan
+  // upload) failed; the next "Send" resumes from here instead of duplicating.
+  const sentRef = useRef<{
+    order: Awaited<ReturnType<typeof submitDentistCase>>;
+    notified: boolean;
+  } | null>(null);
+  useEffect(() => {
+    if (open) sentRef.current = null;
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     const docName =
@@ -369,34 +379,42 @@ export function LabRxFormModal({
 
     setBusy(true);
     try {
-      const order = await submitDentistCase(labId, {
-        patient: patient.trim(),
-        doctor: doctorName || (ar ? "غير محدد" : "Unspecified"),
-        workType,
-        unitsCount: parseInt(unitsCount, 10) || 1,
-        notes: notes.trim(),
-        clinic: role?.clinicName || (ar ? "غير محدد" : "Unspecified"),
-        dentistId: user?.uid ?? "unknown",
-        dentistName: user?.displayName ?? user?.email ?? (ar ? "طبيب" : "Dentist"),
-        shade: shade || undefined,
-        material: primaryMaterial,
-        patientAge: patientAge || undefined,
-        patientGender: patientGender || undefined,
-        patientPhone: patientPhone || undefined,
-        rxTeeth: Object.fromEntries(Object.entries(teeth).map(([n, t]) => [n, t])),
-        rxItems: allItems,
-        rxData: {
-          toothItems,
-          teeth,
-          lowerSelected,
-          lowerSubSelected,
-          receivedDate,
-          vitaTab,
-          customShade: customShade || undefined,
-          primaryMaterial,
-          primaryWorkType,
-        },
-      });
+      // Resume a half-finished send (case created, then the notification or
+      // scan upload failed) instead of creating the case again — every retry
+      // used to add another duplicate case at the lab.
+      let sent = sentRef.current;
+      if (!sent) {
+        const created = await submitDentistCase(labId, {
+          patient: patient.trim(),
+          doctor: doctorName || (ar ? "غير محدد" : "Unspecified"),
+          workType,
+          unitsCount: parseInt(unitsCount, 10) || 1,
+          notes: notes.trim(),
+          clinic: role?.clinicName || (ar ? "غير محدد" : "Unspecified"),
+          dentistId: user?.uid ?? "unknown",
+          dentistName: user?.displayName ?? user?.email ?? (ar ? "طبيب" : "Dentist"),
+          shade: shade || undefined,
+          material: primaryMaterial,
+          patientAge: patientAge || undefined,
+          patientGender: patientGender || undefined,
+          patientPhone: patientPhone || undefined,
+          rxTeeth: Object.fromEntries(Object.entries(teeth).map(([n, t]) => [n, t])),
+          rxItems: allItems,
+          rxData: {
+            toothItems,
+            teeth,
+            lowerSelected,
+            lowerSubSelected,
+            receivedDate,
+            vitaTab,
+            customShade: customShade || undefined,
+            primaryMaterial,
+            primaryWorkType,
+          },
+        });
+        sent = sentRef.current = { order: created, notified: false };
+      }
+      const order = sent.order;
 
       // Sent right after the case doc exists, and *before* the scan-file
       // upload below — that upload can throw (bad network, storage rules,
@@ -413,21 +431,24 @@ export function LabRxFormModal({
         type: "order_new" as const,
         orderId: order.id,
       };
-      try {
-        await createNotification(notifyPayload);
-      } catch (notifyErr) {
-        console.warn("Failed to create case notification, retrying once:", notifyErr);
+      if (!sent.notified) {
         try {
           await createNotification(notifyPayload);
-        } catch (retryErr) {
-          console.warn("Case notification retry also failed:", retryErr);
-          // Surfaced to the sender (not just the console) so a failure here
-          // is never silent again — the case itself is still saved
-          // regardless (see setDone(true) below).
-          toast.error(
-            ar ? "تم إرسال الحالة، لكن تعذر إشعار المختبر بها" : "Case sent, but couldn't notify the lab",
-          );
+        } catch (notifyErr) {
+          console.warn("Failed to create case notification, retrying once:", notifyErr);
+          try {
+            await createNotification(notifyPayload);
+          } catch (retryErr) {
+            console.warn("Case notification retry also failed:", retryErr);
+            // Surfaced to the sender (not just the console) so a failure here
+            // is never silent again — the case itself is still saved
+            // regardless (see setDone(true) below).
+            toast.error(
+              ar ? "تم إرسال الحالة، لكن تعذر إشعار المختبر بها" : "Case sent, but couldn't notify the lab",
+            );
+          }
         }
+        sent.notified = true;
       }
 
       if (scanFile) {
@@ -445,10 +466,17 @@ export function LabRxFormModal({
         });
       }
 
+      sentRef.current = null;
       setDone(true);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
-      setError(msg || (ar ? "فشل الإرسال. حاول مرة أخرى." : "Failed to send. Try again."));
+      setError(
+        sentRef.current
+          ? ar
+            ? `تم إرسال الحالة للمختبر، لكن تعذر رفع الملف${msg ? ` (${msg})` : ""}. اضغط إرسال لإعادة رفع الملف فقط.`
+            : `The case was sent, but the file upload failed${msg ? ` (${msg})` : ""}. Press Send to retry the file only.`
+          : msg || (ar ? "فشل الإرسال. حاول مرة أخرى." : "Failed to send. Try again."),
+      );
     } finally {
       setBusy(false);
     }

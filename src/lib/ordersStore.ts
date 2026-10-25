@@ -660,6 +660,10 @@ export async function submitDentistCase(
   };
 
   await setDoc(caseDocRef(labId, id), serializeOrder(order));
-  await writeCaseFinance(labId, id, order);
+  // No writeCaseFinance here: `private/finance` is lab-only in the rules, so
+  // the dentist's write was always denied — it threw *after* the case was
+  // created, skipping the lab notification and the scan upload and leaving
+  // the form open (each retry created a duplicate case). A just-sent case
+  // has no price anyway; the lab writes its finance doc when it confirms.
   return order;
 }
