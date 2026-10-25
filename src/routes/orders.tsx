@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { OrderDoc } from "@/integrations/firebase/types";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
+import { NotificationBell } from "@/components/NotificationBell";
 import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
 import { IncomingOrderRxModal } from "@/components/IncomingOrderRxModal";
 import { SupplierOrderDetailModal } from "@/components/SupplierOrderDetailModal";
@@ -335,7 +336,13 @@ function LabOrders() {
 
   return (
     <MobileShell wide>
-      <TopBar title={ar ? "الطلبات الواردة" : "Incoming Orders"} showBack wide maxW="6xl" />
+      <TopBar
+        title={ar ? "الطلبات الواردة" : "Incoming Orders"}
+        showBack
+        wide
+        maxW="6xl"
+        actions={user ? <NotificationBell userId={user.uid} /> : null}
+      />
       <div className="px-4 pt-4 pb-6 space-y-4 md:px-6 md:pt-8 lg:px-8 lg:max-w-6xl lg:mx-auto">
         <div className="relative">
           <Search className="size-4 absolute top-1/2 -translate-y-1/2 start-3 text-muted-foreground pointer-events-none" />

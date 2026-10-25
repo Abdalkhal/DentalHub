@@ -13,10 +13,12 @@
  * checkImageSafety  (ADS)      — runs Cloud Vision SafeSearch on a just-uploaded
  *                                "إعلاناتي" ad image; deletes it on the spot if
  *                                it fails the check.
+ * sendPushOnNotification (PUSH) — delivers every new `notifications` doc to
+ *                                the recipient's devices via Expo Push.
  */
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
-const { onDocumentWritten } = require("firebase-functions/v2/firestore");
+const { onDocumentWritten, onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const admin = require("firebase-admin");
 const vision = require("@google-cloud/vision");
@@ -930,3 +932,94 @@ exports.confirmVerifiedOrder = onCall({ region: "us-central1" }, async (request)
 
   return { invoiceId: invoiceRef.id };
 });
+
+/* ============================================================
+ * PUSH — deliver in-app notifications to the recipient's devices.
+ *
+ * Both apps already write a `notifications/{id}` doc for every event (new
+ * Rx case, order, message…) and the native app stores each device's Expo
+ * push token on `user_roles/{uid}.pushTokens` — but nothing ever sent
+ * those tokens a push, so a lab only learned about a new case by opening
+ * the app. This trigger closes that gap for every notification type at
+ * once, with no client change needed.
+ * ============================================================ */
+
+const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
+
+exports.sendPushOnNotification = onDocumentCreated(
+  { document: "notifications/{notificationId}", region: "us-central1" },
+  async (event) => {
+    const snap = event.data;
+    if (!snap) return;
+    const n = snap.data() || {};
+    if (!n.userId || !n.title) return;
+
+    const roleRef = firestore.collection("user_roles").doc(String(n.userId));
+    const roleSnap = await roleRef.get();
+    if (!roleSnap.exists) return;
+    const role = roleSnap.data() || {};
+    // The in-app settings toggle ("الإشعارات") opts the account out of pushes.
+    if (role.notificationsEnabled === false) return;
+
+    const tokens = Array.isArray(role.pushTokens)
+      ? [
+          ...new Set(
+            role.pushTokens.filter(
+              (t) => typeof t === "string" && t.startsWith("ExponentPushToken"),
+            ),
+          ),
+        ]
+      : [];
+    if (tokens.length === 0) return;
+
+    const data = { notificationId: snap.id, type: n.type || "" };
+    if (n.orderId) data.orderId = String(n.orderId);
+    const messages = tokens.map((to) => ({
+      to,
+      title: String(n.title),
+      body: n.body ? String(n.body) : "",
+      data,
+      sound: "default",
+      channelId: "default",
+      priority: "high",
+    }));
+
+    // Expo accepts at most 100 messages per request.
+    const stale = [];
+    for (let i = 0; i < messages.length; i += 100) {
+      const chunk = messages.slice(i, i + 100);
+      try {
+        const res = await fetch(EXPO_PUSH_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify(chunk),
+        });
+        const json = await res.json().catch(() => ({}));
+        const tickets = Array.isArray(json.data) ? json.data : [];
+        tickets.forEach((ticket, idx) => {
+          if (
+            ticket &&
+            ticket.status === "error" &&
+            ticket.details &&
+            ticket.details.error === "DeviceNotRegistered"
+          ) {
+            stale.push(chunk[idx].to);
+          }
+        });
+        if (!res.ok) {
+          console.warn("Expo push request failed", res.status, JSON.stringify(json));
+        }
+      } catch (err) {
+        console.warn("Expo push request error", err);
+      }
+    }
+
+    // Uninstalled apps / revoked permission — drop the dead tokens so they
+    // are not retried on every future notification.
+    if (stale.length > 0) {
+      await roleRef.update({
+        pushTokens: admin.firestore.FieldValue.arrayRemove(...stale),
+      });
+    }
+  },
+);

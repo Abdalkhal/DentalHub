@@ -7,7 +7,6 @@ import {
   Calendar,
   Palette,
   StickyNote,
-  Paperclip,
   Building2,
   Phone,
 } from "lucide-react";
@@ -133,6 +132,16 @@ export function IncomingOrderRxModal({
   const rxItems: string[] = order.rxItems ?? [];
   const toothItems: Record<string, string[]> =
     (order.rxData?.toothItems as Record<string, string[]>) ?? {};
+
+  // The doctor's scan (STL/ZIP) is stored on the case as fileName/filePath by
+  // attachOrderFile, not in `attachments` — listing only `attachments` hid
+  // every uploaded scan from the lab.
+  const caseFiles: { name: string; path?: string; url?: string }[] = [
+    ...(order.filePath && order.fileStatus !== "deleted"
+      ? [{ name: order.fileName || order.filePath.split("/").pop() || "scan", path: order.filePath }]
+      : []),
+    ...(order.attachments ?? []),
+  ];
 
   return (
     <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center">
@@ -328,11 +337,11 @@ export function IncomingOrderRxModal({
             <p className="text-xs font-bold text-slate-500 uppercase mb-2">
               {ar ? "المرفقات" : "Attachments"}
             </p>
-            {(order.attachments ?? []).length === 0 ? (
+            {caseFiles.length === 0 ? (
               <p className="text-xs text-slate-400">{ar ? "لا توجد مرفقات" : "No attachments"}</p>
             ) : (
               <ul className="space-y-2">
-                {(order.attachments ?? []).map((f, i) => (
+                {caseFiles.map((f, i) => (
                   <li key={i}>
                     <CaseFileLink name={f.name} path={f.path} url={f.url} />
                   </li>

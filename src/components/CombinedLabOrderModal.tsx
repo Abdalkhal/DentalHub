@@ -253,6 +253,24 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  // Remembers each material's own last work type / manufacturing method
+  // choice, so switching materials to compare options and back doesn't
+  // silently discard what was picked (e.g. Emax → Veneer, then checking
+  // Zirconia, then back to Emax must still show Veneer — not reset to
+  // Emax's default work type). Synced from state instead of written
+  // manually at each call site, so it also captures a prefill and the
+  // manufacturing-method chips' direct `setSelectedManufacturingMethod`.
+  // Must stay above the `if (!open) return null` below: hooks declared after
+  // an early return change the hook count when the modal opens, which
+  // crashed the page ("Rendered more hooks…") on every "Confirm" click.
+  const lastChoiceByMaterial = useRef<Record<string, { workType: WorkTypeId | ""; manufacturingMethod: string }>>({});
+  useEffect(() => {
+    lastChoiceByMaterial.current[selectedMaterialId] = {
+      workType: selectedWorkType,
+      manufacturingMethod: selectedManufacturingMethod,
+    };
+  }, [selectedMaterialId, selectedWorkType, selectedManufacturingMethod]);
+
   if (!open) return null;
 
   const isClearAligner = selectedMaterialId === "material.clear_aligner";
@@ -390,21 +408,6 @@ export function CombinedLabOrderModal({ open, onClose, onSubmit, labId, prefill 
   const removePricingItem = (id: string) => {
     setPricingItems((prev) => (prev.length > 1 ? prev.filter((it) => it.id !== id) : prev));
   };
-
-  // Remembers each material's own last work type / manufacturing method
-  // choice, so switching materials to compare options and back doesn't
-  // silently discard what was picked (e.g. Emax → Veneer, then checking
-  // Zirconia, then back to Emax must still show Veneer — not reset to
-  // Emax's default work type). Synced from state instead of written
-  // manually at each call site, so it also captures a prefill and the
-  // manufacturing-method chips' direct `setSelectedManufacturingMethod`.
-  const lastChoiceByMaterial = useRef<Record<string, { workType: WorkTypeId | ""; manufacturingMethod: string }>>({});
-  useEffect(() => {
-    lastChoiceByMaterial.current[selectedMaterialId] = {
-      workType: selectedWorkType,
-      manufacturingMethod: selectedManufacturingMethod,
-    };
-  }, [selectedMaterialId, selectedWorkType, selectedManufacturingMethod]);
 
   const selectMaterial = (id: MaterialId) => {
     setSelectedMaterialId(id);

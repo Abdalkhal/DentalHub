@@ -1,4 +1,5 @@
 import { Link, useRouter } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 import { ArrowLeft, ArrowRight, Globe, Search } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -18,6 +19,9 @@ type Props = {
   // Must match the page's own content column, or the title sits on a
   // different edge than the content beneath it. Only read when `wide`.
   maxW?: keyof typeof MAX_W;
+  // Extra controls rendered beside the language toggle (e.g. a notification
+  // bell on pages that have no dashboard header of their own).
+  actions?: ReactNode;
 };
 
 // Written out in full so Tailwind's scanner sees each class literally.
@@ -39,6 +43,7 @@ export function TopBar({
   searchPlaceholder,
   wide = false,
   maxW = "5xl",
+  actions,
 }: Props) {
   const { t, lang, toggle, dir } = useI18n();
   const router = useRouter();
@@ -86,6 +91,7 @@ export function TopBar({
         </div>
 
         <div className="flex items-center gap-2">
+          {actions}
           <button
             onClick={toggle}
             className="flex items-center gap-1.5 h-9 px-3 rounded-full bg-card border border-border text-xs font-semibold text-foreground hover:bg-accent"

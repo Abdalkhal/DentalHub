@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Image, Modal, Pressable, ScrollView, Share, View, type LayoutChangeEvent } from 'react-native';
-import { Check, FileText, Hash, Layers, Paintbrush, Ruler, Share2, Smile, Syringe, X, type LucideIcon } from 'lucide-react-native';
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, Share, View, type LayoutChangeEvent } from 'react-native';
+import * as Sharing from 'expo-sharing';
+import { Check, FileBox, FileText, Hash, Layers, Paintbrush, Ruler, Share2, Smile, Syringe, X, type LucideIcon } from 'lucide-react-native';
 
 import { Text } from '@/components/ui';
 import {
@@ -16,18 +17,16 @@ import {
 import { deriveOrderLines, deriveWorkDetailGroups, cleanDoctorNotes, resolveOrderTotal, type OrderLine } from '@/lib/orderLines';
 import { FDI_UPPER, FDI_LOWER, UPPER_POS, LOWER_POS } from '@/components/DentalArch';
 import type { Order, OrderStatus } from '@/lib/ordersStore';
+import { resolveCaseFileUri } from '@/lib/storagePipeline';
 
 // A faithful port of the web app's OrderInvoiceModal (src/components/OrderInvoiceModal.tsx)
 // — tapping a case anywhere in the app (labs-office.tsx's dashboard,
 // orders.tsx's incoming-orders list) opens this directly, matching the "tap
 // the row, no separate view button" behavior web's own table has via its
 // row's "عرض" action. Left out versus web: the "طباعة" print action (would
-// need a full second HTML template) and the scanner-file / attachments
-// sections — `fileUrl` is deliberately never written by this app (see
-// ordersStore.ts's attachOrderFile comment; only `filePath` is set, which
-// needs a signed-URL resolution step this modal doesn't have), so that
-// section is dead code in practice, and attachments are effectively unused
-// by orders created from either "New Order" screen. "مشاركة" (share) is kept
+// need a full second HTML template). The doctor's scan file (`filePath`,
+// set by attachOrderFile) is listed under "المرفقات" and opened through the
+// rules-enforced resolveCaseFileUri + share sheet. "مشاركة" (share) is kept
 // via RN's Share sheet, using the same text summary web builds.
 
 export const LAB_STATUS_AR: Record<OrderStatus, string> = {
@@ -278,6 +277,36 @@ export function CaseDetailModal({
   // like the pricing table/confirm button above) — the tooth chart the
   // doctor drew stays useful for production long after the case is priced.
   const hasOdontogram = Object.keys(rxTeeth).length > 0 || Object.keys(rxToothItems).length > 0;
+
+  // The doctor's scan (STL/ZIP) is stored as fileName/filePath by
+  // attachOrderFile; nothing displayed it, so the lab never saw the file.
+  const caseFiles: { name: string; path?: string; url?: string }[] = [
+    ...(order.filePath && order.fileStatus !== 'deleted'
+      ? [{ name: order.fileName || order.filePath.split('/').pop() || 'scan', path: order.filePath }]
+      : []),
+    ...(order.attachments ?? []),
+  ];
+  const [openingFile, setOpeningFile] = useState<string | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+
+  // Same rules-enforced path as the designer screen: fetched through the SDK
+  // into the app cache, then handed to the OS share sheet to open/save.
+  const openFile = async (f: { name: string; path?: string }) => {
+    if (!f.path) {
+      setFileError(ar ? 'هذا المرفق قديم وغير مدعوم' : 'Legacy attachment, not supported');
+      return;
+    }
+    setFileError(null);
+    setOpeningFile(f.path);
+    try {
+      const uri = await resolveCaseFileUri(f.path, f.name);
+      if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri);
+    } catch {
+      setFileError(ar ? 'تعذر فتح الملف' : 'Could not open file');
+    } finally {
+      setOpeningFile(null);
+    }
+  };
 
   const handleShare = () => {
     const lines = items.map((i) => `• ${i.name} ×${i.quantity} — ${fmtRowTotal(i, finalAmount)}`);
@@ -539,6 +568,32 @@ export function CaseDetailModal({
               {!!notes && (
                 <SectionCard icon={FileText} title={ar ? 'ملاحظات' : 'Notes'}>
                   <Text className="p-3 text-sm text-slate-700">{notes}</Text>
+                </SectionCard>
+              )}
+
+              {caseFiles.length > 0 && (
+                <SectionCard icon={FileBox} title={ar ? 'المرفقات' : 'Attachments'}>
+                  <View className="gap-2 p-3">
+                    {caseFiles.map((f, i) => (
+                      <Pressable
+                        key={`${f.path ?? f.url ?? f.name}-${i}`}
+                        onPress={() => openFile(f)}
+                        disabled={openingFile === f.path}
+                        className="flex-row items-center gap-2 rounded-xl bg-white p-2.5"
+                        style={{ borderWidth: 1, borderColor: C.lightBlue }}
+                      >
+                        {openingFile === f.path ? (
+                          <ActivityIndicator size="small" color={C.deepBlue} />
+                        ) : (
+                          <FileBox size={16} color={C.deepBlue} />
+                        )}
+                        <Text numberOfLines={1} className="flex-1 text-xs font-semibold text-sky-700" style={{ writingDirection: 'ltr' }}>
+                          {f.name}
+                        </Text>
+                      </Pressable>
+                    ))}
+                    {!!fileError && <Text className="text-xs text-rose-600">{fileError}</Text>}
+                  </View>
                 </SectionCard>
               )}
 

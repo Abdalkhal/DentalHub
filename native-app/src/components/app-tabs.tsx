@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Pressable } from 'react-native';
 import { Tabs, Redirect, router } from 'expo-router';
 import { ArrowLeft, ArrowRight, Home, Heart, Menu, Search, ShoppingBag, Tag, User } from 'lucide-react-native';
@@ -8,6 +9,7 @@ import { useDentistOrders } from '@/lib/orders';
 import { useOrders } from '@/lib/orders';
 import { useSeenOrderIds } from '@/lib/orderSeen';
 import { useI18n } from '@/lib/i18n';
+import { registerPush } from '@/lib/push';
 
 const ALL_NAMES = ['index', 'explore', 'favorites', 'orders', 'offers', 'account', 'more'] as const;
 
@@ -87,6 +89,15 @@ export default function AppTabs() {
   // instead of staying pinned at the all-time total.
   const orders = isDentist ? dentistOrders : supplierOrders;
   const ordersCount = orders.filter((o) => !seenIds.has(o.id)).length;
+
+  // Push tokens were only saved when the user found the "Enable" button on
+  // the notifications screen, so most accounts (labs included) never got
+  // pushes. Register once per sign-in instead; the OS shows its permission
+  // prompt only the first time, and the in-app notifications toggle opts out.
+  const pushUid = role && role.notificationsEnabled !== false ? user?.uid : undefined;
+  useEffect(() => {
+    if (pushUid) void registerPush(pushUid);
+  }, [pushUid]);
 
   // This component *is* the (tabs) layout route, so it must always render its
   // navigator. Returning `null` or a bare <Redirect> here unmounts the Tabs
