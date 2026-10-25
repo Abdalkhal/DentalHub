@@ -536,7 +536,11 @@ function ImplantProductsPanel() {
                     <p className="font-display font-extrabold text-lg text-primary">
                       {fmtPrice(product)}
                     </p>
-                    {product.stock > 0 ? (
+                    {product.stockHidden ? (
+                      <span className="text-[10px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md">
+                        {ar ? "متوفر (المخزون مخفي)" : "Available (stock hidden)"}
+                      </span>
+                    ) : product.stock > 0 ? (
                       <span className="text-[10px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md">
                         {ar ? "متوفر" : "In Stock"}: {product.stock}
                       </span>
@@ -985,6 +989,8 @@ function ImplantDetailView({
             </div>
           )}
 
+          {/* No quantity box when the office chose to hide its stock. */}
+          {!product.stockHidden && (
           <div
             className={cn(
               "rounded-2xl px-4 py-3.5 flex items-center gap-3",
@@ -1026,6 +1032,7 @@ function ImplantDetailView({
               </p>
             )}
           </div>
+          )}
         </div>
       ) : null}
 

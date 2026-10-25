@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { X, Plus, Upload, Loader2, Check, Package, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { StockVisibilityToggle } from "@/components/StockVisibilityToggle";
 import { useI18n } from "@/lib/i18n";
 import {
   useUpsertProduct,
@@ -215,6 +216,7 @@ export function SpecializedImplantForm({
   const [price, setPrice] = useState(product?.price ? String(product.price) : "");
   const [currency, setCurrency] = useState<Currency>(product?.currency || "USD");
   const [stock, setStock] = useState(product?.stock ? String(product.stock) : "0");
+  const [stockHidden, setStockHidden] = useState(product?.stockHidden ?? false);
   const [description, setDescription] = useState(product?.description ?? "");
   const [fields, setFields] = useState<Record<string, string | string[]>>(
     product?.specializedImplant?.fields ?? {},
@@ -364,7 +366,8 @@ export function SpecializedImplantForm({
         brand: manufacturer.trim(),
         price: Math.max(0, Number(price) || 0),
         currency,
-        stock: hideStock ? 1 : Math.max(0, Number(stock) || 0),
+        stock: hideStock ? 1 : stockHidden ? 0 : Math.max(0, Number(stock) || 0),
+        stockHidden: !hideStock && stockHidden,
         inStock: true,
         images: [...existingImages, ...uploadedPaths],
         category: "specialized_implant",
@@ -608,14 +611,17 @@ export function SpecializedImplantForm({
               {!hideStock && (
                 <div>
                   <label className={labelCls}>{ar ? "المخزون" : "Stock"}</label>
-                  <input
-                    type="number"
-                    value={stock}
-                    onChange={(e) => setStock(e.target.value)}
-                    placeholder="0"
-                    dir="ltr"
-                    className={inputCls}
-                  />
+                  <StockVisibilityToggle ar={ar} hidden={stockHidden} onChange={setStockHidden} className="mb-2" />
+                  {!stockHidden && (
+                    <input
+                      type="number"
+                      value={stock}
+                      onChange={(e) => setStock(e.target.value)}
+                      placeholder="0"
+                      dir="ltr"
+                      className={inputCls}
+                    />
+                  )}
                 </div>
               )}
             </div>

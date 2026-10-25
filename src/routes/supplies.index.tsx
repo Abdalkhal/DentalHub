@@ -100,6 +100,7 @@ import {
   Anchor,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { StockVisibilityToggle } from "@/components/StockVisibilityToggle";
 import type { Currency } from "@/lib/products";
 import Cropper, { type Area } from "react-easy-crop";
 import imgGeneral from "@/assets/branch-general.png";
@@ -444,6 +445,7 @@ function ProductsPanel() {
   const [purchasePrice, setPurchasePrice] = useState("");
   const [currency, setCurrency] = useState<Currency>("USD");
   const [stock, setStock] = useState("");
+  const [stockHidden, setStockHidden] = useState(false);
   const [branch, setBranch] = useState("general");
   const [subCategory, setSubCategory] = useState("");
   const [origin, setOrigin] = useState("");
@@ -716,6 +718,7 @@ function ProductsPanel() {
     setPurchasePrice("");
     setCurrency("USD");
     setStock("");
+    setStockHidden(false);
     setBranch(branchFilter !== "all" ? branchFilter : "general");
     setSubCategory("");
     setOrigin("");
@@ -740,6 +743,7 @@ function ProductsPanel() {
     setPurchasePrice(p.purchasePrice ? formatPriceInput(String(p.purchasePrice)) : "");
     setCurrency(p.currency || "USD");
     setStock(String(p.stock ?? 0));
+    setStockHidden(p.stockHidden === true);
     setBranch(p.branch);
     setSubCategory(p.subCategory ?? "");
     setOrigin(p.country || "");
@@ -904,8 +908,9 @@ function ProductsPanel() {
         price: parsePriceInput(price),
         purchasePrice: parsePriceInput(purchasePrice) || undefined,
         currency,
-        stock: Number(stock.replace(/,/g, "")) || 0,
-        inStock: Number(stock.replace(/,/g, "")) > 0,
+        stock: stockHidden ? 0 : Number(stock.replace(/,/g, "")) || 0,
+        inStock: stockHidden || Number(stock.replace(/,/g, "")) > 0,
+        stockHidden,
         images: allImages,
         companyId: editing?.companyId || auth.currentUser?.uid || "",
         country: origin || undefined,
@@ -1356,6 +1361,12 @@ function ProductsPanel() {
                 </div>
                 <div>
                   <label className={labelCls}>{ar ? "المخزون الحالي" : "Current stock"}</label>
+                  <StockVisibilityToggle ar={ar} hidden={stockHidden} onChange={setStockHidden} className="mb-2" />
+                  {stockHidden ? (
+                    <p className="text-[11px] text-slate-500">
+                      {ar ? "لن تظهر كمية المخزون للزبائن، وسيظهر المنتج كمتوفر." : "Buyers will not see a quantity; the product shows as available."}
+                    </p>
+                  ) : (
                   <div className="flex items-center justify-between gap-3 rounded-2xl bg-white border border-slate-200 shadow-sm p-2">
                     <button
                       type="button"
@@ -1382,6 +1393,7 @@ function ProductsPanel() {
                       <Plus className="size-4" />
                     </button>
                   </div>
+                  )}
                 </div>
                 <div>
                   <label className={labelCls}>{ar ? "رمز SKU (تلقائي)" : "SKU (auto)"}</label>
@@ -1652,7 +1664,7 @@ function ProductsPanel() {
       ) : (
         <div className="grid grid-cols-3 gap-3 md:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
           {myProducts.map((p) => {
-            const isOut = (p.stock ?? 0) === 0;
+            const isOut = !p.stockHidden && (p.stock ?? 0) === 0;
             return (
               <div
                 key={p.id}
@@ -1691,7 +1703,9 @@ function ProductsPanel() {
                 <div className="flex items-center gap-1.5 mt-1">
                   <Layers className="size-3 text-slate-400" />
                   <span className={cn("text-[11px] font-semibold", isOut ? "text-rose-500" : "text-emerald-600")}>
-                    {ar ? "المخزون:" : "Stock:"} {p.stock ?? 0}
+                    {p.stockHidden
+                      ? ar ? "متوفر (المخزون مخفي)" : "Available (stock hidden)"
+                      : `${ar ? "المخزون:" : "Stock:"} ${p.stock ?? 0}`}
                   </span>
                 </div>
 

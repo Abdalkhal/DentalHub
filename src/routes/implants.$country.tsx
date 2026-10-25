@@ -128,6 +128,10 @@ function ImplantCard({
   const name = ar ? p.ar || p.en : p.en || p.ar;
   const accessories = p.accessories ?? [];
 
+  // Office chose not to publish stock: show no counts and don't cap quantities.
+  const stockHidden = p.stockHidden === true;
+  const NO_CAP = 999;
+  const baseMax = stockHidden ? NO_CAP : p.stock || 0;
   const variants: { diameter: number; length: number; count: number }[] =
     spec?.variants?.map((v) => ({ diameter: v.diameter, length: v.length, count: v.stock })) ??
     spec?.dimensionStocks?.map((v) => ({ diameter: v.diameter, length: v.length, count: v.quantity })) ??
@@ -313,9 +317,11 @@ function ImplantCard({
               <span className="flex-1 text-[11px] font-bold text-muted-foreground">
                 {ar ? "الطول" : "Length"}
               </span>
-              <span className="w-10 text-end text-[11px] font-bold text-muted-foreground">
-                {ar ? "المخزون" : "Stock"}
-              </span>
+              {!stockHidden && (
+                <span className="w-10 text-end text-[11px] font-bold text-muted-foreground">
+                  {ar ? "المخزون" : "Stock"}
+                </span>
+              )}
               <span className="w-[92px] text-end text-[11px] font-bold text-muted-foreground">
                 {ar ? "الكمية" : "Qty"}
               </span>
@@ -329,11 +335,13 @@ function ImplantCard({
                 >
                   <span className="flex-1 text-xs text-foreground">{v.diameter} mm</span>
                   <span className="flex-1 text-xs text-foreground">{v.length} mm</span>
-                  <span className={cn("w-10 text-end text-xs font-bold", v.count > 0 ? "text-emerald-600" : "text-rose-500")}>
-                    {v.count}
-                  </span>
+                  {!stockHidden && (
+                    <span className={cn("w-10 text-end text-xs font-bold", v.count > 0 ? "text-emerald-600" : "text-rose-500")}>
+                      {v.count}
+                    </span>
+                  )}
                   <div className="w-[92px] flex justify-end">
-                    <QtyStepper qty={variantQty[key] || 0} max={v.count} onChange={(q) => setVariantQty((prev) => ({ ...prev, [key]: q }))} />
+                    <QtyStepper qty={variantQty[key] || 0} max={stockHidden ? NO_CAP : v.count} onChange={(q) => setVariantQty((prev) => ({ ...prev, [key]: q }))} />
                   </div>
                 </div>
               );
@@ -381,6 +389,7 @@ function ImplantCard({
           </p>
           <div className="space-y-1.5">
             {accessories.map((acc, i) => {
+              const accHidden = acc.stockHidden === true;
               const accStock = acc.stock ?? 0;
               return (
                 <div key={i} className="flex items-center gap-2 bg-slate-50 rounded-lg px-2.5 py-1.5">
@@ -403,12 +412,12 @@ function ImplantCard({
                           {money(acc.price, acc.currency)}
                         </span>
                       )}
-                      <span className={cn("text-[10px] font-bold", accStock > 0 ? "text-emerald-600" : "text-rose-500")}>
-                        {ar ? "متوفر: " : "In stock: "}{accStock}
+                      <span className={cn("text-[10px] font-bold", accHidden || accStock > 0 ? "text-emerald-600" : "text-rose-500")}>
+                        {accHidden ? (ar ? "متوفر" : "Available") : `${ar ? "متوفر: " : "In stock: "}${accStock}`}
                       </span>
                     </p>
                   </div>
-                  <QtyStepper qty={accQty[i] || 0} max={accStock} onChange={(q) => setAccQty((prev) => ({ ...prev, [i]: q }))} />
+                  <QtyStepper qty={accQty[i] || 0} max={accHidden ? NO_CAP : accStock} onChange={(q) => setAccQty((prev) => ({ ...prev, [i]: q }))} />
                 </div>
               );
             })}
@@ -430,8 +439,8 @@ function ImplantCard({
             <span className="text-sm font-bold text-primary min-w-6 text-center">{baseQty}</span>
             <button
               type="button"
-              onClick={() => setBaseQty((q) => Math.min(p.stock || q, q + 1))}
-              disabled={baseQty >= (p.stock || 0)}
+              onClick={() => setBaseQty((q) => Math.min(baseMax || q, q + 1))}
+              disabled={baseQty >= baseMax}
               className="size-9 flex items-center justify-center text-slate-600 disabled:opacity-30"
             >
               <Plus className="size-4" />

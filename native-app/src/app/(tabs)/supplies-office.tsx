@@ -116,7 +116,8 @@ export default function SuppliesOfficeScreen() {
       purchasePrice: d.purchasePrice,
       currency: d.currency,
       stock: d.stock,
-      inStock: d.stock > 0,
+      inStock: d.stockHidden === true || d.stock > 0,
+      stockHidden: d.stockHidden === true,
       images: d.images,
       companyId: user?.uid,
       country: d.country,
@@ -285,8 +286,10 @@ export default function SuppliesOfficeScreen() {
                               {p.ar || p.en}
                             </Text>
                             <Text className="mt-0.5 text-[11px] font-extrabold text-primary">{price}</Text>
-                            <Text className={cn('text-[10px]', p.stock > 0 ? 'text-emerald-600' : 'text-rose-500')}>
-                              {p.stock > 0 ? (ar ? `متوفر: ${p.stock}` : `In stock: ${p.stock}`) : ar ? 'نفد' : 'Out'}
+                            <Text className={cn('text-[10px]', p.stockHidden || p.stock > 0 ? 'text-emerald-600' : 'text-rose-500')}>
+                              {p.stockHidden
+                                ? ar ? 'متوفر (المخزون مخفي)' : 'Available (stock hidden)'
+                                : p.stock > 0 ? (ar ? `متوفر: ${p.stock}` : `In stock: ${p.stock}`) : ar ? 'نفد' : 'Out'}
                             </Text>
                             <View className="mt-2 flex-row gap-1.5">
                               <Pressable
@@ -464,6 +467,7 @@ export default function SuppliesOfficeScreen() {
                   purchasePrice: modal.editing.purchasePrice,
                   currency: modal.editing.currency,
                   stock: modal.editing.stock,
+                  stockHidden: modal.editing.stockHidden,
                   description: modal.editing.description ?? '',
                   images: modal.editing.images,
                   branch: modal.editing.branch,

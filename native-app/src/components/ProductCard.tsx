@@ -19,7 +19,7 @@ export function ProductCard({ product, imageUrl, onPress }: Props) {
     : `$${Number(product.price).toFixed(2)}`;
   const name = product.ar || product.en;
   const hasStock = product.stock != null;
-  const inStock = !hasStock || product.stock > 0;
+  const inStock = !hasStock || product.stockHidden || product.stock > 0;
 
   return (
     <Pressable onPress={onPress} className="w-[48%]">
@@ -32,7 +32,9 @@ export function ProductCard({ product, imageUrl, onPress }: Props) {
             }`}
           >
             <Text className="text-[9px] font-bold text-white">
-              {inStock ? (ar ? `متوفر ${product.stock}` : `${product.stock} in stock`) : ar ? "نفد" : "Out"}
+              {product.stockHidden
+                ? ar ? "متوفر" : "Available"
+                : inStock ? (ar ? `متوفر ${product.stock}` : `${product.stock} in stock`) : ar ? "نفد" : "Out"}
             </Text>
           </View>
         )}

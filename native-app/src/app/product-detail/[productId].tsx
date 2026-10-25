@@ -160,6 +160,8 @@ export default function ProductDetailScreen() {
   const name = ar ? product.ar || product.en : product.en || product.ar;
   const officeName = String(office?.name || '') || (ar ? 'المكتب' : 'Office');
   const inStock = product.inStock ?? true;
+  // A hidden stock count is not a cap — the office simply didn't publish it.
+  const maxQty = product.stockHidden ? 999 : product.stock;
 
   const prev = () => setActiveImg((i) => (images.length === 0 ? 0 : (i - 1 + images.length) % images.length));
   const next = () => setActiveImg((i) => (images.length === 0 ? 0 : (i + 1) % images.length));
@@ -310,8 +312,8 @@ export default function ProductDetailScreen() {
             </View>
             <View className="items-end">
               <Text className="text-[11px] font-bold text-emerald-700/70">{ar ? 'المخزون' : 'Stock'}</Text>
-              <Text className={cn('text-lg font-extrabold', product.stock > 0 ? 'text-emerald-700' : 'text-rose-600')}>
-                {product.stock}
+              <Text className={cn('text-lg font-extrabold', product.stockHidden || product.stock > 0 ? 'text-emerald-700' : 'text-rose-600')}>
+                {product.stockHidden ? (ar ? 'متوفر' : 'Available') : product.stock}
               </Text>
             </View>
           </View>
@@ -498,9 +500,9 @@ export default function ProductDetailScreen() {
             </Pressable>
             <Text className="min-w-6 text-center text-sm font-bold text-slate-800">{qty}</Text>
             <Pressable
-              onPress={() => setQty((q) => Math.min(product.stock, q + 1))}
-              disabled={qty >= product.stock}
-              className={cn('h-9 w-9 items-center justify-center', qty >= product.stock && 'opacity-30')}
+              onPress={() => setQty((q) => Math.min(maxQty, q + 1))}
+              disabled={qty >= maxQty}
+              className={cn('h-9 w-9 items-center justify-center', qty >= maxQty && 'opacity-30')}
             >
               <Plus size={16} color="#475569" />
             </Pressable>

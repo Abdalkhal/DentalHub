@@ -18,6 +18,7 @@ import {
 import { useUserRole } from '@/lib/useAuth';
 import { randomUUID } from '@/lib/randomId';
 import { cn } from '@/lib/utils';
+import { StockVisibilityToggle } from '@/components/StockVisibilityToggle';
 import { toast } from '@/lib/toast';
 
 const MAX_CLINICAL_IMAGES = 10;
@@ -157,6 +158,7 @@ export function SpecializedImplantForm({ open, onClose, ar, product }: { open: b
   const [price, setPrice] = useState(product?.price ? String(product.price) : '');
   const [currency, setCurrency] = useState<Currency>(product?.currency || 'USD');
   const [stock, setStock] = useState(product?.stock ? String(product.stock) : '0');
+  const [stockHidden, setStockHidden] = useState(product?.stockHidden ?? false);
   const [description, setDescription] = useState(product?.description ?? '');
   const [fields, setFields] = useState<Record<string, string | string[]>>(product?.specializedImplant?.fields ?? {});
   const [images, setImages] = useState<string[]>(product?.images ?? []);
@@ -222,7 +224,8 @@ export function SpecializedImplantForm({ open, onClose, ar, product }: { open: b
         brand: manufacturer.trim(),
         price: Math.max(0, Number(price) || 0),
         currency,
-        stock: hideStock ? 1 : Math.max(0, Number(stock) || 0),
+        stock: hideStock ? 1 : stockHidden ? 0 : Math.max(0, Number(stock) || 0),
+        stockHidden: !hideStock && stockHidden,
         inStock: true,
         images,
         category: 'specialized_implant',
@@ -338,7 +341,7 @@ export function SpecializedImplantForm({ open, onClose, ar, product }: { open: b
                     <TextInput value={price} onChangeText={(v) => setPrice(v.replace(/[^0-9.]/g, ''))} keyboardType="decimal-pad" placeholder="0" placeholderTextColor="#94A3B8" className={inputCls} style={{ writingDirection: 'ltr', textAlign: 'left' }} />
                   </Field>
                 </View>
-                {!hideStock && (
+                {!hideStock && !stockHidden && (
                   <View className="flex-1">
                     <Field label={ar ? 'المخزون' : 'Stock'}>
                       <TextInput value={stock} onChangeText={(v) => setStock(v.replace(/[^0-9]/g, ''))} keyboardType="number-pad" placeholder="0" placeholderTextColor="#94A3B8" className={inputCls} style={{ writingDirection: 'ltr', textAlign: 'left' }} />
@@ -346,6 +349,7 @@ export function SpecializedImplantForm({ open, onClose, ar, product }: { open: b
                   </View>
                 )}
               </View>
+              {!hideStock && <StockVisibilityToggle ar={ar} hidden={stockHidden} onChange={setStockHidden} />}
             </SectionCard>
 
             <SectionCard title={ar ? 'صور حالات العمل' : 'Clinical Cases'}>

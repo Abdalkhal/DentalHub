@@ -282,7 +282,9 @@ export default function ImplantsOfficeScreen() {
                   </Text>
                   <Text className="mt-0.5 text-[11px] font-extrabold text-primary">{price}</Text>
                   <Text className="text-[10px] text-slate-400">
-                    {p.stock > 0 ? (ar ? `متوفر: ${p.stock}` : `In stock: ${p.stock}`) : ar ? 'نفد' : 'Out'}
+                    {p.stockHidden
+                      ? ar ? 'متوفر (المخزون مخفي)' : 'Available (stock hidden)'
+                      : p.stock > 0 ? (ar ? `متوفر: ${p.stock}` : `In stock: ${p.stock}`) : ar ? 'نفد' : 'Out'}
                   </Text>
                   <View className="mt-2 flex-row gap-1.5">
                     <Pressable

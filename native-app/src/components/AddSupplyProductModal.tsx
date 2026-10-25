@@ -24,6 +24,7 @@ import { uploadProductImage, useSignedImageUrls, type Currency } from '@/lib/pro
 import { randomUUID } from '@/lib/randomId';
 import { hasNativeModule } from '@/lib/nativeModules';
 import { cn } from '@/lib/utils';
+import { StockVisibilityToggle } from '@/components/StockVisibilityToggle';
 
 type CameraApi = typeof import('expo-camera');
 function loadCamera(): CameraApi | null {
@@ -210,6 +211,7 @@ export type SupplyProductDraft = {
   purchasePrice?: number;
   currency: Currency;
   stock: number;
+  stockHidden?: boolean;
   description: string;
   images: string[];
   branch: string;
@@ -277,6 +279,7 @@ export function AddSupplyProductModal({
   const [purchasePrice, setPurchasePrice] = useState(initial?.purchasePrice ? formatPriceInput(String(initial.purchasePrice)) : '');
   const [currency, setCurrency] = useState<Currency>(initial?.currency ?? 'USD');
   const [stock, setStock] = useState(initial?.stock ?? 0);
+  const [stockHidden, setStockHidden] = useState(initial?.stockHidden ?? false);
   const [showScanner, setShowScanner] = useState(false);
   const [description, setDescription] = useState(initial?.description ?? '');
   const [images, setImages] = useState<string[]>(initial?.images ?? []);
@@ -493,7 +496,8 @@ export function AddSupplyProductModal({
         price: parsePriceInput(price),
         purchasePrice: parsePriceInput(purchasePrice) || undefined,
         currency,
-        stock,
+        stock: stockHidden ? 0 : stock,
+        stockHidden,
         description: description.trim(),
         images,
         branch,
@@ -729,7 +733,13 @@ export function AddSupplyProductModal({
                 />
               </Field>
               <Field label={ar ? 'المخزون الحالي' : 'Current stock'}>
-                <View className="flex-row items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-2">
+                <StockVisibilityToggle ar={ar} hidden={stockHidden} onChange={setStockHidden} />
+                {stockHidden ? (
+                  <Text className="mt-2 text-[11px] text-slate-500">
+                    {ar ? 'لن تظهر كمية المخزون للزبائن، وسيظهر المنتج كمتوفر.' : 'Buyers will not see a quantity; the product shows as available.'}
+                  </Text>
+                ) : (
+                <View className="mt-2 flex-row items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-2">
                   <Pressable onPress={() => setStock((v) => Math.max(0, v - 1))} className="h-10 w-10 items-center justify-center rounded-xl bg-slate-100">
                     <Minus size={16} color="#334155" />
                   </Pressable>
@@ -746,6 +756,7 @@ export function AddSupplyProductModal({
                     <Plus size={16} color="#FFFFFF" />
                   </Pressable>
                 </View>
+                )}
               </Field>
               <Field label={ar ? 'رمز SKU (تلقائي)' : 'SKU (auto)'}>
                 <View className="h-11 justify-center rounded-xl border border-slate-200 bg-slate-50 px-3">

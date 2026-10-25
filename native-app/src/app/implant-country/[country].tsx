@@ -287,6 +287,10 @@ function ImplantDetailModal({
   // all of these, which was all this screen showed before, hiding which
   // stock belongs to which size. `variants` and the legacy `dimensionStocks`
   // shape the count field differently (stock vs quantity), so normalize.
+  // Office chose not to publish stock: show no counts and don't cap quantities.
+  const stockHidden = product.stockHidden === true;
+  const NO_CAP = 999;
+  const baseMax = stockHidden ? NO_CAP : product.stock || 0;
   const variants: { diameter: number; length: number; count: number }[] =
     spec?.variants?.map((v) => ({ diameter: v.diameter, length: v.length, count: v.stock })) ??
     spec?.dimensionStocks?.map((v) => ({ diameter: v.diameter, length: v.length, count: v.quantity })) ??
@@ -511,7 +515,7 @@ function ImplantDetailModal({
                 <View className="flex-row items-center bg-slate-50 px-3 py-2">
                   <Text className="flex-1 text-[11px] font-bold text-slate-500">{ar ? 'القطر' : 'Diameter'}</Text>
                   <Text className="flex-1 text-[11px] font-bold text-slate-500">{ar ? 'الطول' : 'Length'}</Text>
-                  <Text className="w-10 text-end text-[11px] font-bold text-slate-500">{ar ? 'المخزون' : 'Stock'}</Text>
+                  {!stockHidden && <Text className="w-10 text-end text-[11px] font-bold text-slate-500">{ar ? 'المخزون' : 'Stock'}</Text>}
                   <Text className="w-[76px] text-end text-[11px] font-bold text-slate-500">{ar ? 'الكمية' : 'Qty'}</Text>
                 </View>
                 {variants.map((v, i) => {
@@ -523,13 +527,15 @@ function ImplantDetailModal({
                     >
                       <Text className="flex-1 text-xs text-slate-700">{v.diameter} mm</Text>
                       <Text className="flex-1 text-xs text-slate-700">{v.length} mm</Text>
-                      <Text className={cn('w-10 text-end text-xs font-bold', v.count > 0 ? 'text-emerald-600' : 'text-rose-500')}>
-                        {v.count}
-                      </Text>
+                      {!stockHidden && (
+                        <Text className={cn('w-10 text-end text-xs font-bold', v.count > 0 ? 'text-emerald-600' : 'text-rose-500')}>
+                          {v.count}
+                        </Text>
+                      )}
                       <View className="w-[76px] items-end">
                         <QtyStepper
                           qty={variantQty[key] || 0}
-                          max={v.count}
+                          max={stockHidden ? NO_CAP : v.count}
                           onChange={(q) => setVariantQty((prev) => ({ ...prev, [key]: q }))}
                         />
                       </View>
@@ -601,6 +607,7 @@ function ImplantDetailModal({
                   {ar ? 'الإكسسوارات' : 'Accessories'} ({product.accessories.length})
                 </Text>
                 {product.accessories.map((acc, i) => {
+                  const accHidden = acc.stockHidden === true;
                   const accStock = acc.stock ?? 0;
                   return (
                     <View key={i} className="flex-row items-center gap-2 rounded-lg bg-slate-50 px-2.5 py-1.5">
@@ -617,12 +624,12 @@ function ImplantDetailModal({
                           {acc.price > 0 && (
                             <Text className="text-[11px] font-bold text-primary">{money(acc.price, acc.currency)}</Text>
                           )}
-                          <Text className={cn('text-[10px] font-bold', accStock > 0 ? 'text-emerald-600' : 'text-rose-500')}>
-                            {ar ? 'متوفر: ' : 'In stock: '}{accStock}
+                          <Text className={cn('text-[10px] font-bold', accHidden || accStock > 0 ? 'text-emerald-600' : 'text-rose-500')}>
+                            {accHidden ? (ar ? 'متوفر' : 'Available') : `${ar ? 'متوفر: ' : 'In stock: '}${accStock}`}
                           </Text>
                         </View>
                       </View>
-                      <QtyStepper qty={accQty[i] || 0} max={accStock} onChange={(q) => setAccQty((prev) => ({ ...prev, [i]: q }))} />
+                      <QtyStepper qty={accQty[i] || 0} max={accHidden ? NO_CAP : accStock} onChange={(q) => setAccQty((prev) => ({ ...prev, [i]: q }))} />
                     </View>
                   );
                 })}
@@ -641,9 +648,9 @@ function ImplantDetailModal({
                   </Pressable>
                   <Text className="min-w-6 text-center text-sm font-bold text-primary">{baseQty}</Text>
                   <Pressable
-                    onPress={() => setBaseQty((q) => Math.min(product.stock || q, q + 1))}
-                    disabled={baseQty >= (product.stock || 0)}
-                    className={cn('h-9 w-9 items-center justify-center', baseQty >= (product.stock || 0) && 'opacity-30')}
+                    onPress={() => setBaseQty((q) => Math.min(baseMax || q, q + 1))}
+                    disabled={baseQty >= baseMax}
+                    className={cn('h-9 w-9 items-center justify-center', baseQty >= baseMax && 'opacity-30')}
                   >
                     <Plus size={15} color="#475569" />
                   </Pressable>

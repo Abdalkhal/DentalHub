@@ -24,6 +24,7 @@ import {
 import { useUserRole } from '@/lib/useAuth';
 import { randomUUID } from '@/lib/randomId';
 import { cn } from '@/lib/utils';
+import { StockVisibilityToggle } from '@/components/StockVisibilityToggle';
 import { toast } from '@/lib/toast';
 
 const ACCENT = '#0284C7';
@@ -191,6 +192,7 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
   const [currency, setCurrency] = useState<Currency>(product?.currency || 'USD');
   const [description, setDescription] = useState(product?.description ?? '');
   const [images, setImages] = useState<string[]>(product?.images ?? []);
+  const [stockHidden, setStockHidden] = useState(product?.stockHidden ?? false);
 
   // Accessory fields — its own image, entirely separate from the main
   // implant's `images` above (they used to share that one state, so a
@@ -203,6 +205,7 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
   const [accessoryCurrency, setAccessoryCurrency] = useState<Currency>('USD');
   const [accessorySpecs, setAccessorySpecs] = useState('');
   const [accessoryStock, setAccessoryStock] = useState('');
+  const [accessoryStockHidden, setAccessoryStockHidden] = useState(false);
 
   // Surgical kit fields — own price/currency/images too, for the same
   // reason.
@@ -324,7 +327,8 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
           price: Math.max(0, parseFloat(accessoryPrice) || 0),
           imageUrl,
           currency: accessoryCurrency,
-          stock: Math.max(0, parseInt(accessoryStock, 10) || 0),
+          stock: accessoryStockHidden ? 0 : Math.max(0, parseInt(accessoryStock, 10) || 0),
+          ...(accessoryStockHidden ? { stockHidden: true } : {}),
         };
         await updateDoc(doc(db, 'products', parentId), { accessories: [...(parent.accessories ?? []), newAccessory] });
         queryClient.invalidateQueries({ queryKey: productsQueryKey });
@@ -355,7 +359,7 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
         });
       } else {
         const variantsArr = variants
-          .map((v) => ({ diameter: Number(v.diameter), length: Number(v.length), stock: Math.max(0, parseInt(v.stock || '0', 10) || 0) }))
+          .map((v) => ({ diameter: Number(v.diameter), length: Number(v.length), stock: stockHidden ? 0 : Math.max(0, parseInt(v.stock || '0', 10) || 0) }))
           .filter((v) => !isNaN(v.diameter) && v.diameter > 0 && !isNaN(v.length) && v.length > 0);
         const totalStock = variantsArr.reduce((sum, v) => sum + v.stock, 0);
         const uniqueDiameters = [...new Set(variantsArr.map((v) => v.diameter))];
@@ -370,7 +374,8 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
           price: Math.max(0, parseFloat(price) || 0),
           currency,
           stock: totalStock,
-          inStock: totalStock > 0,
+          inStock: stockHidden || totalStock > 0,
+          stockHidden,
           images,
           category: 'implant',
           country,
@@ -535,15 +540,18 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
                     />
                   </Field>
                   <Field label={ar ? 'المخزون المتوفر' : 'Available stock'}>
-                    <TextInput
-                      value={accessoryStock}
-                      onChangeText={(t) => setAccessoryStock(t.replace(/[^0-9]/g, ''))}
-                      keyboardType="number-pad"
-                      placeholder="0"
-                      placeholderTextColor="#94A3B8"
-                      className={inputCls}
-                      style={{ writingDirection: 'ltr', textAlign: 'left' }}
-                    />
+                    <StockVisibilityToggle ar={ar} hidden={accessoryStockHidden} onChange={setAccessoryStockHidden} />
+                    {!accessoryStockHidden && (
+                      <TextInput
+                        value={accessoryStock}
+                        onChangeText={(t) => setAccessoryStock(t.replace(/[^0-9]/g, ''))}
+                        keyboardType="number-pad"
+                        placeholder="0"
+                        placeholderTextColor="#94A3B8"
+                        className={cn(inputCls, 'mt-2')}
+                        style={{ writingDirection: 'ltr', textAlign: 'left' }}
+                      />
+                    )}
                   </Field>
                 </SectionCard>
 
@@ -753,17 +761,18 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
                 </SectionCard>
 
                 <SectionCard title={ar ? 'أطوال وأقطار الزرعة' : 'Implant Dimensions'}>
+                  <StockVisibilityToggle ar={ar} hidden={stockHidden} onChange={setStockHidden} />
                   <View className="flex-row gap-2 px-0.5">
                     <Text className="flex-1 text-[10px] font-bold text-slate-400">{ar ? 'القطر (mm)' : 'Diameter (mm)'}</Text>
                     <Text className="flex-1 text-[10px] font-bold text-slate-400">{ar ? 'الطول (mm)' : 'Length (mm)'}</Text>
-                    <Text className="flex-1 text-[10px] font-bold text-slate-400">{ar ? 'الكمية' : 'Qty'}</Text>
+                    {!stockHidden && <Text className="flex-1 text-[10px] font-bold text-slate-400">{ar ? 'الكمية' : 'Qty'}</Text>}
                     <View style={{ width: 36 }} />
                   </View>
                   {variants.map((v) => (
                     <View key={v.key} className="flex-row items-center gap-2">
                       <TextInput value={v.diameter} onChangeText={(t) => updateVariant(v.key, 'diameter', t.replace(/[^0-9.]/g, ''))} keyboardType="decimal-pad" placeholder="3.3" placeholderTextColor="#94A3B8" className="h-11 flex-1 rounded-xl border border-sky-100 bg-white px-2.5 text-sm text-slate-800" style={{ writingDirection: 'ltr', textAlign: 'center' }} />
                       <TextInput value={v.length} onChangeText={(t) => updateVariant(v.key, 'length', t.replace(/[^0-9.]/g, ''))} keyboardType="decimal-pad" placeholder="10" placeholderTextColor="#94A3B8" className="h-11 flex-1 rounded-xl border border-sky-100 bg-white px-2.5 text-sm text-slate-800" style={{ writingDirection: 'ltr', textAlign: 'center' }} />
-                      <TextInput value={v.stock === '0' ? '' : v.stock} onChangeText={(t) => updateVariant(v.key, 'stock', t.replace(/[^0-9]/g, ''))} keyboardType="number-pad" placeholder="0" placeholderTextColor="#94A3B8" className="h-11 flex-1 rounded-xl border border-sky-100 bg-white px-2.5 text-sm text-slate-800" style={{ writingDirection: 'ltr', textAlign: 'center' }} />
+                      {!stockHidden && <TextInput value={v.stock === '0' ? '' : v.stock} onChangeText={(t) => updateVariant(v.key, 'stock', t.replace(/[^0-9]/g, ''))} keyboardType="number-pad" placeholder="0" placeholderTextColor="#94A3B8" className="h-11 flex-1 rounded-xl border border-sky-100 bg-white px-2.5 text-sm text-slate-800" style={{ writingDirection: 'ltr', textAlign: 'center' }} />}
                       <Pressable
                         onPress={() => setVariants((prev) => (prev.length > 1 ? prev.filter((x) => x.key !== v.key) : prev))}
                         disabled={variants.length <= 1}
@@ -794,8 +803,10 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
                         <View className="min-w-0 flex-1">
                           <Text className="text-sm font-bold text-slate-800" numberOfLines={1}>{acc.name}</Text>
                           <Text className="text-[11px] text-slate-400" numberOfLines={1}>{acc.type}</Text>
-                          <Text className={cn('text-[10px] font-bold', (acc.stock ?? 0) > 0 ? 'text-emerald-600' : 'text-rose-500')}>
-                            {ar ? 'المخزون: ' : 'Stock: '}{acc.stock ?? 0}
+                          <Text className={cn('text-[10px] font-bold', acc.stockHidden || (acc.stock ?? 0) > 0 ? 'text-emerald-600' : 'text-rose-500')}>
+                            {acc.stockHidden
+                              ? ar ? 'المخزون مخفي' : 'Stock hidden'
+                              : `${ar ? 'المخزون: ' : 'Stock: '}${acc.stock ?? 0}`}
                           </Text>
                         </View>
                         <Pressable onPress={() => removeAccessory(i)} className="h-8 w-8 items-center justify-center rounded-lg bg-rose-50">

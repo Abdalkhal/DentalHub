@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { doc, updateDoc } from "firebase/firestore";
 import { X, Plus, Trash2, Upload, Image, Settings, Paperclip, Loader2, Package, Check, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { StockVisibilityToggle } from "@/components/StockVisibilityToggle";
 import { useI18n } from "@/lib/i18n";
 import {
   useProducts,
@@ -210,6 +211,8 @@ export function ImplantFormModal({
   const [accessoryCurrency, setAccessoryCurrency] = useState<Currency>("USD");
   const [accessorySpecs, setAccessorySpecs] = useState("");
   const [accessoryStock, setAccessoryStock] = useState("");
+  const [accessoryStockHidden, setAccessoryStockHidden] = useState(false);
+  const [stockHidden, setStockHidden] = useState(product?.stockHidden ?? false);
   const [price, setPrice] = useState(product?.price ? String(product.price) : "");
   const [currency, setCurrency] = useState<Currency>(product?.currency || "USD");
   const [minOrderQty, setMinOrderQty] = useState("");
@@ -311,7 +314,8 @@ export function ImplantFormModal({
           price: Math.max(0, parseFloat(accessoryPrice) || 0),
           imageUrl,
           currency: accessoryCurrency,
-          stock: Math.max(0, parseInt(accessoryStock, 10) || 0),
+          stock: accessoryStockHidden ? 0 : Math.max(0, parseInt(accessoryStock, 10) || 0),
+          ...(accessoryStockHidden ? { stockHidden: true } : {}),
         };
         await updateDoc(doc(db, "products", parentId), {
           accessories: [...(parentImplant.accessories ?? []), newAccessory],
@@ -383,7 +387,7 @@ export function ImplantFormModal({
           .map((v) => ({
             diameter: Number(v.diameter),
             length: Number(v.length),
-            stock: Math.max(0, parseInt(v.stock || "0") || 0),
+            stock: stockHidden ? 0 : Math.max(0, parseInt(v.stock || "0") || 0),
           }))
           .filter((v) => !isNaN(v.diameter) && v.diameter > 0 && !isNaN(v.length) && v.length > 0);
         const totalStock = variantsArr.reduce((sum, v) => sum + v.stock, 0);
@@ -399,7 +403,8 @@ export function ImplantFormModal({
           price: Math.max(0, parseFloat(price) || 0),
           currency,
           stock: totalStock,
-          inStock: totalStock > 0,
+          inStock: stockHidden || totalStock > 0,
+          stockHidden,
           images: [...existingImages, ...uploadedPaths],
           category: "implant",
           country,
@@ -684,18 +689,19 @@ export function ImplantFormModal({
                       <label className="text-xs font-semibold text-[#17324A] mb-2 block">
                         {ar ? "القياسات المتوفرة" : "Available Sizes"}
                       </label>
+                      <StockVisibilityToggle ar={ar} hidden={stockHidden} onChange={setStockHidden} className="mb-2.5" />
                       <div className="space-y-2.5">
-                        <div className="grid grid-cols-[1fr_1fr_1fr_44px] gap-2 px-1 text-[10px] font-bold text-[#7A94A8]">
+                        <div className={cn("grid gap-2 px-1 text-[10px] font-bold text-[#7A94A8]", stockHidden ? "grid-cols-[1fr_1fr_44px]" : "grid-cols-[1fr_1fr_1fr_44px]")}>
                           <span>{ar ? "القطر (Ø mm)" : "Diameter (Ø mm)"}</span>
                           <span>{ar ? "الطول (mm)" : "Length (mm)"}</span>
-                          <span>{ar ? "الكمية المتوفرة" : "Available Qty"}</span>
+                          {!stockHidden && <span>{ar ? "الكمية المتوفرة" : "Available Qty"}</span>}
                           <span />
                         </div>
                         {variants.map((v) => (
-                          <div key={v.key} className="grid grid-cols-[1fr_1fr_1fr_44px] gap-2 items-center">
+                          <div key={v.key} className={cn("grid gap-2 items-center", stockHidden ? "grid-cols-[1fr_1fr_44px]" : "grid-cols-[1fr_1fr_1fr_44px]")}>
                             <input type="number" step="0.1" min="0" dir="ltr" placeholder="3.3" value={v.diameter} onChange={(e) => updateVariant(v.key, "diameter", e.target.value)} className="w-full h-11 rounded-lg bg-white border border-[#D3E8F7] px-3 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition" />
                             <input type="number" step="0.5" min="0" dir="ltr" placeholder="10" value={v.length} onChange={(e) => updateVariant(v.key, "length", e.target.value)} className="w-full h-11 rounded-lg bg-white border border-[#D3E8F7] px-3 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition" />
-                            <input type="number" min="0" dir="ltr" placeholder="0" value={v.stock} onChange={(e) => updateVariant(v.key, "stock", e.target.value)} className="w-full h-11 rounded-lg bg-white border border-[#D3E8F7] px-3 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition" />
+                            {!stockHidden && <input type="number" min="0" dir="ltr" placeholder="0" value={v.stock} onChange={(e) => updateVariant(v.key, "stock", e.target.value)} className="w-full h-11 rounded-lg bg-white border border-[#D3E8F7] px-3 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition" />}
                             <button type="button" onClick={() => removeVariant(v.key)} disabled={variants.length <= 1} className="size-11 rounded-lg border border-rose-200 text-rose-500 hover:bg-rose-50 flex items-center justify-center transition disabled:opacity-30" aria-label={ar ? "حذف القياس" : "Delete size"}>
                               <Trash2 className="size-4" />
                             </button>
@@ -1224,14 +1230,17 @@ export function ImplantFormModal({
                       <label className="text-xs font-semibold text-[#17324A] mb-1.5 block">
                         {ar ? "المخزون المتوفر" : "Available stock"}
                       </label>
-                      <input
-                        type="number"
-                        value={accessoryStock}
-                        onChange={(e) => setAccessoryStock(e.target.value.replace(/[^0-9]/g, ""))}
-                        placeholder="0"
-                        dir="ltr"
-                        className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
-                      />
+                      <StockVisibilityToggle ar={ar} hidden={accessoryStockHidden} onChange={setAccessoryStockHidden} className="mb-2" />
+                      {!accessoryStockHidden && (
+                        <input
+                          type="number"
+                          value={accessoryStock}
+                          onChange={(e) => setAccessoryStock(e.target.value.replace(/[^0-9]/g, ""))}
+                          placeholder="0"
+                          dir="ltr"
+                          className="w-full h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
+                        />
+                      )}
                     </div>
                   </div>
                 </div>

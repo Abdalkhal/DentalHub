@@ -45,6 +45,7 @@ export type ProductAccessory = {
   imageUrl: string;
   currency: Currency;
   stock: number;
+  stockHidden?: boolean;
 };
 
 export type BoneGraftPackSize = {
@@ -99,6 +100,10 @@ export type Product = {
   currency: Currency;
   stock: number;
   inStock: boolean;
+  // The office chose not to publish its stock count ("إخفاء المخزون"): the
+  // product stays orderable (inStock true, stock 0 so checkout never
+  // decrements it) and buyers see "available" with no number.
+  stockHidden?: boolean;
   images: string[];
   category?: string;
   implantSpec?: ImplantSpec;
@@ -141,6 +146,7 @@ const fromDoc = (id: string, data: Record<string, unknown>): Product => {
     currency: (data.currency as Currency) || "USD",
     stock: Number(data.stock) || 0,
     inStock: Boolean(data.inStock),
+    stockHidden: data.stockHidden === true,
     images: (data.images as string[]) ?? [],
     category: (data.category as string) ?? undefined,
     implantSpec: rawSpec
@@ -252,8 +258,9 @@ export function useUpsertProduct() {
           brand: p.brand,
           price: p.price,
           currency: p.currency,
-          stock: p.stock,
-          inStock: p.stock > 0,
+          stock: p.stockHidden ? 0 : p.stock,
+          inStock: p.stockHidden === true || p.stock > 0,
+          stockHidden: p.stockHidden === true,
           images: p.images,
           category: p.category ?? null,
           implantSpec: cleanSpec,

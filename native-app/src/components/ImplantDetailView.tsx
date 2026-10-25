@@ -350,6 +350,8 @@ export function ImplantDetailView({
                     </View>
                   )}
 
+                  {/* No quantity box when the office chose to hide its stock. */}
+                  {!product.stockHidden && (
                   <View
                     className={cn(
                       'flex-row items-center gap-3 rounded-2xl px-4 py-3.5',
@@ -380,6 +382,7 @@ export function ImplantDetailView({
                       </Text>
                     )}
                   </View>
+                  )}
                 </View>
               )}
 

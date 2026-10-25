@@ -56,7 +56,10 @@ export function ProductDetailsModal({
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
   const favorited = useIsFavorited(product.id);
-  const maxQty = typeof product.stock === "number" ? Math.max(1, product.stock) : Infinity;
+  // A hidden stock count is not a cap — the office simply didn't publish it.
+  const maxQty = product.stockHidden
+    ? Infinity
+    : typeof product.stock === "number" ? Math.max(1, product.stock) : Infinity;
 
   const { data: supplier } = useQuery({
     queryKey: ["product-detail-supplier", product.companyId],
@@ -370,10 +373,10 @@ export function ProductDetailsModal({
                 <p
                   className={cn(
                     "font-display font-extrabold text-lg",
-                    (product.stock ?? 0) > 0 ? "text-emerald-700" : "text-rose-600",
+                    product.stockHidden || (product.stock ?? 0) > 0 ? "text-emerald-700" : "text-rose-600",
                   )}
                 >
-                  {product.stock ?? 0}
+                  {product.stockHidden ? (ar ? "متوفر" : "Available") : (product.stock ?? 0)}
                 </p>
               </div>
             </div>
