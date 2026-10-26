@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useNotifications, type Notification } from "@/lib/notifications";
 import { useI18n } from "@/lib/i18n";
+import { toast } from "sonner";
 
 const TYPE_ICONS: Record<string, typeof Package> = {
   order_new: Package,
@@ -46,6 +47,64 @@ export function notificationTimeAgo(ts: number | undefined, ar: boolean): string
   return ar ? `منذ ${Math.floor(hours / 24)} يوم` : `${Math.floor(hours / 24)}d ago`;
 }
 
+/** A short two-tone chime via Web Audio (no audio asset needed). */
+function playChime() {
+  try {
+    const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    [880, 1320].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.frequency.value = freq;
+      const t = ctx.currentTime + i * 0.18;
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.exponentialRampToValueAtTime(0.2, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.32);
+    });
+    setTimeout(() => void ctx.close(), 1000);
+  } catch {
+    /* audio blocked until the user interacts with the page — the toast still shows */
+  }
+}
+
+/**
+ * Announces notifications that arrive while the page is open: a toast, a
+ * chime, and a desktop notification when the tab is in the background. The
+ * bell's badge alone went unnoticed — a lab working on a laptop never knew a
+ * new case had arrived. Only notifications created after the page loaded are
+ * announced, so reloading never replays old ones.
+ */
+function useAnnounceNewNotifications(notifications: Notification[], ar: boolean) {
+  const since = useRef(Date.now());
+  const announced = useRef(new Set<string>());
+  useEffect(() => {
+    for (const n of notifications) {
+      if (n.isRead || announced.current.has(n.id) || (n.createdAt ?? 0) < since.current) continue;
+      announced.current.add(n.id);
+      toast(n.title, { description: n.body });
+      playChime();
+      if (typeof window !== "undefined" && "Notification" in window && document.hidden && Notification.permission === "granted") {
+        try {
+          new Notification(n.title, { body: n.body, lang: ar ? "ar" : "en", tag: n.id });
+        } catch {
+          /* some browsers only allow notifications from a service worker */
+        }
+      }
+    }
+  }, [notifications, ar]);
+}
+
+/** Desktop notifications need a user gesture to request — asked on the first bell click. */
+function requestDesktopNotifications() {
+  if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
+    void Notification.requestPermission().catch(() => {});
+  }
+}
+
 export function NotificationBell({
   userId,
   dark = false,
@@ -64,6 +123,7 @@ export function NotificationBell({
   const navigate = useNavigate();
   const { lang } = useI18n();
   const ar = lang === "ar";
+  useAnnounceNewNotifications(notifications, ar);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -91,7 +151,10 @@ export function NotificationBell({
   return (
     <div ref={ref} className="relative">
       <button
-        onClick={() => setOpen(!open)}
+        onClick={() => {
+          requestDesktopNotifications();
+          setOpen(!open);
+        }}
         className={cn(
           "relative size-10 rounded-xl flex items-center justify-center transition",
           dark
