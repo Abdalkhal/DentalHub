@@ -43,7 +43,6 @@ export type ImplantBrand = {
   types: ImplantType[];
   sizes: string[];
   price: number;
-  agent: { ar: string; en: string };
   variants: ImplantVariant[];
 };
 
@@ -56,7 +55,6 @@ export const IMPLANTS: ImplantBrand[] = [
     types: ["immediate", "delayed"],
     sizes: ["3.6", "4.0", "4.5", "5.0"],
     price: 180,
-    agent: { ar: "وكيل الموصل للأسنان", en: "Mosul Dental Agency" },
     variants: [
       {
         id: "v1",
@@ -92,7 +90,6 @@ export const IMPLANTS: ImplantBrand[] = [
     types: ["immediate", "delayed"],
     sizes: ["3.5", "4.0", "4.5", "5.0", "6.0"],
     price: 200,
-    agent: { ar: "شركة الرافدين الطبية", en: "Rafidain Medical Co." },
     variants: [
       {
         id: "v1",
@@ -128,7 +125,6 @@ export const IMPLANTS: ImplantBrand[] = [
     types: ["immediate", "delayed"],
     sizes: ["3.5", "3.75", "4.0", "4.5", "5.0"],
     price: 520,
-    agent: { ar: "الوكيل الحصري — بغداد", en: "Exclusive Agent — Baghdad" },
     variants: [
       {
         id: "v1",
@@ -156,7 +152,6 @@ export const IMPLANTS: ImplantBrand[] = [
     types: ["delayed"],
     sizes: ["3.8", "4.25", "5.0"],
     price: 320,
-    agent: { ar: "وكيل أوروبا الطبي", en: "Euro-Med Distributor" },
     variants: [
       {
         id: "v1",
@@ -184,7 +179,6 @@ export const IMPLANTS: ImplantBrand[] = [
     types: ["immediate", "delayed", "basal"],
     sizes: ["3.3", "3.75", "4.2", "5.0"],
     price: 399,
-    agent: { ar: "بوابة الموصل", en: "Mosul Gate" },
     variants: [
       {
         id: "v1",
@@ -220,7 +214,6 @@ export const IMPLANTS: ImplantBrand[] = [
     types: ["immediate", "delayed"],
     sizes: ["3.5", "3.75", "4.0", "4.3", "5.0"],
     price: 260,
-    agent: { ar: "نيودنت العراق", en: "Neodent Iraq" },
     variants: [
       {
         id: "v1",

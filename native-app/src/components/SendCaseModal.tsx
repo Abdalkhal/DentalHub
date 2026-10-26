@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { KeyboardAwareScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import {
   AtSign,
   Calendar,
@@ -16,6 +17,7 @@ import { useI18n } from '@/lib/i18n';
 import { useSession, useUserRole } from '@/lib/useAuth';
 import { attachOrderFile, submitDentistCase } from '@/lib/ordersStore';
 import { uploadOrderFile } from '@/lib/storagePipeline';
+import { readScanFile, SCAN_MAX_BYTES, SCAN_MAX_MB } from '@/lib/scanFile';
 import { createNotification } from '@/lib/notifications';
 import { useLabCatalog, type LabCatalog } from '@/lib/catalogStore';
 import {
@@ -143,7 +145,7 @@ function GenderChip({ active, onPress, children }: { active: boolean; onPress: (
 type PickerApi = {
   getDocumentAsync: (o: { multiple?: boolean; copyToCacheDirectory?: boolean; type?: string }) => Promise<{
     canceled: boolean;
-    assets: { uri: string; name?: string }[];
+    assets: { uri: string; name?: string; size?: number }[];
   }>;
 };
 
@@ -176,7 +178,7 @@ function OdontogramArch({
     // being mirrored under forced Arabic RTL layout — otherwise Android
     // flips every `left`/`top` offset in this subtree and swaps each tooth
     // onto the wrong side (e.g. #18 rendering on the patient-left side).
-    <View style={{ width: '100%', aspectRatio: 4 / 3, direction: 'ltr' }}>
+    <View style={{ width: '100%', maxWidth: 480, alignSelf: 'center', aspectRatio: 4 / 3, direction: 'ltr' }}>
       <Image source={archSrc} style={{ position: 'absolute', width: '100%', height: '100%' }} resizeMode="contain" />
       {fdiList.map((n) => {
         const pos = posMap[n];
@@ -258,16 +260,17 @@ export function SendCaseModal({ labId, labName, labPhone, labAddress, labInstagr
   const [doctorName, setDoctorName] = useState('');
   const [scanFile, setScanFile] = useState<{ uri: string; name: string } | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
-  // Case already created by a send whose later step (notification / scan
-  // upload) failed; the next "Send" resumes from here instead of duplicating.
-  const sentRef = useRef<{
-    order: Awaited<ReturnType<typeof submitDentistCase>>;
-    notified: boolean;
-  } | null>(null);
 
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The case already created on this lab, once the first send got that far.
+  // A failed scan upload used to fall into the generic "Failed to send"
+  // error, so doctors tapped Send again and created the same case several
+  // times; now a retry only re-uploads the file onto this case.
+  const [sentOrderId, setSentOrderId] = useState<string | null>(null);
+  // Blocks a second tap before React re-renders with busy=true.
+  const submitting = useRef(false);
 
   useEffect(() => {
     if (!open) return;
@@ -331,6 +334,16 @@ export function SendCaseModal({ labId, labName, labPhone, labAddress, labInstagr
       setError(ar ? 'يُسمح فقط بملفات STL أو ZIP' : 'Only .stl and .zip files are allowed');
       return;
     }
+    // Rejected up front (Storage refuses larger uploads, see storage.rules),
+    // before any case is created for it.
+    if (asset.size != null && asset.size > SCAN_MAX_BYTES) {
+      setError(
+        ar
+          ? `حجم الملف أكبر من ${SCAN_MAX_MB} ميغابايت — يرجى ضغطه أو تقليل دقته`
+          : `The file is larger than ${SCAN_MAX_MB} MB — please compress it or reduce its resolution`,
+      );
+      return;
+    }
     setError(null);
     setScanFile({ uri: asset.uri, name: asset.name ?? 'scan.stl' });
     setUploadProgress(0);
@@ -362,7 +375,7 @@ export function SendCaseModal({ labId, labName, labPhone, labAddress, labInstagr
     setUploadProgress(0);
     setDone(false);
     setError(null);
-    sentRef.current = null;
+    setSentOrderId(null);
   };
 
   const handleClose = () => {
@@ -370,8 +383,56 @@ export function SendCaseModal({ labId, labName, labPhone, labAddress, labInstagr
     onClose();
   };
 
+  const uploadScan = async (orderId: string) => {
+    if (!scanFile) return;
+    const bytes = await readScanFile(scanFile.uri);
+    const { path } = await uploadOrderFile({
+      orderId,
+      labId,
+      dentistId: user?.uid ?? '',
+      file: bytes,
+      fileName: scanFile.name,
+      contentType: scanFile.name.toLowerCase().endsWith('.zip') ? 'application/zip' : 'model/stl',
+      onProgress: (pct) => setUploadProgress(pct),
+    });
+    await attachOrderFile(labId, orderId, { name: scanFile.name, path });
+  };
+
+  // The case exists but its scan didn't upload: retry only the file.
+  const retryScanUpload = async (orderId: string) => {
+    setBusy(true);
+    setUploadProgress(0);
+    try {
+      await uploadScan(orderId);
+      setDone(true);
+    } catch (err) {
+      console.warn('Scan upload retry failed:', err);
+      setError(
+        ar
+          ? 'تم إرسال الحالة للمختبر، لكن تعذر رفع ملف الماسح. تحقق من الاتصال واضغط "إعادة رفع الملف".'
+          : 'The case was sent to the lab, but the scan file failed to upload. Check your connection and tap "Retry file upload".',
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleSubmit = async () => {
+    if (submitting.current) return;
+    submitting.current = true;
+    try {
+      await submit();
+    } finally {
+      submitting.current = false;
+    }
+  };
+
+  const submit = async () => {
     setError(null);
+    if (sentOrderId) {
+      await retryScanUpload(sentOrderId);
+      return;
+    }
     if (!patient.trim()) {
       setError(ar ? 'الرجاء إدخال اسم المريض' : 'Please enter patient name');
       return;
@@ -428,44 +489,36 @@ export function SendCaseModal({ labId, labName, labPhone, labAddress, labInstagr
 
     setBusy(true);
     try {
-      // Resume a half-finished send (case created, then the notification or
-      // scan upload failed) instead of creating the case again — every retry
-      // used to add another duplicate case at the lab.
-      let sent = sentRef.current;
-      if (!sent) {
-        const created = await submitDentistCase(labId, {
-          patient: patient.trim(),
-          doctor: doctorName || (ar ? 'غير محدد' : 'Unspecified'),
-          workType,
-          unitsCount: parseInt(unitsCount, 10) || 1,
-          notes: notes.trim(),
-          clinic: role?.clinicName || (ar ? 'غير محدد' : 'Unspecified'),
-          dentistId: user?.uid ?? 'unknown',
-          dentistName: user?.displayName ?? user?.email ?? (ar ? 'طبيب' : 'Dentist'),
-          shade: shade || customShade || undefined,
-          material: primaryMaterial,
-          patientAge: patientAge || undefined,
-          patientGender: patientGender || undefined,
-          patientPhone: patientPhone || undefined,
-          rxTeeth: Object.fromEntries(Object.entries(teeth)),
-          rxItems: allItems,
-          rxData: {
-            toothItems,
-            teeth,
-            lowerSelected,
-            lowerSubSelected,
-            receivedDate,
-            vitaTab,
-            customShade: customShade || undefined,
-            primaryMaterial,
-            primaryWorkType,
-            itemMaterial: itemMaterialUsed,
-            itemWorkType: itemWorkTypeUsed,
-          },
-        });
-        sent = sentRef.current = { order: created, notified: false };
-      }
-      const order = sent.order;
+      const order = await submitDentistCase(labId, {
+        patient: patient.trim(),
+        doctor: doctorName || (ar ? 'غير محدد' : 'Unspecified'),
+        workType,
+        unitsCount: parseInt(unitsCount, 10) || 1,
+        notes: notes.trim(),
+        clinic: role?.clinicName || (ar ? 'غير محدد' : 'Unspecified'),
+        dentistId: user?.uid ?? 'unknown',
+        dentistName: user?.displayName ?? user?.email ?? (ar ? 'طبيب' : 'Dentist'),
+        shade: shade || customShade || undefined,
+        material: primaryMaterial,
+        patientAge: patientAge || undefined,
+        patientGender: patientGender || undefined,
+        patientPhone: patientPhone || undefined,
+        rxTeeth: Object.fromEntries(Object.entries(teeth)),
+        rxItems: allItems,
+        rxData: {
+          toothItems,
+          teeth,
+          lowerSelected,
+          lowerSubSelected,
+          receivedDate,
+          vitaTab,
+          customShade: customShade || undefined,
+          primaryMaterial,
+          primaryWorkType,
+          itemMaterial: itemMaterialUsed,
+          itemWorkType: itemWorkTypeUsed,
+        },
+      });
 
       // Sent right after the case doc exists, and *before* the scan-file
       // upload below — that upload can throw (bad network, storage rules,
@@ -482,52 +535,44 @@ export function SendCaseModal({ labId, labName, labPhone, labAddress, labInstagr
         type: 'order_new' as const,
         orderId: order.id,
       };
-      if (!sent.notified) {
+      try {
+        await createNotification(notifyPayload);
+      } catch (notifyErr) {
+        console.warn('Failed to create case notification, retrying once:', notifyErr);
         try {
           await createNotification(notifyPayload);
-        } catch (notifyErr) {
-          console.warn('Failed to create case notification, retrying once:', notifyErr);
-          try {
-            await createNotification(notifyPayload);
-          } catch (retryErr) {
-            console.warn('Case notification retry also failed:', retryErr);
-            // Surfaced to the sender (not just the console, which isn't visible
-            // on a real device) so a failure here is never silent again — the
-            // case itself is still saved regardless (see setDone(true) below).
-            toast.error(
-              ar
-                ? 'تم إرسال الحالة، لكن تعذر إشعار المختبر بها'
-                : "Case sent, but couldn't notify the lab",
-            );
-          }
+        } catch (retryErr) {
+          console.warn('Case notification retry also failed:', retryErr);
+          // Surfaced to the sender (not just the console, which isn't visible
+          // on a real device) so a failure here is never silent again — the
+          // case itself is still saved regardless (see setDone(true) below).
+          toast.error(
+            ar
+              ? 'تم إرسال الحالة، لكن تعذر إشعار المختبر بها'
+              : "Case sent, but couldn't notify the lab",
+          );
         }
-        sent.notified = true;
       }
 
       if (scanFile) {
-        const blob = await fetch(scanFile.uri).then((r) => r.blob());
-        const { path } = await uploadOrderFile({
-          orderId: order.id,
-          labId,
-          dentistId: user?.uid ?? '',
-          file: blob,
-          fileName: scanFile.name,
-          onProgress: (pct) => setUploadProgress(pct),
-        });
-        await attachOrderFile(labId, order.id, { name: scanFile.name, path });
+        try {
+          await uploadScan(order.id);
+        } catch (uploadErr) {
+          console.warn('Scan upload failed:', uploadErr);
+          setSentOrderId(order.id);
+          setError(
+            ar
+              ? 'تم إرسال الحالة للمختبر، لكن تعذر رفع ملف الماسح. تحقق من الاتصال واضغط "إعادة رفع الملف".'
+              : 'The case was sent to the lab, but the scan file failed to upload. Check your connection and tap "Retry file upload".',
+          );
+          return;
+        }
       }
 
-      sentRef.current = null;
       setDone(true);
     } catch (err) {
       const msg = err instanceof Error ? err.message : '';
-      setError(
-        sentRef.current
-          ? ar
-            ? `تم إرسال الحالة للمختبر، لكن تعذر رفع الملف${msg ? ` (${msg})` : ''}. اضغط إرسال لإعادة رفع الملف فقط.`
-            : `The case was sent, but the file upload failed${msg ? ` (${msg})` : ''}. Press Send to retry the file only.`
-          : msg || (ar ? 'فشل الإرسال. حاول مرة أخرى.' : 'Failed to send. Try again.'),
-      );
+      setError(msg || (ar ? 'فشل الإرسال. حاول مرة أخرى.' : 'Failed to send. Try again.'));
     } finally {
       setBusy(false);
     }
@@ -560,7 +605,7 @@ export function SendCaseModal({ labId, labName, labPhone, labAddress, labInstagr
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={handleClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>
       <View className="flex-1 justify-end bg-black/40">
         <View className="max-h-[92%] rounded-t-3xl bg-[#EBF3FA]">
           <View className="flex-row items-center justify-between border-b border-slate-200 px-4 pb-2.5 pt-4">
@@ -588,7 +633,7 @@ export function SendCaseModal({ labId, labName, labPhone, labAddress, labInstagr
             </Pressable>
           </View>
 
-          <ScrollView className="px-4" contentContainerClassName="gap-4 py-4">
+          <KeyboardAwareScrollView bottomOffset={24} keyboardShouldPersistTaps="handled" className="px-4" contentContainerClassName="gap-4 py-4">
             {!!error && (
               <View className="rounded-xl border border-rose-200 bg-rose-50 p-3">
                 <Text className="text-sm text-rose-700">{error}</Text>
@@ -916,7 +961,7 @@ export function SendCaseModal({ labId, labName, labPhone, labAddress, labInstagr
                     <Text numberOfLines={1} className="flex-1 text-xs font-semibold text-slate-700">
                       {scanFile.name}
                     </Text>
-                    {!busy && (
+                    {!busy && !sentOrderId && (
                       <Pressable onPress={clearFile} className="h-7 w-7 items-center justify-center rounded-lg">
                         <X size={16} color="#94A3B8" />
                       </Pressable>
@@ -955,12 +1000,16 @@ export function SendCaseModal({ labId, labName, labPhone, labAddress, labInstagr
                 </>
               ) : (
                 <>
-                  <Send size={16} color="#FFFFFF" />
-                  <Text className="text-sm font-bold text-primary-foreground">{ar ? 'إرسال الوصفة للمختبر' : 'Send Rx to Lab'}</Text>
+                  {sentOrderId ? <Upload size={16} color="#FFFFFF" /> : <Send size={16} color="#FFFFFF" />}
+                  <Text className="text-sm font-bold text-primary-foreground">
+                    {sentOrderId
+                      ? ar ? 'إعادة رفع الملف' : 'Retry file upload'
+                      : ar ? 'إرسال الوصفة للمختبر' : 'Send Rx to Lab'}
+                  </Text>
                 </>
               )}
             </Pressable>
-          </ScrollView>
+          </KeyboardAwareScrollView>
 
           <View className="flex-row items-center justify-between border-t border-slate-200 bg-[#E2EDF8] px-5 py-3">
             <View className="flex-row items-center gap-1">
@@ -974,7 +1023,7 @@ export function SendCaseModal({ labId, labName, labPhone, labAddress, labInstagr
           </View>
         </View>
       </View>
-      </KeyboardAvoidingView>
+      </View>
 
       <CalendarPickerModal
         visible={showReceivedCal}

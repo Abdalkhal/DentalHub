@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Modal, Pressable, TextInput, View } from 'react-native';
+import { KeyboardAwareScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Trash2, TrendingDown, TrendingUp, Wallet, X } from 'lucide-react-native';
 
@@ -159,7 +160,7 @@ function AddTxModal({ open, onClose, ar }: { open: boolean; onClose: () => void;
 
   return (
     <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>
       <View className="flex-1 justify-start bg-black/40">
         <View className="rounded-b-3xl bg-white" style={{ paddingTop: insets.top }}>
           <View className="flex-row items-center justify-between border-b border-slate-100 px-4 pb-2.5 pt-4">
@@ -171,7 +172,7 @@ function AddTxModal({ open, onClose, ar }: { open: boolean; onClose: () => void;
             </Pressable>
           </View>
 
-          <ScrollView contentContainerClassName="gap-3 px-4 py-4">
+          <KeyboardAwareScrollView bottomOffset={24} keyboardShouldPersistTaps="handled" contentContainerClassName="gap-3 px-4 py-4">
             {/* Income / Expense toggle */}
             <View className="flex-row gap-2">
               <Pressable
@@ -248,10 +249,10 @@ function AddTxModal({ open, onClose, ar }: { open: boolean; onClose: () => void;
                 {ar ? 'حفظ الحركة' : 'Save Transaction'}
               </Text>
             </Pressable>
-          </ScrollView>
+          </KeyboardAwareScrollView>
         </View>
       </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }

@@ -1,5 +1,6 @@
 ﻿import { createLocalStore } from "./createLocalStore";
 import { toast } from "@/lib/toast";
+import { requireSignIn } from "@/lib/guestAccess";
 
 export type FavKind = "brand" | "product" | "implant" | "office";
 
@@ -42,6 +43,8 @@ export function useIsFavorited(id: string): boolean {
 }
 
 export function toggleFavorite(item: FavItem, lang?: string): boolean {
+  // Favorites are saved per account; guests are sent to sign in.
+  if (requireSignIn()) return false;
   const list = favorites.getSnapshot();
   const exists = list.findIndex((i) => i.id === item.id);
   const ar = lang === "ar";

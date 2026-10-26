@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, FlatList, Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, Share, TextInput, View } from 'react-native';
+import { Alert, FlatList, Image, Linking, Modal, Platform, Pressable, ScrollView, Share, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useLocalSearchParams } from 'expo-router';
 import {
   Building2,
@@ -346,7 +347,7 @@ function HeaderDialog({
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
       <View className="flex-1 items-center justify-center bg-black/40 p-4">
         <View className="w-full max-w-sm gap-3 rounded-2xl bg-white p-4">
           <Text className="text-sm font-extrabold text-slate-900">
@@ -454,9 +455,16 @@ function AddMedicineSheet({
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+      {/* Android: this sheet rendered as a fully black screen. Everything
+          here that is known to break Android modals is avoided: no
+          KeyboardAvoidingView 'height' resizing (the search box sits at the
+          top, so the keyboard never covers it), a definite sheet height so
+          the FlatList below has a bounded viewport and actually virtualizes
+          (with only max-h it could lay out all ~177 rows and their images at
+          once), and no removeClippedSubviews. */}
+      <KeyboardAvoidingView behavior="padding" enabled={Platform.OS === 'ios'} style={{ flex: 1 }}>
       <View className="flex-1 justify-end bg-black/40">
-        <View className="max-h-[88%] rounded-t-3xl bg-white px-4 pb-4 pt-3">
+        <View className="h-[88%] rounded-t-3xl bg-white px-4 pb-4 pt-3">
           <View className="mb-1 h-1 w-10 self-center rounded-full bg-slate-200" />
           <Text className="mb-3 text-[17px] font-extrabold text-slate-900">
             {ar ? 'اختر دواء لإضافته للورقة' : 'Pick a medicine'}
@@ -521,14 +529,13 @@ function AddMedicineSheet({
               virtualizing means only the rows actually scrolled into view
               ever mount, so only their images load. */}
           <FlatList
-            className="mt-2"
+            className="mt-2 flex-1"
             data={list}
             keyExtractor={(m) => m.id}
             contentContainerClassName="gap-2.5 pb-2"
             initialNumToRender={10}
             maxToRenderPerBatch={10}
             windowSize={7}
-            removeClippedSubviews
             ListEmptyComponent={
               <Text className="py-6 text-center text-xs text-slate-400">{ar ? 'لا نتائج' : 'No results'}</Text>
             }
@@ -544,7 +551,7 @@ function AddMedicineSheet({
                     style={{ backgroundColor: 'rgba(59,130,246,0.1)' }}
                   >
                     {m.image ? (
-                      <Image source={{ uri: m.image }} className="h-full w-full bg-white" resizeMode="contain" />
+                      <Image source={{ uri: m.image }} className="h-full w-full bg-white" resizeMode="contain" resizeMethod="resize" />
                     ) : (
                       <Pill size={18} color="#3B82F6" />
                     )}

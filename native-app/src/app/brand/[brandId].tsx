@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
-import { Image, Pressable, ScrollView, View } from 'react-native';
+import { Image, Linking, Pressable, ScrollView, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { doc, getDoc } from 'firebase/firestore';
-import { BadgeCheck, Check, Heart, MapPin, Package, ShoppingCart } from 'lucide-react-native';
+import { Check, Heart, MapPin, MessageCircle, Package, ShoppingCart } from 'lucide-react-native';
 
 import { Screen, Text } from '@/components/ui';
 import { db } from '@/integrations/firebase/client';
@@ -11,6 +11,7 @@ import { getBrand } from '@/data/brands';
 import { BRANCHES, CITIES } from '@/data/offices';
 import { useProducts, type Product } from '@/lib/products';
 import { useIsFavorited, toggleFavorite } from '@/lib/favoritesStore';
+import { supportWhatsAppUrl } from '@/lib/support';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
@@ -181,20 +182,35 @@ export default function BrandDetailScreen() {
               <MapPin size={13} color="rgba(255,255,255,0.9)" />
               <Text className="text-xs text-white/90">{ar ? brand.countryAr : brand.countryEn}</Text>
             </View>
-            {/* `brand.distributors` was static seed data, disconnected from
-                the real vendors below (and often wrong for it) — count the
-                actual companies whose live products matched this brand. */}
-            {companyIds.length > 0 && (
-              <View className="mt-2 flex-row items-center gap-1 self-start rounded-full bg-white px-2.5 py-1">
-                <BadgeCheck size={13} color="#2563EB" />
-                <Text className="text-[11px] font-bold text-slate-800">
-                  {ar ? `${companyIds.length} وكيل معتمد` : `${companyIds.length} certified distributors`}
-                </Text>
-              </View>
-            )}
           </View>
         </View>
       </View>
+
+      {/* No brand has an authorized agent on Dent Hub yet — the vendors below
+          only sell its products — so instead of labelling them as certified
+          agents, invite the real agent to get in touch. */}
+      <Pressable
+        onPress={() =>
+          Linking.openURL(
+            supportWhatsAppUrl(
+              `مرحباً، أنا الوكيل المعتمد لبراند ${brand.ar} (${brand.name}) وأرغب بالتواصل مع Dent Hub.`,
+            ),
+          )
+        }
+        className="mt-4 flex-row items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3.5"
+      >
+        <View className="h-10 w-10 items-center justify-center rounded-xl bg-emerald-100">
+          <MessageCircle size={20} color="#059669" />
+        </View>
+        <View className="min-w-0 flex-1">
+          <Text className="text-sm font-extrabold text-slate-800">
+            {ar ? 'هل أنت الوكيل المعتمد لهذا البراند؟' : 'Are you the authorized agent for this brand?'}
+          </Text>
+          <Text className="mt-0.5 text-[11px] text-slate-600">
+            {ar ? 'اترك بيانات التواصل وسنتواصل معك' : 'Leave your contact details and we will get in touch'}
+          </Text>
+        </View>
+      </Pressable>
 
       {/* Governorate tabs */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-4">

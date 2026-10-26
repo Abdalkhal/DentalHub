@@ -1,4 +1,4 @@
-import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { DefaultTheme, Stack, ThemeProvider, router, usePathname, useRootNavigationState } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
 import { Cairo_400Regular, Cairo_500Medium, Cairo_600SemiBold, Cairo_700Bold, Cairo_800ExtraBold, Cairo_900Black } from '@expo-google-fonts/cairo';
@@ -7,6 +7,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 
 import { StyleSheet, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 
 import '@/global.css';
 import '@/lib/polyfills';
@@ -15,6 +17,9 @@ import { LanguageProvider, useI18n, type DictKey } from '@/lib/i18n';
 import { AnimatedSplashOverlay, SplashArt } from '@/components/animated-icon';
 import { ToastHost } from '@/components/ToastHost';
 import { CartHeaderButton } from '@/components/CartHeaderButton';
+import { isGuestRoute } from '@/lib/guestAccess';
+import { useSession } from '@/lib/useAuth';
+import { registerPush } from '@/lib/push';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -76,6 +81,29 @@ const TITLED_SCREENS: { name: string; title: DictKey; cart?: boolean }[] = [
  */
 function RootStack() {
   const { t } = useI18n();
+  const pathname = usePathname();
+  const { user, loading } = useSession();
+  const navigationKey = useRootNavigationState()?.key;
+
+  // Signed-out visitors may browse the catalog (see lib/guestAccess.ts);
+  // any account-based route sends them to sign in. `replace` rather than
+  // `push`, so going back from the login screen returns to the screen they
+  // were browsing instead of the gated one.
+  const needsSignIn = !loading && !user && !isGuestRoute(pathname);
+  useEffect(() => {
+    if (navigationKey && needsSignIn) router.replace('/login');
+  }, [navigationKey, needsSignIn]);
+
+  // Save this device's push token for every signed-in user. It used to be
+  // requested only from the Notifications screen, so most accounts (e.g. a
+  // lab waiting for new cases) never had a token and could not be notified.
+  // registerPush only prompts while permission is undetermined, and fails
+  // quietly (no native module, permission denied, offline).
+  const uid = user?.uid;
+  useEffect(() => {
+    if (uid) void registerPush(uid);
+  }, [uid]);
+
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
@@ -145,15 +173,23 @@ export default function RootLayout() {
   // No <SafeAreaProvider> here: expo-router's ExpoRoot already wraps the
   // whole app in one (see node_modules/expo-router/build/ExpoRoot.js), so
   // adding a second one here would just be a redundant nested provider.
+  // GestureHandlerRootView: required above any react-native-gesture-handler
+  // gesture (the dental chart's pinch/pan in ArchViewer.tsx). KeyboardProvider:
+  // required by react-native-keyboard-controller's KeyboardAwareScrollView /
+  // KeyboardAvoidingView, which keep focused inputs above the keyboard.
   return (
-    <QueryClientProvider client={queryClient}>
-      <LanguageProvider>
-        <ThemeProvider value={DefaultTheme}>
-          <AnimatedSplashOverlay />
-          <ToastHost />
-          <RootStack />
-        </ThemeProvider>
-      </LanguageProvider>
-    </QueryClientProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <KeyboardProvider>
+      <QueryClientProvider client={queryClient}>
+        <LanguageProvider>
+          <ThemeProvider value={DefaultTheme}>
+            <AnimatedSplashOverlay />
+            <ToastHost />
+            <RootStack />
+          </ThemeProvider>
+        </LanguageProvider>
+      </QueryClientProvider>
+      </KeyboardProvider>
+    </GestureHandlerRootView>
   );
 }

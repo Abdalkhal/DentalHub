@@ -160,7 +160,7 @@ function RxOdontogramArch({ jaw, teeth }: { jaw: 'upper' | 'lower'; teeth: Recor
   return (
     // `direction: 'ltr'` (matching DentalArch.tsx) keeps the absolute tooth
     // markers from being mirrored under forced Arabic RTL layout.
-    <View onLayout={onLayout} style={{ width: '100%', aspectRatio: 4 / 3, direction: 'ltr' }}>
+    <View onLayout={onLayout} style={{ width: '100%', maxWidth: 480, alignSelf: 'center', aspectRatio: 4 / 3, direction: 'ltr' }}>
       <Image source={archSrc} style={{ position: 'absolute', width: '100%', height: '100%' }} resizeMode="contain" />
       {size.width > 0 &&
         fdiList.map((n) => {

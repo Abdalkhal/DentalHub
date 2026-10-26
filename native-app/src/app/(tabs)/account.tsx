@@ -1,7 +1,7 @@
 import { Image, Pressable, View } from 'react-native';
 import { router } from 'expo-router';
 import { signOut } from 'firebase/auth';
-import { Bell, ChevronRight, FileText, Globe, Heart, LifeBuoy, LogOut, Megaphone, MessageCircle, User } from 'lucide-react-native';
+import { Bell, ChevronRight, FileText, Globe, Heart, LifeBuoy, LogIn, LogOut, Megaphone, MessageCircle, ShieldCheck, User } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 
 import { Screen, Text } from '@/components/ui';
@@ -49,7 +49,7 @@ function Row({
 export default function AccountScreen() {
   const { lang, toggle } = useI18n();
   const ar = lang === 'ar';
-  const { role } = useUserRole();
+  const { user, role, loading } = useUserRole();
 
   const name = [role?.name, role?.surname].filter(Boolean).join(' ').trim() || 'Dent Hub';
   const type = role?.accountType ?? 'dentist';
@@ -57,6 +57,8 @@ export default function AccountScreen() {
   const photo = role?.photoURL ?? '';
   const city = role?.city || role?.address || '';
   const email = role?.email || '';
+
+  if (!loading && !user) return <GuestAccount />;
 
   return (
     <Screen>
@@ -160,6 +162,66 @@ export default function AccountScreen() {
           {ar ? 'تسجيل الخروج' : 'Sign out'}
         </Text>
       </Pressable>
+    </Screen>
+  );
+}
+
+/**
+ * Account tab for signed-out visitors (guest browsing — see
+ * lib/guestAccess.ts): explains what an account is for and offers sign-in,
+ * while language, help and privacy stay available without one.
+ */
+function GuestAccount() {
+  const { lang, toggle } = useI18n();
+  const ar = lang === 'ar';
+
+  return (
+    <Screen>
+      <View className="items-center rounded-2xl border border-slate-200 bg-card p-6 shadow-sm">
+        <View className="h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
+          <User size={28} color="#3B82F6" />
+        </View>
+        <Text className="mt-3 text-lg font-extrabold text-slate-900">
+          {ar ? 'أنت تتصفح كزائر' : "You're browsing as a guest"}
+        </Text>
+        <Text className="mt-1.5 text-center text-sm leading-snug text-slate-500">
+          {ar
+            ? 'سجّل الدخول أو أنشئ حساباً لطلب المنتجات، وحفظ المفضلة، وإدارة عيادتك، ومراسلة الموردين.'
+            : 'Sign in or create an account to order products, save favorites, manage your clinic and message suppliers.'}
+        </Text>
+        <Pressable
+          onPress={() => router.push('/login')}
+          className="mt-5 h-12 w-full flex-row items-center justify-center gap-2 rounded-2xl bg-primary"
+        >
+          <LogIn size={17} color="#FFFFFF" />
+          <Text className="text-sm font-bold text-white">{ar ? 'تسجيل الدخول / إنشاء حساب' : 'Sign in / Create account'}</Text>
+        </Pressable>
+      </View>
+
+      <View className="mt-5 gap-2.5">
+        <Row
+          icon={Globe}
+          tone="bg-sky-100"
+          color="#0284C7"
+          label={ar ? 'اللغة' : 'Language'}
+          right={lang === 'ar' ? 'العربية' : 'English'}
+          onPress={toggle}
+        />
+        <Row
+          icon={LifeBuoy}
+          tone="bg-indigo-100"
+          color="#4F46E5"
+          label={ar ? 'المساعدة' : 'Help'}
+          onPress={() => router.push('/help')}
+        />
+        <Row
+          icon={ShieldCheck}
+          tone="bg-slate-100"
+          color="#334155"
+          label={ar ? 'سياسة الخصوصية' : 'Privacy Policy'}
+          onPress={() => router.push('/privacy')}
+        />
+      </View>
     </Screen>
   );
 }

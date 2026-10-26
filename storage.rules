@@ -223,7 +223,7 @@ service firebase.storage {
 
       allow create: if isSignedIn()
         && isNewObject()
-        && request.resource.size < 60 * 1024 * 1024
+        && request.resource.size < 150 * 1024 * 1024
         && request.resource.metadata.get('labId', '').size() > 0
         && uid() == request.resource.metadata.get('dentistId', '');
 

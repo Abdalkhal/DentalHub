@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View } from 'react-native';
+import { Alert, Modal, Pressable, View } from 'react-native';
+import { KeyboardAwareScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import { Trash2 } from 'lucide-react-native';
 
 import { Button, Input, Text } from '@/components/ui';
@@ -193,9 +194,9 @@ function OfferFormModal({
 
   return (
     <Modal visible transparent animationType="slide">
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>
       <View className="flex-1 justify-end bg-black/40">
-        <ScrollView
+        <KeyboardAwareScrollView bottomOffset={24} keyboardShouldPersistTaps="handled"
           className="max-h-[85%] rounded-t-3xl bg-white p-5 pb-8"
           contentContainerClassName="gap-3"
         >
@@ -240,9 +241,9 @@ function OfferFormModal({
             <Button variant="outline" title={ar ? 'إلغاء' : 'Cancel'} onPress={onClose} className="flex-1" />
             <Button title={ar ? 'حفظ' : 'Save'} onPress={save} loading={busy} className="flex-1" />
           </View>
-        </ScrollView>
+        </KeyboardAwareScrollView>
       </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }

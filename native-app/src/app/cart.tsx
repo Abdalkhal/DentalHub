@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, Share, View } from 'react-native';
+import { Pressable, Share, View } from 'react-native';
+import { KeyboardAwareScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import { router } from 'expo-router';
 import { Loader2, Share2, ShoppingCart, Trash2 } from 'lucide-react-native';
 
@@ -113,7 +114,7 @@ export default function CartScreen() {
 
   return (
     <Screen scroll={false}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
+      <KeyboardAwareScrollView bottomOffset={24} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
         {/* Invoice header */}
         <View className="overflow-hidden rounded-3xl p-5 shadow-lg" style={{ backgroundColor: TEAL }}>
           <View className="flex-row items-start justify-between gap-3">
@@ -202,7 +203,7 @@ export default function CartScreen() {
             )}
           </View>
         </View>
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
       {/* Sticky bottom actions */}
       <View className="flex-row gap-2 border-t border-slate-200 bg-white px-4 pb-4 pt-3">
