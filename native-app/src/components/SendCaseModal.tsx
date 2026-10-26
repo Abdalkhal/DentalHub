@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { KeyboardAwareScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import {
   AtSign,
   Calendar,
@@ -177,7 +178,7 @@ function OdontogramArch({
     // being mirrored under forced Arabic RTL layout — otherwise Android
     // flips every `left`/`top` offset in this subtree and swaps each tooth
     // onto the wrong side (e.g. #18 rendering on the patient-left side).
-    <View style={{ width: '100%', aspectRatio: 4 / 3, direction: 'ltr' }}>
+    <View style={{ width: '100%', maxWidth: 480, alignSelf: 'center', aspectRatio: 4 / 3, direction: 'ltr' }}>
       <Image source={archSrc} style={{ position: 'absolute', width: '100%', height: '100%' }} resizeMode="contain" />
       {fdiList.map((n) => {
         const pos = posMap[n];
@@ -604,7 +605,7 @@ export function SendCaseModal({ labId, labName, labPhone, labAddress, labInstagr
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={handleClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>
       <View className="flex-1 justify-end bg-black/40">
         <View className="max-h-[92%] rounded-t-3xl bg-[#EBF3FA]">
           <View className="flex-row items-center justify-between border-b border-slate-200 px-4 pb-2.5 pt-4">
@@ -632,7 +633,7 @@ export function SendCaseModal({ labId, labName, labPhone, labAddress, labInstagr
             </Pressable>
           </View>
 
-          <ScrollView className="px-4" contentContainerClassName="gap-4 py-4">
+          <KeyboardAwareScrollView bottomOffset={24} keyboardShouldPersistTaps="handled" className="px-4" contentContainerClassName="gap-4 py-4">
             {!!error && (
               <View className="rounded-xl border border-rose-200 bg-rose-50 p-3">
                 <Text className="text-sm text-rose-700">{error}</Text>
@@ -1008,7 +1009,7 @@ export function SendCaseModal({ labId, labName, labPhone, labAddress, labInstagr
                 </>
               )}
             </Pressable>
-          </ScrollView>
+          </KeyboardAwareScrollView>
 
           <View className="flex-row items-center justify-between border-t border-slate-200 bg-[#E2EDF8] px-5 py-3">
             <View className="flex-row items-center gap-1">
@@ -1022,7 +1023,7 @@ export function SendCaseModal({ labId, labName, labPhone, labAddress, labInstagr
           </View>
         </View>
       </View>
-      </KeyboardAvoidingView>
+      </View>
 
       <CalendarPickerModal
         visible={showReceivedCal}

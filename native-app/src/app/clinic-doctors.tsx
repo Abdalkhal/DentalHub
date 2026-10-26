@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Modal, Pressable, TextInput, View } from 'react-native';
+import { KeyboardAwareScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Clock, Phone, Plus, Stethoscope, Trash2, X } from 'lucide-react-native';
 
@@ -135,7 +136,7 @@ function AddDoctorSheet({ ar, onClose }: { ar: boolean; onClose: () => void }) {
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>
       <View className="flex-1 justify-start bg-black/40">
         <View className="max-h-[92%] rounded-b-3xl bg-white" style={{ paddingTop: insets.top }}>
           <View className="flex-row items-center justify-between border-b border-slate-100 px-4 pb-2.5 pt-4">
@@ -145,7 +146,7 @@ function AddDoctorSheet({ ar, onClose }: { ar: boolean; onClose: () => void }) {
             </Pressable>
           </View>
 
-          <ScrollView className="px-4" contentContainerClassName="gap-3.5 py-4">
+          <KeyboardAwareScrollView bottomOffset={24} keyboardShouldPersistTaps="handled" className="px-4" contentContainerClassName="gap-3.5 py-4">
             <Field label={ar ? 'اسم الطبيب' : 'Doctor name'}>
               <TextInput
                 autoFocus
@@ -288,10 +289,10 @@ function AddDoctorSheet({ ar, onClose }: { ar: boolean; onClose: () => void }) {
             <Pressable onPress={submit} className="h-12 items-center justify-center rounded-2xl bg-primary">
               <Text className="text-sm font-extrabold text-primary-foreground">{ar ? 'حفظ' : 'Save'}</Text>
             </Pressable>
-          </ScrollView>
+          </KeyboardAwareScrollView>
         </View>
       </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }

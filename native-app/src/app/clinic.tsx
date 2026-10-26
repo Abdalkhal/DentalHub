@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Image, Modal, Pressable, View } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { router, type Href } from 'expo-router';
 import {
   BarChart3,
@@ -291,6 +292,7 @@ export default function ClinicHomeScreen() {
       <AddAppointmentModal open={showAdd} onClose={() => setShowAdd(false)} />
 
       <Modal visible={formMode !== 'closed'} transparent animationType="fade" onRequestClose={() => setFormMode('closed')}>
+        <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
         <View className="flex-1 justify-end bg-black/40">
           <View className="gap-3 rounded-t-3xl bg-white p-5">
             <Text className="text-lg font-extrabold text-slate-800">
@@ -316,6 +318,7 @@ export default function ClinicHomeScreen() {
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
     </Screen>
   );

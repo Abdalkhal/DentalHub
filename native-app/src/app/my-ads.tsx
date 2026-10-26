@@ -19,12 +19,7 @@ import {
   type Ad,
 } from '@/lib/adsStore';
 import { useSignedImageUrls } from '@/lib/products';
-
-// The support/admin WhatsApp Business number, per the app owner. Every
-// newly-submitted ad routes here — the actual approval always happens from
-// the admin panel, this is only how the two of them get in touch to sort out
-// duration/payment (see plan discussion; nothing about either is automated).
-const ADS_WHATSAPP_NUMBER = '9647503581161';
+import { SUPPORT_WHATSAPP_NUMBER } from '@/lib/support';
 
 const STATUS_TONE: Record<Ad['status'], string> = {
   pending: 'bg-amber-50 text-amber-700',
@@ -43,11 +38,14 @@ function statusLabel(status: Ad['status'], ar: boolean): string {
   }
 }
 
+// Every newly-submitted ad routes to the support WhatsApp — the actual
+// approval always happens from the admin panel; this is only how the two of
+// them get in touch to sort out duration/payment.
 function whatsappLink(accountName: string, title: string): string {
   const text = encodeURIComponent(
     `مرحباً، أرسلت للتو إعلاناً جديداً على Dent Hub.\nالحساب: ${accountName}\nعنوان الإعلان: ${title}`,
   );
-  return `https://wa.me/${ADS_WHATSAPP_NUMBER}?text=${text}`;
+  return `https://wa.me/${SUPPORT_WHATSAPP_NUMBER}?text=${text}`;
 }
 
 function AdCard({ ad, ar, onDelete }: { ad: Ad; ar: boolean; onDelete: () => void }) {

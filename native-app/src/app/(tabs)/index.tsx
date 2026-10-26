@@ -466,24 +466,28 @@ export default function HomeScreen() {
                         style={{ width: carouselWidth || undefined }}
                         className="relative min-h-[170px] justify-center overflow-hidden bg-[#2563EB] p-6"
                       >
-                        {!!b.image && (
+                        {/* An ad image is a designed banner that carries its own
+                            text, so it is shown as-is — overlaying the ad's title
+                            (and a dark scrim) on top of it garbled the design.
+                            The title is still shown in the ad's detail modal. */}
+                        {b.image ? (
+                          <Image source={{ uri: b.image }} resizeMode="cover" style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }} />
+                        ) : (
                           <>
-                            <Image source={{ uri: b.image }} resizeMode="cover" style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }} />
-                            <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(15,23,42,0.45)' }} />
+                            <View className="absolute -right-14 -top-16 h-48 w-48 rounded-full bg-white/15" />
+                            <View className="absolute -bottom-20 -left-12 h-44 w-44 rounded-full bg-white/10" />
+                            <View className="flex-row items-center gap-3">
+                              <View className="min-w-0 flex-1">
+                                <Text className="text-xl font-extrabold leading-tight text-white">
+                                  {b.title}
+                                </Text>
+                                {!!b.price && (
+                                  <Text className="mt-2 text-lg font-extrabold text-yellow-300">{b.price}</Text>
+                                )}
+                              </View>
+                            </View>
                           </>
                         )}
-                        <View className="absolute -right-14 -top-16 h-48 w-48 rounded-full bg-white/15" />
-                        <View className="absolute -bottom-20 -left-12 h-44 w-44 rounded-full bg-white/10" />
-                        <View className="flex-row items-center gap-3">
-                          <View className="min-w-0 flex-1">
-                            <Text className="text-xl font-extrabold leading-tight text-white">
-                              {b.title}
-                            </Text>
-                            {!!b.price && (
-                              <Text className="mt-2 text-lg font-extrabold text-yellow-300">{b.price}</Text>
-                            )}
-                          </View>
-                        </View>
                       </Pressable>
                     );
                   })}

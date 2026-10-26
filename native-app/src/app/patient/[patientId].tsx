@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Linking, Modal, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { KeyboardAwareScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import { useLocalSearchParams, router } from 'expo-router';
 import {
   Activity,
@@ -317,7 +318,7 @@ export default function PatientDetailScreen() {
         })}
       </View>
 
-      <ScrollView className="mt-4 flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+      <KeyboardAwareScrollView bottomOffset={24} keyboardShouldPersistTaps="handled" className="mt-4 flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
         {tab === 'info' && (
           <View className="gap-3">
             <Card>
@@ -362,7 +363,7 @@ export default function PatientDetailScreen() {
         {tab === 'plan' && <PlanCard p={p} ar={ar} />}
 
         {tab === 'fees' && <BillingTab p={p} ar={ar} />}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </Screen>
   );
 }
@@ -814,7 +815,7 @@ function MiniBtn({ children, onPress }: { children: React.ReactNode; onPress: ()
 function ChartCard({ p, ar }: { p: Patient; ar: boolean }) {
   const [jaw, setJaw] = useState<'upper' | 'lower'>('upper');
   const [brush, setBrush] = useState<ToothStatus>('caries');
-  const [zoom, setZoom] = useState(0.75);
+  const [zoom, setZoom] = useState(1);
   const [selecting, setSelecting] = useState(true);
   const [saved, setSaved] = useState(false);
 
@@ -866,7 +867,9 @@ function ChartCard({ p, ar }: { p: Patient; ar: boolean }) {
           />
         </ArchViewer>
         <Text className="mt-1.5 text-center text-[10px] text-slate-400">
-          {ar ? 'اختر لوناً من المفتاح ثم اضغط على السن' : 'Pick a legend color, then tap a tooth'}
+          {ar
+            ? 'اختر لوناً من المفتاح ثم اضغط على السن — قرّب بإصبعين واسحب للتنقل'
+            : 'Pick a legend color, then tap a tooth — pinch to zoom, drag to move'}
         </Text>
       </View>
 

@@ -7,6 +7,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 
 import { StyleSheet, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 
 import '@/global.css';
 import '@/lib/polyfills';
@@ -171,15 +173,23 @@ export default function RootLayout() {
   // No <SafeAreaProvider> here: expo-router's ExpoRoot already wraps the
   // whole app in one (see node_modules/expo-router/build/ExpoRoot.js), so
   // adding a second one here would just be a redundant nested provider.
+  // GestureHandlerRootView: required above any react-native-gesture-handler
+  // gesture (the dental chart's pinch/pan in ArchViewer.tsx). KeyboardProvider:
+  // required by react-native-keyboard-controller's KeyboardAwareScrollView /
+  // KeyboardAvoidingView, which keep focused inputs above the keyboard.
   return (
-    <QueryClientProvider client={queryClient}>
-      <LanguageProvider>
-        <ThemeProvider value={DefaultTheme}>
-          <AnimatedSplashOverlay />
-          <ToastHost />
-          <RootStack />
-        </ThemeProvider>
-      </LanguageProvider>
-    </QueryClientProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <KeyboardProvider>
+      <QueryClientProvider client={queryClient}>
+        <LanguageProvider>
+          <ThemeProvider value={DefaultTheme}>
+            <AnimatedSplashOverlay />
+            <ToastHost />
+            <RootStack />
+          </ThemeProvider>
+        </LanguageProvider>
+      </QueryClientProvider>
+      </KeyboardProvider>
+    </GestureHandlerRootView>
   );
 }

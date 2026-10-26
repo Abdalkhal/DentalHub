@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Modal, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { KeyboardAwareScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Bell, Calendar, Check, ChevronDown, Clock, Phone, User, X } from 'lucide-react-native';
 
@@ -182,7 +183,7 @@ export function AddAppointmentModal({ open, onClose }: { open: boolean; onClose:
 
   return (
     <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>
       <View className="flex-1 justify-start bg-black/45">
         <View className="max-h-[92%] overflow-hidden rounded-b-3xl" style={{ paddingTop: insets.top }}>
           <GradientFill colors={SHEET_GRADIENT} />
@@ -195,7 +196,7 @@ export function AddAppointmentModal({ open, onClose }: { open: boolean; onClose:
             </Pressable>
           </View>
 
-          <ScrollView className="px-4" contentContainerClassName="py-4 gap-4">
+          <KeyboardAwareScrollView bottomOffset={24} keyboardShouldPersistTaps="handled" className="px-4" contentContainerClassName="py-4 gap-4">
             {/* Patient */}
             <View className="gap-2.5">
               <FieldLabel>{ar ? 'بيانات المريض' : 'Patient'}</FieldLabel>
@@ -362,7 +363,7 @@ export function AddAppointmentModal({ open, onClose }: { open: boolean; onClose:
                 </View>
               </GradientField>
             </Pressable>
-          </ScrollView>
+          </KeyboardAwareScrollView>
 
           <View className="border-t border-white/40 p-4">
             <Pressable onPress={submit} className="overflow-hidden rounded-full shadow-lg">
@@ -377,7 +378,7 @@ export function AddAppointmentModal({ open, onClose }: { open: boolean; onClose:
           </View>
         </View>
       </View>
-      </KeyboardAvoidingView>
+      </View>
 
       <CalendarPickerModal
         visible={showCalendar}
