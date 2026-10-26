@@ -655,8 +655,22 @@ export function OrderInvoiceModal({ order, labName, labAddress, labPhone, onClos
                 </SectionCard>
               )}
 
-              {/* Scanner file (STL/ZIP) */}
-              {order.fileUrl && order.fileStatus !== "deleted" && (
+              {/* Scanner file (STL/ZIP). The apps store only `filePath` (a
+                  stored download URL would be a permanent, rules-bypassing
+                  handle on a patient scan), so it is resolved on click via
+                  CaseFileLink; `fileUrl` is the legacy fallback. Checking only
+                  `fileUrl` here hid every scan the mobile app sent. */}
+              {order.filePath && order.fileStatus !== "deleted" && (
+                <SectionCard icon={Layers} title={ar ? "ملف الماسح" : "Scanner File"}>
+                  <div className="px-4 py-3">
+                    <p className="mb-1.5 text-xs font-semibold text-slate-500">
+                      {ar ? "تحميل ملف 3D (.stl / .zip)" : "Download 3D file (.stl / .zip)"}
+                    </p>
+                    <CaseFileLink name={order.fileName || "scan.stl"} path={order.filePath} className="text-sm" />
+                  </div>
+                </SectionCard>
+              )}
+              {!order.filePath && order.fileUrl && order.fileStatus !== "deleted" && (
                 <SectionCard icon={Layers} title={ar ? "ملف الماسح" : "Scanner File"}>
                   <div className="px-4 py-3">
                     <a

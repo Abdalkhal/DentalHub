@@ -328,10 +328,19 @@ export function IncomingOrderRxModal({
             <p className="text-xs font-bold text-slate-500 uppercase mb-2">
               {ar ? "المرفقات" : "Attachments"}
             </p>
-            {(order.attachments ?? []).length === 0 ? (
+            {/* The dentist's scanner file (STL/ZIP) lives on the case as
+                `filePath`, separate from `attachments` — listing only
+                attachments showed "No attachments" for every scan sent from
+                the mobile app. */}
+            {(order.attachments ?? []).length === 0 && !(order.filePath && order.fileStatus !== "deleted") ? (
               <p className="text-xs text-slate-400">{ar ? "لا توجد مرفقات" : "No attachments"}</p>
             ) : (
               <ul className="space-y-2">
+                {order.filePath && order.fileStatus !== "deleted" && (
+                  <li>
+                    <CaseFileLink name={order.fileName || "scan.stl"} path={order.filePath} />
+                  </li>
+                )}
                 {(order.attachments ?? []).map((f, i) => (
                   <li key={i}>
                     <CaseFileLink name={f.name} path={f.path} url={f.url} />

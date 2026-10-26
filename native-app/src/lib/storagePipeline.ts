@@ -226,17 +226,21 @@ export async function uploadOrderFile(opts: {
   orderId: string;
   labId: string;
   dentistId: string;
-  file: globalThis.File | Blob;
+  /** Raw bytes are preferred on native: a Blob from `fetch(fileUri)` is unreliable for large binary files on Android. */
+  file: globalThis.File | Blob | Uint8Array;
   fileName: string;
+  contentType?: string;
   onProgress?: (pct: number) => void;
 }): Promise<{ path: string }> {
   const { orderId, labId, dentistId, file, fileName, onProgress } = opts;
+  const contentType =
+    opts.contentType || (file instanceof Uint8Array ? "" : (file as globalThis.File).type) || "application/octet-stream";
   const path = `orders_files/${orderId}/${fileName}`;
   const fileRef = ref(storage, path);
 
   await new Promise<void>((resolve, reject) => {
     const task = uploadBytesResumable(fileRef, file, {
-      contentType: (file as globalThis.File).type || "application/octet-stream",
+      contentType,
       cacheControl: "private, max-age=86400",
       customMetadata: { labId, dentistId, orderId },
     });

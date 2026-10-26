@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import {
   AtSign,
@@ -16,6 +16,7 @@ import { useI18n } from '@/lib/i18n';
 import { useSession, useUserRole } from '@/lib/useAuth';
 import { attachOrderFile, submitDentistCase } from '@/lib/ordersStore';
 import { uploadOrderFile } from '@/lib/storagePipeline';
+import { readScanFile, SCAN_MAX_BYTES, SCAN_MAX_MB } from '@/lib/scanFile';
 import { createNotification } from '@/lib/notifications';
 import { useLabCatalog, type LabCatalog } from '@/lib/catalogStore';
 import {
@@ -143,7 +144,7 @@ function GenderChip({ active, onPress, children }: { active: boolean; onPress: (
 type PickerApi = {
   getDocumentAsync: (o: { multiple?: boolean; copyToCacheDirectory?: boolean; type?: string }) => Promise<{
     canceled: boolean;
-    assets: { uri: string; name?: string }[];
+    assets: { uri: string; name?: string; size?: number }[];
   }>;
 };
 
@@ -262,6 +263,13 @@ export function SendCaseModal({ labId, labName, labPhone, labAddress, labInstagr
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The case already created on this lab, once the first send got that far.
+  // A failed scan upload used to fall into the generic "Failed to send"
+  // error, so doctors tapped Send again and created the same case several
+  // times; now a retry only re-uploads the file onto this case.
+  const [sentOrderId, setSentOrderId] = useState<string | null>(null);
+  // Blocks a second tap before React re-renders with busy=true.
+  const submitting = useRef(false);
 
   useEffect(() => {
     if (!open) return;
@@ -325,6 +333,16 @@ export function SendCaseModal({ labId, labName, labPhone, labAddress, labInstagr
       setError(ar ? 'يُسمح فقط بملفات STL أو ZIP' : 'Only .stl and .zip files are allowed');
       return;
     }
+    // Rejected up front (Storage refuses larger uploads, see storage.rules),
+    // before any case is created for it.
+    if (asset.size != null && asset.size > SCAN_MAX_BYTES) {
+      setError(
+        ar
+          ? `حجم الملف أكبر من ${SCAN_MAX_MB} ميغابايت — يرجى ضغطه أو تقليل دقته`
+          : `The file is larger than ${SCAN_MAX_MB} MB — please compress it or reduce its resolution`,
+      );
+      return;
+    }
     setError(null);
     setScanFile({ uri: asset.uri, name: asset.name ?? 'scan.stl' });
     setUploadProgress(0);
@@ -356,6 +374,7 @@ export function SendCaseModal({ labId, labName, labPhone, labAddress, labInstagr
     setUploadProgress(0);
     setDone(false);
     setError(null);
+    setSentOrderId(null);
   };
 
   const handleClose = () => {
@@ -363,8 +382,56 @@ export function SendCaseModal({ labId, labName, labPhone, labAddress, labInstagr
     onClose();
   };
 
+  const uploadScan = async (orderId: string) => {
+    if (!scanFile) return;
+    const bytes = await readScanFile(scanFile.uri);
+    const { path } = await uploadOrderFile({
+      orderId,
+      labId,
+      dentistId: user?.uid ?? '',
+      file: bytes,
+      fileName: scanFile.name,
+      contentType: scanFile.name.toLowerCase().endsWith('.zip') ? 'application/zip' : 'model/stl',
+      onProgress: (pct) => setUploadProgress(pct),
+    });
+    await attachOrderFile(labId, orderId, { name: scanFile.name, path });
+  };
+
+  // The case exists but its scan didn't upload: retry only the file.
+  const retryScanUpload = async (orderId: string) => {
+    setBusy(true);
+    setUploadProgress(0);
+    try {
+      await uploadScan(orderId);
+      setDone(true);
+    } catch (err) {
+      console.warn('Scan upload retry failed:', err);
+      setError(
+        ar
+          ? 'تم إرسال الحالة للمختبر، لكن تعذر رفع ملف الماسح. تحقق من الاتصال واضغط "إعادة رفع الملف".'
+          : 'The case was sent to the lab, but the scan file failed to upload. Check your connection and tap "Retry file upload".',
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleSubmit = async () => {
+    if (submitting.current) return;
+    submitting.current = true;
+    try {
+      await submit();
+    } finally {
+      submitting.current = false;
+    }
+  };
+
+  const submit = async () => {
     setError(null);
+    if (sentOrderId) {
+      await retryScanUpload(sentOrderId);
+      return;
+    }
     if (!patient.trim()) {
       setError(ar ? 'الرجاء إدخال اسم المريض' : 'Please enter patient name');
       return;
@@ -487,16 +554,18 @@ export function SendCaseModal({ labId, labName, labPhone, labAddress, labInstagr
       }
 
       if (scanFile) {
-        const blob = await fetch(scanFile.uri).then((r) => r.blob());
-        const { path } = await uploadOrderFile({
-          orderId: order.id,
-          labId,
-          dentistId: user?.uid ?? '',
-          file: blob,
-          fileName: scanFile.name,
-          onProgress: (pct) => setUploadProgress(pct),
-        });
-        await attachOrderFile(labId, order.id, { name: scanFile.name, path });
+        try {
+          await uploadScan(order.id);
+        } catch (uploadErr) {
+          console.warn('Scan upload failed:', uploadErr);
+          setSentOrderId(order.id);
+          setError(
+            ar
+              ? 'تم إرسال الحالة للمختبر، لكن تعذر رفع ملف الماسح. تحقق من الاتصال واضغط "إعادة رفع الملف".'
+              : 'The case was sent to the lab, but the scan file failed to upload. Check your connection and tap "Retry file upload".',
+          );
+          return;
+        }
       }
 
       setDone(true);
@@ -891,7 +960,7 @@ export function SendCaseModal({ labId, labName, labPhone, labAddress, labInstagr
                     <Text numberOfLines={1} className="flex-1 text-xs font-semibold text-slate-700">
                       {scanFile.name}
                     </Text>
-                    {!busy && (
+                    {!busy && !sentOrderId && (
                       <Pressable onPress={clearFile} className="h-7 w-7 items-center justify-center rounded-lg">
                         <X size={16} color="#94A3B8" />
                       </Pressable>
@@ -930,8 +999,12 @@ export function SendCaseModal({ labId, labName, labPhone, labAddress, labInstagr
                 </>
               ) : (
                 <>
-                  <Send size={16} color="#FFFFFF" />
-                  <Text className="text-sm font-bold text-primary-foreground">{ar ? 'إرسال الوصفة للمختبر' : 'Send Rx to Lab'}</Text>
+                  {sentOrderId ? <Upload size={16} color="#FFFFFF" /> : <Send size={16} color="#FFFFFF" />}
+                  <Text className="text-sm font-bold text-primary-foreground">
+                    {sentOrderId
+                      ? ar ? 'إعادة رفع الملف' : 'Retry file upload'
+                      : ar ? 'إرسال الوصفة للمختبر' : 'Send Rx to Lab'}
+                  </Text>
                 </>
               )}
             </Pressable>
