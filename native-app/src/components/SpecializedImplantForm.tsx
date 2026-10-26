@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { KeyboardAwareScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import { Check, Package, Plus, Sparkles, Upload, X } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -246,7 +247,7 @@ export function SpecializedImplantForm({ open, onClose, ar, product }: { open: b
 
   return (
     <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>
       <View className="flex-1 justify-end bg-black/40">
         <View className="max-h-[93%] overflow-hidden rounded-t-[32px] bg-[#F6F5FF]">
           <View className="flex-row items-center justify-between px-4 pb-3 pt-4" style={{ backgroundColor: ACCENT }}>
@@ -264,7 +265,7 @@ export function SpecializedImplantForm({ open, onClose, ar, product }: { open: b
             </Pressable>
           </View>
 
-          <ScrollView className="px-4" contentContainerClassName="gap-3.5 py-4">
+          <KeyboardAwareScrollView bottomOffset={24} keyboardShouldPersistTaps="handled" className="px-4" contentContainerClassName="gap-3.5 py-4">
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerClassName="gap-1.5">
               {SPECIALIZED_CATEGORIES.map((c) => {
                 const active = category === c.id;
@@ -367,10 +368,10 @@ export function SpecializedImplantForm({ open, onClose, ar, product }: { open: b
             <Pressable onPress={submit} disabled={busy} className="h-14 items-center justify-center rounded-2xl" style={{ backgroundColor: ACCENT, opacity: busy ? 0.6 : 1 }}>
               <Text className="text-sm font-extrabold text-white">{busy ? (ar ? 'جارٍ الحفظ...' : 'Saving...') : ar ? 'حفظ الزرعة المتخصصة' : 'Save Specialized Implant'}</Text>
             </Pressable>
-          </ScrollView>
+          </KeyboardAwareScrollView>
         </View>
       </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }

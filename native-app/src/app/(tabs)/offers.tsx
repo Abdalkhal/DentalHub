@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, View } from 'react-native';
+import { Image, Linking, Modal, Pressable, ScrollView, View } from 'react-native';
+import { KeyboardAwareScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import * as ImagePicker from 'expo-image-picker';
 
 import { Button, Input, Screen, Text } from '@/components/ui';
@@ -463,9 +464,9 @@ function ClassifiedModal({
 
   return (
     <Modal visible transparent animationType="slide">
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>
       <View className="flex-1 justify-end bg-black/40">
-        <ScrollView
+        <KeyboardAwareScrollView bottomOffset={24} keyboardShouldPersistTaps="handled"
           className="max-h-[88%] rounded-t-3xl bg-white p-5 pb-8"
           contentContainerClassName="gap-3"
         >
@@ -597,9 +598,9 @@ function ClassifiedModal({
           )}
 
           <Button title={ar ? 'نشر الإعلان' : 'Publish Ad'} onPress={submit} />
-        </ScrollView>
+        </KeyboardAwareScrollView>
       </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }

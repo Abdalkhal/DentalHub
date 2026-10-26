@@ -10,7 +10,7 @@ module.exports = {
   expo: {
     name: "Dent Hub",
     slug: "native-app",
-    version: "1.0.0",
+    version: "1.0.1",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
     scheme: "dentalhub",
@@ -28,7 +28,7 @@ module.exports = {
       package: "com.khazer.denthub",
       googleServicesFile: process.env.GOOGLE_SERVICES_JSON || "./google-services.json",
       adaptiveIcon: {
-        backgroundColor: "#2563EB",
+        backgroundColor: "#F5F9FE",
         foregroundImage: "./assets/images/android-icon-foreground.png",
         backgroundImage: "./assets/images/android-icon-background.png",
         monochromeImage: "./assets/images/android-icon-monochrome.png",
@@ -63,6 +63,17 @@ module.exports = {
           backgroundColor: "#EFF5FC",
           image: "./assets/images/splash-branded.png",
           resizeMode: "cover",
+          // Android 12+ can't show a full-screen splash image: it shrinks
+          // whatever it is given into a small centred icon, which turned the
+          // branded art above into a tiny, ugly "Dent Hub" thumbnail. Android
+          // gets just the logo mark on the brand background; the full art
+          // still appears in-app via AnimatedSplashOverlay.
+          android: {
+            image: "./assets/images/splash-icon-android.png",
+            imageWidth: 200,
+            resizeMode: "contain",
+            backgroundColor: "#EFF5FC",
+          },
         },
       ],
       "expo-image",

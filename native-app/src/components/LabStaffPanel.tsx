@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, View } from 'react-native';
+import { KeyboardAwareScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import {
   Building2,
   Mail,
@@ -283,9 +284,9 @@ function MemberFormModal({
 
   return (
     <Modal visible transparent animationType="fade">
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>
       <View className="flex-1 justify-end bg-black/40">
-        <ScrollView className="max-h-[90%] rounded-t-3xl bg-white p-5" contentContainerClassName="gap-3 pb-8">
+        <KeyboardAwareScrollView bottomOffset={24} keyboardShouldPersistTaps="handled" className="max-h-[90%] rounded-t-3xl bg-white p-5" contentContainerClassName="gap-3 pb-8">
           <View className="flex-row items-center justify-between">
             <View className="flex-row items-center gap-2.5">
               <View className="h-9 w-9 items-center justify-center rounded-xl bg-sky-50">
@@ -362,9 +363,9 @@ function MemberFormModal({
             loading={busy}
             onPress={handleSubmit}
           />
-        </ScrollView>
+        </KeyboardAwareScrollView>
       </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
