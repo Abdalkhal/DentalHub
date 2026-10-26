@@ -19,6 +19,8 @@ import {
 import { useAllAds } from '@/lib/adsStore';
 import { useUserRole, useIsAdmin } from '@/lib/useAuth';
 import { auth, storage } from '@/integrations/firebase/client';
+import { app } from '@/integrations/firebase/config';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { CalendarPickerModal, toDateStr } from '@/components/CalendarPickerModal';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
@@ -39,6 +41,53 @@ function AdThumb({ path }: { path?: string }) {
   }, [path]);
   if (!url) return <View className="h-12 w-12 rounded-lg bg-slate-100" />;
   return <Image source={{ uri: url }} className="h-12 w-12 rounded-lg bg-slate-100" />;
+}
+
+/**
+ * Rebuilds every `public_profiles` doc from `user_roles` (backfillPublicProfiles
+ * Cloud Function, admin only). Accounts that existed before syncPublicProfile
+ * was deployed have no public profile until this runs — their company card
+ * and "Visit profile" button never appear to dentists. Safe to re-run.
+ */
+function SyncProfilesCard({ ar }: { ar: boolean }) {
+  const [state, setState] = useState<'idle' | 'busy' | 'done' | 'error'>('idle');
+  const [count, setCount] = useState(0);
+  const run = async () => {
+    setState('busy');
+    try {
+      const call = httpsCallable<Record<string, never>, { copied: number }>(getFunctions(app), 'backfillPublicProfiles');
+      const { data } = await call({});
+      setCount(data.copied);
+      setState('done');
+    } catch {
+      setState('error');
+    }
+  };
+  return (
+    <Card className="mt-4 gap-2">
+      <Text className="text-xs font-bold text-slate-500">{ar ? 'الملفات العامة للحسابات' : 'Public profiles'}</Text>
+      <Text className="text-[11px] text-slate-500">
+        {ar
+          ? 'تنشئ نسخة الملف العامة (الاسم، الصورة، الهاتف) لكل حساب، ليظهر زر «زيارة الملف الشخصي» على منتجاته.'
+          : 'Builds each account\'s public profile (name, photo, phone) so "Visit profile" appears on its products.'}
+      </Text>
+      <Button
+        size="sm"
+        variant="outline"
+        loading={state === 'busy'}
+        onPress={run}
+        title={
+          state === 'busy'
+            ? ar ? 'جارٍ المزامنة...' : 'Syncing...'
+            : state === 'done'
+              ? ar ? `تمت مزامنة ${count} حساب` : `Synced ${count} accounts`
+              : state === 'error'
+                ? ar ? 'فشلت المزامنة — أعد المحاولة' : 'Sync failed — retry'
+                : ar ? 'مزامنة الملفات العامة' : 'Sync public profiles'
+        }
+      />
+    </Card>
+  );
 }
 
 export default function AdminScreen() {
@@ -181,6 +230,8 @@ export default function AdminScreen() {
           ))}
         </View>
       </Card>
+
+      <SyncProfilesCard ar={ar} />
 
       <Text className="mt-5 text-sm font-bold text-slate-600">
         {ar ? 'الإعلانات قيد المراجعة' : 'Pending ads'} ({pending.length})
