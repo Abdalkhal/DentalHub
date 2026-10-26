@@ -17,6 +17,7 @@ import { ToastHost } from '@/components/ToastHost';
 import { CartHeaderButton } from '@/components/CartHeaderButton';
 import { isGuestRoute } from '@/lib/guestAccess';
 import { useSession } from '@/lib/useAuth';
+import { registerPush } from '@/lib/push';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -90,6 +91,16 @@ function RootStack() {
   useEffect(() => {
     if (navigationKey && needsSignIn) router.replace('/login');
   }, [navigationKey, needsSignIn]);
+
+  // Save this device's push token for every signed-in user. It used to be
+  // requested only from the Notifications screen, so most accounts (e.g. a
+  // lab waiting for new cases) never had a token and could not be notified.
+  // registerPush only prompts while permission is undetermined, and fails
+  // quietly (no native module, permission denied, offline).
+  const uid = user?.uid;
+  useEffect(() => {
+    if (uid) void registerPush(uid);
+  }, [uid]);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
