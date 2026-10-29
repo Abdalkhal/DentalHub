@@ -214,6 +214,14 @@ service firebase.storage {
     // labId, so the owning lab is recorded in metadata at write time — and
     // because objects here are immutable, that stamp cannot later be forged by
     // overwriting someone else's file.
+    // A dentist's patient files and X-rays (patients.$patientId / patient
+    // screen). Private to the owning account; 25 MB per file.
+    match /dentist_records/{ownerId}/{allPaths=**} {
+      allow read, delete: if isSignedIn() && uid() == ownerId;
+      allow create, update: if isSignedIn() && uid() == ownerId
+        && request.resource.size < 25 * 1024 * 1024;
+    }
+
     match /orders_files/{orderId}/{file} {
       allow read: if isSignedIn() && (
         uid() == resource.metadata.get('dentistId', '')

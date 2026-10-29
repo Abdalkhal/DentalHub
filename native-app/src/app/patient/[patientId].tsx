@@ -34,6 +34,7 @@ import type { LucideIcon } from 'lucide-react-native';
 
 import { Screen, Card, Button, Input, Text } from '@/components/ui';
 import { CalendarPickerModal } from '@/components/CalendarPickerModal';
+import { XrayGallery, useXrayUpload } from '@/components/PatientXrays';
 import { DentalArch, LEGEND_ORDER, TOOTH_META } from '@/components/DentalArch';
 import { ArchViewer, ARCH_ZOOM_MIN, ARCH_ZOOM_MAX } from '@/components/ArchViewer';
 import {
@@ -1048,6 +1049,7 @@ function ChartCard({ p, ar }: { p: Patient; ar: boolean }) {
 
 function PlanCard({ p, ar }: { p: Patient; ar: boolean }) {
   const [dept, setDept] = useState<string>(p.branch || BRANCHES[0].key);
+  const { upload: uploadXrays, uploading: xrayUploading } = useXrayUpload(p, ar);
   const [adding, setAdding] = useState(false);
   const [picking, setPicking] = useState(false);
   const [form, setForm] = useState({ title: '', tooth: '', cost: '', note: '' });
@@ -1173,7 +1175,8 @@ function PlanCard({ p, ar }: { p: Patient; ar: boolean }) {
                 : deptMeta.en}
           </Text>
           <Pressable
-            onPress={() => (isRadio ? undefined : setPicking(true))}
+            onPress={() => (isRadio ? void uploadXrays() : setPicking(true))}
+            disabled={isRadio && xrayUploading}
             className="h-8 shrink-0 flex-row items-center gap-1 rounded-full px-3"
             style={{ backgroundColor: 'rgba(59,130,246,0.1)' }}
           >
@@ -1284,12 +1287,7 @@ function PlanCard({ p, ar }: { p: Patient; ar: boolean }) {
         )}
 
         {isRadio ? (
-          <View className="items-center rounded-2xl bg-slate-50 py-8">
-            <Cloud size={28} color="#94A3B8" />
-            <Text className="mt-2 text-xs font-semibold text-slate-500">
-              {ar ? 'معرض الأشعة قادم قريباً' : 'X-ray gallery coming soon'}
-            </Text>
-          </View>
+          <XrayGallery p={p} ar={ar} uploading={xrayUploading} />
         ) : plan.length === 0 ? (
           <View className="items-center rounded-2xl bg-slate-50 py-8">
             <Text className="text-xs text-slate-400">

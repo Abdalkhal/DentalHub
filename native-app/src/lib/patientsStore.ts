@@ -1,5 +1,17 @@
-// Local patients store (localStorage) for the Dentist dashboard.
+// Patients store for the Dentist dashboard. Local storage is the instant,
+// offline-capable cache the UI reads; for a signed-in dentist every change is
+// also synced to Firestore (see the "Cloud sync" section at the end and
+// dentistRecords.ts), so the same records appear on the phone and the web.
 import { useSyncExternalStore } from "react";
+import { onSnapshot, query, setDoc, where, type QueryDocumentSnapshot } from "firebase/firestore";
+import {
+  deletePatientFile,
+  patientDoc,
+  patientFilePath,
+  patientsCol,
+  toFirestore,
+  uploadDataUrl,
+} from "./dentistRecords";
 
 export type Gender = "male" | "female";
 export type PatientStatus = "in_treatment" | "completed" | "new";
@@ -60,7 +72,10 @@ export type Visit = {
 export type PatientFile = {
   id: string;
   name: string;
-  dataUrl: string;
+  // Storage path (synced). Files added before cloud sync, or by a guest,
+  // carry an inline `dataUrl` instead until they are uploaded.
+  path?: string;
+  dataUrl?: string;
   type: string;
   addedAt: string;
 };
@@ -101,6 +116,8 @@ export type Patient = {
   notes?: string;
   plan?: PlanStep[];
   log?: HistoryEntry[];
+  // Last local change (ms) — the newer side wins when syncing.
+  updatedAt?: number;
 };
 
 export const EMPTY_HISTORY: MedicalHistory = {
@@ -124,21 +141,30 @@ const listeners = new Set<() => void>();
 // into another's. Called by clinicsStore.ts's `pointStoresAt` every time
 // the active clinic changes, not just on sign-in.
 export function setPatientStoreUser(uid: string, clinicId: string) {
+  // The web app re-runs this on every page mount; resetting (and restarting
+  // the cloud listener) when nothing changed only threw the cache away.
+  if (uid === currentUserId && clinicId === currentClinicId && loaded) return;
+  flushPushes();
   currentUserId = uid;
   currentClinicId = clinicId;
   loaded = false;
   state = [];
+  startSync();
   listeners.forEach((l) => l());
 }
 
-function getKey() {
-  return KEY_PREFIX + (currentUserId || "guest") + ":" + (currentClinicId || "default");
+function keyFor(uid: string, clinicId: string) {
+  return KEY_PREFIX + (uid || "guest") + ":" + (clinicId || "default");
 }
 
-function load(): Patient[] {
+function getKey() {
+  return keyFor(currentUserId, currentClinicId);
+}
+
+function load(key = getKey()): Patient[] {
   if (typeof window === "undefined") return [];
   try {
-    return JSON.parse(localStorage.getItem(getKey()) || "[]") as Patient[];
+    return JSON.parse(localStorage.getItem(key) || "[]") as Patient[];
   } catch {
     return [];
   }
@@ -151,10 +177,22 @@ function ensure() {
   }
 }
 
-function persist() {
+/** Writes the local cache and re-renders. Never throws: a full browser
+ *  storage (quota) used to crash the page and lose the edit. */
+function saveLocal() {
   if (typeof window === "undefined") return;
-  localStorage.setItem(getKey(), JSON.stringify(state));
+  try {
+    localStorage.setItem(getKey(), JSON.stringify(state));
+  } catch (err) {
+    console.warn("Patients cache not saved locally (storage full?):", err);
+  }
   listeners.forEach((l) => l());
+}
+
+/** Local save + queue the changed patient(s) for the cloud. */
+function persist(changedIds: string[] = []) {
+  saveLocal();
+  for (const id of changedIds) schedulePush(id);
 }
 
 export function subscribe(cb: () => void) {
@@ -199,9 +237,10 @@ export function addPatient(input: PatientInput): Patient {
     totalFees: 0,
     payments: [],
     ...input,
+    updatedAt: Date.now(),
   };
   state = [p, ...state];
-  persist();
+  persist([p.id]);
   return p;
 }
 
@@ -228,14 +267,16 @@ export function findOrCreatePatient(name: string, phone: string): Patient {
 
 export function updatePatient(id: string, patch: Partial<Patient>) {
   ensure();
-  state = state.map((p) => (p.id === id ? { ...p, ...patch } : p));
-  persist();
+  state = state.map((p) => (p.id === id ? { ...p, ...patch, updatedAt: Date.now() } : p));
+  persist([id]);
 }
 
 export function removePatient(id: string) {
   ensure();
+  const gone = state.find((p) => p.id === id);
   state = state.filter((p) => p.id !== id);
   persist();
+  if (gone) pushDelete(gone);
 }
 
 export function setTooth(id: string, tooth: number, status: ToothStatus) {
@@ -263,18 +304,25 @@ export function removeVisit(id: string, visitId: string) {
   updatePatient(id, { visits: p.visits.filter((v) => v.id !== visitId) });
 }
 
-export function addFile(id: string, f: Omit<PatientFile, "id" | "addedAt">) {
+/** `f.id` may be pre-chosen so it matches the file's Storage path. */
+export function addFile(id: string, f: Omit<PatientFile, "id" | "addedAt"> & { id?: string }) {
   const p = getPatient(id);
   if (!p) return;
   updatePatient(id, {
-    files: [{ id: `f_${Date.now().toString(36)}`, addedAt: new Date().toISOString(), ...f }, ...p.files],
+    files: [{ ...f, id: f.id ?? newFileId(), addedAt: new Date().toISOString() }, ...p.files],
   });
+}
+
+export function newFileId(): string {
+  return `f_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 }
 
 export function removeFile(id: string, fileId: string) {
   const p = getPatient(id);
   if (!p) return;
+  const file = p.files.find((f) => f.id === fileId);
   updatePatient(id, { files: p.files.filter((f) => f.id !== fileId) });
+  if (file?.path) void deletePatientFile(file.path);
 }
 
 export function addPayment(id: string, pay: Omit<Payment, "id">) {
@@ -417,4 +465,228 @@ export function planTotals(p: Patient): Record<FeeCurrency, number> {
   const sums: Record<FeeCurrency, number> = { USD: 0, IQD: 0 };
   for (const s of getPlan(p)) sums[planCurrency(p, s)] += Number(s.cost) || 0;
   return sums;
+}
+
+/* ── Cloud sync ─────────────────────────────────────────────────
+ * Local storage stays the instant, offline cache; Firestore is the shared
+ * copy. Per patient, the newer `updatedAt` wins. A deleted patient leaves a
+ * tombstone (`deleted: true`) remotely and an entry in a local "deleted"
+ * list, so neither side resurrects it from a stale copy. */
+
+type RemotePatient = Patient & { clinicId?: string; deleted?: boolean };
+
+const PUSH_DELAY_MS = 800; // typing in a note must not be one write per key
+const pushTimers = new Map<string, ReturnType<typeof setTimeout>>();
+let unsubscribeRemote: (() => void) | null = null;
+// Off until clinicsStore has reconciled this account's clinic list with the
+// cloud: on a device's first sync its local clinic may be merged into the
+// account's existing one, and patients must not be uploaded under the old id.
+let syncReady = false;
+
+const syncEnabled = (uid = currentUserId) => !!uid && syncReady && typeof window !== "undefined";
+
+export function setPatientSyncReady(ready: boolean) {
+  const was = syncReady;
+  syncReady = ready;
+  if (ready && !was) startSync();
+  if (!ready) {
+    unsubscribeRemote?.();
+    unsubscribeRemote = null;
+  }
+}
+const pushKey = (uid: string, clinicId: string, id: string) => `${uid}|${clinicId}|${id}`;
+const deletedKey = (uid: string, clinicId: string) => `${keyFor(uid, clinicId)}:deleted`;
+
+function readDeleted(uid: string, clinicId: string): Record<string, number> {
+  try {
+    return JSON.parse(localStorage.getItem(deletedKey(uid, clinicId)) || "{}") as Record<string, number>;
+  } catch {
+    return {};
+  }
+}
+
+function markDeleted(uid: string, clinicId: string, id: string, at: number) {
+  try {
+    localStorage.setItem(deletedKey(uid, clinicId), JSON.stringify({ ...readDeleted(uid, clinicId), [id]: at }));
+  } catch {
+    /* best effort */
+  }
+}
+
+function schedulePush(id: string) {
+  if (!syncEnabled() || !currentClinicId) return;
+  const uid = currentUserId;
+  const clinicId = currentClinicId;
+  const key = pushKey(uid, clinicId, id);
+  const prev = pushTimers.get(key);
+  if (prev) clearTimeout(prev);
+  pushTimers.set(
+    key,
+    setTimeout(() => {
+      pushTimers.delete(key);
+      void pushPatient(uid, clinicId, id);
+    }, PUSH_DELAY_MS),
+  );
+}
+
+/** Sends every queued change now — before the account or clinic switches. */
+function flushPushes() {
+  for (const [key, timer] of pushTimers) {
+    clearTimeout(timer);
+    const [uid, clinicId, id] = key.split("|");
+    void pushPatient(uid, clinicId, id);
+  }
+  pushTimers.clear();
+}
+
+function readPatient(uid: string, clinicId: string, id: string): Patient | undefined {
+  if (uid === currentUserId && clinicId === currentClinicId) {
+    ensure();
+    return state.find((p) => p.id === id);
+  }
+  return load(keyFor(uid, clinicId)).find((p) => p.id === id);
+}
+
+/** Records Storage paths for files that were uploaded, without touching any
+ *  other field (the doctor may have kept editing while the upload ran). */
+function applyUploadedPaths(uid: string, clinicId: string, patientId: string, paths: Map<string, string>) {
+  const patch = (p: Patient): Patient =>
+    p.id !== patientId
+      ? p
+      : {
+          ...p,
+          files: p.files.map((f) => {
+            const path = paths.get(f.id);
+            if (!path) return f;
+            const { dataUrl: _inline, ...rest } = f;
+            return { ...rest, path };
+          }),
+        };
+  if (uid === currentUserId && clinicId === currentClinicId) {
+    state = state.map(patch);
+    saveLocal();
+    return;
+  }
+  try {
+    localStorage.setItem(keyFor(uid, clinicId), JSON.stringify(load(keyFor(uid, clinicId)).map(patch)));
+  } catch {
+    /* the next sync retries */
+  }
+}
+
+/** Legacy files were stored inline as `data:` URLs — too big for Firestore
+ *  (1 MB per document) and the reason the browser storage filled up. They
+ *  are moved to Storage before the record is synced. */
+async function uploadInlineFiles(uid: string, clinicId: string, p: Patient): Promise<Patient> {
+  const inline = p.files.filter((f) => f.dataUrl && !f.path);
+  if (inline.length === 0) return p;
+  const paths = new Map<string, string>();
+  for (const f of inline) {
+    const path = patientFilePath(uid, p.id, f.id, f.name);
+    await uploadDataUrl(path, f.dataUrl!);
+    paths.set(f.id, path);
+  }
+  applyUploadedPaths(uid, clinicId, p.id, paths);
+  return readPatient(uid, clinicId, p.id) ?? p;
+}
+
+async function pushPatient(uid: string, clinicId: string, id: string) {
+  const p = readPatient(uid, clinicId, id);
+  if (!p) return;
+  try {
+    const ready = await uploadInlineFiles(uid, clinicId, p);
+    // Never send an inline file body, even if its upload failed above.
+    const files = ready.files.filter((f) => f.path).map(({ dataUrl: _inline, ...f }) => f);
+    await setDoc(patientDoc(uid, id), toFirestore({ ...ready, files, clinicId, deleted: false }));
+  } catch (err) {
+    // Kept locally with a newer `updatedAt`, so the next sync sends it again.
+    console.warn("Patient not synced yet:", id, err);
+  }
+}
+
+function pushDelete(p: Patient) {
+  if (!currentUserId || !currentClinicId || typeof window === "undefined") return;
+  const uid = currentUserId;
+  const clinicId = currentClinicId;
+  const at = Date.now();
+  const key = pushKey(uid, clinicId, p.id);
+  const timer = pushTimers.get(key);
+  if (timer) clearTimeout(timer);
+  pushTimers.delete(key);
+  // Recorded even while sync is off, so the next sync sends the tombstone.
+  markDeleted(uid, clinicId, p.id, at);
+  if (!syncEnabled()) return;
+  setDoc(patientDoc(uid, p.id), { id: p.id, clinicId, deleted: true, updatedAt: at }).catch((err) =>
+    console.warn("Patient delete not synced yet:", p.id, err),
+  );
+  for (const f of p.files) if (f.path) void deletePatientFile(f.path);
+}
+
+function mergeRemote(docs: QueryDocumentSnapshot[], complete: boolean) {
+  ensure();
+  const uid = currentUserId;
+  const clinicId = currentClinicId;
+  const deletedHere = readDeleted(uid, clinicId);
+  const byId = new Map(state.map((p) => [p.id, p] as const));
+  const seen = new Set<string>();
+  const toPush: string[] = [];
+  const tombstonesToResend: Patient[] = [];
+  let changed = false;
+
+  for (const d of docs) {
+    const { clinicId: _clinic, deleted, ...remote } = d.data() as RemotePatient;
+    const id = d.id;
+    seen.add(id);
+    const local = byId.get(id);
+    const rTime = remote.updatedAt ?? 0;
+    const lTime = local?.updatedAt ?? 0;
+    if (deleted) {
+      if (local && lTime <= rTime) {
+        byId.delete(id);
+        changed = true;
+      } else if (local) toPush.push(id); // edited here after it was deleted elsewhere
+      continue;
+    }
+    if (!local) {
+      // Deleted on this device after that remote copy was written.
+      if ((deletedHere[id] ?? 0) >= rTime) tombstonesToResend.push({ ...(remote as Patient), id });
+      else {
+        byId.set(id, { ...(remote as Patient), id });
+        changed = true;
+      }
+    } else if (rTime > lTime) {
+      byId.set(id, { ...(remote as Patient), id });
+      changed = true;
+    } else if (lTime > rTime) toPush.push(id);
+  }
+  // First sync from this device: upload what only exists locally. Only on a
+  // server-complete snapshot — a partial cached one would look "missing".
+  if (complete) for (const id of byId.keys()) if (!seen.has(id)) toPush.push(id);
+
+  if (changed) {
+    state = [...byId.values()].sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
+    saveLocal();
+  }
+  for (const id of toPush) schedulePush(id);
+  for (const p of tombstonesToResend) pushDelete(p);
+}
+
+function startSync() {
+  unsubscribeRemote?.();
+  unsubscribeRemote = null;
+  if (!syncEnabled() || !currentClinicId) return;
+  const uid = currentUserId;
+  const clinicId = currentClinicId;
+  try {
+    unsubscribeRemote = onSnapshot(
+      query(patientsCol(uid), where("clinicId", "==", clinicId)),
+      (snap) => {
+        if (uid !== currentUserId || clinicId !== currentClinicId) return;
+        mergeRemote(snap.docs, !snap.metadata.fromCache);
+      },
+      (err) => console.warn("Patients sync listener error:", err),
+    );
+  } catch (err) {
+    console.warn("Patients sync not started:", err);
+  }
 }

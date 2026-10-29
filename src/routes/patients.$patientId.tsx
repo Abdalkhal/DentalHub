@@ -35,10 +35,12 @@ import {
   usePatients,
   type PlanStatus,
   type PlanStep,
+  newFileId,
   parseToothList,
   planTotals,
   type ToothStatus,
 } from "@/lib/patientsStore";
+import { fetchPatientFile, patientFilePath, uploadPatientFile } from "@/lib/dentistRecords";
 import { listOrders } from "@/lib/ordersStore";
 import { useClinic } from "@/lib/clinicStore";
 import { setClinicsStoreUser } from "@/lib/clinicsStore";
@@ -890,6 +892,85 @@ function PlanCard({ p, ar }: { p: P; ar: boolean }) {
 
 const XRAY_TAG = "[xray] ";
 
+/** Picked files go to Storage (private to the account) and the record keeps
+ *  only the path. They used to be embedded as data URLs in the browser's
+ *  storage, which holds ~5 MB — a few photos filled it and saving failed
+ *  silently. A guest (no account) still keeps them inline, locally. */
+async function addPatientFiles(p: P, files: FileList | null, uid: string | undefined, namePrefix = "") {
+  if (!files) return;
+  for (const f of Array.from(files)) {
+    const name = namePrefix + f.name;
+    if (uid) {
+      const fileId = newFileId();
+      const path = patientFilePath(uid, p.id, fileId, f.name);
+      try {
+        await uploadPatientFile(path, f, f.type);
+        addFile(p.id, { id: fileId, name, path, type: f.type });
+      } catch (err) {
+        console.warn("Patient file upload failed:", err);
+        window.alert(`تعذر رفع الملف ${f.name} — تحقق من الاتصال وحاول مرة أخرى.\nCould not upload ${f.name}.`);
+      }
+    } else {
+      const dataUrl = await new Promise<string>((res) => {
+        const r = new FileReader();
+        r.onload = () => res(String(r.result));
+        r.readAsDataURL(f);
+      });
+      addFile(p.id, { name, dataUrl, type: f.type });
+    }
+  }
+}
+
+/** Display URL for a patient file: inline data URL, or a Storage object
+ *  fetched through the SDK (rules-checked) into a temporary object URL. */
+function useFileUrl(f: { path?: string; dataUrl?: string } | undefined): string | undefined {
+  const [url, setUrl] = useState<string | undefined>(f?.dataUrl);
+  const path = f?.path;
+  const dataUrl = f?.dataUrl;
+  useEffect(() => {
+    if (dataUrl || !path) {
+      setUrl(dataUrl);
+      return;
+    }
+    let objectUrl: string | null = null;
+    let cancelled = false;
+    setUrl(undefined);
+    fetchPatientFile(path)
+      .then((blob) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setUrl(objectUrl);
+      })
+      .catch((err) => console.warn("Patient file not loaded:", err));
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [path, dataUrl]);
+  return url;
+}
+
+function FileImage_({ f, className, alt }: { f: { path?: string; dataUrl?: string; type: string }; className: string; alt?: string }) {
+  const url = useFileUrl(f);
+  if (!f.type.startsWith("image/")) {
+    return (
+      <span className={cn(className, "flex items-center justify-center")}>
+        <FileImage className="size-6 text-muted-foreground" />
+      </span>
+    );
+  }
+  return url ? <img src={url} alt={alt ?? ""} className={className} /> : <span className={cn(className, "bg-muted animate-pulse")} />;
+}
+
+function FileLink({ f, children, className, download }: { f: { path?: string; dataUrl?: string }; children: React.ReactNode; className?: string; download?: boolean }) {
+  const url = useFileUrl(f);
+  return (
+    <a href={url} target={download ? undefined : "_blank"} rel="noreferrer" download={download || undefined} className={className} onClick={(e) => e.stopPropagation()}>
+      {children}
+    </a>
+  );
+}
+
 function RadiologyGallery({
   p,
   ar,
@@ -901,22 +982,23 @@ function RadiologyGallery({
 }) {
   const xrays = p.files.filter((f) => f.name.startsWith(XRAY_TAG));
   const [viewer, setViewer] = useState<{ idx: number; zoom: number; rotate: number } | null>(null);
+  const { user } = useSession();
+  const [uploading, setUploading] = useState(false);
+  const viewerUrl = useFileUrl(viewer ? xrays[viewer.idx] : undefined);
 
   const onPick = async (files: FileList | null) => {
-    if (!files) return;
-    for (const f of Array.from(files)) {
-      const dataUrl = await new Promise<string>((res) => {
-        const r = new FileReader();
-        r.onload = () => res(String(r.result));
-        r.readAsDataURL(f);
-      });
-      addFile(p.id, { name: XRAY_TAG + f.name, dataUrl, type: f.type });
+    setUploading(true);
+    try {
+      await addPatientFiles(p, files, user?.uid, XRAY_TAG);
+    } finally {
+      setUploading(false);
     }
   };
 
   return (
     <div>
       <input ref={inputRef} type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={(e) => onPick(e.target.files)} />
+      {uploading && <p className="mb-2 text-[11px] font-bold text-primary">{ar ? "جارٍ رفع الأشعة…" : "Uploading…"}</p>}
       {xrays.length === 0 ? (
         <div className="rounded-xl border border-border bg-[oklch(0.98_0.01_240)] py-7 flex flex-col items-center gap-2">
           <FileImage className="size-9 text-muted-foreground" />
@@ -929,7 +1011,7 @@ function RadiologyGallery({
               <button onClick={() => setViewer({ idx: i, zoom: 1, rotate: 0 })} className="block w-full rounded-xl overflow-hidden border border-border bg-card hover:ring-2 hover:ring-primary/50 transition">
                 {f.type.startsWith("image/") ? (
                   <div className="relative">
-                    <img src={f.dataUrl} alt="" className="w-full aspect-square object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                    <FileImage_ f={f} className="w-full aspect-square object-cover" />
                     <span className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition"><ZoomIn className="size-5 text-white opacity-0 group-hover:opacity-100 transition" /></span>
                   </div>
                 ) : <span className="w-full aspect-square flex items-center justify-center"><FileImage className="size-6 text-muted-foreground" /></span>}
@@ -951,12 +1033,12 @@ function RadiologyGallery({
               <button onClick={(e) => { e.stopPropagation(); setViewer((v) => v && { ...v, zoom: Math.max(0.5, v.zoom - 0.5) }); }} className="size-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20"><Minus className="size-4" /></button>
               <button onClick={(e) => { e.stopPropagation(); setViewer((v) => v && { ...v, zoom: 1 }); }} className="size-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20 text-[10px] font-bold">1:1</button>
               <button onClick={(e) => { e.stopPropagation(); setViewer((v) => v && { ...v, rotate: v.rotate + 90 }); }} className="size-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20"><RotateCcw className="size-4" /></button>
-              <a href={xrays[viewer.idx].dataUrl} download className="size-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20" onClick={(e) => e.stopPropagation()}><Download className="size-4" /></a>
+              <FileLink f={xrays[viewer.idx]} download className="size-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20"><Download className="size-4" /></FileLink>
             </div>
           </div>
           <div className="flex-1 flex items-center justify-center overflow-auto p-8" onClick={() => setViewer(null)}>
             <img
-              src={xrays[viewer.idx].dataUrl}
+              src={viewerUrl}
               alt=""
               onClick={(e) => e.stopPropagation()}
               className="max-w-none"
@@ -1178,16 +1260,15 @@ function NotesCard({ p, ar }: { p: P; ar: boolean }) {
 
 function FilesCard({ p, ar }: { p: P; ar: boolean }) {
   const ref = useRef<HTMLInputElement>(null);
+  const { user } = useSession();
+  const [uploading, setUploading] = useState(false);
 
   const onPick = async (files: FileList | null) => {
-    if (!files) return;
-    for (const f of Array.from(files)) {
-      const dataUrl = await new Promise<string>((res) => {
-        const r = new FileReader();
-        r.onload = () => res(String(r.result));
-        r.readAsDataURL(f);
-      });
-      addFile(p.id, { name: f.name, dataUrl, type: f.type });
+    setUploading(true);
+    try {
+      await addPatientFiles(p, files, user?.uid);
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -1198,22 +1279,16 @@ function FilesCard({ p, ar }: { p: P; ar: boolean }) {
           onClick={() => ref.current?.click()}
           className="aspect-square rounded-2xl border-2 border-dashed border-border bg-[oklch(0.98_0.01_240)] flex flex-col items-center justify-center gap-1 text-muted-foreground"
         >
-          <Cloud className="size-5 text-primary" />
-          <span className="text-[10px] font-bold">{ar ? "رفع ملف" : "Upload"}</span>
+          <Cloud className={cn("size-5 text-primary", uploading && "animate-pulse")} />
+          <span className="text-[10px] font-bold">{uploading ? (ar ? "جارٍ الرفع…" : "Uploading…") : ar ? "رفع ملف" : "Upload"}</span>
         </button>
         <input ref={ref} type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={(e) => onPick(e.target.files)} />
 
         {p.files.filter((f) => !f.name.startsWith("[xray] ")).map((f) => (
           <div key={f.id} className="relative">
-            <a href={f.dataUrl} target="_blank" rel="noreferrer" className="block rounded-2xl overflow-hidden border border-border bg-card">
-              {f.type.startsWith("image/") ? (
-                <img src={f.dataUrl} alt={f.name} className="w-full aspect-square object-cover" />
-              ) : (
-                <span className="w-full aspect-square flex items-center justify-center">
-                  <FileImage className="size-6 text-muted-foreground" />
-                </span>
-              )}
-            </a>
+            <FileLink f={f} className="block rounded-2xl overflow-hidden border border-border bg-card">
+              <FileImage_ f={f} alt={f.name} className="w-full aspect-square object-cover" />
+            </FileLink>
             <p className="text-[10px] font-semibold truncate mt-1 text-center">{f.name}</p>
             <p className="text-[9px] text-muted-foreground text-center" dir="ltr">{f.addedAt.slice(0, 10)}</p>
             <button

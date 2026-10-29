@@ -141,3 +141,23 @@ test("a path with no explicit rule is denied (no catch-all)", async () => {
     env.authenticatedContext(OUTSIDER).storage().ref("some/unmapped/path.bin").getMetadata(),
   );
 });
+
+// ---- dentist_records: a dentist's own patient files only ----
+
+const PATIENT_FILE = "dentist_records/dentist-own/patients/p1/f1-xray.png";
+
+test("a dentist can upload and read their own patient file", async () => {
+  const st = env.authenticatedContext("dentist-own").storage();
+  await assertSucceeds(st.ref(PATIENT_FILE).put(BYTES, { contentType: "image/png" }));
+  await assertSucceeds(st.ref(PATIENT_FILE).getMetadata());
+});
+
+test("another account cannot read or overwrite a dentist's patient file", async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.storage().ref(PATIENT_FILE).put(BYTES, { contentType: "image/png" });
+  });
+  const other = env.authenticatedContext("dentist-other").storage();
+  await assertFails(other.ref(PATIENT_FILE).getMetadata());
+  await assertFails(other.ref(PATIENT_FILE).put(BYTES, { contentType: "image/png" }));
+  await assertFails(env.unauthenticatedContext().storage().ref(PATIENT_FILE).getMetadata());
+});

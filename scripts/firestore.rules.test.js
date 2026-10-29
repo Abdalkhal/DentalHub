@@ -183,3 +183,25 @@ test("unauthenticated user cannot read private/finance", async () => {
   const db = env.unauthenticatedContext().firestore();
   await assertFails(db.doc("lab_orders/lab1/cases/case1/private/finance").get());
 });
+
+// ---- dentist_records: a dentist's own patients/clinic list only ----
+
+test("dentist can read and write their own patient records and clinic list", async () => {
+  const db = env.authenticatedContext("dentist1").firestore();
+  await assertSucceeds(db.doc("dentist_records/dentist1").set({ clinics: [{ id: "c1", name: "Main" }] }));
+  await assertSucceeds(db.doc("dentist_records/dentist1/patients/p1").set({ id: "p1", clinicId: "c1", name: "A" }));
+  await assertSucceeds(db.doc("dentist_records/dentist1/patients/p1").get());
+  await assertSucceeds(db.collection("dentist_records/dentist1/patients").where("clinicId", "==", "c1").get());
+});
+
+test("another account cannot read or write a dentist's patient records", async () => {
+  await env.withSecurityRulesDisabled((ctx) =>
+    ctx.firestore().doc("dentist_records/dentist1/patients/p1").set({ id: "p1", clinicId: "c1" }),
+  );
+  const other = env.authenticatedContext("dentist2").firestore();
+  await assertFails(other.doc("dentist_records/dentist1/patients/p1").get());
+  await assertFails(other.doc("dentist_records/dentist1").get());
+  await assertFails(other.doc("dentist_records/dentist1/patients/p2").set({ id: "p2" }));
+  const anon = env.unauthenticatedContext().firestore();
+  await assertFails(anon.doc("dentist_records/dentist1/patients/p1").get());
+});

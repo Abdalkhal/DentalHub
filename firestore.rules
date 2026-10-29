@@ -534,6 +534,19 @@ service cloud.firestore {
     }
 
     // ============================================================
+    // Dentist clinic records (patients, clinic list) — synced from the
+    // apps' local cache (patientsStore.ts / clinicsStore.ts, see
+    // dentistRecords.ts). Medical data: only the owning account, nobody
+    // else — not admins, not other clinics, not lab accounts.
+    //   dentist_records/{uid}                      { clinics }
+    //   dentist_records/{uid}/patients/{patientId}
+    // The recursive wildcard also matches the {uid} document itself.
+    // ============================================================
+    match /dentist_records/{ownerId}/{document=**} {
+      allow read, write: if isAuthenticated() && request.auth.uid == ownerId;
+    }
+
+    // ============================================================
     // Deny-by-default for everything else
     // ============================================================
     match /{document=**} {
