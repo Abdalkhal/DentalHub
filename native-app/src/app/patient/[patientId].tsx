@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { Linking, Modal, Pressable, ScrollView, TextInput, View } from 'react-native';
-import { KeyboardAwareScrollView } from '@/components/ui/KeyboardAwareScrollView';
+import { Linking, Alert, Modal, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import {
   Activity,
@@ -34,6 +33,7 @@ import {
 import type { LucideIcon } from 'lucide-react-native';
 
 import { Screen, Card, Button, Input, Text } from '@/components/ui';
+import { CalendarPickerModal } from '@/components/CalendarPickerModal';
 import { DentalArch, LEGEND_ORDER, TOOTH_META } from '@/components/DentalArch';
 import { ArchViewer, ARCH_ZOOM_MIN, ARCH_ZOOM_MAX } from '@/components/ArchViewer';
 import {
@@ -51,7 +51,16 @@ import {
   updatePlanStep,
   removePlanStep,
   cyclePlanStep,
+  planCurrency,
+  formatMoney,
+  formatMoneyTotals,
+  formatAmountInput,
+  parseAmountInput,
+  type FeeCurrency,
+  planTotals,
   type Patient,
+  type PlanStep,
+  parseToothList,
   type PatientStatus,
   type PlanStatus,
   type ToothStatus,
@@ -196,6 +205,14 @@ const STATUS_AR: Record<PatientStatus, string> = {
   completed: 'مكتمل',
 };
 
+/** Every delete on this screen used to fire on a single tap. */
+function confirmDelete(ar: boolean, message: string, onConfirm: () => void) {
+  Alert.alert(ar ? 'تأكيد الحذف' : 'Confirm delete', message, [
+    { text: ar ? 'إلغاء' : 'Cancel', style: 'cancel' },
+    { text: ar ? 'حذف' : 'Delete', style: 'destructive', onPress: onConfirm },
+  ]);
+}
+
 export default function PatientDetailScreen() {
   const { patientId } = useLocalSearchParams<{ patientId: string }>();
   const { lang } = useI18n();
@@ -204,7 +221,10 @@ export default function PatientDetailScreen() {
   const p = patients.find((x) => x.id === patientId);
 
   const [tab, setTab] = useState<'info' | 'visits' | 'teeth' | 'plan' | 'fees'>('info');
-  const [note, setNote] = useState('');
+  // Starts from the saved note — it used to open empty, so saving silently
+  // replaced a note the doctor could not see.
+  const [note, setNote] = useState(() => p?.doctorNote ?? '');
+  const noteDirty = note !== (p?.doctorNote ?? '');
 
   if (!p) {
     return (
@@ -218,7 +238,6 @@ export default function PatientDetailScreen() {
 
   const sharePatientRecord = async () => {
     const genderLabel = p.gender === 'male' ? (ar ? 'ذكر' : 'Male') : ar ? 'أنثى' : 'Female';
-    const sym = p.feeCurrency === 'IQD' ? (ar ? 'د.ع' : 'IQD') : '$';
     const teeth = Object.entries(p.teeth)
       .map(([tooth, status]) => ({ tooth: Number(tooth), status, meta: TOOTH_META[status] }))
       .sort((a, b) => a.tooth - b.tooth)
@@ -227,7 +246,7 @@ export default function PatientDetailScreen() {
       title: s.title,
       tooth: s.tooth,
       dept: s.dept ? (ar ? BRANCHES.find((b) => b.key === s.dept)?.ar : BRANCHES.find((b) => b.key === s.dept)?.en) : undefined,
-      cost: s.cost ? `${sym}${s.cost}` : undefined,
+      cost: s.cost ? formatMoney(s.cost, planCurrency(p, s)) : undefined,
       status: ar ? PLAN_META[s.status].ar : PLAN_META[s.status].en,
       statusColor: PLAN_META[s.status].text,
       note: s.note,
@@ -272,6 +291,8 @@ export default function PatientDetailScreen() {
 
   return (
     <Screen>
+      {/* Centred column on tablets — fields used to stretch the full iPad width. */}
+      <View style={{ width: '100%', maxWidth: 820, alignSelf: 'center' }}>
       {/* Quick actions */}
       <View className="flex-row items-center gap-1.5">
         <Pressable
@@ -318,7 +339,10 @@ export default function PatientDetailScreen() {
         })}
       </View>
 
-      <KeyboardAwareScrollView bottomOffset={24} keyboardShouldPersistTaps="handled" className="mt-4 flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+      {/* Plain container: Screen already scrolls and keeps the focused input
+          above the keyboard. A second, nested keyboard-aware scroll view here
+          fought it, which let the keyboard cover the form on tablets. */}
+      <View className="mt-4 pb-6">
         {tab === 'info' && (
           <View className="gap-3">
             <Card>
@@ -332,10 +356,18 @@ export default function PatientDetailScreen() {
               />
             </Card>
             <Card>
-              <Text className="mb-2 text-xs font-bold text-slate-500">{ar ? 'ملاحظات الطبيب' : 'Doctor note'}</Text>
+              <View className="mb-2 flex-row items-center justify-between">
+                <Text className="text-xs font-bold text-slate-500">{ar ? 'ملاحظات الطبيب' : 'Doctor note'}</Text>
+                {!!p.doctorNoteDate && (
+                  <Text className="text-[10px] text-slate-400" style={{ writingDirection: 'ltr' }}>
+                    {ar ? `آخر حفظ: ${p.doctorNoteDate}` : `Last saved: ${p.doctorNoteDate}`}
+                  </Text>
+                )}
+              </View>
               <Input value={note} onChangeText={setNote} placeholder={ar ? 'اكتب ملاحظة...' : 'Write a note...'} multiline />
               <Button
-                title={ar ? 'حفظ الملاحظة' : 'Save note'}
+                title={noteDirty ? (ar ? 'حفظ الملاحظة' : 'Save note') : ar ? 'محفوظة ✓' : 'Saved ✓'}
+                disabled={!noteDirty}
                 onPress={() => updatePatient(p.id, { doctorNote: note, doctorNoteDate: new Date().toISOString().slice(0, 10) })}
                 className="mt-2"
               />
@@ -363,7 +395,8 @@ export default function PatientDetailScreen() {
         {tab === 'plan' && <PlanCard p={p} ar={ar} />}
 
         {tab === 'fees' && <BillingTab p={p} ar={ar} />}
-      </KeyboardAwareScrollView>
+      </View>
+      </View>
     </Screen>
   );
 }
@@ -372,6 +405,7 @@ function VisitsTab({ p, ar }: { p: Patient; ar: boolean }) {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [procedure, setProcedure] = useState('');
   const [upcoming, setUpcoming] = useState(false);
+  const [pickingDate, setPickingDate] = useState(false);
 
   const submit = () => {
     if (!procedure.trim()) return;
@@ -389,7 +423,23 @@ function VisitsTab({ p, ar }: { p: Patient; ar: boolean }) {
           <View className="flex-row gap-2">
             <View className="flex-1">
               <Text className="mb-1 text-[10px] font-semibold text-slate-500">{ar ? 'التاريخ' : 'Date'}</Text>
-              <Input value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" />
+              {/* Calendar instead of free-typed "YYYY-MM-DD", which accepted any text. */}
+              <Pressable
+                onPress={() => setPickingDate(true)}
+                className="h-11 flex-row items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3"
+              >
+                <Text className="text-sm text-slate-800" style={{ writingDirection: 'ltr' }}>{date}</Text>
+                <CalendarDays size={16} color="#94A3B8" />
+              </Pressable>
+              <CalendarPickerModal
+                visible={pickingDate}
+                onClose={() => setPickingDate(false)}
+                selectedDate={date}
+                onSelect={(ds) => {
+                  setDate(ds);
+                  setPickingDate(false);
+                }}
+              />
             </View>
             <View className="flex-1">
               <Text className="mb-1 text-[10px] font-semibold text-slate-500">{ar ? 'النوع' : 'Type'}</Text>
@@ -445,7 +495,7 @@ function VisitsTab({ p, ar }: { p: Patient; ar: boolean }) {
                     {v.date} · {v.upcoming ? (ar ? 'موعد قادم' : 'Upcoming') : ar ? 'منجزة' : 'Done'}
                   </Text>
                 </View>
-                <Pressable onPress={() => removeVisit(p.id, v.id)} className="shrink-0">
+                <Pressable onPress={() => confirmDelete(ar, ar ? `حذف الزيارة «${v.procedure}»؟` : `Delete visit "${v.procedure}"?`, () => removeVisit(p.id, v.id))} className="shrink-0">
                   <Trash2 size={15} color="#94A3B8" />
                 </Pressable>
               </View>
@@ -463,17 +513,46 @@ function BillingTab({ p, ar }: { p: Patient; ar: boolean }) {
   const cur = p.feeCurrency ?? 'USD';
   const paid = paidTotal(p);
   const remaining = (Number(p.totalFees) || 0) - paid;
+  const overpaid = remaining < 0;
   const sym = cur === 'IQD' ? 'د.ع' : '$';
+  // Typed text kept locally so a dollar amount can pass through "12." on its
+  // way to "12.50" — formatting the stored number back lost the dot.
+  const [feesText, setFeesText] = useState(() => (p.totalFees ? formatAmountInput(String(p.totalFees), cur) : ''));
 
-  const fmt = (n: number) => {
-    const v = Number(n || 0).toLocaleString('en-US');
-    return cur === 'IQD' ? `${v} ${sym}` : `${sym}${v}`;
+  const fmt = (n: number) => formatMoney(Math.abs(Number(n) || 0), cur);
+  const plan = planTotals(p);
+  const otherCur: FeeCurrency = cur === 'USD' ? 'IQD' : 'USD';
+
+  const setCurrency = (c: FeeCurrency) => {
+    if (c === cur) return;
+    const apply = () => {
+      updatePatient(p.id, { feeCurrency: c });
+      setFeesText(p.totalFees ? formatAmountInput(String(p.totalFees), c) : '');
+      setAmount((a) => formatAmountInput(a, c));
+    };
+    // Switching only relabels the amounts — it never converts them.
+    if ((Number(p.totalFees) || 0) > 0 || p.payments.length > 0) {
+      Alert.alert(
+        ar ? 'تغيير العملة' : 'Change currency',
+        ar
+          ? 'سيتغيّر رمز العملة فقط ولن تُحوَّل المبالغ المسجلة (مثلاً 250$ تصبح 250 د.ع). هل تريد المتابعة؟'
+          : 'Only the currency label changes — recorded amounts are not converted (e.g. $250 becomes 250 IQD). Continue?',
+        [
+          { text: ar ? 'إلغاء' : 'Cancel', style: 'cancel' },
+          { text: ar ? 'تغيير' : 'Change', onPress: apply },
+        ],
+      );
+    } else apply();
   };
-  const digitsOnly = (raw: string) => raw.replace(/[^\d]/g, '');
-  const setCurrency = (c: 'USD' | 'IQD') => updatePatient(p.id, { feeCurrency: c });
+
+  const setFees = (text: string) => {
+    const formatted = formatAmountInput(text, cur);
+    setFeesText(formatted);
+    updatePatient(p.id, { totalFees: parseAmountInput(formatted) ?? 0 });
+  };
 
   const submit = () => {
-    const n = Number(digitsOnly(amount));
+    const n = parseAmountInput(amount);
     if (!n) return;
     addPayment(p.id, { amount: n, note: note.trim() || undefined, date: new Date().toISOString().slice(0, 10) });
     setAmount('');
@@ -525,18 +604,49 @@ function BillingTab({ p, ar }: { p: Patient; ar: boolean }) {
           </Text>
           <Text className="mt-0.5 text-[10.5px] text-emerald-600">{ar ? 'المدفوع' : 'Paid'}</Text>
         </View>
-        <View className={cn('flex-1 items-center rounded-2xl p-3', remaining > 0 ? 'bg-rose-50' : 'bg-emerald-50')}>
+        {/* An overpayment used to show as a green negative "remaining". */}
+        <View className={cn('flex-1 items-center rounded-2xl p-3', overpaid ? 'bg-amber-50' : remaining > 0 ? 'bg-rose-50' : 'bg-emerald-50')}>
           <Text
             numberOfLines={1}
-            className={cn('text-base font-extrabold', remaining > 0 ? 'text-rose-600' : 'text-emerald-700')}
+            className={cn('text-base font-extrabold', overpaid ? 'text-amber-700' : remaining > 0 ? 'text-rose-600' : 'text-emerald-700')}
           >
             {fmt(remaining)}
           </Text>
-          <Text className={cn('mt-0.5 text-[10.5px]', remaining > 0 ? 'text-rose-500' : 'text-emerald-600')}>
-            {ar ? 'المتبقي' : 'Remaining'}
+          <Text className={cn('mt-0.5 text-[10.5px]', overpaid ? 'text-amber-600' : remaining > 0 ? 'text-rose-500' : 'text-emerald-600')}>
+            {overpaid ? (ar ? 'دفع زائد' : 'Overpaid') : ar ? 'المتبقي' : 'Remaining'}
           </Text>
         </View>
       </View>
+
+      {/* Treatment plan total — the plan and the fees were two unrelated numbers. */}
+      {(plan.USD > 0 || plan.IQD > 0) && (
+        <Card>
+          <View className="flex-row items-center justify-between gap-2">
+            <View className="min-w-0 flex-1">
+              <Text className="text-xs font-bold text-slate-500">{ar ? 'مجموع خطة العلاج' : 'Treatment plan total'}</Text>
+              <Text className="mt-0.5 text-sm font-extrabold text-slate-800" style={{ writingDirection: 'ltr' }}>
+                {formatMoneyTotals(getPlan(p), p)}
+              </Text>
+            </View>
+            {plan[cur] > 0 && plan[cur] !== (Number(p.totalFees) || 0) && (
+              <Pressable
+                onPress={() => setFees(String(plan[cur]))}
+                className="shrink-0 rounded-xl px-3 py-2"
+                style={{ backgroundColor: 'rgba(59,130,246,0.1)' }}
+              >
+                <Text className="text-[11px] font-bold text-primary">{ar ? 'اعتماده كإجمالي' : 'Use as total'}</Text>
+              </Pressable>
+            )}
+          </View>
+          {plan[otherCur] > 0 && (
+            <Text className="mt-1.5 text-[10.5px] text-amber-700">
+              {ar
+                ? `جزء من الخطة بعملة ${otherCur === 'USD' ? 'الدولار' : 'الدينار'} ولا يدخل في إجمالي الأتعاب (${cur === 'USD' ? 'دولار' : 'دينار'}).`
+                : `Part of the plan is in ${otherCur} and isn't included in the ${cur} total fees.`}
+            </Text>
+          )}
+        </Card>
+      )}
 
       {/* Editable total fees */}
       <Card>
@@ -547,15 +657,13 @@ function BillingTab({ p, ar }: { p: Patient; ar: boolean }) {
         <View className="h-11 flex-row items-center rounded-xl border border-slate-200 bg-slate-50 px-3">
           <Text className="me-2 shrink-0 text-xs font-bold text-slate-400">{sym}</Text>
           <TextInput
-            value={p.totalFees ? p.totalFees.toLocaleString('en-US') : ''}
-            onChangeText={(v) => {
-              const digits = digitsOnly(v);
-              updatePatient(p.id, { totalFees: digits ? Number(digits) : 0 });
-            }}
-            keyboardType="numeric"
+            value={feesText}
+            onChangeText={setFees}
+            keyboardType={cur === 'IQD' ? 'number-pad' : 'decimal-pad'}
             placeholder="0"
             placeholderTextColor="#94A3B8"
             className="flex-1 text-sm text-slate-800"
+            style={{ writingDirection: 'ltr', textAlign: 'left' }}
           />
         </View>
       </Card>
@@ -570,14 +678,12 @@ function BillingTab({ p, ar }: { p: Patient; ar: boolean }) {
               <Text className="me-2 shrink-0 text-xs font-bold text-slate-400">{sym}</Text>
               <TextInput
                 value={amount}
-                onChangeText={(v) => {
-                  const digits = digitsOnly(v);
-                  setAmount(digits ? Number(digits).toLocaleString('en-US') : '');
-                }}
-                keyboardType="numeric"
+                onChangeText={(v) => setAmount(formatAmountInput(v, cur))}
+                keyboardType={cur === 'IQD' ? 'number-pad' : 'decimal-pad'}
                 placeholder="0"
                 placeholderTextColor="#94A3B8"
                 className="flex-1 text-sm text-slate-800"
+                style={{ writingDirection: 'ltr', textAlign: 'left' }}
               />
             </View>
           </View>
@@ -612,7 +718,7 @@ function BillingTab({ p, ar }: { p: Patient; ar: boolean }) {
                     {x.note ? ` · ${x.note}` : ''}
                   </Text>
                 </View>
-                <Pressable onPress={() => removePayment(p.id, x.id)}>
+                <Pressable onPress={() => confirmDelete(ar, ar ? `حذف دفعة ${fmt(x.amount)}؟` : `Delete payment of ${fmt(x.amount)}?`, () => removePayment(p.id, x.id))}>
                   <Trash2 size={14} color="#94A3B8" />
                 </Pressable>
               </View>
@@ -735,7 +841,13 @@ function PatientInfoCard({ p, ar }: { p: Patient; ar: boolean }) {
           )}
           <View className="mt-1 flex-row items-center gap-1.5">
             <CalendarDays size={11} color="#94A3B8" />
-            <Text className="text-[11px] text-slate-400">{p.dob || p.lastVisit || '—'}</Text>
+            <Text className="text-[11px] text-slate-400">
+              {p.dob
+                ? `${ar ? 'تاريخ الميلاد' : 'Born'}: ${p.dob}`
+                : p.lastVisit
+                  ? `${ar ? 'آخر زيارة' : 'Last visit'}: ${p.lastVisit}`
+                  : '—'}
+            </Text>
           </View>
         </View>
         {!editing && (
@@ -911,16 +1023,14 @@ function ChartCard({ p, ar }: { p: Patient; ar: boolean }) {
 
       {/* Actions */}
       <View className="mt-3 flex-row gap-2">
-        <Pressable
-          onPress={() => setSaved(true)}
-          className="h-11 flex-1 flex-row items-center justify-center gap-1.5 rounded-2xl bg-primary"
-          style={shadowMd}
-        >
-          <Check size={14} color="#FFFFFF" strokeWidth={3} />
-          <Text className="text-xs font-extrabold text-primary-foreground">
-            {saved ? (ar ? 'تم الحفظ' : 'Saved') : ar ? 'حفظ مخطط الأسنان' : 'Save chart'}
+        {/* Each tooth tap is saved immediately; this used to be a "Save chart"
+            button that saved nothing and only changed its own label. */}
+        <View className="h-11 flex-1 flex-row items-center justify-center gap-1.5 rounded-2xl bg-emerald-50">
+          <Check size={14} color="#047857" strokeWidth={3} />
+          <Text className="text-xs font-extrabold text-emerald-700">
+            {saved ? (ar ? 'تم حفظ التغيير' : 'Change saved') : ar ? 'يُحفظ تلقائياً' : 'Saves automatically'}
           </Text>
-        </Pressable>
+        </View>
         <Pressable
           onPress={() => setSelecting((v) => !v)}
           className={cn('h-11 flex-1 flex-row items-center justify-center gap-1.5 rounded-2xl border', !selecting && 'border-slate-200 bg-white')}
@@ -941,12 +1051,15 @@ function PlanCard({ p, ar }: { p: Patient; ar: boolean }) {
   const [adding, setAdding] = useState(false);
   const [picking, setPicking] = useState(false);
   const [form, setForm] = useState({ title: '', tooth: '', cost: '', note: '' });
+  // Chosen explicitly per procedure — the cost used to be shown as "$" no
+  // matter what the doctor meant.
+  const [cur, setCur] = useState<FeeCurrency>(() => planCurrency(p));
 
   const all = getPlan(p);
   const plan = all.filter((s) => (s.dept ?? 'general') === dept);
   const deptMeta = BRANCHES.find((b) => b.key === dept) ?? BRANCHES[0];
   const isRadio = deptMeta.key === 'radio';
-  const total = plan.reduce((s, x) => s + (Number(x.cost) || 0), 0);
+  const totalLabel = formatMoneyTotals(plan, p);
   const doneCount = plan.filter((s) => s.status === 'done').length;
   const statusLabel =
     plan.length === 0
@@ -967,17 +1080,50 @@ function PlanCard({ p, ar }: { p: Patient; ar: boolean }) {
         ? 'bg-slate-100 text-slate-500'
         : 'bg-blue-100 text-blue-700';
 
-  const submit = () => {
-    if (!form.title.trim()) return;
-    addPlanStep(p.id, form.title, {
-      dept,
-      tooth: form.tooth.trim() || undefined,
-      cost: form.cost === '' ? undefined : Number(form.cost),
-      note: form.note.trim() || undefined,
-    });
+  // Set while the form edits an existing step instead of adding one.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [toothError, setToothError] = useState(false);
+
+  const closeForm = () => {
     setForm({ title: '', tooth: '', cost: '', note: '' });
+    setEditingId(null);
+    setToothError(false);
     setAdding(false);
   };
+
+  const startEdit = (s: PlanStep) => {
+    const c = planCurrency(p, s);
+    setCur(c);
+    setForm({ title: s.title, tooth: s.tooth ?? '', cost: s.cost ? formatAmountInput(String(s.cost), c) : '', note: s.note ?? '' });
+    setEditingId(s.id);
+    setToothError(false);
+    setAdding(true);
+  };
+
+  const submit = () => {
+    if (!form.title.trim()) return;
+    const tooth = parseToothList(form.tooth);
+    if (!tooth.ok) {
+      setToothError(true);
+      return;
+    }
+    const cost = parseAmountInput(form.cost);
+    const fields = {
+      tooth: tooth.value || undefined,
+      cost,
+      currency: cost === undefined ? undefined : cur,
+      note: form.note.trim() || undefined,
+    };
+    if (editingId) updatePlanStep(p.id, editingId, { title: form.title.trim(), ...fields });
+    else addPlanStep(p.id, form.title, { dept, ...fields });
+    closeForm();
+  };
+
+  const confirmRemove = (s: PlanStep) =>
+    Alert.alert(ar ? 'حذف الإجراء' : 'Delete procedure', ar ? `حذف «${s.title}» من الخطة؟` : `Delete "${s.title}" from the plan?`, [
+      { text: ar ? 'إلغاء' : 'Cancel', style: 'cancel' },
+      { text: ar ? 'حذف' : 'Delete', style: 'destructive', onPress: () => removePlanStep(p.id, s.id) },
+    ]);
 
   return (
     <View className="gap-3">
@@ -1046,8 +1192,8 @@ function PlanCard({ p, ar }: { p: Patient; ar: boolean }) {
             <Text className="text-[11px] text-slate-400">
               {doneCount}/{plan.length} {ar ? 'منجز' : 'done'}
             </Text>
-            {total > 0 && (
-              <Text className="ml-auto text-[13px] font-extrabold text-slate-800">${total.toLocaleString()}</Text>
+            {!!totalLabel && (
+              <Text numberOfLines={1} className="ml-auto shrink text-[13px] font-extrabold text-slate-800">{totalLabel}</Text>
             )}
           </View>
         )}
@@ -1065,19 +1211,57 @@ function PlanCard({ p, ar }: { p: Patient; ar: boolean }) {
             <View className="flex-row gap-2">
               <TextInput
                 value={form.tooth}
-                onChangeText={(v) => setForm((f) => ({ ...f, tooth: v }))}
-                placeholder={ar ? 'رقم السن' : 'Tooth #'}
+                onChangeText={(v) => {
+                  setToothError(false);
+                  setForm((f) => ({ ...f, tooth: v }));
+                }}
+                keyboardType="numbers-and-punctuation"
+                placeholder={ar ? 'رقم السن (مثال: 36)' : 'Tooth # (e.g. 36)'}
                 placeholderTextColor="#94A3B8"
-                className="h-11 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-800"
+                className={cn('h-11 flex-1 rounded-xl border bg-white px-3 text-xs text-slate-800', toothError ? 'border-rose-400' : 'border-slate-200')}
+                style={{ writingDirection: 'ltr', textAlign: 'left' }}
               />
-              <TextInput
-                value={form.cost}
-                onChangeText={(v) => setForm((f) => ({ ...f, cost: v }))}
-                keyboardType="decimal-pad"
-                placeholder={ar ? 'الكلفة' : 'Cost'}
-                placeholderTextColor="#94A3B8"
-                className="h-11 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-800"
-              />
+              <View className="h-11 flex-1 flex-row items-center rounded-xl border border-slate-200 bg-white px-3">
+                <Text className="me-2 shrink-0 text-xs font-bold text-slate-400">{cur === 'IQD' ? 'د.ع' : '$'}</Text>
+                <TextInput
+                  value={form.cost}
+                  onChangeText={(v) => setForm((f) => ({ ...f, cost: formatAmountInput(v, cur) }))}
+                  keyboardType={cur === 'IQD' ? 'number-pad' : 'decimal-pad'}
+                  placeholder={ar ? 'الكلفة' : 'Cost'}
+                  placeholderTextColor="#94A3B8"
+                  className="flex-1 text-xs text-slate-800"
+                  style={{ writingDirection: 'ltr', textAlign: 'left' }}
+                />
+              </View>
+            </View>
+            {toothError && (
+              <Text className="text-[11px] text-rose-600">
+                {ar
+                  ? 'رقم السن غير صحيح — استخدم ترقيم FDI (11–48، وللأسنان اللبنية 51–85)، وافصل بين الأسنان بفارزة.'
+                  : 'Invalid tooth number — use FDI (11–48, primary 51–85), comma-separated.'}
+              </Text>
+            )}
+            <View className="flex-row items-center justify-between">
+              <Text className="text-[11px] font-bold text-slate-500">{ar ? 'عملة الكلفة' : 'Cost currency'}</Text>
+              <View className="flex-row gap-1.5">
+                {(['USD', 'IQD'] as const).map((c) => (
+                  <Pressable
+                    key={c}
+                    onPress={() => {
+                      setCur(c);
+                      setForm((f) => ({ ...f, cost: formatAmountInput(f.cost, c) }));
+                    }}
+                    className={cn(
+                      'h-8 items-center justify-center rounded-full border px-3',
+                      cur === c ? 'border-primary bg-primary' : 'border-slate-200 bg-white',
+                    )}
+                  >
+                    <Text className={cn('text-[11px] font-bold', cur === c ? 'text-primary-foreground' : 'text-slate-500')}>
+                      {c === 'USD' ? `$ ${ar ? 'دولار' : 'USD'}` : `د.ع ${ar ? 'دينار' : 'IQD'}`}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
             </View>
             <TextInput
               value={form.note}
@@ -1086,9 +1270,16 @@ function PlanCard({ p, ar }: { p: Patient; ar: boolean }) {
               placeholderTextColor="#94A3B8"
               className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-800"
             />
-            <Pressable onPress={submit} className="h-11 items-center justify-center rounded-xl bg-primary" style={shadowSm}>
-              <Text className="text-xs font-extrabold text-primary-foreground">{ar ? 'إضافة للخطة' : 'Add to plan'}</Text>
-            </Pressable>
+            <View className="flex-row gap-2">
+              <Pressable onPress={closeForm} className="h-11 flex-1 items-center justify-center rounded-xl bg-slate-200">
+                <Text className="text-xs font-bold text-slate-700">{ar ? 'إلغاء' : 'Cancel'}</Text>
+              </Pressable>
+              <Pressable onPress={submit} className="h-11 flex-[2] items-center justify-center rounded-xl bg-primary" style={shadowSm}>
+                <Text className="text-xs font-extrabold text-primary-foreground">
+                  {editingId ? (ar ? 'حفظ التعديل' : 'Save changes') : ar ? 'إضافة للخطة' : 'Add to plan'}
+                </Text>
+              </Pressable>
+            </View>
           </View>
         )}
 
@@ -1114,7 +1305,8 @@ function PlanCard({ p, ar }: { p: Patient; ar: boolean }) {
                     {s.tooth || '—'}
                   </Text>
                 </View>
-                <View className="min-w-0 flex-1">
+                {/* Tap the procedure to edit its name, tooth, cost or note. */}
+                <Pressable onPress={() => startEdit(s)} className="min-w-0 flex-1">
                   <Text
                     numberOfLines={1}
                     className={cn('text-xs font-semibold text-slate-800', s.status === 'done' && 'text-slate-400 line-through')}
@@ -1122,28 +1314,24 @@ function PlanCard({ p, ar }: { p: Patient; ar: boolean }) {
                     {s.title}
                   </Text>
                   <Text numberOfLines={1} className="text-[10px] text-slate-400">
-                    {[s.note, s.cost ? `$${Number(s.cost).toLocaleString()}` : ''].filter(Boolean).join(' · ') ||
+                    {[s.note, s.cost ? formatMoney(Number(s.cost), planCurrency(p, s)) : ''].filter(Boolean).join(' · ') ||
                       (ar ? 'بدون ملاحظات' : 'No notes')}
                   </Text>
-                </View>
+                </Pressable>
+                {/* The one status control: planned → in progress → done. A
+                    separate "done" checkbox used to sit next to it. */}
                 <Pressable
                   onPress={() => cyclePlanStep(p.id, s.id)}
-                  style={{ flexShrink: 0, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: PLAN_META[s.status].bg }}
+                  style={{ flexShrink: 0, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: PLAN_META[s.status].bg }}
                 >
                   <Text className="font-bold" style={{ fontSize: 10, color: PLAN_META[s.status].text }}>
                     {ar ? PLAN_META[s.status].ar : PLAN_META[s.status].en}
                   </Text>
                 </Pressable>
-                <Pressable
-                  onPress={() => updatePlanStep(p.id, s.id, { status: s.status === 'done' ? 'planned' : 'done' })}
-                  className={cn(
-                    'h-6 w-6 shrink-0 items-center justify-center rounded-lg',
-                    s.status === 'done' ? 'bg-primary' : 'border border-slate-300 bg-white',
-                  )}
-                >
-                  {s.status === 'done' && <Check size={13} color="#FFFFFF" strokeWidth={3} />}
+                <Pressable onPress={() => startEdit(s)} className="shrink-0 p-1">
+                  <Pencil size={14} color="#64748B" />
                 </Pressable>
-                <Pressable onPress={() => removePlanStep(p.id, s.id)} className="shrink-0 p-1">
+                <Pressable onPress={() => confirmRemove(s)} className="shrink-0 p-1">
                   <Trash2 size={14} color="#94A3B8" />
                 </Pressable>
               </View>
@@ -1158,11 +1346,13 @@ function PlanCard({ p, ar }: { p: Patient; ar: boolean }) {
           deptMeta={deptMeta}
           onClose={() => setPicking(false)}
           onPick={(title) => {
+            setEditingId(null);
             setForm({ title, tooth: '', cost: '', note: '' });
             setPicking(false);
             setAdding(true);
           }}
           onCustom={() => {
+            setEditingId(null);
             setForm({ title: '', tooth: '', cost: '', note: '' });
             setPicking(false);
             setAdding(true);

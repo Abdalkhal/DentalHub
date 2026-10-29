@@ -32,6 +32,8 @@ export type PlanStep = {
   dept?: string;
   tooth?: string;
   cost?: number;
+  // Chosen per step; older steps have none — see planCurrency().
+  currency?: "USD" | "IQD";
   note?: string;
 };
 
@@ -337,4 +339,82 @@ export function removeLogEntry(id: string, entryId: string) {
   const p = getPatient(id);
   if (!p) return;
   updatePatient(id, { log: getLog(p).filter((e) => e.id !== entryId) });
+}
+
+/* ── Money (treatment plan costs) ───────────────────────────── */
+
+export type FeeCurrency = "USD" | "IQD";
+
+/**
+ * Currency of a plan step. Steps saved before a currency could be chosen
+ * have none — they used to render as "$" regardless of what the doctor
+ * meant, so they fall back to the patient's fee currency, then IQD.
+ */
+export function planCurrency(p: Patient, s?: PlanStep): FeeCurrency {
+  return s?.currency ?? p.feeCurrency ?? "IQD";
+}
+
+/** "25,000 د.ع" / "$1,250.5" — always Western digits with thousands commas. */
+export function formatMoney(n: number, cur: FeeCurrency): string {
+  const v = (Number(n) || 0).toLocaleString("en-US", { maximumFractionDigits: cur === "IQD" ? 0 : 2 });
+  return cur === "IQD" ? `${v} د.ع` : `$${v}`;
+}
+
+/** Per-currency sums, rendered as e.g. "$120 + 50,000 د.ع" (empty when zero). */
+export function formatMoneyTotals(steps: PlanStep[], p: Patient): string {
+  const sums: Record<FeeCurrency, number> = { USD: 0, IQD: 0 };
+  for (const s of steps) sums[planCurrency(p, s)] += Number(s.cost) || 0;
+  return (["USD", "IQD"] as const)
+    .filter((c) => sums[c] > 0)
+    .map((c) => formatMoney(sums[c], c))
+    .join(" + ");
+}
+
+/**
+ * Live-formats a typed amount with thousands commas. Accepts Arabic-Indic
+ * digits (an Arabic keyboard may send them); IQD is whole dinars, USD keeps
+ * up to two decimals.
+ */
+export function formatAmountInput(raw: string, cur: FeeCurrency): string {
+  const latin = raw.replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).replace(/[٫]/g, ".");
+  const cleaned = latin.replace(/[^\d.]/g, "");
+  const [intPart, ...rest] = cleaned.split(".");
+  const int = intPart.replace(/^0+(?=\d)/, "");
+  const grouped = int ? Number(int).toLocaleString("en-US") : rest.length && cur === "USD" ? "0" : "";
+  if (cur === "IQD" || rest.length === 0) return grouped;
+  return `${grouped}.${rest.join("").slice(0, 2)}`;
+}
+
+/** Inverse of formatAmountInput; undefined for an empty field. */
+export function parseAmountInput(text: string): number | undefined {
+  const n = Number(text.replace(/,/g, ""));
+  return text.trim() === "" || !Number.isFinite(n) ? undefined : n;
+}
+
+/* ── Tooth numbers (FDI) ───────────────────────────────────── */
+
+/** FDI code: permanent 11–18…41–48, primary 51–55…81–85. */
+export function isValidFdiTooth(code: string): boolean {
+  const m = /^([1-8])([1-8])$/.exec(code);
+  if (!m) return false;
+  const q = Number(m[1]);
+  const t = Number(m[2]);
+  return q <= 4 ? t <= 8 : t <= 5;
+}
+
+/**
+ * Normalises a typed tooth field ("11, 12" / "١١ ١٢") to "11, 12". Returns
+ * `ok: false` when any entry isn't a valid FDI code; an empty field is ok.
+ */
+export function parseToothList(raw: string): { value: string; ok: boolean } {
+  const latin = raw.replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)));
+  const parts = latin.split(/[\s,،]+/).filter(Boolean);
+  return { value: parts.join(", "), ok: parts.every(isValidFdiTooth) };
+}
+
+/** Sum of the whole treatment plan, per currency. */
+export function planTotals(p: Patient): Record<FeeCurrency, number> {
+  const sums: Record<FeeCurrency, number> = { USD: 0, IQD: 0 };
+  for (const s of getPlan(p)) sums[planCurrency(p, s)] += Number(s.cost) || 0;
+  return sums;
 }

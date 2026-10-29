@@ -15,6 +15,12 @@ import {
   addPlanStep,
   addVisit,
   cyclePlanStep,
+  planCurrency,
+  formatMoney,
+  formatMoneyTotals,
+  formatAmountInput,
+  parseAmountInput,
+  type FeeCurrency,
   getLog,
   getPlan,
   paidTotal,
@@ -28,6 +34,9 @@ import {
   updatePlanStep,
   usePatients,
   type PlanStatus,
+  type PlanStep,
+  parseToothList,
+  planTotals,
   type ToothStatus,
 } from "@/lib/patientsStore";
 import { listOrders } from "@/lib/ordersStore";
@@ -197,6 +206,11 @@ const BRANCHES: Array<{ key: string; ar: string; en: string; icon: typeof Smile;
 
 
 
+/** Every delete on this page used to fire on a single click. */
+function confirmDelete(message: string): boolean {
+  return typeof window === "undefined" ? false : window.confirm(message);
+}
+
 const PLAN_META: Record<PlanStatus, { ar: string; en: string; cls: string; num: string }> = {
   done: { ar: "مكتمل", en: "Done", cls: "bg-emerald-100 text-emerald-700", num: "bg-emerald-500" },
   active: { ar: "قيد التنفيذ", en: "In progress", cls: "bg-blue-100 text-blue-700", num: "bg-blue-500" },
@@ -237,14 +251,18 @@ function PatientProfile() {
 
   const tabs: Array<{ key: TabKey; ar: string; en: string }> = [
     { key: "summary", ar: "ملخص", en: "Summary" },
+    // "history" (incl. treatment status) and "orders" were fully built but
+    // missing from this list, so they could not be opened.
+    { key: "history", ar: "التاريخ المرضي", en: "History" },
     { key: "meds", ar: "الأدوية والحساسيات", en: "Meds & allergies" },
     { key: "visits", ar: "الزيارات", en: "Visits" },
     { key: "billing", ar: "المالية", en: "Billing" },
+    { key: "orders", ar: "طلبات المختبر", en: "Lab orders" },
   ];
 
   return (
     <MobileShell wide>
-      <TopBar title={ar ? "سجل المرضى" : "Patient record"} showBack wide maxW="6xl" />
+      <TopBar title={p.name || (ar ? "سجل المريض" : "Patient record")} showBack wide maxW="6xl" />
 
       {/* Quick actions */}
       <div className="px-4 pt-3 flex items-center gap-1.5 md:px-6 md:pt-6 md:gap-2 md:flex-wrap lg:px-8 lg:max-w-6xl lg:mx-auto">
@@ -263,14 +281,14 @@ function PatientProfile() {
       </div>
 
       {/* Patient info card */}
-      <section className="px-4 mt-3">
+      <section className="px-4 mt-3 md:px-6 lg:px-8 lg:max-w-6xl lg:mx-auto">
         <div className="rounded-2xl bg-card border border-border p-4 shadow-sm">
           <PatientInfoCard p={p} ar={ar} />
         </div>
       </section>
 
       {/* Tabs */}
-      <nav className="mt-3 px-4">
+      <nav className="mt-3 px-4 md:px-6 lg:px-8 lg:max-w-6xl lg:mx-auto">
         <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
           {tabs.map((tb) => (
             <button
@@ -291,7 +309,7 @@ function PatientProfile() {
 
       <section className="px-4 py-3 pb-8 grid gap-2.5 items-start md:px-6 md:py-6 md:pb-14 md:grid-cols-2 md:gap-5 xl:grid-cols-3 lg:px-8 lg:max-w-6xl lg:mx-auto">
         <div className="space-y-2.5 min-w-0">
-          {tab === "summary" && <Summary p={p} ar={ar} />}
+          {tab === "summary" && <Summary p={p} ar={ar} onViewHistory={() => setTab("history")} />}
           {tab === "history" && <HistoryTab p={p} ar={ar} />}
           {tab === "meds" && <MedsTab p={p} ar={ar} />}
           {tab === "files" && <FilesCard p={p} ar={ar} />}
@@ -337,7 +355,6 @@ const PLAN_HEX: Record<PlanStatus, string> = { done: "#047857", active: "#1D4ED8
 // printable document — the web counterpart of the native app's PDF share.
 function exportPatientRecord(p: P, ar: boolean) {
   const genderLabel = p.gender === "male" ? (ar ? "ذكر" : "Male") : ar ? "أنثى" : "Female";
-  const sym = p.feeCurrency === "IQD" ? (ar ? "د.ع" : "IQD") : "$";
   const teeth = Object.entries(p.teeth)
     .map(([tooth, status]) => ({ tooth: Number(tooth), status: String(status) }))
     .sort((a, b) => a.tooth - b.tooth)
@@ -352,7 +369,7 @@ function exportPatientRecord(p: P, ar: boolean) {
       title: s.title,
       tooth: s.tooth,
       dept: dept ? (ar ? dept.ar : dept.en) : undefined,
-      cost: s.cost ? `${sym}${s.cost}` : undefined,
+      cost: s.cost ? formatMoney(s.cost, planCurrency(p, s)) : undefined,
       status: ar ? PLAN_META[s.status].ar : PLAN_META[s.status].en,
       statusColor: PLAN_HEX[s.status],
       note: s.note,
@@ -439,12 +456,12 @@ function Card({ title, children, action }: { title: string; children: React.Reac
 
 /* ---------------- Summary ---------------- */
 
-function Summary({ p, ar }: { p: P; ar: boolean }) {
+function Summary({ p, ar, onViewHistory }: { p: P; ar: boolean; onViewHistory: () => void }) {
   return (
     <div className="space-y-2.5">
       <ChartCard p={p} ar={ar} />
       <PlanCard p={p} ar={ar} />
-      <HistoryCard p={p} ar={ar} compact />
+      <HistoryCard p={p} ar={ar} compact onViewAll={onViewHistory} />
       <NotesCard p={p} ar={ar} />
       <FilesCard p={p} ar={ar} />
     </div>
@@ -531,13 +548,15 @@ function ChartCard({ p, ar }: { p: P; ar: boolean }) {
 
 
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => setSaved(true)}
-            className="flex-1 min-w-[46%] h-10 rounded-full bg-primary text-primary-foreground text-[12px] font-display font-extrabold flex items-center justify-center gap-1.5"
+          {/* Each tooth click is saved immediately; this used to be a "Save chart"
+              button that saved nothing and only changed its own label. */}
+          <div
+            role="status"
+            className="flex-1 min-w-[46%] h-10 rounded-full bg-emerald-50 text-emerald-700 text-[12px] font-display font-extrabold flex items-center justify-center gap-1.5"
           >
             <Check className="size-4" strokeWidth={3} />
-            {saved ? (ar ? "تم الحفظ" : "Saved") : ar ? "حفظ مخطط الأسنان" : "Save chart"}
-          </button>
+            {saved ? (ar ? "تم حفظ التغيير" : "Change saved") : ar ? "يُحفظ تلقائياً" : "Saves automatically"}
+          </div>
           <button
             onClick={() => setSelecting((v) => !v)}
             className={cn(
@@ -568,13 +587,16 @@ function PlanCard({ p, ar }: { p: P; ar: boolean }) {
   const [adding, setAdding] = useState(false);
   const [picking, setPicking] = useState(false);
   const [form, setForm] = useState({ title: "", tooth: "", cost: "", note: "" });
+  // Chosen explicitly per procedure — the cost used to be shown as "$" no
+  // matter what the doctor meant.
+  const [cur, setCur] = useState<FeeCurrency>(() => planCurrency(p));
   const xrayRef = useRef<HTMLInputElement>(null);
 
   const all = getPlan(p);
   const plan = all.filter((s) => (s.dept ?? "general") === dept);
   const deptMeta = BRANCHES.find((b) => b.key === dept) ?? BRANCHES[0];
   const isRadio = deptMeta.key === "radio";
-  const total = plan.reduce((s, x) => s + (Number(x.cost) || 0), 0);
+  const totalLabel = formatMoneyTotals(plan, p);
   const doneCount = plan.filter((s) => s.status === "done").length;
   const statusLabel =
     plan.length === 0
@@ -583,17 +605,44 @@ function PlanCard({ p, ar }: { p: P; ar: boolean }) {
         ? ar ? "مكتملة" : "Completed"
         : ar ? "نشطة" : "Active";
 
+  // Set while the form edits an existing step instead of adding one.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [toothError, setToothError] = useState(false);
+
+  const closeForm = () => {
+    setForm({ title: "", tooth: "", cost: "", note: "" });
+    setEditingId(null);
+    setToothError(false);
+    setAdding(false);
+  };
+
+  const startEdit = (s: PlanStep) => {
+    const c = planCurrency(p, s);
+    setCur(c);
+    setForm({ title: s.title, tooth: s.tooth ?? "", cost: s.cost ? formatAmountInput(String(s.cost), c) : "", note: s.note ?? "" });
+    setEditingId(s.id);
+    setToothError(false);
+    setAdding(true);
+  };
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title.trim()) return;
-    addPlanStep(p.id, form.title, {
-      dept,
-      tooth: form.tooth.trim() || undefined,
-      cost: form.cost === "" ? undefined : Number(form.cost),
+    const tooth = parseToothList(form.tooth);
+    if (!tooth.ok) {
+      setToothError(true);
+      return;
+    }
+    const cost = parseAmountInput(form.cost);
+    const fields = {
+      tooth: tooth.value || undefined,
+      cost,
+      currency: cost === undefined ? undefined : cur,
       note: form.note.trim() || undefined,
-    });
-    setForm({ title: "", tooth: "", cost: "", note: "" });
-    setAdding(false);
+    };
+    if (editingId) updatePlanStep(p.id, editingId, { title: form.title.trim(), ...fields });
+    else addPlanStep(p.id, form.title, { dept, ...fields });
+    closeForm();
   };
 
   return (
@@ -647,9 +696,9 @@ function PlanCard({ p, ar }: { p: P; ar: boolean }) {
           <span className="text-muted-foreground">
             {doneCount}/{plan.length} {ar ? "منجز" : "done"}
           </span>
-          {total > 0 && (
-            <span className="ms-auto font-display font-extrabold">
-              {total.toLocaleString()} {ar ? "$" : "$"}
+          {!!totalLabel && (
+            <span className="ms-auto font-display font-extrabold truncate" dir="ltr">
+              {totalLabel}
             </span>
           )}
         </div>
@@ -666,17 +715,59 @@ function PlanCard({ p, ar }: { p: P; ar: boolean }) {
             <div className="grid grid-cols-2 gap-2">
               <input
                 value={form.tooth}
-                onChange={(e) => setForm({ ...form, tooth: e.target.value })}
-                placeholder={ar ? "رقم السن" : "Tooth #"}
-                className="h-10 rounded-lg border border-border bg-card px-2.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-ring/40"
+                onChange={(e) => {
+                  setToothError(false);
+                  setForm({ ...form, tooth: e.target.value });
+                }}
+                placeholder={ar ? "رقم السن (مثال: 36)" : "Tooth # (e.g. 36)"}
+                dir="ltr"
+                aria-invalid={toothError}
+                className={cn(
+                  "h-10 rounded-lg border bg-card px-2.5 text-[12px] text-start focus:outline-none focus:ring-2 focus:ring-ring/40",
+                  toothError ? "border-rose-400" : "border-border",
+                )}
               />
-              <input
-                inputMode="decimal"
-                value={form.cost}
-                onChange={(e) => setForm({ ...form, cost: e.target.value })}
-                placeholder={ar ? "الكلفة" : "Cost"}
-                className="h-10 rounded-lg border border-border bg-card px-2.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-ring/40"
-              />
+              <div className="relative">
+                <span className="absolute start-2.5 top-1/2 -translate-y-1/2 text-[11px] font-bold text-muted-foreground pointer-events-none">
+                  {cur === "IQD" ? "د.ع" : "$"}
+                </span>
+                <input
+                  inputMode={cur === "IQD" ? "numeric" : "decimal"}
+                  value={form.cost}
+                  onChange={(e) => setForm({ ...form, cost: formatAmountInput(e.target.value, cur) })}
+                  placeholder={ar ? "الكلفة" : "Cost"}
+                  dir="ltr"
+                  className="w-full h-10 rounded-lg border border-border bg-card ps-9 pe-2.5 text-[12px] text-start focus:outline-none focus:ring-2 focus:ring-ring/40"
+                />
+              </div>
+            </div>
+            {toothError && (
+              <p className="text-[11px] text-rose-600">
+                {ar
+                  ? "رقم السن غير صحيح — استخدم ترقيم FDI (11–48، وللأسنان اللبنية 51–85)، وافصل بين الأسنان بفارزة."
+                  : "Invalid tooth number — use FDI (11–48, primary 51–85), comma-separated."}
+              </p>
+            )}
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-muted-foreground">{ar ? "عملة الكلفة" : "Cost currency"}</span>
+              <div className="flex gap-1.5">
+                {(["USD", "IQD"] as const).map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => {
+                      setCur(c);
+                      setForm((f) => ({ ...f, cost: formatAmountInput(f.cost, c) }));
+                    }}
+                    className={cn(
+                      "h-8 px-3 rounded-full text-[11px] font-bold border transition",
+                      cur === c ? "bg-primary text-primary-foreground border-primary" : "bg-card text-muted-foreground border-border",
+                    )}
+                  >
+                    {c === "USD" ? `$ ${ar ? "دولار" : "USD"}` : `د.ع ${ar ? "دينار" : "IQD"}`}
+                  </button>
+                ))}
+              </div>
             </div>
             <input
               value={form.note}
@@ -684,9 +775,14 @@ function PlanCard({ p, ar }: { p: P; ar: boolean }) {
               placeholder={ar ? "ملاحظة (الجلسة الثانية…)" : "Note (session 2…)"}
               className="w-full h-10 rounded-lg border border-border bg-card px-2.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-ring/40"
             />
-            <button type="submit" className="w-full h-10 rounded-lg bg-primary text-primary-foreground text-[12px] font-display font-extrabold">
-              {ar ? "إضافة للخطة" : "Add to plan"}
-            </button>
+            <div className="flex gap-2">
+              <button type="button" onClick={closeForm} className="flex-1 h-10 rounded-lg bg-muted text-foreground text-[12px] font-bold">
+                {ar ? "إلغاء" : "Cancel"}
+              </button>
+              <button type="submit" className="flex-[2] h-10 rounded-lg bg-primary text-primary-foreground text-[12px] font-display font-extrabold">
+                {editingId ? (ar ? "حفظ التعديل" : "Save changes") : ar ? "إضافة للخطة" : "Add to plan"}
+              </button>
+            </div>
           </form>
         )}
 
@@ -703,31 +799,31 @@ function PlanCard({ p, ar }: { p: P; ar: boolean }) {
                 <span className={cn("size-8 shrink-0 rounded-full text-[11px] font-display font-extrabold flex items-center justify-center", deptMeta.cls)}>
                   {s.tooth || "—"}
                 </span>
-                <div className="flex-1 min-w-0">
+                {/* Click the procedure to edit its name, tooth, cost or note. */}
+                <button type="button" onClick={() => startEdit(s)} className="flex-1 min-w-0 text-start">
                   <p className={cn("text-[12px] font-semibold truncate", s.status === "done" && "line-through text-muted-foreground")}>
                     {s.title}
                   </p>
                   <p className="text-[10px] text-muted-foreground truncate">
-                    {[s.note, s.cost ? `${Number(s.cost).toLocaleString()} $` : ""].filter(Boolean).join(" · ") || (ar ? "بدون ملاحظات" : "No notes")}
+                    {[s.note, s.cost ? formatMoney(Number(s.cost), planCurrency(p, s)) : ""].filter(Boolean).join(" · ") || (ar ? "بدون ملاحظات" : "No notes")}
                   </p>
-                </div>
+                </button>
+                {/* The one status control: planned → in progress → done. A
+                    separate "done" checkbox used to sit next to it. */}
                 <button
                   onClick={() => cyclePlanStep(p.id, s.id)}
-                  className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0", PLAN_META[s.status].cls)}
+                  className={cn("text-[10px] font-bold px-2.5 py-1 rounded-full shrink-0", PLAN_META[s.status].cls)}
                 >
                   {ar ? PLAN_META[s.status].ar : PLAN_META[s.status].en}
                 </button>
-                <button
-                  onClick={() => updatePlanStep(p.id, s.id, { status: s.status === "done" ? "planned" : "done" })}
-                  className={cn(
-                    "size-5 shrink-0 rounded-md border flex items-center justify-center",
-                    s.status === "done" ? "bg-primary border-primary text-primary-foreground" : "border-border bg-card"
-                  )}
-                  aria-label={ar ? "تم" : "Done"}
-                >
-                  {s.status === "done" && <Check className="size-3.5" strokeWidth={3} />}
+                <button onClick={() => startEdit(s)} className="text-muted-foreground hover:text-primary shrink-0" aria-label={ar ? "تعديل" : "Edit"}>
+                  <Pencil className="size-3.5" />
                 </button>
-                <button onClick={() => removePlanStep(p.id, s.id)} className="text-muted-foreground hover:text-destructive shrink-0">
+                <button
+                  onClick={() => confirmDelete(ar ? `حذف «${s.title}» من الخطة؟` : `Delete "${s.title}" from the plan?`) && removePlanStep(p.id, s.id)}
+                  className="text-muted-foreground hover:text-destructive shrink-0"
+                  aria-label={ar ? "حذف" : "Delete"}
+                >
                   <Trash2 className="size-3.5" />
                 </button>
               </li>
@@ -757,6 +853,7 @@ function PlanCard({ p, ar }: { p: P; ar: boolean }) {
                 <li key={s.ar}>
                   <button
                     onClick={() => {
+                      setEditingId(null);
                       setForm({ title: ar ? s.ar : s.en, tooth: "", cost: "", note: "" });
                       setPicking(false);
                       setAdding(true);
@@ -774,6 +871,7 @@ function PlanCard({ p, ar }: { p: P; ar: boolean }) {
             </ul>
             <button
               onClick={() => {
+                setEditingId(null);
                 setForm({ title: "", tooth: "", cost: "", note: "" });
                 setPicking(false);
                 setAdding(true);
@@ -837,7 +935,7 @@ function RadiologyGallery({
                 ) : <span className="w-full aspect-square flex items-center justify-center"><FileImage className="size-6 text-muted-foreground" /></span>}
               </button>
               <p className="text-[9px] text-muted-foreground text-center mt-1" dir="ltr">{f.addedAt.slice(0, 10)}</p>
-              <button onClick={() => removeFile(p.id, f.id)} className="absolute top-1 end-1 size-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center"><Trash2 className="size-3" /></button>
+              <button onClick={() => confirmDelete(ar ? "حذف هذا الملف؟" : "Delete this file?") && removeFile(p.id, f.id)} className="absolute top-1 end-1 size-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center"><Trash2 className="size-3" /></button>
             </div>
           ))}
         </div>
@@ -879,7 +977,7 @@ function RadiologyGallery({
   );
 }
 
-function HistoryCard({ p, ar, compact }: { p: P; ar: boolean; compact?: boolean }) {
+function HistoryCard({ p, ar, compact, onViewAll }: { p: P; ar: boolean; compact?: boolean; onViewAll?: () => void }) {
   const log = getLog(p);
   const shown = compact ? log.slice(0, 4) : log;
   const [adding, setAdding] = useState(false);
@@ -913,7 +1011,7 @@ function HistoryCard({ p, ar, compact }: { p: P; ar: boolean; compact?: boolean 
               <span className="flex-1 min-w-0 text-[12px] font-semibold truncate">{e.text}</span>
               <span className="text-[10px] text-muted-foreground shrink-0" dir="ltr">{e.date}</span>
               {!compact && (
-                <button onClick={() => removeLogEntry(p.id, e.id)} className="text-muted-foreground hover:text-destructive">
+                <button onClick={() => confirmDelete(ar ? "حذف هذا الحدث المرضي؟" : "Delete this history entry?") && removeLogEntry(p.id, e.id)} className="text-muted-foreground hover:text-destructive">
                   <Trash2 className="size-3.5" />
                 </button>
               )}
@@ -922,7 +1020,9 @@ function HistoryCard({ p, ar, compact }: { p: P; ar: boolean; compact?: boolean 
         </ul>
       )}
       {compact && log.length > 4 && (
-        <p className="text-center text-[11px] font-bold text-primary mt-2">{ar ? "عرض الكل" : "View all"}</p>
+        <button type="button" onClick={onViewAll} className="block w-full text-center text-[11px] font-bold text-primary mt-2 hover:underline">
+          {ar ? "عرض الكل" : "View all"}
+        </button>
       )}
 
       {adding && (
@@ -1117,7 +1217,7 @@ function FilesCard({ p, ar }: { p: P; ar: boolean }) {
             <p className="text-[10px] font-semibold truncate mt-1 text-center">{f.name}</p>
             <p className="text-[9px] text-muted-foreground text-center" dir="ltr">{f.addedAt.slice(0, 10)}</p>
             <button
-              onClick={() => removeFile(p.id, f.id)}
+              onClick={() => confirmDelete(ar ? "حذف هذا الملف؟" : "Delete this file?") && removeFile(p.id, f.id)}
               className="absolute top-1 end-1 size-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center"
             >
               <Trash2 className="size-3" />
@@ -1188,7 +1288,7 @@ function Visits({ p, ar }: { p: P; ar: boolean }) {
                     {v.date} · {v.upcoming ? (ar ? "موعد قادم" : "Upcoming") : ar ? "منجزة" : "Done"}
                   </p>
                 </div>
-                <button onClick={() => removeVisit(p.id, v.id)} className="text-muted-foreground hover:text-destructive">
+                <button onClick={() => confirmDelete(ar ? `حذف الزيارة «${v.procedure}»؟` : `Delete visit "${v.procedure}"?`) && removeVisit(p.id, v.id)} className="text-muted-foreground hover:text-destructive">
                   <Trash2 className="size-4" />
                 </button>
               </li>
@@ -1243,18 +1343,42 @@ function Billing({ p, ar }: { p: P; ar: boolean }) {
   const cur = p.feeCurrency ?? "USD";
   const paid = paidTotal(p);
   const remaining = (Number(p.totalFees) || 0) - paid;
+  const overpaid = remaining < 0;
 
   const sym = cur === "IQD" ? "د.ع" : "$";
-  const fmt = (n: number) => {
-    const v = Number(n || 0).toLocaleString("en-US");
-    return cur === "IQD" ? `${v} ${sym}` : `${sym}${v}`;
+  // Typed text kept locally so a dollar amount can pass through "12." on its
+  // way to "12.50" — formatting the stored number back lost the dot.
+  const [feesText, setFeesText] = useState(() => (p.totalFees ? formatAmountInput(String(p.totalFees), cur) : ""));
+  const fmt = (n: number) => formatMoney(Math.abs(Number(n) || 0), cur);
+  const plan = planTotals(p);
+  const otherCur: FeeCurrency = cur === "USD" ? "IQD" : "USD";
+
+  const setCurrency = (c: FeeCurrency) => {
+    if (c === cur) return;
+    // Switching only relabels the amounts — it never converts them.
+    if (
+      ((Number(p.totalFees) || 0) > 0 || p.payments.length > 0) &&
+      !window.confirm(
+        ar
+          ? "سيتغيّر رمز العملة فقط ولن تُحوَّل المبالغ المسجلة (مثلاً 250$ تصبح 250 د.ع). هل تريد المتابعة؟"
+          : "Only the currency label changes — recorded amounts are not converted (e.g. $250 becomes 250 IQD). Continue?",
+      )
+    )
+      return;
+    updatePatient(p.id, { feeCurrency: c });
+    setFeesText(p.totalFees ? formatAmountInput(String(p.totalFees), c) : "");
+    setAmount((a) => formatAmountInput(a, c));
   };
-  const digitsOnly = (raw: string) => raw.replace(/[^\d]/g, "");
-  const setCurrency = (c: "USD" | "IQD") => updatePatient(p.id, { feeCurrency: c });
+
+  const setFees = (text: string) => {
+    const formatted = formatAmountInput(text, cur);
+    setFeesText(formatted);
+    updatePatient(p.id, { totalFees: parseAmountInput(formatted) ?? 0 });
+  };
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    const n = Number(digitsOnly(amount));
+    const n = parseAmountInput(amount);
     if (!n) return;
     addPayment(p.id, { amount: n, note, date: new Date().toISOString().slice(0, 10) });
     setAmount("");
@@ -1299,8 +1423,38 @@ function Billing({ p, ar }: { p: P; ar: boolean }) {
       <div className="grid grid-cols-3 gap-2">
         <Stat label={ar ? "إجمالي الأتعاب" : "Total fees"} value={fmt(p.totalFees)} cls="bg-[oklch(0.96_0.03_240)] text-foreground" />
         <Stat label={ar ? "المدفوع" : "Paid"} value={fmt(paid)} cls="bg-emerald-50 text-emerald-700" />
-        <Stat label={ar ? "المتبقي" : "Remaining"} value={fmt(remaining)} cls={remaining > 0 ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"} />
+        {/* An overpayment used to show as a green negative "remaining". */}
+        <Stat
+          label={overpaid ? (ar ? "دفع زائد" : "Overpaid") : ar ? "المتبقي" : "Remaining"}
+          value={fmt(remaining)}
+          cls={overpaid ? "bg-amber-50 text-amber-700" : remaining > 0 ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}
+        />
       </div>
+
+      {/* Treatment plan total — the plan and the fees were two unrelated numbers. */}
+      {(plan.USD > 0 || plan.IQD > 0) && (
+        <Card title={ar ? "مجموع خطة العلاج" : "Treatment plan total"}>
+          <div className="flex items-center justify-between gap-2">
+            <p className="font-display font-extrabold text-[14px]" dir="ltr">{formatMoneyTotals(getPlan(p), p)}</p>
+            {plan[cur] > 0 && plan[cur] !== (Number(p.totalFees) || 0) && (
+              <button
+                type="button"
+                onClick={() => setFees(String(plan[cur]))}
+                className="shrink-0 h-8 px-3 rounded-xl bg-primary/10 text-primary text-[11px] font-bold"
+              >
+                {ar ? "اعتماده كإجمالي" : "Use as total"}
+              </button>
+            )}
+          </div>
+          {plan[otherCur] > 0 && (
+            <p className="mt-1.5 text-[10.5px] text-amber-700">
+              {ar
+                ? `جزء من الخطة بعملة ${otherCur === "USD" ? "الدولار" : "الدينار"} ولا يدخل في إجمالي الأتعاب (${cur === "USD" ? "دولار" : "دينار"}).`
+                : `Part of the plan is in ${otherCur} and isn't included in the ${cur} total fees.`}
+            </p>
+          )}
+        </Card>
+      )}
 
       <Card title={ar ? "إجمالي الأتعاب" : "Total fees"} action={<Wallet className="size-4 text-primary" />}>
         <div className="relative">
@@ -1309,13 +1463,10 @@ function Billing({ p, ar }: { p: P; ar: boolean }) {
           </span>
           <input
             type="text"
-            inputMode="numeric"
+            inputMode={cur === "IQD" ? "numeric" : "decimal"}
             min={0}
-            value={p.totalFees ? p.totalFees.toLocaleString("en-US") : ""}
-            onChange={(e) => {
-              const digits = digitsOnly(e.target.value);
-              updatePatient(p.id, { totalFees: digits ? Number(digits) : 0 });
-            }}
+            value={feesText}
+            onChange={(e) => setFees(e.target.value)}
             placeholder="0"
             dir="ltr"
             className={cn(inputCls, "pe-8 text-start")}
@@ -1333,10 +1484,10 @@ function Billing({ p, ar }: { p: P; ar: boolean }) {
                 </span>
                 <input
                   type="text"
-                  inputMode="numeric"
+                  inputMode={cur === "IQD" ? "numeric" : "decimal"}
                   min={0}
                   value={amount}
-                  onChange={(e) => setAmount(digitsOnly(e.target.value) ? Number(digitsOnly(e.target.value)).toLocaleString("en-US") : "")}
+                  onChange={(e) => setAmount(formatAmountInput(e.target.value, cur))}
                   placeholder="0"
                   dir="ltr"
                   className={cn(inputCls, "pe-8 text-start")}
@@ -1364,7 +1515,7 @@ function Billing({ p, ar }: { p: P; ar: boolean }) {
                   <p className="text-[12px] font-bold">{fmt(x.amount)}</p>
                   <p className="text-[11px] text-muted-foreground truncate">{x.date}{x.note ? ` · ${x.note}` : ""}</p>
                 </div>
-                <button onClick={() => removePayment(p.id, x.id)} className="text-muted-foreground hover:text-destructive">
+                <button onClick={() => confirmDelete(ar ? `حذف دفعة ${fmt(x.amount)}؟` : `Delete payment of ${fmt(x.amount)}?`) && removePayment(p.id, x.id)} className="text-muted-foreground hover:text-destructive">
                   <Trash2 className="size-4" />
                 </button>
               </li>
@@ -1414,7 +1565,13 @@ function PatientInfoCard({ p, ar }: { p: P; ar: boolean }) {
           )}
           <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1.5">
             <CalendarDays className="size-3 shrink-0" />
-            <span dir="ltr">{p.dob || p.lastVisit || "—"}</span>
+            {p.dob ? (
+              <span>{ar ? "تاريخ الميلاد" : "Born"}: <span dir="ltr">{p.dob}</span></span>
+            ) : p.lastVisit ? (
+              <span>{ar ? "آخر زيارة" : "Last visit"}: <span dir="ltr">{p.lastVisit}</span></span>
+            ) : (
+              "—"
+            )}
           </p>
         </div>
         <button onClick={() => setEditing(!editing)} className="text-primary shrink-0" aria-label={ar ? "تعديل" : "Edit"}>
