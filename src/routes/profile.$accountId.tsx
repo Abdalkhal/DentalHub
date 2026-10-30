@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, Link, Navigate, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { MobileShell } from "@/components/MobileShell";
@@ -37,13 +37,11 @@ import {
   Heart,
   MessageCircle,
   MessageSquare,
-  Send,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsFavorited, toggleFavorite } from "@/lib/favoritesStore";
 import { addToCart } from "@/lib/cartStore";
 import { useUserRole } from "@/lib/useAuth";
-import { LabRxFormModal } from "@/components/LabRxFormModal";
 import imgGeneral from "@/assets/branch-general.png";
 import imgOperative from "@/assets/branch-operative.png";
 import imgEndodontic from "@/assets/branch-endodontic.png";
@@ -111,6 +109,11 @@ const branchOptions = [
 ];
 
 export const Route = createFileRoute("/profile/$accountId")({
+  // The open product category lives in the URL so back (header or browser)
+  // returns to the category list instead of leaving the profile.
+  validateSearch: (s: Record<string, unknown>): { branch?: string } => ({
+    branch: typeof s.branch === "string" ? s.branch : undefined,
+  }),
   component: ProfilePage,
 });
 
@@ -141,7 +144,6 @@ function ProfilePage() {
   const ar = lang === "ar";
 
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [showSendCase, setShowSendCase] = useState(false);
   const { user, role } = useUserRole();
   const isDentistViewer = role?.accountType === "dentist";
   const officeFavorited = useIsFavorited(accountId);
@@ -187,7 +189,18 @@ function ProfilePage() {
 
   const isSupply = account?.accountType === "supply";
 
-  const [branchFilter, setBranchFilter] = useState<string>("all");
+  const { branch } = Route.useSearch();
+  const navigate = useNavigate();
+  const branchFilter = branch ?? "all";
+  // Opening a category pushes a history entry; closing it replaces, so back
+  // from a category lands on the category list, then leaves the profile.
+  const setBranchFilter = (value: string) =>
+    navigate({
+      to: "/profile/$accountId",
+      params: { accountId },
+      search: value === "all" ? {} : { branch: value },
+      replace: value === "all",
+    });
 
   const activeBranchName = branchFilter !== "all"
     ? branchOptions.find((b) => b.value === branchFilter)
@@ -232,6 +245,12 @@ function ProfilePage() {
         </div>
       </MobileShell>
     );
+  }
+
+  // A lab's services live in lab_services/{labId}, which only the lab page
+  // shows — this generic profile listed a lab as empty.
+  if (account.accountType === "lab") {
+    return <Navigate to="/labs/$labId" params={{ labId: accountId }} replace />;
   }
 
   const displayName = account.name || account.surname || "";
@@ -366,10 +385,9 @@ function ProfilePage() {
           </div>
         )}
 
-        {(!!user && user.uid !== accountId) || (account.accountType === "lab" && isDentistViewer) ? (
+        {!!user && user.uid !== accountId && (
           <div className="flex flex-col gap-2.5 md:flex-row">
-            {!!user && user.uid !== accountId && (
-              <Link
+            <Link
                 to="/messages"
                 search={{ with: accountId, withName: displayName }}
                 className="flex-1 h-12 rounded-2xl bg-[#2563EB] text-white text-sm font-bold flex items-center justify-center gap-2 hover:bg-[#1D4ED8] transition shadow-sm"
@@ -377,18 +395,8 @@ function ProfilePage() {
                 <MessageSquare className="size-4" />
                 {ar ? "مراسلة" : "Message"}
               </Link>
-            )}
-            {account.accountType === "lab" && isDentistViewer && (
-              <button
-                onClick={() => setShowSendCase(true)}
-                className="flex-1 h-12 rounded-2xl bg-emerald-500 text-white text-sm font-bold flex items-center justify-center gap-2 hover:bg-emerald-600 transition shadow-sm"
-              >
-                <Send className="size-4" />
-                {ar ? "إرسال حالة للمختبر" : "Send case to lab"}
-              </button>
-            )}
           </div>
-        ) : null}
+        )}
 
         {/* ── Offers ────────────────────────────── */}
         {offers.length > 0 && (
@@ -589,17 +597,6 @@ function ProfilePage() {
           </div>
         )}
       </div>
-      {account.accountType === "lab" && (
-        <LabRxFormModal
-          labId={accountId}
-          labName={displayName}
-          labPhone={account.phone || ""}
-          labAddress={account.address || ""}
-          labInstagram={(account as { instagram?: string }).instagram || ""}
-          open={showSendCase}
-          onClose={() => setShowSendCase(false)}
-        />
-      )}
       {selectedProduct && (
         <ProductDetailsModal
           product={selectedProduct}

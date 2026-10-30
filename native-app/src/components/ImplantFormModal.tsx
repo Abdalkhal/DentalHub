@@ -7,6 +7,8 @@ import { Check, Package, Paperclip, Plus, Ruler, Settings, Trash2, Wrench, X } f
 import * as ImagePicker from 'expo-image-picker';
 
 import { Select, Text } from '@/components/ui';
+import { useConfirmClose, useFormDirty } from '@/lib/confirmClose';
+import { SINGLE_LINE_INPUT } from '@/components/ui/singleLineInput';
 import { CountrySelect } from '@/components/CountrySelect';
 import { countryCodeToFlag } from '@/data/countries';
 import { db } from '@/integrations/firebase/client';
@@ -292,12 +294,21 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7 });
     if (res.canceled || !res.assets?.length) return;
     const asset = res.assets[0];
-    const path = await uploadProductImage(draftId, { uri: asset.uri, name: asset.fileName ?? undefined, type: asset.mimeType ?? undefined });
-    setTarget((prev) => [...prev, path]);
+    // A failed upload used to vanish silently, leaving the product with no image.
+    try {
+      const path = await uploadProductImage(draftId, { uri: asset.uri, name: asset.fileName ?? undefined, type: asset.mimeType ?? undefined });
+      setTarget((prev) => [...prev, path]);
+    } catch (e) {
+      toast.error(`${ar ? 'تعذر رفع الصورة' : 'Image upload failed'}${e instanceof Error ? `: ${e.message}` : ''}`);
+    }
   };
   const pickImage = makePickImage(setImages);
   const pickKitImage = makePickImage(setKitImages);
   const pickAccessoryImage = makePickImage(setAccessoryDraftImages);
+
+  // Closing by mistake (✕ / Android back) asks first when something was typed.
+  const dirty = useFormDirty([productType, name, brand, country, implantCategory, line, variants, surgicalGuide, surgicalGuideTools, price, currency, description, images, stockHidden, accessoryCategory, accessorySubType, parentId, accessoryDraftImages, accessoryPrice, accessoryCurrency, accessorySpecs, accessoryStock, accessoryStockHidden, kitType, placementType, compatibility, compatDraft, toolsCount, kitSku, kitInStock, kitPrice, kitCurrency, kitImages]);
+  const requestClose = useConfirmClose(dirty, onClose, ar);
 
   const submit = async () => {
     setError('');
@@ -408,9 +419,10 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
   };
 
   const categoryOptions = [
-    { value: 'comprehensive', label: ar ? 'فورية (Compressive)' : 'Immediate (Compressive)' },
+    // Traditional first (stored as non_immediate), then the immediate types.
+    { value: 'non_immediate', label: ar ? 'تقليدية (Traditional)' : 'Traditional' },
+    { value: 'comprehensive', label: ar ? 'فورية (Comprehensive)' : 'Immediate (Comprehensive)' },
     { value: 'basal', label: ar ? 'فورية (Basal)' : 'Immediate (Basal)' },
-    { value: 'non_immediate', label: ar ? 'غير فورية' : 'Non-Immediate' },
   ];
   const kitTypeOptions = KIT_TYPES.map((k) => ({ value: k, label: k }));
   const placementOptions = PLACEMENT_TYPES_AR.map((p) => ({ value: p, label: p }));
@@ -437,7 +449,7 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
   ];
 
   return (
-    <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={open} transparent animationType="slide" onRequestClose={requestClose}>
       <View style={{ flex: 1 }}>
       <View className="flex-1 justify-end bg-black/40">
         <View className="max-h-[93%] overflow-hidden rounded-t-[32px] bg-[#F2F9FE]">
@@ -451,7 +463,7 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
                 <Text className="text-[11px] text-white/75">{ar ? 'أضف زرعة وإكسسواراتها بسهولة' : 'Add implant and its accessories easily'}</Text>
               </View>
             </View>
-            <Pressable onPress={onClose} className="h-9 w-9 items-center justify-center rounded-full bg-white/20">
+            <Pressable onPress={requestClose} className="h-9 w-9 items-center justify-center rounded-full bg-white/20">
               <X size={16} color="#FFFFFF" />
             </Pressable>
           </View>
@@ -512,7 +524,7 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
                       placeholder={ar ? 'مثال: قطر 3.5mm' : 'e.g. 3.5mm diameter'}
                       placeholderTextColor="#94A3B8"
                       className={inputCls}
-                      style={{ writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }}
+                      style={{ ...SINGLE_LINE_INPUT, writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }}
                     />
                   </Field>
                 </SectionCard>
@@ -537,7 +549,7 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
                       placeholder="0"
                       placeholderTextColor="#94A3B8"
                       className={inputCls}
-                      style={{ writingDirection: 'ltr', textAlign: 'left' }}
+                      style={{ ...SINGLE_LINE_INPUT, writingDirection: 'ltr', textAlign: 'left' }}
                     />
                   </Field>
                   <Field label={ar ? 'المخزون المتوفر' : 'Available stock'}>
@@ -550,7 +562,7 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
                         placeholder="0"
                         placeholderTextColor="#94A3B8"
                         className={cn(inputCls, 'mt-2')}
-                        style={{ writingDirection: 'ltr', textAlign: 'left' }}
+                        style={{ ...SINGLE_LINE_INPUT, writingDirection: 'ltr', textAlign: 'left' }}
                       />
                     )}
                   </Field>
@@ -585,10 +597,10 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
               <>
                 <SectionCard title={ar ? 'معلومات المنتج' : 'Product Info'}>
                   <Field label={ar ? 'اسم المنتج' : 'Product name'} required>
-                    <TextInput value={name} onChangeText={setName} placeholder={ar ? 'مثال: Surgical Kit – Guided' : 'e.g. Surgical Kit – Guided'} placeholderTextColor="#94A3B8" className={inputCls} style={{ writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }} />
+                    <TextInput value={name} onChangeText={setName} placeholder={ar ? 'مثال: Surgical Kit – Guided' : 'e.g. Surgical Kit – Guided'} placeholderTextColor="#94A3B8" className={inputCls} style={{ ...SINGLE_LINE_INPUT, writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }} />
                   </Field>
                   <Field label={ar ? 'الشركة المصنعة' : 'Manufacturer'} required>
-                    <TextInput value={brand} onChangeText={setBrand} placeholder={ar ? 'اكتب اسم الشركة' : 'Type manufacturer'} placeholderTextColor="#94A3B8" className={inputCls} style={{ writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }} />
+                    <TextInput value={brand} onChangeText={setBrand} placeholder={ar ? 'اكتب اسم الشركة' : 'Type manufacturer'} placeholderTextColor="#94A3B8" className={inputCls} style={{ ...SINGLE_LINE_INPUT, writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }} />
                   </Field>
                   <View className="flex-row gap-2.5">
                     <View className="flex-1">
@@ -598,7 +610,7 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
                     </View>
                     <View className="flex-1">
                       <Field label={ar ? 'خط المنتج' : 'Product line'}>
-                        <TextInput value={line} onChangeText={setLine} placeholder={ar ? 'مثال: GuideSystem' : 'e.g. GuideSystem'} placeholderTextColor="#94A3B8" className={inputCls} style={{ writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }} />
+                        <TextInput value={line} onChangeText={setLine} placeholder={ar ? 'مثال: GuideSystem' : 'e.g. GuideSystem'} placeholderTextColor="#94A3B8" className={inputCls} style={{ ...SINGLE_LINE_INPUT, writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }} />
                       </Field>
                     </View>
                   </View>
@@ -620,7 +632,7 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
                         placeholder={ar ? 'اكتب قيمة واضغط +' : 'Type a value, tap +'}
                         placeholderTextColor="#94A3B8"
                         className={cn(inputCls, 'flex-1')}
-                        style={{ writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }}
+                        style={{ ...SINGLE_LINE_INPUT, writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }}
                       />
                       <Pressable onPress={addCompat} className="h-12 w-12 items-center justify-center rounded-2xl" style={{ backgroundColor: ACCENT }}>
                         <Plus size={18} color="#FFFFFF" />
@@ -638,7 +650,7 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
                     )}
                   </Field>
                   <Field label={ar ? 'عدد الأدوات' : 'Tools count'}>
-                    <TextInput value={toolsCount} onChangeText={(v) => setToolsCount(v.replace(/[^0-9]/g, ''))} keyboardType="number-pad" placeholder="0" placeholderTextColor="#94A3B8" className={inputCls} style={{ writingDirection: 'ltr', textAlign: 'left' }} />
+                    <TextInput value={toolsCount} onChangeText={(v) => setToolsCount(v.replace(/[^0-9]/g, ''))} keyboardType="number-pad" placeholder="0" placeholderTextColor="#94A3B8" className={inputCls} style={{ ...SINGLE_LINE_INPUT, writingDirection: 'ltr', textAlign: 'left' }} />
                   </Field>
                 </SectionCard>
 
@@ -662,11 +674,11 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
                       placeholder="0"
                       placeholderTextColor="#94A3B8"
                       className={inputCls}
-                      style={{ writingDirection: 'ltr', textAlign: 'left' }}
+                      style={{ ...SINGLE_LINE_INPUT, writingDirection: 'ltr', textAlign: 'left' }}
                     />
                   </Field>
                   <Field label={ar ? 'رمز SKU' : 'SKU / Code'}>
-                    <TextInput value={kitSku} onChangeText={setKitSku} placeholder="KIT-001" placeholderTextColor="#94A3B8" className={inputCls} style={{ writingDirection: 'ltr', textAlign: 'left' }} />
+                    <TextInput value={kitSku} onChangeText={setKitSku} placeholder="KIT-001" placeholderTextColor="#94A3B8" className={inputCls} style={{ ...SINGLE_LINE_INPUT, writingDirection: 'ltr', textAlign: 'left' }} />
                   </Field>
                   <Pressable onPress={() => setKitInStock((v) => !v)} className="flex-row items-center justify-between rounded-2xl border border-sky-100 bg-sky-50/40 px-4 py-3">
                     <View>
@@ -708,10 +720,10 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
               <>
                 <SectionCard title={ar ? 'معلومات الزرعة' : 'Implant Info'}>
                   <Field label={ar ? 'اسم الزرعة' : 'Implant name'} required>
-                    <TextInput value={name} onChangeText={setName} placeholder={ar ? 'مثال: Straumann BLX' : 'e.g. Straumann BLX'} placeholderTextColor="#94A3B8" className={inputCls} style={{ writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }} />
+                    <TextInput value={name} onChangeText={setName} placeholder={ar ? 'مثال: Straumann BLX' : 'e.g. Straumann BLX'} placeholderTextColor="#94A3B8" className={inputCls} style={{ ...SINGLE_LINE_INPUT, writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }} />
                   </Field>
                   <Field label={ar ? 'الشركة المصنعة' : 'Manufacturer'} required>
-                    <TextInput value={brand} onChangeText={setBrand} placeholder={ar ? 'مثال: Straumann' : 'e.g. Straumann'} placeholderTextColor="#94A3B8" className={inputCls} style={{ writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }} />
+                    <TextInput value={brand} onChangeText={setBrand} placeholder={ar ? 'مثال: Straumann' : 'e.g. Straumann'} placeholderTextColor="#94A3B8" className={inputCls} style={{ ...SINGLE_LINE_INPUT, writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }} />
                   </Field>
                   <View className="flex-row gap-2.5">
                     <View className="flex-1">
@@ -726,7 +738,7 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
                     </View>
                   </View>
                   <Field label={ar ? 'خط المنتج (اختياري)' : 'Product line (optional)'}>
-                    <TextInput value={line} onChangeText={setLine} placeholder={ar ? 'مثال: BLX' : 'e.g. BLX'} placeholderTextColor="#94A3B8" className={inputCls} style={{ writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }} />
+                    <TextInput value={line} onChangeText={setLine} placeholder={ar ? 'مثال: BLX' : 'e.g. BLX'} placeholderTextColor="#94A3B8" className={inputCls} style={{ ...SINGLE_LINE_INPUT, writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }} />
                   </Field>
                 </SectionCard>
 
@@ -771,9 +783,9 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
                   </View>
                   {variants.map((v) => (
                     <View key={v.key} className="flex-row items-center gap-2">
-                      <TextInput value={v.diameter} onChangeText={(t) => updateVariant(v.key, 'diameter', t.replace(/[^0-9.]/g, ''))} keyboardType="decimal-pad" placeholder="3.3" placeholderTextColor="#94A3B8" className="h-11 flex-1 rounded-xl border border-sky-100 bg-white px-2.5 text-sm text-slate-800" style={{ writingDirection: 'ltr', textAlign: 'center' }} />
-                      <TextInput value={v.length} onChangeText={(t) => updateVariant(v.key, 'length', t.replace(/[^0-9.]/g, ''))} keyboardType="decimal-pad" placeholder="10" placeholderTextColor="#94A3B8" className="h-11 flex-1 rounded-xl border border-sky-100 bg-white px-2.5 text-sm text-slate-800" style={{ writingDirection: 'ltr', textAlign: 'center' }} />
-                      {!stockHidden && <TextInput value={v.stock === '0' ? '' : v.stock} onChangeText={(t) => updateVariant(v.key, 'stock', t.replace(/[^0-9]/g, ''))} keyboardType="number-pad" placeholder="0" placeholderTextColor="#94A3B8" className="h-11 flex-1 rounded-xl border border-sky-100 bg-white px-2.5 text-sm text-slate-800" style={{ writingDirection: 'ltr', textAlign: 'center' }} />}
+                      <TextInput value={v.diameter} onChangeText={(t) => updateVariant(v.key, 'diameter', t.replace(/[^0-9.]/g, ''))} keyboardType="decimal-pad" placeholder="3.3" placeholderTextColor="#94A3B8" className="h-11 flex-1 rounded-xl border border-sky-100 bg-white px-2.5 text-sm text-slate-800" style={{ ...SINGLE_LINE_INPUT, writingDirection: 'ltr', textAlign: 'center' }} />
+                      <TextInput value={v.length} onChangeText={(t) => updateVariant(v.key, 'length', t.replace(/[^0-9.]/g, ''))} keyboardType="decimal-pad" placeholder="10" placeholderTextColor="#94A3B8" className="h-11 flex-1 rounded-xl border border-sky-100 bg-white px-2.5 text-sm text-slate-800" style={{ ...SINGLE_LINE_INPUT, writingDirection: 'ltr', textAlign: 'center' }} />
+                      {!stockHidden && <TextInput value={v.stock === '0' ? '' : v.stock} onChangeText={(t) => updateVariant(v.key, 'stock', t.replace(/[^0-9]/g, ''))} keyboardType="number-pad" placeholder="0" placeholderTextColor="#94A3B8" className="h-11 flex-1 rounded-xl border border-sky-100 bg-white px-2.5 text-sm text-slate-800" style={{ ...SINGLE_LINE_INPUT, writingDirection: 'ltr', textAlign: 'center' }} />}
                       <Pressable
                         onPress={() => setVariants((prev) => (prev.length > 1 ? prev.filter((x) => x.key !== v.key) : prev))}
                         disabled={variants.length <= 1}
@@ -869,7 +881,7 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
                       placeholder="0"
                       placeholderTextColor="#94A3B8"
                       className={inputCls}
-                      style={{ writingDirection: 'ltr', textAlign: 'left' }}
+                      style={{ ...SINGLE_LINE_INPUT, writingDirection: 'ltr', textAlign: 'left' }}
                     />
                   </Field>
                   <Field label={ar ? 'الوصف (اختياري)' : 'Description (optional)'}>

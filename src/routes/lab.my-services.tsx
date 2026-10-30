@@ -1,8 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "@/integrations/firebase/client";
+import { migrateInlineServiceImages, storeServiceImage } from "@/lib/labServices";
 import { useSession } from "@/lib/useAuth";
 import { MobileShell } from "@/components/MobileShell";
 import { useI18n } from "@/lib/i18n";
@@ -56,6 +57,21 @@ function LabMyServices() {
     enabled: !!labId,
   });
 
+  // Photos saved inline by older versions are moved to Storage once (see
+  // lib/labServices.ts — the inline copies made the document hit 1 MB).
+  useEffect(() => {
+    if (!labId || services.length === 0) return;
+    let cancelled = false;
+    void migrateInlineServiceImages(labId, services).then(async (next) => {
+      if (!next || cancelled) return;
+      await setDoc(doc(db, "lab_services", labId), { services: next }, { merge: true });
+      queryClient.invalidateQueries({ queryKey: ["lab-services", labId] });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [labId, services, queryClient]);
+
   const [filter, setFilter] = useState("all");
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -88,7 +104,9 @@ function LabMyServices() {
     try {
       let img = editingImg;
       if (imgFile) img = await new Promise<string>((r) => { const reader = new FileReader(); reader.onload = () => r(reader.result as string); reader.readAsDataURL(imgFile); });
-      const svc: Service = { id: editingId ?? crypto.randomUUID(), titleAr: form.titleAr.trim(), titleEn: form.titleEn.trim() || form.titleAr.trim(), category: form.category.trim(), turnaroundAr: form.turnaroundAr.trim(), turnaroundEn: form.turnaroundEn.trim(), price: parseFloat(form.price) || 0, currency: form.currency, imageUrl: img || undefined };
+      const id = editingId ?? crypto.randomUUID();
+      img = (await storeServiceImage(labId, id, img)) ?? "";
+      const svc: Service = { id, titleAr: form.titleAr.trim(), titleEn: form.titleEn.trim() || form.titleAr.trim(), category: form.category.trim(), turnaroundAr: form.turnaroundAr.trim(), turnaroundEn: form.turnaroundEn.trim(), price: parseFloat(form.price) || 0, currency: form.currency, imageUrl: img || undefined };
       const updated = editingId ? services.map((s) => (s.id === editingId ? svc : s)) : [svc, ...services];
       await setDoc(doc(db, "lab_services", labId), { services: updated }, { merge: true });
       await queryClient.invalidateQueries({ queryKey: ["lab-services", labId] });

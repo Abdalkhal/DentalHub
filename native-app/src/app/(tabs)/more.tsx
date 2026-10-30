@@ -81,7 +81,7 @@ const ITEMS: Record<string, Item[]> = {
   lab: [
     { icon: FlaskConical, ar: 'لوحة المختبر', en: 'Lab Dashboard', to: '/labs-office' },
     { icon: PenTool, ar: 'حالات التصميم', en: 'Design Cases', to: '/designer' },
-    { icon: Stethoscope, ar: 'الأطباء', en: 'Doctors', to: '/doctors' },
+    { icon: Stethoscope, ar: 'الأطباء', en: 'Doctors', to: '/lab-doctors' },
     { icon: FileText, ar: 'فواتير الأطباء', en: 'Doctor Invoices', to: '/doctor-invoices' },
     { icon: Megaphone, ar: 'إعلاناتي', en: 'My Ads', to: '/my-ads' },
     { icon: MessageSquare, ar: 'الرسائل', en: 'Messages', to: '/messages' },

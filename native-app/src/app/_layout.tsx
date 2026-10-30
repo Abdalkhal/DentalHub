@@ -6,7 +6,7 @@ import { Urbanist_400Regular, Urbanist_500Medium, Urbanist_600SemiBold, Urbanist
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 
-import { StyleSheet, View } from 'react-native';
+import { AppState, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 
@@ -20,6 +20,7 @@ import { CartHeaderButton } from '@/components/CartHeaderButton';
 import { isGuestRoute } from '@/lib/guestAccess';
 import { useSession } from '@/lib/useAuth';
 import { registerPush } from '@/lib/push';
+import { resyncPatients } from '@/lib/patientsStore';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -149,6 +150,15 @@ export default function RootLayout() {
   // synchronous `localStorage.getItem` reads return persisted data.
   useEffect(() => {
     hydrateStorage().finally(() => setReady(true));
+  }, []);
+
+  // Coming back to the app re-syncs patient records on its own (a listener
+  // left open in the background may have been cut off by the OS).
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') resyncPatients();
+    });
+    return () => sub.remove();
   }, []);
 
   useEffect(() => {

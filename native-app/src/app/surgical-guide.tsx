@@ -13,6 +13,7 @@ import {
   type SurgicalGuideCompany,
 } from '@/lib/surgicalGuides';
 import { useSignedImageUrls } from '@/lib/products';
+import { SurgicalGuideDetailsModal } from '@/components/SurgicalGuideDetailsModal';
 import { useI18n } from '@/lib/i18n';
 
 function systemLabel(en: string, ar: boolean): string {
@@ -44,6 +45,7 @@ export default function SurgicalGuideScreen() {
   const { lang } = useI18n();
   const ar = lang === 'ar';
   const { data: companies = [], isLoading } = useSurgicalGuideCompanies();
+  const [selected, setSelected] = useState<SurgicalGuideCompany | null>(null);
 
   const logoPaths = useMemo(
     () => companies.map((c) => c.logoUrl).filter((x): x is string => !!x),
@@ -72,7 +74,11 @@ export default function SurgicalGuideScreen() {
       ) : (
         <View className="mt-4 gap-3 pb-6">
           {companies.map((c) => (
-            <View key={c.id} className="rounded-2xl border border-slate-200 bg-card p-3.5 shadow-sm">
+            <Pressable
+              key={c.id}
+              onPress={() => setSelected(c)}
+              className="rounded-2xl border border-slate-200 bg-card p-3.5 shadow-sm active:opacity-80"
+            >
               <View className="flex-row items-center gap-3">
                 <Logo uri={c.logoUrl ? urlMap[c.logoUrl] : undefined} name={ar ? c.nameAr : c.nameEn} />
                 <View className="min-w-0 flex-1">
@@ -125,9 +131,18 @@ export default function SurgicalGuideScreen() {
                   </Pressable>
                 </View>
               )}
-            </View>
+            </Pressable>
           ))}
         </View>
+      )}
+
+      {selected && (
+        <SurgicalGuideDetailsModal
+          company={selected}
+          logoUri={selected.logoUrl ? urlMap[selected.logoUrl] : undefined}
+          ar={ar}
+          onClose={() => setSelected(null)}
+        />
       )}
     </Screen>
   );

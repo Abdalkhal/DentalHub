@@ -11,8 +11,12 @@ import {
   clinicTotals,
   addTransaction,
   removeTransaction,
+  fmtMoney,
+  txCurrency,
+  type Currency,
   type TxKind,
 } from '@/lib/clinicStore';
+import { CurrencySwitch } from '@/components/CurrencySwitch';
 import { setClinicsStoreUser } from '@/lib/clinicsStore';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
@@ -23,10 +27,6 @@ const SOURCES = [
   { id: 'supply', ar: 'مستلزمات', en: 'Supplies' },
   { id: 'other', ar: 'أخرى', en: 'Other' },
 ] as const;
-
-function fmtIQD(n: number) {
-  return `${n.toLocaleString()} د.ع`;
-}
 
 function StatCard({ label, value, tone }: { label: string; value: string; tone?: 'warn' | 'good' | 'bad' }) {
   return (
@@ -53,16 +53,21 @@ export default function ClinicFinanceScreen() {
   }, [user?.uid]);
 
   const clinic = useClinic();
-  const { income, expense, net, dueOrders } = clinicTotals(clinic);
+  // Dinars and dollars are kept apart: totals and the list show one currency.
+  const [currency, setCurrency] = useState<Currency>('IQD');
+  const { income, expense, net, dueOrders } = clinicTotals(clinic, currency);
+  const txs = clinic.transactions.filter((t) => txCurrency(t) === currency);
+  const fmt = (n: number) => fmtMoney(n, currency);
   const [showAdd, setShowAdd] = useState(false);
 
   return (
     <Screen>
+      <CurrencySwitch value={currency} onChange={setCurrency} ar={ar} className="mb-3" />
       <View className="flex-row flex-wrap gap-2.5">
-        <StatCard label={ar ? 'الإيرادات' : 'Revenue'} value={fmtIQD(income)} tone="good" />
-        <StatCard label={ar ? 'المصاريف' : 'Expenses'} value={fmtIQD(expense)} tone="bad" />
-        <StatCard label={ar ? 'الصافي' : 'Net'} value={fmtIQD(net)} tone={net >= 0 ? 'good' : 'bad'} />
-        <StatCard label={ar ? 'متبقي للموردين' : 'Outstanding'} value={fmtIQD(dueOrders)} tone="warn" />
+        <StatCard label={ar ? 'الإيرادات' : 'Revenue'} value={fmt(income)} tone="good" />
+        <StatCard label={ar ? 'المصاريف' : 'Expenses'} value={fmt(expense)} tone="bad" />
+        <StatCard label={ar ? 'الصافي' : 'Net'} value={fmt(net)} tone={net >= 0 ? 'good' : 'bad'} />
+        {currency === 'IQD' && <StatCard label={ar ? 'متبقي للموردين' : 'Outstanding'} value={fmt(dueOrders)} tone="warn" />}
       </View>
 
       <Pressable
@@ -75,11 +80,11 @@ export default function ClinicFinanceScreen() {
         </Text>
       </Pressable>
 
-      {clinic.transactions.length === 0 ? (
+      {txs.length === 0 ? (
         <View className="mt-4 items-center rounded-2xl border border-dashed border-slate-200 bg-white p-8">
           <Wallet size={32} color="#94A3B8" />
           <Text className="mt-2 text-sm font-semibold text-slate-700">
-            {ar ? 'لا توجد حركات مالية' : 'No transactions'}
+            {ar ? (currency === 'IQD' ? 'لا توجد حركات بالدينار' : 'لا توجد حركات بالدولار') : `No ${currency} transactions`}
           </Text>
           <Text className="mt-1 text-center text-[11px] text-slate-400">
             {ar ? 'سجّل أول دفعة أو مصروف' : 'Add your first entry'}
@@ -87,7 +92,7 @@ export default function ClinicFinanceScreen() {
         </View>
       ) : (
         <View className="mt-4 gap-2.5">
-          {clinic.transactions.map((t) => {
+          {txs.map((t) => {
             const src = SOURCES.find((s) => s.id === t.source);
             return (
               <View key={t.id} className="flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
@@ -110,7 +115,7 @@ export default function ClinicFinanceScreen() {
                   </Text>
                 </View>
                 <Text className={cn('text-sm font-extrabold', t.kind === 'income' ? 'text-emerald-600' : 'text-rose-600')}>
-                  {fmtIQD(t.amount)}
+                  {fmtMoney(t.amount, txCurrency(t))}
                 </Text>
                 <Pressable onPress={() => removeTransaction(t.id)} className="h-8 w-8 items-center justify-center rounded-full bg-slate-100">
                   <Trash2 size={14} color="#64748B" />
@@ -121,22 +126,41 @@ export default function ClinicFinanceScreen() {
         </View>
       )}
 
-      <AddTxModal open={showAdd} onClose={() => setShowAdd(false)} ar={ar} />
+      <AddTxModal open={showAdd} initialCurrency={currency} onClose={() => setShowAdd(false)} ar={ar} />
     </Screen>
   );
 }
 
-function AddTxModal({ open, onClose, ar }: { open: boolean; onClose: () => void; ar: boolean }) {
+function AddTxModal({
+  open,
+  initialCurrency,
+  onClose,
+  ar,
+}: {
+  open: boolean;
+  initialCurrency: Currency;
+  onClose: () => void;
+  ar: boolean;
+}) {
   const insets = useSafeAreaInsets();
   const [label, setLabel] = useState('');
   const [kind, setKind] = useState<TxKind>('income');
   const [amountDisplay, setAmountDisplay] = useState('');
   const [source, setSource] = useState<(typeof SOURCES)[number]['id']>('patient');
+  const [currency, setCurrency] = useState<Currency>(initialCurrency);
+  const unit = currency === 'IQD' ? (ar ? 'د.ع' : 'IQD') : '$';
 
-  const formatAmount = (raw: string) => {
-    const digits = raw.replace(/\D/g, '');
-    if (!digits) return '';
-    return Number(digits).toLocaleString('en-US');
+  // Opens on the currency the finance screen is showing.
+  useEffect(() => {
+    if (open) setCurrency(initialCurrency);
+  }, [open, initialCurrency]);
+
+  // Dinars are whole numbers; dollars keep up to two decimals.
+  const formatAmount = (raw: string, cur: Currency = currency) => {
+    const cleaned = raw.replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))).replace(/[^\d.]/g, '');
+    const [int, ...rest] = cleaned.split('.');
+    const grouped = int ? Number(int).toLocaleString('en-US') : rest.length ? '0' : '';
+    return cur === 'USD' && rest.length ? `${grouped}.${rest.join('').slice(0, 2)}` : grouped;
   };
 
   const reset = () => {
@@ -153,6 +177,7 @@ function AddTxModal({ open, onClose, ar }: { open: boolean; onClose: () => void;
       kind,
       amount: Number(amountDisplay.replace(/,/g, '')) || 0,
       source,
+      currency,
     });
     reset();
     onClose();
@@ -213,19 +238,31 @@ function AddTxModal({ open, onClose, ar }: { open: boolean; onClose: () => void;
             </View>
 
             <View>
+              <Text className="mb-1.5 text-[11px] font-bold text-slate-500">{ar ? 'العملة' : 'Currency'}</Text>
+              <CurrencySwitch
+                value={currency}
+                ar={ar}
+                onChange={(c) => {
+                  setCurrency(c);
+                  setAmountDisplay((v) => formatAmount(v, c));
+                }}
+              />
+            </View>
+
+            <View>
               <Text className="mb-1.5 text-[11px] font-bold text-slate-500">
-                {ar ? 'المبلغ' : 'Amount'} ({ar ? 'د.ع' : 'IQD'})
+                {ar ? 'المبلغ' : 'Amount'} ({unit})
               </Text>
               <View className="h-11 flex-row items-center rounded-xl border border-slate-200 bg-slate-50 px-3">
                 <TextInput
                   value={amountDisplay}
                   onChangeText={(v) => setAmountDisplay(formatAmount(v))}
-                  keyboardType="numeric"
+                  keyboardType={currency === 'USD' ? 'decimal-pad' : 'numeric'}
                   placeholder="0"
                   placeholderTextColor="#94A3B8"
                   className="flex-1 text-right text-sm text-slate-800"
                 />
-                <Text className="ms-2 shrink-0 text-xs font-bold text-slate-400">{ar ? 'د.ع' : 'IQD'}</Text>
+                <Text className="ms-2 shrink-0 text-xs font-bold text-slate-400">{unit}</Text>
               </View>
             </View>
 

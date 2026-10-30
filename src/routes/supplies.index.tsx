@@ -54,6 +54,7 @@ import { SupplierOrderDetailModal } from "@/components/SupplierOrderDetailModal"
 import { useUserRole } from "@/lib/useAuth";
 import { auth } from "@/integrations/firebase/client";
 import { useI18n } from "@/lib/i18n";
+import { useConfirmClose, useFormDirty } from "@/lib/confirmClose";
 import {
   MapPin,
   Star,
@@ -834,6 +835,14 @@ function ProductsPanel() {
     setEditing({ ...editing, images: updated });
   };
 
+  // The form stays mounted and is refilled on each open; closing it by mistake
+  // asks first when something was typed (see lib/confirmClose.ts).
+  const dirty = useFormDirty(
+    [nameEn, brand, price, purchasePrice, currency, stock, stockHidden, branch, subCategory, origin, barcode, expiryDate, description, specs, techSpecs, tiers, imagePreviews],
+    showForm,
+  );
+  const requestClose = useConfirmClose(dirty, () => setShowForm(false), ar);
+
   const submit = async () => {
     setFormError("");
 
@@ -979,7 +988,7 @@ function ProductsPanel() {
         <div className="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:p-6">
           <div
             className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
-            onClick={() => setShowForm(false)}
+            onClick={requestClose}
           />
           {/* Phone: a full-height bottom sheet, exactly as before (the flex
               parent + h-calc reproduce the old inset-x-0/bottom-0/top-6 box).
@@ -1002,7 +1011,7 @@ function ProductsPanel() {
               </div>
               <button
                 type="button"
-                onClick={() => setShowForm(false)}
+                onClick={requestClose}
                 className="size-9 rounded-xl bg-white/70 border border-white/80 text-slate-500 flex items-center justify-center hover:bg-white transition"
               >
                 <X className="size-4" />
@@ -2322,6 +2331,13 @@ function ImplantProductsPanel() {
   const toNums = (arr: string[]): number[] =>
     arr.map((s) => parseFloat(s)).filter((n) => !isNaN(n) && n > 0);
 
+  // Closing the form by mistake asks first when something was typed.
+  const dirty = useFormDirty(
+    [nameAr, nameEn, brand, materialGrade, surfaceTreatment, diameters, lengths, connectionType, recommendedTorque, kitType, country, implantType, subType, price, catalogUrl, certificationsStr, imagePreviews],
+    showForm,
+  );
+  const requestClose = useConfirmClose(dirty, () => setShowForm(false), ar);
+
   const submit = async () => {
     setFormError("");
     if (!nameAr.trim() || !brand.trim()) {
@@ -2411,7 +2427,7 @@ function ImplantProductsPanel() {
       )}
 
       {/* Modal form */}
-      <Dialog open={showForm} onOpenChange={setShowForm}>
+      <Dialog open={showForm} onOpenChange={(o) => (o ? setShowForm(true) : requestClose())}>
         <DialogContent className="max-w-lg max-h-[90svh] overflow-y-auto rounded-3xl p-5 sm:rounded-3xl [&>button]:hidden">
           <DialogHeader className="p-0">
             <div className="flex items-center justify-between">
@@ -2425,7 +2441,7 @@ function ImplantProductsPanel() {
                     : "New implant product"}
               </DialogTitle>
               <button
-                onClick={() => setShowForm(false)}
+                onClick={requestClose}
                 className="size-9 rounded-xl bg-[#E7F4FE] hover:bg-[#DCEEFB] text-[#1C6FB5] flex items-center justify-center transition cursor-pointer"
               >
                 <X className="size-4" />

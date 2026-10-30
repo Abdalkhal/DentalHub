@@ -7,7 +7,7 @@ export type Notification = {
   userId: string;
   title: string;
   body: string;
-  type: "order_new" | "order_status" | "message";
+  type: "order_new" | "order_status" | "message" | "case_message";
   isRead: boolean;
   createdAt: number;
   orderId?: string;
@@ -21,6 +21,10 @@ export type Notification = {
   /** For type "message": the other participant's uid, so opening the
    * notification can jump straight into that direct-message thread. */
   chatWith?: string;
+  /** For type "case_message": the case's lab, and which side receives it
+   * ("lab" → incoming orders, "doctor" → case tracking). */
+  labId?: string;
+  forRole?: "doctor" | "lab";
 };
 
 /** Live list of the user's non-expired notifications, newest first. Sorted

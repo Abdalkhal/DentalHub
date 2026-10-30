@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Alert, Image, Linking, Pressable, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { File } from 'expo-file-system';
 import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import {
   EmailAuthProvider,
@@ -9,7 +10,8 @@ import {
   updateProfile,
   deleteUser,
 } from 'firebase/auth';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, getDownloadURL } from 'firebase/storage';
+import { uploadData } from '@/lib/uploadData';
 import { router } from 'expo-router';
 import { Bell, Camera, Link2, Lock, MapPin, Trash2, User } from 'lucide-react-native';
 
@@ -100,8 +102,9 @@ export default function SettingsScreen() {
     try {
       const asset = res.assets[0];
       const path = `profile_pictures/${role.userId}/${randomUUID()}.jpg`;
-      const blob = await (await fetch(asset.uri)).blob();
-      await uploadBytes(ref(storage, path), blob, { contentType: asset.mimeType || 'image/jpeg' });
+      // Read natively — fetch(uri).blob() is unreliable on Android.
+      const bytes = new Uint8Array(await new File(asset.uri).arrayBuffer());
+      await uploadData(ref(storage, path), bytes, { contentType: asset.mimeType || 'image/jpeg' });
       const url = await getDownloadURL(ref(storage, path));
       await updateDoc(doc(db, 'user_roles', role.userId), { photoURL: url });
       if (auth.currentUser) await updateProfile(auth.currentUser, { photoURL: url });

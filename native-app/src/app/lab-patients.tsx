@@ -3,7 +3,8 @@ import { Pressable, View } from 'react-native';
 import { ChevronDown, ChevronUp, Search, Users } from 'lucide-react-native';
 
 import { Screen, Text, Input } from '@/components/ui';
-import { useOrders, connectLabOrders, disconnectLabOrders, type Order } from '@/lib/ordersStore';
+import { useOrders, connectLabOrders, disconnectLabOrders } from '@/lib/ordersStore';
+import { groupOrders, type OrderGroup } from '@/lib/labFinance';
 import { useUserRole } from '@/lib/useAuth';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
@@ -16,7 +17,7 @@ import { cn } from '@/lib/utils';
 // "المرضى" to that same dentist chart tool for every role, which would show
 // an empty "add your own patient" screen for a lab account.
 
-type PatientEntry = { name: string; orders: Order[] };
+type PatientEntry = OrderGroup;
 
 const STATUS_META: Record<string, { ar: string; en: string; cls: string }> = {
   new: { ar: 'جديد', en: 'New', cls: 'bg-sky-50 text-sky-600' },
@@ -58,17 +59,8 @@ export default function LabPatientsScreen() {
     return () => disconnectLabOrders();
   }, [labId]);
 
-  const patients = useMemo(() => {
-    const map = new Map<string, Order[]>();
-    for (const o of orders) {
-      const name = (o.patient || '').trim();
-      if (!name) continue;
-      const list = map.get(name) ?? [];
-      list.push(o);
-      map.set(name, list);
-    }
-    return [...map.entries()].map(([name, list]) => ({ name, orders: list })).sort((a, b) => b.orders.length - a.orders.length);
-  }, [orders]);
+  // Per doctor: namesakes at different doctors are different patients.
+  const patients = useMemo(() => groupOrders(orders, 'patient'), [orders]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return patients;
@@ -147,7 +139,7 @@ export default function LabPatientsScreen() {
           <View className="gap-2.5">
             {filtered.map((p) => (
               <Pressable
-                key={p.name}
+                key={p.key}
                 onPress={() => setSelected(p)}
                 className="flex-row items-start gap-3 rounded-2xl border border-slate-200 bg-card p-3.5 shadow-sm"
               >

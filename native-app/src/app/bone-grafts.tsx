@@ -1,14 +1,14 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { collection, getDocs } from 'firebase/firestore';
 import { Package } from 'lucide-react-native';
 
 import { Screen, Text, Spinner } from '@/components/ui';
 import { ProductImage } from '@/components/ProductImage';
+import { BoneGraftDetailsModal } from '@/components/BoneGraftDetailsModal';
 import { db } from '@/integrations/firebase/client';
-import { useProducts, useSignedImageUrls } from '@/lib/products';
+import { useProducts, useSignedImageUrls, type Product } from '@/lib/products';
 import { useI18n } from '@/lib/i18n';
 
 export default function BoneGraftsScreen() {
@@ -16,6 +16,7 @@ export default function BoneGraftsScreen() {
   const ar = lang === 'ar';
 
   const { data: allProducts = [], isLoading } = useProducts();
+  const [selected, setSelected] = useState<Product | null>(null);
   const items = useMemo(() => allProducts.filter((p) => p.branch === 'bone_graft'), [allProducts]);
   const { data: urlMap = {} } = useSignedImageUrls(
     useMemo(() => items.flatMap((p) => p.images), [items]),
@@ -65,9 +66,7 @@ export default function BoneGraftsScreen() {
             return (
               <Pressable
                 key={p.id}
-                onPress={() =>
-                  router.push({ pathname: '/product-detail/[productId]', params: { productId: p.id } })
-                }
+                onPress={() => setSelected(p)}
                 className="w-[48.5%] overflow-hidden rounded-2xl border border-slate-200 bg-card shadow-sm"
               >
                 <ProductImage
@@ -102,6 +101,8 @@ export default function BoneGraftsScreen() {
           })}
         </View>
       )}
+
+      {selected && <BoneGraftDetailsModal product={selected} ar={ar} onClose={() => setSelected(null)} />}
     </Screen>
   );
 }

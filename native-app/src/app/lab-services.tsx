@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, View } from 'react-native';
 import { KeyboardAwareScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import * as ImagePicker from 'expo-image-picker';
@@ -9,17 +9,15 @@ import { Clock, Pencil, Plus, Sparkles, Trash2, Upload, X } from 'lucide-react-n
 import { Screen, Text, Input, Button, Spinner } from '@/components/ui';
 import { db } from '@/integrations/firebase/client';
 import { randomUUID } from '@/lib/randomId';
+import { migrateInlineServiceImages, storeServiceImage } from '@/lib/labServices';
 import { useUserRole } from '@/lib/useAuth';
 import { useI18n } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 
 // Ported from the web app's lab.my-services.tsx — same `lab_services/{labId}`
-// document. Images are stored as a base64 data URI (like web's own
-// `FileReader.readAsDataURL`), not uploaded to Storage: this field is read
-// by both platforms, and a Storage *path* written here would be meaningless
-// to web's plain `<img src>`, while a self-contained data URI renders
-// correctly on both without needing a signed-URL resolution step.
+// document. Photos are uploaded to Storage and saved as their download URL
+// (renders as-is on both platforms) — see lib/labServices.ts.
 
 type Service = {
   id: string;
@@ -53,6 +51,19 @@ export default function LabServicesScreen() {
     },
     enabled: !!labId,
   });
+
+  // Photos saved inline by older versions are moved to Storage once.
+  useEffect(() => {
+    if (!labId || services.length === 0) return;
+    let cancelled = false;
+    void migrateInlineServiceImages(labId, services).then((next) => {
+      if (next && !cancelled) saveMutation.mutate(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [labId, services]);
 
   const saveMutation = useMutation({
     mutationFn: async (next: Service[]) => {
@@ -108,8 +119,16 @@ export default function LabServicesScreen() {
       toast.error(ar ? 'اسم الخدمة مطلوب' : 'Service name required');
       return;
     }
+    const id = editingId ?? randomUUID();
+    let imageUrl: string | undefined;
+    try {
+      imageUrl = await storeServiceImage(labId, id, imgUri);
+    } catch (e) {
+      toast.error(ar ? `تعذر رفع الصورة: ${e instanceof Error ? e.message : String(e)}` : `Image upload failed: ${e instanceof Error ? e.message : String(e)}`);
+      return;
+    }
     const svc: Service = {
-      id: editingId ?? randomUUID(),
+      id,
       titleAr: form.titleAr.trim(),
       titleEn: form.titleEn.trim() || form.titleAr.trim(),
       category: form.category.trim(),
@@ -117,7 +136,7 @@ export default function LabServicesScreen() {
       turnaroundEn: form.turnaroundEn.trim(),
       price: parseFloat(form.price) || 0,
       currency: form.currency,
-      imageUrl: imgUri || undefined,
+      imageUrl,
     };
     const next = editingId ? services.map((s) => (s.id === editingId ? svc : s)) : [svc, ...services];
     try {

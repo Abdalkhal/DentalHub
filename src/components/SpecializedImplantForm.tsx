@@ -3,6 +3,7 @@ import { X, Plus, Upload, Loader2, Check, Package, ChevronDown } from "lucide-re
 import { cn } from "@/lib/utils";
 import { StockVisibilityToggle } from "@/components/StockVisibilityToggle";
 import { useI18n } from "@/lib/i18n";
+import { useConfirmClose, useFormDirty } from "@/lib/confirmClose";
 import {
   useUpsertProduct,
   uploadProductImage,
@@ -309,6 +310,10 @@ export function SpecializedImplantForm({
     setExistingClinical((prev) => prev.filter((p) => p !== path));
   };
 
+  // Closing by mistake (✕, a click outside, the tab) asks first when something was typed.
+  const dirty = useFormDirty([category, name, manufacturer, country, price, currency, stock, stockHidden, description, fields, imagePreviews, existingImages, clinicalPreviews, existingClinical]);
+  const requestClose = useConfirmClose(dirty, onClose, ar);
+
   const submit = async () => {
     setError("");
     if (!name.trim()) {
@@ -392,7 +397,7 @@ export function SpecializedImplantForm({
 
   return (
     <div className="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:p-6">
-      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={requestClose} />
       <div
         className="relative w-full max-w-md max-h-[92vh] flex flex-col rounded-t-3xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom md:max-w-2xl md:max-h-[88vh] md:rounded-3xl lg:max-w-3xl"
         style={{ background: "linear-gradient(to bottom, #F7FCFF, #EAE4FF, #D6CDFF)" }}
@@ -411,7 +416,7 @@ export function SpecializedImplantForm({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             className="size-9 rounded-xl bg-white/70 border border-white/80 text-slate-500 flex items-center justify-center hover:bg-white transition"
           >
             <X className="size-4" />

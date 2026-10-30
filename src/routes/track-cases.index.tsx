@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
+import { CaseChat } from "@/components/CaseChat";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { IncomingOrderRxModal } from "@/components/IncomingOrderRxModal";
@@ -19,10 +20,14 @@ import { useCaseUnreadCount } from "@/lib/caseMessages";
 import { useSession, useUserRole } from "@/lib/useAuth";
 import {
   User, Wrench, CalendarDays, Truck, Hash, Building2, ClipboardList,
-  RefreshCw,
+  RefreshCw, MessageCircle, X,
 } from "lucide-react";
 
 export const Route = createFileRoute("/track-cases/")({
+  // `open` = a case id to open the chat for (from a "new message" notification).
+  validateSearch: (s: Record<string, unknown>): { open?: string } => ({
+    open: typeof s.open === "string" ? s.open : undefined,
+  }),
   component: TrackCases,
 });
 
@@ -117,6 +122,8 @@ function TrackCases() {
       : "";
   const { cases: remoteCases, loading } = useDentistCases(user?.uid ?? "");
   const [selectedCase, setSelectedCase] = useState<TrackedCase | null>(null);
+  const [chatCase, setChatCase] = useState<TrackedCase | null>(null);
+  const { open } = Route.useSearch();
 
   // Filter strictly by the doctor's unique id (Firestore), with a legacy
   // fallback: cases that lack `dentistId` are matched by doctor name
@@ -131,6 +138,18 @@ function TrackCases() {
       new Map([...remote, ...legacy].map((c) => [c.order.id, c])).values(),
     );
   }, [remoteCases, localOrders, doctorName]);
+
+  useEffect(() => {
+    if (!open) return;
+    const c = allCases.find((x) => x.order.id === open && x.labId);
+    if (c) setChatCase(c);
+  }, [open, allCases]);
+
+  useEffect(() => {
+    if (!open) return;
+    const c = allCases.find((x) => x.order.id === open && x.labId);
+    if (c) setChatCase(c);
+  }, [open, allCases]);
 
   const [filter, setFilter] = useState<string>("all");
 
@@ -271,12 +290,58 @@ function TrackCases() {
                       </span>
                     )}
                   </div>
+                  {c.labId && (
+                    <div className="px-4 pb-3">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setChatCase(c);
+                        }}
+                        className="w-full h-10 rounded-xl bg-gradient-to-l from-sky-500 to-blue-600 text-white text-[12px] font-bold flex items-center justify-center gap-2 shadow-sm shadow-sky-500/20 hover:opacity-95"
+                      >
+                        <MessageCircle className="size-4" />
+                        {ar ? "مراسلة المختبر حول الحالة" : "Message the lab about this case"}
+                        <UnreadBadge labId={c.labId} caseId={o.id} userId={user?.uid} />
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
         )}
       </div>
+
+      {chatCase && user?.uid && (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-900/50 backdrop-blur-sm md:items-center md:p-6" onClick={() => setChatCase(null)}>
+          <div className="relative h-[92svh] w-full max-w-2xl md:h-[82vh]" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              onClick={() => setChatCase(null)}
+              className="absolute -top-12 end-2 size-10 rounded-full bg-white/90 text-slate-700 shadow flex items-center justify-center md:-end-12 md:top-0"
+              aria-label={ar ? "إغلاق" : "Close"}
+            >
+              <X className="size-5" />
+            </button>
+            <CaseChat
+              variant="full"
+              labId={chatCase.labId}
+              caseId={chatCase.order.id}
+              currentUserId={user.uid}
+              senderRole="doctor"
+              senderName={[role?.name, role?.surname].filter(Boolean).join(" ") || user.displayName || user.email || (ar ? "الطبيب" : "Doctor")}
+              counterpartId={chatCase.labId}
+              context={{
+                patient: chatCase.order.patient,
+                orderNumber: chatCase.order.orderNumber,
+                workType: chatCase.order.workType,
+                statusLabel: ar ? STATUS_LABELS[canonicalStatus(chatCase.order.status)].ar : STATUS_LABELS[canonicalStatus(chatCase.order.status)].en,
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {selectedCase && (
         <IncomingOrderRxModal

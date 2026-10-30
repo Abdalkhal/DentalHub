@@ -5,6 +5,8 @@ import { Check, Package, Plus, Sparkles, Upload, X } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 
 import { Select, Text } from '@/components/ui';
+import { useConfirmClose, useFormDirty } from '@/lib/confirmClose';
+import { SINGLE_LINE_INPUT } from '@/components/ui/singleLineInput';
 import { CountrySelect } from '@/components/CountrySelect';
 import { SPECIALIZED_CATEGORIES, SPECIALIZED_FIELDS, type SpecializedField } from '@/data/specializedImplants';
 import {
@@ -98,7 +100,7 @@ function DynamicField({ field, value, onChange, ar }: { field: SpecializedField;
           placeholder={field.placeholder}
           placeholderTextColor="#94A3B8"
           className={inputCls}
-          style={{ writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }}
+          style={{ ...SINGLE_LINE_INPUT, writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }}
         />
       </Field>
     );
@@ -191,9 +193,18 @@ export function SpecializedImplantForm({ open, onClose, ar, product }: { open: b
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7 });
     if (res.canceled || !res.assets?.length) return;
     const asset = res.assets[0];
-    const path = await uploadProductImage(draftId, { uri: asset.uri, name: asset.fileName ?? undefined, type: asset.mimeType ?? undefined });
-    onPath(path);
+    // A failed upload used to vanish silently, leaving the product with no image.
+    try {
+      const path = await uploadProductImage(draftId, { uri: asset.uri, name: asset.fileName ?? undefined, type: asset.mimeType ?? undefined });
+      onPath(path);
+    } catch (e) {
+      toast.error(`${ar ? 'تعذر رفع الصورة' : 'Image upload failed'}${e instanceof Error ? `: ${e.message}` : ''}`);
+    }
   };
+
+  // Closing by mistake (✕ / Android back) asks first when something was typed.
+  const dirty = useFormDirty([category, name, manufacturer, country, price, currency, stock, stockHidden, description, fields, images, clinicalImages]);
+  const requestClose = useConfirmClose(dirty, onClose, ar);
 
   const submit = async () => {
     setError('');
@@ -249,7 +260,7 @@ export function SpecializedImplantForm({ open, onClose, ar, product }: { open: b
   };
 
   return (
-    <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={open} transparent animationType="slide" onRequestClose={requestClose}>
       <View style={{ flex: 1 }}>
       <View className="flex-1 justify-end bg-black/40">
         <View className="max-h-[93%] overflow-hidden rounded-t-[32px] bg-[#F6F5FF]">
@@ -263,7 +274,7 @@ export function SpecializedImplantForm({ open, onClose, ar, product }: { open: b
                 <Text className="text-[11px] text-white/75">{ar ? 'حلول متقدمة للحالات المعقدة' : 'Advanced solutions for complex cases'}</Text>
               </View>
             </View>
-            <Pressable onPress={onClose} className="h-9 w-9 items-center justify-center rounded-full bg-white/20">
+            <Pressable onPress={requestClose} className="h-9 w-9 items-center justify-center rounded-full bg-white/20">
               <X size={16} color="#FFFFFF" />
             </Pressable>
           </View>
@@ -282,10 +293,10 @@ export function SpecializedImplantForm({ open, onClose, ar, product }: { open: b
 
             <SectionCard title={ar ? 'معلومات أساسية' : 'Basic Information'}>
               <Field label={ar ? 'اسم الزرعة المتخصصة' : 'Implant name'}>
-                <TextInput value={name} onChangeText={setName} placeholder={ar ? 'مثال: Subperiosteal Mesh' : 'e.g. Subperiosteal Mesh'} placeholderTextColor="#94A3B8" className={inputCls} style={{ writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }} />
+                <TextInput value={name} onChangeText={setName} placeholder={ar ? 'مثال: Subperiosteal Mesh' : 'e.g. Subperiosteal Mesh'} placeholderTextColor="#94A3B8" className={inputCls} style={{ ...SINGLE_LINE_INPUT, writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }} />
               </Field>
               <Field label={ar ? 'الشركة المصنعة' : 'Manufacturer'}>
-                <TextInput value={manufacturer} onChangeText={setManufacturer} placeholder={ar ? 'مثال: Zygoma' : 'e.g. Zygoma'} placeholderTextColor="#94A3B8" className={inputCls} style={{ writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }} />
+                <TextInput value={manufacturer} onChangeText={setManufacturer} placeholder={ar ? 'مثال: Zygoma' : 'e.g. Zygoma'} placeholderTextColor="#94A3B8" className={inputCls} style={{ ...SINGLE_LINE_INPUT, writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }} />
               </Field>
               <Field label={ar ? 'بلد المنشأ' : 'Country of Origin'}>
                 <CountrySelect value={country} onChange={setCountry} ar={ar} />
@@ -339,13 +350,13 @@ export function SpecializedImplantForm({ open, onClose, ar, product }: { open: b
               <View className="flex-row gap-2.5">
                 <View className="flex-1">
                   <Field label={ar ? 'سعر الوحدة' : 'Unit price'}>
-                    <TextInput value={price} onChangeText={(v) => setPrice(v.replace(/[^0-9.]/g, ''))} keyboardType="decimal-pad" placeholder="0" placeholderTextColor="#94A3B8" className={inputCls} style={{ writingDirection: 'ltr', textAlign: 'left' }} />
+                    <TextInput value={price} onChangeText={(v) => setPrice(v.replace(/[^0-9.]/g, ''))} keyboardType="decimal-pad" placeholder="0" placeholderTextColor="#94A3B8" className={inputCls} style={{ ...SINGLE_LINE_INPUT, writingDirection: 'ltr', textAlign: 'left' }} />
                   </Field>
                 </View>
                 {!hideStock && !stockHidden && (
                   <View className="flex-1">
                     <Field label={ar ? 'المخزون' : 'Stock'}>
-                      <TextInput value={stock} onChangeText={(v) => setStock(v.replace(/[^0-9]/g, ''))} keyboardType="number-pad" placeholder="0" placeholderTextColor="#94A3B8" className={inputCls} style={{ writingDirection: 'ltr', textAlign: 'left' }} />
+                      <TextInput value={stock} onChangeText={(v) => setStock(v.replace(/[^0-9]/g, ''))} keyboardType="number-pad" placeholder="0" placeholderTextColor="#94A3B8" className={inputCls} style={{ ...SINGLE_LINE_INPUT, writingDirection: 'ltr', textAlign: 'left' }} />
                     </Field>
                   </View>
                 )}

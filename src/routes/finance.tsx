@@ -5,11 +5,21 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "@/integrations/firebase/client";
 import { useI18n } from "@/lib/i18n";
 import { useSession } from "@/lib/useAuth";
-import { useOrders, connectLabOrders, disconnectLabOrders, formatOrderId, type Order } from "@/lib/ordersStore";
+import { useOrders, connectLabOrders, disconnectLabOrders, formatOrderId } from "@/lib/ordersStore";
+import { resolveOrderTotal } from "@/lib/orderLines";
+import {
+  doctorAccounts,
+  fmtLabMoney,
+  labTotals,
+  type DoctorAccount,
+  type LabCurrency,
+  type LabPayment,
+} from "@/lib/labFinance";
+import { CurrencySwitch } from "@/components/CurrencySwitch";
 import { getStatusLabel, getStatusColor } from "@/lib/caseTracking";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
-import { cn, normalizeName } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import {
   DollarSign,
   Wallet,
@@ -27,6 +37,7 @@ import {
   Plus,
   Save,
   Pencil,
+  Trash2,
 } from "lucide-react";
 
 export const Route = createFileRoute("/finance")({
@@ -34,14 +45,6 @@ export const Route = createFileRoute("/finance")({
 });
 
 /* ── Types ────────────────────────────────────────── */
-
-type PaymentRecord = {
-  id: string;
-  clinic: string;
-  amount: number;
-  currency: "USD" | "IQD";
-  date: string;
-};
 
 type ExpenseItem = {
   label: string;
@@ -56,16 +59,8 @@ type ExpenseCategory = {
 };
 
 type LabFinanceDoc = {
-  payments: PaymentRecord[];
+  payments: LabPayment[];
   expenses: ExpenseCategory[];
-};
-
-type ClinicSummary = {
-  name: string;
-  billed: number;
-  collected: number;
-  remaining: number;
-  orders: Order[];
 };
 
 /* ── Default expense categories ──────────────────── */
@@ -134,14 +129,9 @@ const ICON_MAP: Record<string, typeof DollarSign> = {
 
 /* ── Helpers ─────────────────────────────────────── */
 
-function fmt(n: number) {
-  return n.toLocaleString() + " د.ع";
-}
-
-/** Safely parses an amount, stripping currency symbols/commas and never returning NaN. */
-function parseAmount(val: unknown): number {
-  const n = Number(String(val || 0).replace(/[^0-9.-]+/g, ""));
-  return isNaN(n) ? 0 : n;
+/** Operating expenses are entered in dinars. */
+function fmtIQD(n: number) {
+  return fmtLabMoney(n, "IQD");
 }
 
 /* ── Page Component ──────────────────────────────── */
@@ -163,10 +153,15 @@ function FinancePage() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [editingExpenseCat, setEditingExpenseCat] = useState<string | null>(null);
   const [paymentClinic, setPaymentClinic] = useState("");
+  const [paymentDoctorId, setPaymentDoctorId] = useState<string | undefined>();
   const [paymentAmount, setPaymentAmount] = useState("");
-  const [paymentCurrency, setPaymentCurrency] = useState<"USD" | "IQD">("IQD");
+  const [paymentCurrency, setPaymentCurrency] = useState<LabCurrency>("IQD");
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split("T")[0]);
-  const [detailClinic, setDetailClinic] = useState<ClinicSummary | null>(null);
+  const [detailKey, setDetailKey] = useState<string | null>(null);
+  // Dinars and dollars are never added together: everything is shown in the
+  // currency picked at the top (see lib/labFinance.ts).
+  const [currency, setCurrency] = useState<LabCurrency>("IQD");
+  const fmt = (n: number) => fmtLabMoney(n, currency);
 
   /* ── Load lab finances from Firestore ────────────── */
 
@@ -194,7 +189,7 @@ function FinancePage() {
     staleTime: 30_000,
   });
 
-  const payments: PaymentRecord[] = finDoc?.payments ?? [];
+  const payments: LabPayment[] = useMemo(() => finDoc?.payments ?? [], [finDoc]);
   const expenses: ExpenseCategory[] = finDoc?.expenses ?? [];
 
   /* ── Save mutation ──────────────────────────────── */
@@ -209,49 +204,20 @@ function FinancePage() {
     },
   });
 
-  /* ── Derived clinic summaries ───────────────────── */
+  /* ── Per-doctor accounts, in the chosen currency ── */
 
-  // Grouped (and payments matched) by normalizeName — the doctor on a case
-  // and the clinic on a payment are typed separately, so spelling can drift.
-  // A doctor with only a payment logged (e.g. an advance) still gets a card.
-  // Billed as soon as a case is placed and priced, not only once completed —
-  // a lab bills for work taken on. Same as native's lab-finance.
-  const clinicSummaries: ClinicSummary[] = useMemo(() => {
-    const byClinic = new Map<string, { name: string; orders: Order[] }>();
-    for (const o of orders) {
-      const key = normalizeName(o.doctor || "");
-      if (!key) continue;
-      const bucket = byClinic.get(key);
-      if (bucket) bucket.orders.push(o);
-      else byClinic.set(key, { name: o.doctor.trim(), orders: [o] });
-    }
-    for (const p of payments) {
-      const key = normalizeName(p.clinic || "");
-      if (!key || byClinic.has(key)) continue;
-      byClinic.set(key, { name: p.clinic.trim(), orders: [] });
-    }
-    const results: ClinicSummary[] = [];
-    for (const [key, { name, orders: clinicOrders }] of byClinic) {
-      const billed = clinicOrders.reduce((sum, o) => sum + parseAmount(o.totalAmount), 0);
-      const collected = payments
-        .filter((p) => normalizeName(p.clinic) === key)
-        .reduce((sum, p) => sum + parseAmount(p.amount), 0);
-      results.push({ name, billed, collected, remaining: billed - collected, orders: clinicOrders });
-    }
-    return results;
-  }, [orders, payments]);
+  const clinicSummaries: DoctorAccount[] = useMemo(
+    () => doctorAccounts(orders, payments, currency),
+    [orders, payments, currency],
+  );
+  const detailClinic = clinicSummaries.find((c) => c.key === detailKey) ?? null;
 
   /* ── Totals ─────────────────────────────────────── */
 
-  const totalInvoiced = useMemo(
-    () => orders.reduce((sum, o) => sum + parseAmount(o.totalAmount), 0),
-    [orders],
+  const { invoiced: totalInvoiced, collected: totalCollected, remaining: totalRemaining } = useMemo(
+    () => labTotals(orders, payments, currency),
+    [orders, payments, currency],
   );
-  const totalCollected = useMemo(
-    () => payments.reduce((s, p) => s + parseAmount(p.amount), 0),
-    [payments],
-  );
-  const totalRemaining = totalInvoiced - totalCollected;
 
   const totalExpenses = useMemo(
     () => expenses.reduce((s, cat) => s + cat.items.reduce((a, i) => a + i.amount, 0), 0),
@@ -260,12 +226,29 @@ function FinancePage() {
 
   /* ── Payment modal handlers ─────────────────────── */
 
+  const openPaymentModal = (account?: DoctorAccount) => {
+    setPaymentClinic(account?.name ?? "");
+    setPaymentDoctorId(account?.doctorId);
+    setPaymentCurrency(currency);
+    setShowPaymentModal(true);
+  };
+
+  // A payment logged by mistake used to be permanent.
+  const removePayment = (p: LabPayment) => {
+    const msg = ar
+      ? `حذف دفعة ${fmtLabMoney(p.amount, p.currency)} بتاريخ ${p.date}؟`
+      : `Delete the ${fmtLabMoney(p.amount, p.currency)} payment of ${p.date}?`;
+    if (!window.confirm(msg)) return;
+    saveMutation.mutate({ payments: payments.filter((x) => x.id !== p.id), expenses });
+  };
+
   const handleAddPayment = () => {
     const amt = parseFloat(paymentAmount);
     if (!paymentClinic.trim() || !amt || amt <= 0) return;
-    const newPayment: PaymentRecord = {
+    const newPayment: LabPayment = {
       id: crypto.randomUUID(),
       clinic: paymentClinic.trim(),
+      ...(paymentDoctorId ? { doctorId: paymentDoctorId } : {}),
       amount: amt,
       currency: paymentCurrency,
       date: paymentDate,
@@ -276,8 +259,8 @@ function FinancePage() {
     };
     saveMutation.mutate(updated);
     setPaymentClinic("");
+    setPaymentDoctorId(undefined);
     setPaymentAmount("");
-    setPaymentCurrency("IQD");
     setPaymentDate(new Date().toISOString().split("T")[0]);
     setShowPaymentModal(false);
   };
@@ -304,6 +287,8 @@ function FinancePage() {
     <MobileShell wide>
       <TopBar title={ar ? "المالية" : "Finance"} showBack wide maxW="6xl" />
       <div className="px-4 pt-4 pb-6 space-y-4 md:px-6 md:pt-6 md:pb-12 md:space-y-6 lg:px-8 lg:max-w-6xl lg:mx-auto">
+        <CurrencySwitch value={currency} onChange={setCurrency} ar={ar} className="md:max-w-xl" />
+
         {/* ── Account Summary ─────────────────────────── */}
         <div className="bg-gradient-to-br from-primary/10 to-primary-soft/30 rounded-3xl border border-primary/10 p-5 space-y-4">
           <div className="flex items-center justify-between">
@@ -316,7 +301,7 @@ function FinancePage() {
               </span>
             </div>
             <button
-              onClick={() => setShowPaymentModal(true)}
+              onClick={() => openPaymentModal()}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-primary-foreground text-[11px] font-bold hover:opacity-90 transition"
             >
               <Plus className="size-3.5" />
@@ -369,13 +354,17 @@ function FinancePage() {
                 ? ar
                   ? "لا توجد طلبات بعد — أضف طلبات لعرض فواتير العيادات"
                   : "No orders yet — add orders to see clinic invoices"
-                : t("no_invoices")}
+                : ar
+                  ? currency === "IQD"
+                    ? "لا توجد فواتير بالدينار"
+                    : "لا توجد فواتير بالدولار"
+                  : `No ${currency} invoices`}
             </div>
           ) : (
             <div className="space-y-2">
               {clinicSummaries.map((clinic) => (
                 <div
-                  key={clinic.name}
+                  key={clinic.key}
                   className="bg-card border border-border rounded-2xl p-4"
                 >
                   <div className="flex items-center gap-3 mb-3">
@@ -395,7 +384,7 @@ function FinancePage() {
                     </span>
                     <button
                       type="button"
-                      onClick={() => setDetailClinic(clinic)}
+                      onClick={() => setDetailKey(clinic.key)}
                       className="flex-1 min-w-0 text-start"
                     >
                       <p className="font-bold text-foreground text-sm truncate">{clinic.name}</p>
@@ -404,10 +393,7 @@ function FinancePage() {
                       </p>
                     </button>
                     <button
-                      onClick={() => {
-                        setPaymentClinic(clinic.name);
-                        setShowPaymentModal(true);
-                      }}
+                      onClick={() => openPaymentModal(clinic)}
                       className="px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-[11px] font-bold hover:bg-primary/20 transition"
                     >
                       {ar ? "تسجيل دفعة" : "Log Payment"}
@@ -440,7 +426,7 @@ function FinancePage() {
               {t("operational_expenses")}
             </h2>
             <span className="text-xs font-bold text-muted-foreground bg-slate-100 rounded-full px-2.5 py-1">
-              {ar ? "الإجمالي" : "Total"}: {fmt(totalExpenses)}
+              {ar ? "الإجمالي" : "Total"}: {fmtIQD(totalExpenses)}
             </span>
           </div>
 
@@ -474,7 +460,7 @@ function FinancePage() {
                         {cat.category}
                       </p>
                       <span className="font-display font-extrabold text-foreground">
-                        {fmt(catTotal)}
+                        {fmtIQD(catTotal)}
                       </span>
                       <Pencil
                         className={cn(
@@ -554,12 +540,15 @@ function FinancePage() {
                 <div className="flex flex-wrap gap-2 mb-2">
                   {clinicSummaries.map((c) => (
                     <button
-                      key={c.name}
+                      key={c.key}
                       type="button"
-                      onClick={() => setPaymentClinic(c.name)}
+                      onClick={() => {
+                        setPaymentClinic(c.name);
+                        setPaymentDoctorId(c.doctorId);
+                      }}
                       className={cn(
                         "rounded-xl border px-3 py-2 text-xs font-bold transition",
-                        paymentClinic === c.name
+                        paymentClinic === c.name && paymentDoctorId === c.doctorId
                           ? "border-primary bg-primary/10 text-primary"
                           : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
                       )}
@@ -571,7 +560,10 @@ function FinancePage() {
               )}
               <input
                 value={paymentClinic}
-                onChange={(e) => setPaymentClinic(e.target.value)}
+                onChange={(e) => {
+                  setPaymentClinic(e.target.value);
+                  setPaymentDoctorId(undefined); // a typed name isn't tied to an account
+                }}
                 placeholder={ar ? "أو أدخل اسم العيادة" : "Or type a clinic name"}
                 className="w-full h-11 rounded-xl bg-slate-50 border border-border px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
               />
@@ -586,7 +578,7 @@ function FinancePage() {
                   <input
                     type="number"
                     min="0"
-                    step="1000"
+                    step={paymentCurrency === "USD" ? "0.01" : "1000"}
                     value={paymentAmount}
                     onChange={(e) => setPaymentAmount(e.target.value)}
                     placeholder="0"
@@ -654,12 +646,12 @@ function FinancePage() {
       {/* ── Doctor case list ─────────────────────────── */}
       {detailClinic && (
         <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDetailClinic(null)} />
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDetailKey(null)} />
           <div className="relative w-full max-w-md md:max-w-lg max-h-[80vh] bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl p-5 flex flex-col gap-3">
             <div className="flex items-center justify-between gap-2">
               <h3 className="flex-1 truncate font-display font-extrabold text-base">{detailClinic.name}</h3>
               <button
-                onClick={() => setDetailClinic(null)}
+                onClick={() => setDetailKey(null)}
                 className="size-8 rounded-xl hover:bg-slate-100 flex items-center justify-center text-muted-foreground"
               >
                 <X className="size-4" />
@@ -667,8 +659,8 @@ function FinancePage() {
             </div>
             <p className="text-xs text-slate-400">
               {ar
-                ? "المفوترة والمستحصلة والمتبقي هي مجموع كل حالات هذا الطبيب. الدفعات مسجَّلة للطبيب ككل وليست مربوطة بحالة معينة."
-                : "Invoiced, collected and remaining are the sum of this doctor's cases. Payments are logged for the doctor as a whole, not tied to one case."}
+                ? "المبالغ هنا بعملة واحدة فقط. الدفعات مسجَّلة للطبيب ككل وليست مربوطة بحالة معينة."
+                : "Amounts here are in one currency. Payments are logged for the doctor as a whole, not tied to one case."}
             </p>
             <div className="flex-1 overflow-y-auto space-y-2">
               {detailClinic.orders.length === 0 ? (
@@ -683,7 +675,28 @@ function FinancePage() {
                         {formatOrderId(o)} · {getStatusLabel(o.status, ar ? "ar" : "en")}
                       </p>
                     </div>
-                    <span className="text-xs font-extrabold text-slate-800">{fmt(parseAmount(o.totalAmount))}</span>
+                    <span className="text-xs font-extrabold text-slate-800">{fmt(resolveOrderTotal(o))}</span>
+                  </div>
+                ))
+              )}
+              <p className="pt-2 text-xs font-extrabold text-slate-700">{ar ? "الدفعات" : "Payments"}</p>
+              {detailClinic.payments.length === 0 ? (
+                <p className="text-[11px] text-slate-400">{ar ? "لا توجد دفعات" : "No payments"}</p>
+              ) : (
+                detailClinic.payments.map((p) => (
+                  <div key={p.id} className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-emerald-50/60 p-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-extrabold text-emerald-800">{fmtLabMoney(p.amount, p.currency)}</p>
+                      <p className="text-[10px] text-slate-500">{p.date}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removePayment(p)}
+                      aria-label={ar ? "حذف الدفعة" : "Delete payment"}
+                      className="size-8 rounded-lg bg-white flex items-center justify-center text-rose-600 hover:bg-rose-50"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
                   </div>
                 ))
               )}

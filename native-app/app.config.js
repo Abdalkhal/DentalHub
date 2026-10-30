@@ -86,6 +86,15 @@ module.exports = {
       ],
       "expo-notifications",
       "expo-sharing",
+      // Voice notes in the case chat. Native module: only active from the next
+      // store build; the JS guards on its presence (see components/VoiceRecorder).
+      [
+        "expo-audio",
+        {
+          microphonePermission: "Allow Dent Hub to record voice notes for your lab cases.",
+          enableBackgroundPlayback: false,
+        },
+      ],
     ],
     experiments: {
       typedRoutes: true,

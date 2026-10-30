@@ -75,12 +75,12 @@ function implantCategoryOf(spec: ImplantSpec | undefined): ImplantCategory | nul
   return null;
 }
 
-// "Comprehensive"/"Basal" stay in English in both languages — only
-// "فورية"/"غير فورية" (Immediate/Non-Immediate) switch with the language.
+// The English part stays in both languages; "تقليدية"/"فورية" switch with
+// the language. Stored value for Traditional is still `non-immediate`.
 const CATEGORY_LABEL: Record<ImplantCategory, { ar: string; en: string }> = {
   comprehensive: { ar: 'فورية (Comprehensive)', en: 'Immediate (Comprehensive)' },
   basal: { ar: 'فورية (Basal)', en: 'Immediate (Basal)' },
-  non_immediate: { ar: 'غير فورية', en: 'Non-Immediate' },
+  non_immediate: { ar: 'تقليدية (Traditional)', en: 'Traditional' },
 };
 
 const CATEGORY_TONE: Record<ImplantCategory, { box: string; text: string }> = {
@@ -91,9 +91,10 @@ const CATEGORY_TONE: Record<ImplantCategory, { box: string; text: string }> = {
 
 const FILTERS: { key: ImplantFilter; ar: string; en: string }[] = [
   { key: 'all', ar: 'الكل', en: 'All' },
+  // Traditional first, then the two immediate types.
+  { key: 'non_immediate', ...CATEGORY_LABEL.non_immediate },
   { key: 'comprehensive', ...CATEGORY_LABEL.comprehensive },
   { key: 'basal', ...CATEGORY_LABEL.basal },
-  { key: 'non_immediate', ...CATEGORY_LABEL.non_immediate },
 ];
 
 function resolveCountry(slug: string) {

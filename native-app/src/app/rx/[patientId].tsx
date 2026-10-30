@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, FlatList, Image, Linking, Modal, Platform, Pressable, ScrollView, Share, TextInput, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useNavigation } from 'expo-router';
 import {
   Building2,
   FilePenLine,
@@ -17,6 +17,7 @@ import {
   Trash2,
   X,
   Plus,
+  Check,
 } from 'lucide-react-native';
 
 import { Screen, Text } from '@/components/ui';
@@ -99,6 +100,20 @@ export default function RxScreen() {
     setHeader(loadJSON(HEADER_KEY, DEFAULT_HEADER));
   }, []);
 
+  // The picker replaces this screen's content (no Modal — see
+  // AddMedicineScreen), so "back" (header, Android button, swipe) must close
+  // the picker instead of leaving the prescription.
+  const navigation = useNavigation();
+  useEffect(
+    () =>
+      navigation.addListener('beforeRemove', (e) => {
+        if (!addOpen) return;
+        e.preventDefault();
+        setAddOpen(false);
+      }),
+    [navigation, addOpen],
+  );
+
   const saveHeader = (h: RxHeader) => {
     setHeader(h);
     try {
@@ -119,6 +134,24 @@ export default function RxScreen() {
       <Screen>
         <Text className="mt-10 text-center text-slate-500">{ar ? 'المريض غير موجود' : 'Patient not found'}</Text>
       </Screen>
+    );
+  }
+
+  if (addOpen) {
+    return (
+      <AddMedicineScreen
+        ar={ar}
+        alreadyAdded={new Set(items.map((m) => m.id))}
+        onClose={() => setAddOpen(false)}
+        onAdd={(picked) => {
+          // Skip anything already on the sheet so a re-pick doesn't duplicate it.
+          setItems((prev) => {
+            const have = new Set(prev.map((m) => m.id));
+            return [...prev, ...picked.filter((m) => !have.has(m.id))];
+          });
+          setAddOpen(false);
+        }}
+      />
     );
   }
 
@@ -306,16 +339,6 @@ export default function RxScreen() {
       </View>
 
       {editHeader && <HeaderDialog header={header} onClose={() => setEditHeader(false)} onSave={saveHeader} ar={ar} />}
-      {addOpen && (
-        <AddMedicineSheet
-          ar={ar}
-          onClose={() => setAddOpen(false)}
-          onPick={(m) => {
-            setItems((prev) => [...prev, m]);
-            setAddOpen(false);
-          }}
-        />
-      )}
     </Screen>
   );
 }
@@ -379,13 +402,28 @@ function HeaderDialog({
   );
 }
 
-function AddMedicineSheet({
+/**
+ * The medicine picker, shown as a full screen in place of the sheet.
+ *
+ * It used to be a slide-up <Modal>. On Android that modal first rendered as a
+ * black screen, then (after the workaround) opened and closed immediately —
+ * Android modals are a separate native window and fight the keyboard
+ * controller / virtualized list here. Rendering inside the Rx screen itself
+ * avoids the Modal altogether.
+ *
+ * Multi-select: tap rows to select (highlighted, ✓), then "Add (N)" adds them
+ * all at once — it used to add one medicine and close, so three medicines
+ * meant opening it three times.
+ */
+function AddMedicineScreen({
   onClose,
-  onPick,
+  onAdd,
+  alreadyAdded,
   ar,
 }: {
   onClose: () => void;
-  onPick: (m: RxCatalogItem) => void;
+  onAdd: (items: RxCatalogItem[]) => void;
+  alreadyAdded: Set<string>;
   ar: boolean;
 }) {
   const [cat, setCat] = useState('الكل');
@@ -393,27 +431,30 @@ function AddMedicineSheet({
   const [q, setQ] = useState('');
   const [favs, setFavs] = useState<string[]>([]);
   const [hidden, setHidden] = useState<string[]>([]);
+  // Selection order is kept, so the sheet lists them as they were picked.
+  const [selected, setSelected] = useState<string[]>([]);
 
   useEffect(() => {
     setFavs(loadJSON<string[]>(FAV_KEY, []));
     setHidden(loadIdList(HIDDEN_KEY));
   }, []);
 
+  const toggle = (id: string) =>
+    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
   // Not every doctor uses every medicine in the catalog — let them permanently
-  // hide the ones they never prescribe, after an explicit confirmation, so
-  // their own list stays short instead of scrolling past irrelevant items.
+  // hide the ones they never prescribe, after an explicit confirmation.
   const confirmDelete = (m: RxCatalogItem) => {
     Alert.alert(
       ar ? 'حذف الدواء' : 'Delete medicine',
-      ar
-        ? `هل تريد حذف "${m.nameAr || m.name}" وصورته من هذه القائمة؟`
-        : `Delete "${m.name}" and its image from this list?`,
+      ar ? `هل تريد حذف "${m.nameAr || m.name}" وصورته من هذه القائمة؟` : `Delete "${m.name}" and its image from this list?`,
       [
         { text: ar ? 'إلغاء' : 'Cancel', style: 'cancel' },
         {
           text: ar ? 'حذف' : 'Delete',
           style: 'destructive',
           onPress: () => {
+            setSelected((prev) => prev.filter((x) => x !== m.id));
             setHidden((prev) => {
               if (prev.includes(m.id)) return prev;
               const next = [...prev, m.id];
@@ -453,142 +494,172 @@ function AddMedicineSheet({
     ).sort((a, b) => Number(favs.includes(b.id)) - Number(favs.includes(a.id)));
   }, [cat, company, q, favs, hidden]);
 
+  const confirm = () => {
+    const byId = new Map(RX_CATALOG.map((m) => [m.id, m] as const));
+    onAdd(selected.map((id) => byId.get(id)).filter((m): m is RxCatalogItem => !!m));
+  };
+
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      {/* Android: this sheet rendered as a fully black screen. Everything
-          here that is known to break Android modals is avoided: no
-          KeyboardAvoidingView 'height' resizing (the search box sits at the
-          top, so the keyboard never covers it), a definite sheet height so
-          the FlatList below has a bounded viewport and actually virtualizes
-          (with only max-h it could lay out all ~177 rows and their images at
-          once), and no removeClippedSubviews. */}
-      <KeyboardAvoidingView behavior="padding" enabled={Platform.OS === 'ios'} style={{ flex: 1 }}>
-      <View className="flex-1 justify-end bg-black/40">
-        <View className="h-[88%] rounded-t-3xl bg-white px-4 pb-4 pt-3">
-          <View className="mb-1 h-1 w-10 self-center rounded-full bg-slate-200" />
-          <Text className="mb-3 text-[17px] font-extrabold text-slate-900">
-            {ar ? 'اختر دواء لإضافته للورقة' : 'Pick a medicine'}
+    <Screen scroll={false}>
+      <View className="mb-3 flex-row items-center gap-3">
+        <Pressable onPress={onClose} className="h-10 w-10 items-center justify-center rounded-xl bg-slate-100">
+          <X size={18} color="#334155" />
+        </Pressable>
+        <View className="min-w-0 flex-1">
+          <Text className="text-[17px] font-extrabold text-slate-900">{ar ? 'اختر الأدوية' : 'Pick medicines'}</Text>
+          <Text className="text-[11px] text-slate-500">
+            {ar ? 'اضغط على الدواء لتحديده — يمكنك تحديد أكثر من دواء' : 'Tap to select — you can pick several'}
           </Text>
-
-          <View className="relative mb-3">
-            <TextInput
-              value={q}
-              onChangeText={setQ}
-              placeholder={ar ? 'ابحث عن دواء...' : 'Search medicine...'}
-              placeholderTextColor="#94A3B8"
-              className="h-11 rounded-full border border-slate-200 bg-slate-50 pl-4 pr-11 text-[13px] text-slate-800"
-            />
-            <View className="absolute bottom-0 right-4 top-0 justify-center">
-              <Search size={15} color="#94A3B8" />
-            </View>
-          </View>
-
-          {/* Company cards */}
-          <View className="mb-2 flex-row gap-2">
-            {COMPANIES.map((c) => {
-              const active = company === c.key;
-              return (
-                <Pressable
-                  key={c.key}
-                  onPress={() => setCompany(c.key)}
-                  className="flex-1 items-center justify-center gap-1 overflow-hidden rounded-2xl border bg-white px-1 py-2.5"
-                  style={active ? { borderColor: '#3B82F6', borderWidth: 2 } : { borderColor: '#E2E8F0' }}
-                >
-                  {c.key === 'ALL' ? (
-                    <Building2 size={22} color="#3B82F6" />
-                  ) : (
-                    <Image source={COMPANY_LOGOS[c.key]} style={{ width: '100%', height: 28 }} resizeMode="contain" />
-                  )}
-                  <Text numberOfLines={1} className="text-center text-[9px] font-bold text-slate-500">
-                    {ar ? c.ar : c.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerClassName="gap-1.5 py-1">
-            {RX_CATEGORIES.map((c) => {
-              const active = cat === c;
-              return (
-                <Pressable
-                  key={c}
-                  onPress={() => setCat(c)}
-                  className={cn('h-9 items-center justify-center rounded-full border px-4', active ? 'border-primary bg-primary' : 'border-slate-200 bg-white')}
-                >
-                  <Text className={cn('text-[12px] font-bold', active ? 'text-primary-foreground' : 'text-slate-500')}>{c}</Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-
-          {/* FlatList, not a ScrollView.map() — the catalog is ~177 items,
-              each with its own remote image (KIN/LACALUT/WISDOM's own
-              sites). A plain ScrollView mounts every row (and so starts
-              every image's network fetch) the instant this sheet opens;
-              virtualizing means only the rows actually scrolled into view
-              ever mount, so only their images load. */}
-          <FlatList
-            className="mt-2 flex-1"
-            data={list}
-            keyExtractor={(m) => m.id}
-            contentContainerClassName="gap-2.5 pb-2"
-            initialNumToRender={10}
-            maxToRenderPerBatch={10}
-            windowSize={7}
-            ListEmptyComponent={
-              <Text className="py-6 text-center text-xs text-slate-400">{ar ? 'لا نتائج' : 'No results'}</Text>
-            }
-            renderItem={({ item: m }) => {
-              const fav = favs.includes(m.id);
-              return (
-                <View
-                  className="flex-row items-center gap-2 rounded-2xl border bg-white p-3"
-                  style={fav ? { borderColor: 'rgba(59,130,246,0.4)' } : { borderColor: '#E2E8F0' }}
-                >
-                  <View
-                    className="h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl"
-                    style={{ backgroundColor: 'rgba(59,130,246,0.1)' }}
-                  >
-                    {m.image ? (
-                      <Image source={{ uri: m.image }} className="h-full w-full bg-white" resizeMode="contain" resizeMethod="resize" />
-                    ) : (
-                      <Pill size={18} color="#3B82F6" />
-                    )}
-                  </View>
-                  <View className="min-w-0 flex-1">
-                    <Text numberOfLines={1} className="text-sm font-bold text-slate-900">
-                      {m.name}
-                    </Text>
-                    {!!m.nameAr && (
-                      <Text numberOfLines={1} className="text-[11px] font-semibold text-slate-500">
-                        {m.nameAr}
-                      </Text>
-                    )}
-                    <Text numberOfLines={2} className="mt-0.5 text-[11px] text-slate-400">
-                      {m.instruction} ({m.duration})
-                    </Text>
-                  </View>
-                  <Pressable onPress={() => toggleFav(m.id)} className="shrink-0 p-1">
-                    <Star size={20} color={fav ? '#FBBF24' : '#CBD5E1'} fill={fav ? '#FBBF24' : 'transparent'} />
-                  </Pressable>
-                  <Pressable onPress={() => confirmDelete(m)} className="shrink-0 p-1">
-                    <Trash2 size={18} color="#CBD5E1" />
-                  </Pressable>
-                  <Pressable
-                    onPress={() => onPick(m)}
-                    className="h-9 w-9 shrink-0 items-center justify-center rounded-[10px]"
-                    style={{ backgroundColor: 'rgba(59,130,246,0.1)' }}
-                  >
-                    <Plus size={18} color="#3B82F6" />
-                  </Pressable>
-                </View>
-              );
-            }}
-          />
         </View>
       </View>
-      </KeyboardAvoidingView>
-    </Modal>
+
+      <View className="relative mb-3">
+        <TextInput
+          value={q}
+          onChangeText={setQ}
+          placeholder={ar ? 'ابحث عن دواء...' : 'Search medicine...'}
+          placeholderTextColor="#94A3B8"
+          className="h-11 rounded-full border border-slate-200 bg-slate-50 pl-4 pr-11 text-[13px] text-slate-800"
+        />
+        <View className="absolute bottom-0 right-4 top-0 justify-center">
+          <Search size={15} color="#94A3B8" />
+        </View>
+      </View>
+
+      {/* Company cards */}
+      <View className="mb-2 flex-row gap-2">
+        {COMPANIES.map((c) => {
+          const active = company === c.key;
+          return (
+            <Pressable
+              key={c.key}
+              onPress={() => setCompany(c.key)}
+              className="flex-1 items-center justify-center gap-1 overflow-hidden rounded-2xl border bg-white px-1 py-2.5"
+              style={active ? { borderColor: '#3B82F6', borderWidth: 2 } : { borderColor: '#E2E8F0' }}
+            >
+              {c.key === 'ALL' ? (
+                <Building2 size={22} color="#3B82F6" />
+              ) : (
+                <Image source={COMPANY_LOGOS[c.key]} style={{ width: '100%', height: 28 }} resizeMode="contain" />
+              )}
+              <Text numberOfLines={1} className="text-center text-[9px] font-bold text-slate-500">
+                {ar ? c.ar : c.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerClassName="gap-1.5 py-1">
+        {RX_CATEGORIES.map((c) => {
+          const active = cat === c;
+          return (
+            <Pressable
+              key={c}
+              onPress={() => setCat(c)}
+              className={cn('h-9 items-center justify-center rounded-full border px-4', active ? 'border-primary bg-primary' : 'border-slate-200 bg-white')}
+            >
+              <Text className={cn('text-[12px] font-bold', active ? 'text-primary-foreground' : 'text-slate-500')}>{c}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
+      {/* FlatList, not a ScrollView.map() — the catalog is ~177 items, each
+          with its own remote image; virtualizing mounts (and loads images
+          for) only the rows actually on screen. */}
+      <FlatList
+        style={{ flex: 1, marginTop: 8 }}
+        data={list}
+        keyExtractor={(m) => m.id}
+        contentContainerStyle={{ gap: 10, paddingBottom: 12 }}
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={7}
+        keyboardShouldPersistTaps="handled"
+        extraData={selected}
+        ListEmptyComponent={<Text className="py-6 text-center text-xs text-slate-400">{ar ? 'لا نتائج' : 'No results'}</Text>}
+        renderItem={({ item: m }) => {
+          const fav = favs.includes(m.id);
+          const isSel = selected.includes(m.id);
+          const onSheet = alreadyAdded.has(m.id);
+          return (
+            <Pressable
+              onPress={() => toggle(m.id)}
+              className="flex-row items-center gap-2 rounded-2xl p-3"
+              style={{
+                borderWidth: isSel ? 2 : 1,
+                borderColor: isSel ? '#2563EB' : fav ? 'rgba(59,130,246,0.4)' : '#E2E8F0',
+                backgroundColor: isSel ? '#EFF6FF' : '#FFFFFF',
+              }}
+            >
+              <View
+                className="h-6 w-6 shrink-0 items-center justify-center rounded-lg"
+                style={{ backgroundColor: isSel ? '#2563EB' : '#FFFFFF', borderWidth: isSel ? 0 : 1.5, borderColor: '#CBD5E1' }}
+              >
+                {isSel && <Check size={14} color="#FFFFFF" strokeWidth={3} />}
+              </View>
+              <View className="h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl" style={{ backgroundColor: 'rgba(59,130,246,0.1)' }}>
+                {m.image ? (
+                  <Image source={{ uri: m.image }} style={{ width: 44, height: 44, backgroundColor: '#FFFFFF' }} resizeMode="contain" resizeMethod="resize" />
+                ) : (
+                  <Pill size={18} color="#3B82F6" />
+                )}
+              </View>
+              <View className="min-w-0 flex-1">
+                <View className="flex-row items-center gap-1.5">
+                  <Text numberOfLines={1} className="shrink text-sm font-bold text-slate-900">
+                    {m.name}
+                  </Text>
+                  {onSheet && (
+                    <View className="rounded-full bg-emerald-100 px-1.5 py-0.5">
+                      <Text className="text-[9px] font-bold text-emerald-700">{ar ? 'مضاف' : 'Added'}</Text>
+                    </View>
+                  )}
+                </View>
+                {!!m.nameAr && (
+                  <Text numberOfLines={1} className="text-[11px] font-semibold text-slate-500">
+                    {m.nameAr}
+                  </Text>
+                )}
+                <Text numberOfLines={2} className="mt-0.5 text-[11px] text-slate-400">
+                  {m.instruction} ({m.duration})
+                </Text>
+              </View>
+              <Pressable onPress={() => toggleFav(m.id)} hitSlop={6} className="shrink-0 p-1">
+                <Star size={20} color={fav ? '#FBBF24' : '#CBD5E1'} fill={fav ? '#FBBF24' : 'transparent'} />
+              </Pressable>
+              <Pressable onPress={() => confirmDelete(m)} hitSlop={6} className="shrink-0 p-1">
+                <Trash2 size={18} color="#CBD5E1" />
+              </Pressable>
+            </Pressable>
+          );
+        }}
+      />
+
+      {/* Confirm bar */}
+      <View className="flex-row gap-2 border-t border-slate-200 pt-3">
+        <Pressable onPress={onClose} className="h-12 flex-1 items-center justify-center rounded-xl border border-slate-200 bg-white">
+          <Text className="text-[13px] font-bold text-slate-700">{ar ? 'إلغاء' : 'Cancel'}</Text>
+        </Pressable>
+        <Pressable
+          onPress={confirm}
+          disabled={selected.length === 0}
+          className="h-12 flex-[2] flex-row items-center justify-center gap-1.5 rounded-xl bg-primary"
+          style={{ opacity: selected.length === 0 ? 0.45 : 1 }}
+        >
+          <Check size={16} color="#FFFFFF" strokeWidth={3} />
+          <Text className="text-[13px] font-bold text-primary-foreground">
+            {selected.length === 0
+              ? ar
+                ? 'حدد دواءً واحداً على الأقل'
+                : 'Select at least one'
+              : ar
+                ? `إضافة (${selected.length}) للورقة`
+                : `Add ${selected.length} to the sheet`}
+          </Text>
+        </Pressable>
+      </View>
+    </Screen>
   );
 }

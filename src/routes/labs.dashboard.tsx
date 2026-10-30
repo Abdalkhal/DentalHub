@@ -7,7 +7,7 @@ import { OrderInvoiceModal } from "@/components/OrderInvoiceModal";
 import { CombinedLabOrderModal, type CombinedLabOrder } from "@/components/CombinedLabOrderModal";
 import { useI18n } from "@/lib/i18n";
 import { useUserRole } from "@/lib/useAuth";
-import { cn } from "@/lib/utils";
+import { cn, normalizeName } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   addOrder,
@@ -28,6 +28,7 @@ import {
   Clock,
   CreditCard,
   FileText,
+  Inbox,
   Layers,
   List,
   Megaphone,
@@ -36,9 +37,11 @@ import {
   Plus,
   Search,
   Sparkles,
+  Stethoscope,
   TrendingDown,
   TrendingUp,
   UserCircle2,
+  UserRound,
   Users,
   X,
   type LucideIcon,
@@ -75,6 +78,8 @@ const STATUS_ACCENT: Record<OrderStatus, string> = {
 
 const STAT_CARDS: { key: "all" | OrderStatus; ar: string; en: string; icon: LucideIcon; bg: string; fg: string }[] = [
   { key: "all", ar: "إجمالي الطلبات", en: "Total Orders", icon: Layers, bg: "#E0F2FE", fg: "#0369A1" },
+  // New cases are what a lab acts on first; they had no card of their own.
+  { key: "new", ar: "جديدة", en: "New", icon: Inbox, bg: "#EDE9FE", fg: "#6D28D9" },
   { key: "in_progress", ar: "قيد التنفيذ", en: "In Production", icon: Clock, bg: "#FEF3C7", fg: "#B45309" },
   { key: "completed", ar: "مكتملة", en: "Completed", icon: CheckCircle2, bg: "#D1FAE5", fg: "#047857" },
   { key: "delayed", ar: "متأخرة", en: "Delayed", icon: AlertCircle, bg: "#FEE2E2", fg: "#B91C1C" },
@@ -115,9 +120,9 @@ type MenuItem = { key: string; ar: string; en: string; icon: LucideIcon; to?: st
 const MENU_ITEMS: MenuItem[] = [
   { key: "new_order", ar: "طلب جديد", en: "New Order", icon: Plus },
   { key: "orders", ar: "الطلبات", en: "Orders", icon: List, to: "/orders" },
-  { key: "doctors", ar: "الأطباء", en: "Doctors", icon: Users, to: "/lab-doctors" },
+  { key: "doctors", ar: "الأطباء", en: "Doctors", icon: Stethoscope, to: "/lab-doctors" },
   { key: "accounts", ar: "الحسابات", en: "Accounts", icon: CreditCard, to: "/finance" },
-  { key: "patients", ar: "المرضى", en: "Patients", icon: Users, to: "/lab-patients" },
+  { key: "patients", ar: "المرضى", en: "Patients", icon: UserRound, to: "/lab-patients" },
   { key: "reports", ar: "التقارير", en: "Reports", icon: BarChart3, to: "/reports" },
   { key: "services", ar: "خدمات المختبر", en: "Lab Services", icon: Sparkles, to: "/lab/my-services" },
   { key: "myads", ar: "إعلاناتي", en: "My Ads", icon: Megaphone, to: "/my-ads" },
@@ -231,14 +236,15 @@ function LabDashboard() {
 
   const filtered = useMemo(() => {
     let list = filter === "all" ? internalOrders : internalOrders.filter((o) => o.status === filter);
-    const q = search.trim().toLowerCase();
+    // normalizeName: "احمد" also finds "أحمد" (hamza/alef-maqsura variants).
+    const q = normalizeName(search);
     if (q) {
       list = list.filter(
         (o) =>
-          (o.patient || "").toLowerCase().includes(q) ||
-          (o.doctor || "").toLowerCase().includes(q) ||
-          (o.orderNumber || "").toLowerCase().includes(q) ||
-          String(o.caseId || "").toLowerCase().includes(q),
+          normalizeName(o.patient || "").includes(q) ||
+          normalizeName(o.doctor || "").includes(q) ||
+          normalizeName(o.orderNumber || "").includes(q) ||
+          String(o.caseId || "").includes(q),
       );
     }
     return list;
@@ -251,6 +257,14 @@ function LabDashboard() {
 
   const labName = role?.name || (ar ? "المختبر" : "Lab");
   const labAddress = [role?.city, role?.address].filter(Boolean).join("، ");
+
+  // One click used to move a case straight on (e.g. to "completed") with no
+  // way to tell a slip from intent.
+  const confirmStatus = (o: Order, to: OrderStatus) => {
+    const label = ar ? STATUS_AR[to] : STATUS_EN[to];
+    const msg = ar ? `نقل حالة ${o.patient || o.orderNumber} إلى «${label}»؟` : `Move ${o.patient || o.orderNumber} to "${label}"?`;
+    if (window.confirm(msg)) updateOrderStatus(o.id, to);
+  };
 
   return (
     <MobileShell wide>
@@ -346,7 +360,7 @@ function LabDashboard() {
         {tab === "cases" ? (
           <>
             {/* Stat cards — tapping one filters the list below. */}
-            <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-5">
               {STAT_CARDS.map((c) => {
                 const active = filter === c.key;
                 const Icon = c.icon;
@@ -359,6 +373,7 @@ function LabDashboard() {
                     className={cn(
                       "relative overflow-hidden rounded-2xl p-4 text-start transition",
                       active && "shadow-md",
+                      c.key === "all" && "col-span-2 lg:col-span-1",
                     )}
                     style={{
                       backgroundColor: c.bg,
@@ -460,19 +475,19 @@ function LabDashboard() {
                         )}
                       </div>
                     )}
+                    {/* A completed case has nothing left to advance or delay. */}
+                    {o.status !== "completed" && (
                     <div className="mt-2.5 flex gap-1.5" onClick={(e) => e.stopPropagation()}>
-                      {o.status !== "completed" && (
                         <button
                           type="button"
-                          onClick={() => updateOrderStatus(o.id, nextStatus(o.status))}
+                          onClick={() => confirmStatus(o, nextStatus(o.status))}
                           className="flex-1 h-9 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:opacity-90 transition"
                         >
                           {ar ? "تقدم للمرحلة التالية" : "Advance"}
                         </button>
-                      )}
                       <button
                         type="button"
-                        onClick={() => updateOrderStatus(o.id, o.status === "delayed" ? "in_progress" : "delayed")}
+                        onClick={() => confirmStatus(o, o.status === "delayed" ? "in_progress" : "delayed")}
                         className={cn(
                           "flex-1 h-9 rounded-xl border bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 transition",
                           o.status === "delayed" ? "border-slate-200" : "border-rose-200",
@@ -481,6 +496,7 @@ function LabDashboard() {
                         {o.status === "delayed" ? (ar ? "إلغاء التأخير" : "Clear delay") : ar ? "تأخير" : "Delay"}
                       </button>
                     </div>
+                    )}
                   </div>
                 ))}
               </div>

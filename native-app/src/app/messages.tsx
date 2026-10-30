@@ -12,6 +12,7 @@ import { useDentistCases, filterLegacyOrders } from '@/lib/caseTracking';
 import {
   useCaseMessages,
   sendCaseMessage,
+  messagePreview,
   markCaseRead,
   useCaseUnreadCount,
   type CaseMessage,
@@ -185,7 +186,7 @@ export default function MessagesScreen() {
   const otherPhoto = selectedDm ? selectedDm.photos[otherId] || '' : '';
 
   const bubbles: ChatBubble[] = selectedCase
-    ? caseMessages.map((m) => ({ id: m.id, senderId: m.senderId, text: m.text, createdAt: m.createdAt }))
+    ? caseMessages.map((m) => ({ id: m.id, senderId: m.senderId, text: m.text || messagePreview(m, ar), createdAt: m.createdAt }))
     : dmMessages.map((m: DmMessage) => ({ id: m.id, senderId: m.senderId, text: m.text, createdAt: m.createdAt }));
 
   useEffect(() => {

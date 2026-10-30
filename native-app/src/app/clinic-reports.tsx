@@ -3,7 +3,8 @@ import { Pressable, View } from 'react-native';
 import { Download } from 'lucide-react-native';
 
 import { Screen, Select, Text } from '@/components/ui';
-import { useClinic, clinicTotals } from '@/lib/clinicStore';
+import { fmtMoney, reportTotals, txCurrency, useClinic, type Currency } from '@/lib/clinicStore';
+import { CurrencySwitch } from '@/components/CurrencySwitch';
 import { usePatients } from '@/lib/patientsStore';
 import { setClinicsStoreUser } from '@/lib/clinicsStore';
 import { useUserRole } from '@/lib/useAuth';
@@ -18,10 +19,6 @@ const PERIOD_OPTIONS = [
   { id: 'month', ar: 'هذا الشهر', en: 'This month' },
   { id: 'year', ar: 'هذه السنة', en: 'This year' },
 ];
-
-function fmtIQD(n: number) {
-  return `${n.toLocaleString()} د.ع`;
-}
 
 function StatCard({ label, value, tone }: { label: string; value: string; tone?: 'good' | 'bad' | 'default' }) {
   return (
@@ -59,25 +56,21 @@ export default function ClinicReportsScreen() {
 
   const data = useClinic();
   const patients = usePatients();
-  const { expense } = clinicTotals(data);
   const [doctorFilter, setDoctorFilter] = useState('all');
   const [periodFilter, setPeriodFilter] = useState('month');
+  // Dinars and dollars are reported separately — never added together.
+  const [currency, setCurrency] = useState<Currency>('IQD');
+  const fmtIQD = (n: number) => fmtMoney(n, currency);
+  const { income, expense, net } = reportTotals(data, patients, periodFilter, currency);
+  const monthTotals = reportTotals(data, patients, 'month', currency);
 
   const month = new Date().toISOString().slice(0, 7);
 
-  // Revenue is what patients have actually paid (each patient's billing tab),
-  // not the clinic-wide manual "income" transactions — those are a separate
-  // ledger for things like supplier refunds, not patient collections.
-  const income = patients.reduce((s, p) => s + p.payments.reduce((ps, pay) => ps + pay.amount, 0), 0);
-  const monthIncome = patients.reduce(
-    (s, p) => s + p.payments.filter((pay) => pay.date.startsWith(month)).reduce((ps, pay) => ps + pay.amount, 0),
-    0,
-  );
-  const net = income - expense;
+  // Totals follow the period filter (it used to be decorative), and revenue
+  // includes manual "income" movements — see reportTotals().
+  const monthIncome = monthTotals.income;
 
-  const monthExpense = data.transactions
-    .filter((t) => t.kind === 'expense' && t.date.startsWith(month))
-    .reduce((s, t) => s + t.amount, 0);
+  const monthExpense = monthTotals.expense;
   const completed = patients.filter((p) => p.status === 'completed').length;
   const inTreatment = patients.filter((p) => p.status === 'in_treatment').length;
   const newPatients = patients.filter((p) => p.status === 'new').length;
@@ -109,8 +102,8 @@ export default function ClinicReportsScreen() {
 
   const exportCsv = async () => {
     const rows = [
-      ['type', 'label', 'amount', 'date', 'source'],
-      ...data.transactions.map((t) => [t.kind, t.label, String(t.amount), t.date, t.source]),
+      ['type', 'label', 'amount', 'currency', 'date', 'source'],
+      ...data.transactions.map((t) => [t.kind, t.label, String(t.amount), txCurrency(t), t.date, t.source]),
     ];
     const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
     const ok = await shareCsv(`clinic-report-${month}.csv`, csv);
@@ -125,6 +118,8 @@ export default function ClinicReportsScreen() {
 
   return (
     <Screen>
+      <CurrencySwitch value={currency} onChange={setCurrency} ar={ar} className="mb-2.5" />
+
       {/* Filter bar */}
       <View className="flex-row gap-2">
         <View className="flex-1">

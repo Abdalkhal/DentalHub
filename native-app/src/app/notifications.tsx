@@ -13,7 +13,7 @@ import { useI18n } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 
-type NotifType = 'order_new' | 'order_status' | 'message';
+type NotifType = 'order_new' | 'order_status' | 'message' | 'case_message';
 
 type Notif = {
   id: string;
@@ -27,12 +27,14 @@ type Notif = {
   senderName?: string;
   senderPhotoURL?: string;
   chatWith?: string;
+  forRole?: 'doctor' | 'lab';
 };
 
 const TYPE_META: Record<NotifType, { icon: LucideIcon; tone: string; color: string }> = {
   order_new: { icon: Package, tone: 'bg-sky-100', color: '#0284C7' },
   order_status: { icon: Truck, tone: 'bg-amber-100', color: '#D97706' },
   message: { icon: MessageCircle, tone: 'bg-emerald-100', color: '#059669' },
+  case_message: { icon: MessageCircle, tone: 'bg-violet-100', color: '#7C3AED' },
 };
 
 function timeAgo(ts: number | undefined, ar: boolean): string {
@@ -102,6 +104,10 @@ export default function NotificationsScreen() {
     markRead(n.id);
     if (n.type === 'message' && n.chatWith) {
       router.push({ pathname: '/messages', params: { with: n.chatWith } });
+    } else if (n.type === 'case_message') {
+      // The doctor reads case chats from case tracking; the lab from its orders.
+      if (n.forRole === 'doctor') router.push({ pathname: '/track-cases', params: n.orderId ? { open: n.orderId } : {} });
+      else router.push('/orders' as never);
     } else if (n.invoiceId) {
       router.push({ pathname: '/doctor-invoices/[invoiceId]', params: { invoiceId: n.invoiceId } });
     } else if (n.orderId || n.type === 'order_new') {

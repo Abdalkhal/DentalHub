@@ -19,6 +19,7 @@ import {
   markCaseRead,
   useCaseUnreadCount,
   type CaseMessage,
+  messagePreview,
 } from "@/lib/caseMessages";
 import {
   useDmThreads,
@@ -174,7 +175,7 @@ function Messages() {
   const otherPhoto = selectedDm ? selectedDm.photos[otherId] || "" : "";
 
   const bubbles: ChatBubble[] = selectedCase
-    ? caseMessages.map((m) => ({ id: m.id, senderId: m.senderId, text: m.text, createdAt: m.createdAt }))
+    ? caseMessages.map((m) => ({ id: m.id, senderId: m.senderId, text: m.text || messagePreview(m, ar), createdAt: m.createdAt }))
     : dmMessages.map((m) => ({ id: m.id, senderId: m.senderId, text: m.text, createdAt: m.createdAt }));
 
   useEffect(() => {

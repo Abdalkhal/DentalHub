@@ -1,14 +1,17 @@
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { KeyboardAwareScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import { router } from 'expo-router';
-import { CalendarDays, ChevronLeft, ChevronRight, Phone, Plus, Search, Users, X } from 'lucide-react-native';
+import { CalendarDays, ChevronLeft, ChevronRight, CloudOff, Phone, Plus, Search, Users, X } from 'lucide-react-native';
+import { toast } from '@/lib/toast';
 
 import { Screen, Text } from '@/components/ui';
 import {
   addPatient,
   updatePatient,
   usePatients,
+  syncPatientsNow,
+  usePatientSyncStatus,
   EMPTY_HISTORY,
   type MedicalHistory,
   type Patient,
@@ -125,6 +128,8 @@ export default function PatientsScreen() {
           <Users size={18} color="#0369A1" />
         </View>
       </View>
+
+      <SyncNotice ar={ar} />
 
       <View className="relative mt-3">
         <TextInput
@@ -372,6 +377,48 @@ function AddPatientModal({ open, onClose, ar }: { open: boolean; onClose: () => 
           </Pressable>
         </KeyboardAwareScrollView>
       </View>
+    </View>
+  );
+}
+
+/** Sync is automatic; this only appears when records did not reach the cloud
+ *  (they are retried on their own — the button just does it now). */
+function SyncNotice({ ar }: { ar: boolean }) {
+  const { failed, error } = usePatientSyncStatus();
+  const [busy, setBusy] = useState(false);
+  if (!error) return null;
+  const retry = async () => {
+    setBusy(true);
+    try {
+      const r = await syncPatientsNow();
+      if (r.failed === 0 && !r.error) toast.success(ar ? 'تمت مزامنة المرضى' : 'Patients synced');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <View className="mt-3 flex-row items-start gap-2.5 rounded-2xl border border-amber-200 bg-amber-50 p-3">
+      <CloudOff size={18} color="#B45309" />
+      <View className="min-w-0 flex-1">
+        <Text className="text-xs font-bold text-amber-800">
+          {failed > 0
+            ? ar
+              ? `لم تُرفع بيانات ${failed} مريض إلى السحابة بعد`
+              : `${failed} patient(s) not saved to the cloud yet`
+            : ar
+              ? 'تعذر الاتصال بالسحابة لمزامنة المرضى'
+              : 'Could not reach the cloud to sync patients'}
+        </Text>
+        <Text className="mt-0.5 text-[11px] text-amber-700">{ar ? 'ستُعاد المحاولة تلقائياً.' : 'Retrying automatically.'}</Text>
+        <Text className="mt-0.5 text-[10px] text-amber-600">{error}</Text>
+      </View>
+      <Pressable onPress={retry} disabled={busy} className="h-8 items-center justify-center rounded-xl bg-white px-2.5">
+        {busy ? (
+          <ActivityIndicator size="small" color="#B45309" />
+        ) : (
+          <Text className="text-[11px] font-bold text-amber-800">{ar ? 'أعد الآن' : 'Retry'}</Text>
+        )}
+      </Pressable>
     </View>
   );
 }

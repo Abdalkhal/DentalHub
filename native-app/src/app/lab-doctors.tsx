@@ -3,7 +3,8 @@ import { Pressable, View } from 'react-native';
 import { ChevronDown, ChevronUp, Search, Stethoscope } from 'lucide-react-native';
 
 import { Screen, Text, Input } from '@/components/ui';
-import { useOrders, connectLabOrders, disconnectLabOrders, type Order } from '@/lib/ordersStore';
+import { useOrders, connectLabOrders, disconnectLabOrders } from '@/lib/ordersStore';
+import { groupOrders, type OrderGroup } from '@/lib/labFinance';
 import { useUserRole } from '@/lib/useAuth';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
@@ -14,7 +15,7 @@ import { cn } from '@/lib/utils';
 // on web this page is permanently empty too. This groups the lab's real
 // `ordersStore` orders by doctor, same as web's `buildDoctors`.
 
-type DoctorEntry = { name: string; orders: Order[] };
+type DoctorEntry = OrderGroup;
 
 const STATUS_META: Record<string, { ar: string; en: string; cls: string }> = {
   new: { ar: 'جديد', en: 'New', cls: 'bg-sky-50 text-sky-600' },
@@ -56,17 +57,8 @@ export default function LabDoctorsScreen() {
     return () => disconnectLabOrders();
   }, [labId]);
 
-  const doctors = useMemo(() => {
-    const map = new Map<string, Order[]>();
-    for (const o of orders) {
-      const name = (o.doctor || '').trim();
-      if (!name) continue;
-      const list = map.get(name) ?? [];
-      list.push(o);
-      map.set(name, list);
-    }
-    return [...map.entries()].map(([name, list]) => ({ name, orders: list })).sort((a, b) => b.orders.length - a.orders.length);
-  }, [orders]);
+  // By the doctor's account, not the typed name (see groupOrders).
+  const doctors = useMemo(() => groupOrders(orders, 'doctor'), [orders]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return doctors;
@@ -145,7 +137,7 @@ export default function LabDoctorsScreen() {
           <View className="gap-2.5">
             {filtered.map((d) => (
               <Pressable
-                key={d.name}
+                key={d.key}
                 onPress={() => setSelected(d)}
                 className="flex-row items-start gap-3 rounded-2xl border border-slate-200 bg-card p-3.5 shadow-sm"
               >

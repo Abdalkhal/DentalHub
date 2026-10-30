@@ -18,7 +18,11 @@
  */
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
-const { onDocumentWritten, onDocumentCreated } = require("firebase-functions/v2/firestore");
+const {
+  onDocumentWritten,
+  onDocumentCreated,
+  onDocumentDeleted,
+} = require("firebase-functions/v2/firestore");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const admin = require("firebase-admin");
 const vision = require("@google-cloud/vision");
@@ -507,6 +511,8 @@ const PRIVATE_PROFILE_FIELDS = [
   "notificationsEnabled",
 ];
 
+const DENTIST_PRIVATE_FIELDS = ["phone", "address", "latitude", "longitude", "mapUrl", "instagram"];
+
 /**
  * Strips private fields from a `user_roles` doc.
  * @param {object} data user_roles document data.
@@ -515,6 +521,12 @@ const PRIVATE_PROFILE_FIELDS = [
 function toPublicProfile(data) {
   const out = { ...data };
   for (const f of PRIVATE_PROFILE_FIELDS) delete out[f];
+  // Dentists are customers, not businesses: any signed-in account can list
+  // this collection, so their phone and location must not be in it. Labs get
+  // the phone of a doctor who sends them a case on the case itself.
+  if (data.accountType === "dentist") {
+    for (const f of DENTIST_PRIVATE_FIELDS) delete out[f];
+  }
   return out;
 }
 
@@ -1021,5 +1033,90 @@ exports.sendPushOnNotification = onDocumentCreated(
         pushTokens: admin.firestore.FieldValue.arrayRemove(...stale),
       });
     }
+  },
+);
+
+/* ============================================================
+ * ACCOUNT DELETION — remove what a deleted account published.
+ *
+ * Deleting an account (both apps delete `user_roles/{uid}`, then the Auth
+ * user) left its products, offers and ads on the marketplace, so dentists
+ * kept seeing listings from a company that no longer exists.
+ * ============================================================ */
+
+// [collection, owner field] for everything an account can publish.
+const PUBLISHED_CONTENT = [
+  ["products", "companyId"],
+  ["offers", "supplierId"],
+  ["ads", "accountId"],
+];
+
+/**
+ * Deletes every listing owned by `uid`, and its images in Storage.
+ * @param {string} uid the deleted account.
+ * @return {Promise<number>} how many documents were removed.
+ */
+async function purgeAccountContent(uid) {
+  if (!uid) return 0;
+  const bucket = admin.storage().bucket();
+  let removed = 0;
+  for (const [col, field] of PUBLISHED_CONTENT) {
+    const snap = await firestore.collection(col).where(field, "==", uid).get();
+    for (const d of snap.docs) {
+      if (col === "products") {
+        await bucket.deleteFiles({ prefix: `products/${d.id}/` }).catch(() => {});
+      }
+      await d.ref.delete();
+      removed += 1;
+    }
+  }
+  await bucket.deleteFiles({ prefix: `ads/${uid}/` }).catch(() => {});
+  return removed;
+}
+
+exports.purgeDeletedAccountContent = onDocumentDeleted(
+  { document: "user_roles/{uid}", region: "us-central1" },
+  async (event) => {
+    const removed = await purgeAccountContent(event.params.uid);
+    console.log("Purged deleted account content", event.params.uid, removed);
+  },
+);
+
+/**
+ * One-off repair (admin only): removes listings whose owner account no
+ * longer exists — accounts deleted before purgeDeletedAccountContent did.
+ * Safe to re-run.
+ */
+exports.cleanupOrphanedContent = onCall(
+  { region: "us-central1", maxInstances: 1 },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Authentication required.");
+    }
+    let isAdmin = request.auth.token.role === "admin";
+    if (!isAdmin) {
+      const me = await firestore.collection("user_roles").doc(request.auth.uid).get();
+      isAdmin = me.exists && me.data().role === "admin";
+    }
+    if (!isAdmin) {
+      throw new HttpsError("permission-denied", "Only an admin can run this.");
+    }
+
+    const owners = new Set();
+    for (const [col, field] of PUBLISHED_CONTENT) {
+      const snap = await firestore.collection(col).select(field).get();
+      for (const d of snap.docs) {
+        const owner = d.get(field);
+        if (typeof owner === "string" && owner) owners.add(owner);
+      }
+    }
+    const gone = [];
+    for (const uid of owners) {
+      const role = await firestore.collection("user_roles").doc(uid).get();
+      if (!role.exists) gone.push(uid);
+    }
+    let removed = 0;
+    for (const uid of gone) removed += await purgeAccountContent(uid);
+    return { accounts: gone.length, removed };
   },
 );

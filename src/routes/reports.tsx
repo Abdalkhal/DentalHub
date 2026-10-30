@@ -6,6 +6,8 @@ import { useI18n } from "@/lib/i18n";
 import { useSession } from "@/lib/useAuth";
 import { useOrders, connectLabOrders, disconnectLabOrders } from "@/lib/ordersStore";
 import { resolveOrderTotal } from "@/lib/orderLines";
+import { fmtLabMoney, ordersInCurrency, type LabCurrency } from "@/lib/labFinance";
+import { CurrencySwitch } from "@/components/CurrencySwitch";
 import { Activity, BarChart3, DollarSign, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -98,6 +100,8 @@ function Reports() {
   const labId = user?.uid ?? "";
   const orders = useOrders();
   const [range, setRange] = useState<Range>("30d");
+  // Revenue is summed per currency — dinar and dollar cases are never added up.
+  const [currency, setCurrency] = useState<LabCurrency>("IQD");
 
   useEffect(() => {
     if (!labId) return;
@@ -125,7 +129,7 @@ function Reports() {
       .map(([label, value]) => ({ label, value }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 6);
-  }, [filtered, unspecified]);
+  }, [filtered, unspecified, currency]);
 
   const turnaroundData = useMemo(() => {
     const byMonth = new Map<string, number[]>();
@@ -146,7 +150,7 @@ function Reports() {
 
   const revenueData = useMemo(() => {
     const sums = new Map<string, number>();
-    for (const o of filtered) {
+    for (const o of ordersInCurrency(filtered, currency)) {
       const key = o.workType || unspecified;
       sums.set(key, (sums.get(key) ?? 0) + resolveOrderTotal(o));
     }
@@ -232,6 +236,12 @@ function Reports() {
             </ChartCard>
 
             <ChartCard icon={<DollarSign className="size-4 text-primary" />} title={ar ? "توزيع الإيرادات" : "Revenue Breakdown"}>
+              <CurrencySwitch value={currency} onChange={setCurrency} ar={ar} className="mb-3" />
+              {revenueData.length === 0 && (
+                <p className="py-4 text-center text-xs text-slate-400">
+                  {ar ? (currency === "IQD" ? "لا توجد إيرادات بالدينار" : "لا توجد إيرادات بالدولار") : `No ${currency} revenue`}
+                </p>
+              )}
               <div className="space-y-2.5">
                 {revenueData.map((d, i) => (
                   <BarRow
@@ -240,7 +250,7 @@ function Reports() {
                     value={d.value}
                     max={revenueMax}
                     color={BAR_COLORS[i % BAR_COLORS.length]}
-                    valueLabel={`${d.value.toLocaleString("en-US")} ${ar ? "د.ع" : "IQD"}`}
+                    valueLabel={fmtLabMoney(d.value, currency)}
                   />
                 ))}
               </div>

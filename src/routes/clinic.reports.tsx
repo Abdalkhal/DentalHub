@@ -3,7 +3,8 @@ import { useState, useMemo, useEffect } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
-import { clinicTotals, useClinic } from "@/lib/clinicStore";
+import { fmtMoney, reportTotals, txCurrency, useClinic, type Currency } from "@/lib/clinicStore";
+import { CurrencySwitch } from "@/components/CurrencySwitch";
 import { usePatients } from "@/lib/patientsStore";
 import { setClinicsStoreUser } from "@/lib/clinicsStore";
 import { useSession } from "@/lib/useAuth";
@@ -31,8 +32,6 @@ const PERIOD_OPTIONS = [
   { id: "year", ar: "هذه السنة", en: "This year" },
 ];
 
-function fmtIQD(n: number) { return `${n.toLocaleString()} د.ع`; }
-
 function ReportsPage() {
   const { lang } = useI18n();
   const ar = lang === "ar";
@@ -48,22 +47,19 @@ function ReportsPage() {
 
   const data = useClinic();
   const patients = usePatients();
-  const { expense } = clinicTotals(data);
   const [doctorFilter, setDoctorFilter] = useState("all");
   const [periodFilter, setPeriodFilter] = useState("month");
+  // Dinars and dollars are reported separately — never added together.
+  const [currency, setCurrency] = useState<Currency>("IQD");
+  const fmt = (n: number) => fmtMoney(n, currency);
+  const { income, expense, net } = reportTotals(data, patients, periodFilter, currency);
+  const monthTotals = reportTotals(data, patients, "month", currency);
 
   const month = new Date().toISOString().slice(0, 7);
-  // Revenue is what patients actually paid (each patient's billing tab), not
-  // the clinic-wide manual "income" ledger — same definition as the native app.
-  const income = patients.reduce((s, p) => s + p.payments.reduce((ps, pay) => ps + pay.amount, 0), 0);
-  const monthIncome = patients.reduce(
-    (s, p) => s + p.payments.filter((pay) => pay.date.startsWith(month)).reduce((ps, pay) => ps + pay.amount, 0),
-    0,
-  );
-  const net = income - expense;
-  const monthExpense = data.transactions
-    .filter((t) => t.kind === "expense" && t.date.startsWith(month))
-    .reduce((s, t) => s + t.amount, 0);
+  // Totals follow the period filter (it used to be decorative), and revenue
+  // includes manual "income" movements — see reportTotals().
+  const monthIncome = monthTotals.income;
+  const monthExpense = monthTotals.expense;
   const completed = patients.filter((p) => p.status === "completed").length;
   const inTreatment = patients.filter((p) => p.status === "in_treatment").length;
   const newPatients = patients.filter((p) => p.status === "new").length;
@@ -89,8 +85,8 @@ function ReportsPage() {
 
   const exportCsv = () => {
     const rows = [
-      ["type", "label", "amount", "date", "source"],
-      ...data.transactions.map((t) => [t.kind, t.label, String(t.amount), t.date, t.source]),
+      ["type", "label", "amount", "currency", "date", "source"],
+      ...data.transactions.map((t) => [t.kind, t.label, String(t.amount), txCurrency(t), t.date, t.source]),
     ];
     const csv = rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
     const url = URL.createObjectURL(new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" }));
@@ -107,6 +103,8 @@ function ReportsPage() {
     <MobileShell wide>
       <TopBar title={ar ? "التقارير والإحصائيات" : "Reports & Analytics"} showBack wide />
       <div className="px-3 pt-3 pb-6 space-y-3 md:px-6 md:pt-6 md:pb-12 lg:px-8 lg:max-w-5xl lg:mx-auto lg:grid lg:grid-cols-2 lg:gap-5 lg:space-y-0 lg:items-start">
+        <CurrencySwitch value={currency} onChange={setCurrency} ar={ar} className="md:max-w-xl lg:col-span-2" />
+
         {/* Filter bar */}
         <div className="flex gap-2 md:gap-3 md:max-w-xl lg:col-span-2">
           <div className="relative flex-1">
@@ -127,10 +125,10 @@ function ReportsPage() {
 
         {/* Stats */}
         <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 md:gap-4 lg:col-span-2">
-          <Stat label={ar ? "إجمالي الإيرادات" : "Total revenue"} value={fmtIQD(income)} tone="good" />
-          <Stat label={ar ? "إجمالي المصاريف" : "Total expenses"} value={fmtIQD(expense)} tone="bad" />
+          <Stat label={ar ? "إجمالي الإيرادات" : "Total revenue"} value={fmt(income)} tone="good" />
+          <Stat label={ar ? "إجمالي المصاريف" : "Total expenses"} value={fmt(expense)} tone="bad" />
           <div className="col-span-2 md:col-span-1">
-            <Stat label={ar ? "صافي الربح" : "Net profit"} value={fmtIQD(net)} tone={net >= 0 ? "good" : "bad"} />
+            <Stat label={ar ? "صافي الربح" : "Net profit"} value={fmt(net)} tone={net >= 0 ? "good" : "bad"} />
           </div>
         </div>
 
@@ -142,7 +140,7 @@ function ReportsPage() {
               <div key={b.label}>
                 <div className="flex items-center justify-between text-[11px] mb-1">
                   <span className="text-muted-foreground">{b.label}</span>
-                  <span className="font-bold">{fmtIQD(b.value)}</span>
+                  <span className="font-bold">{fmt(b.value)}</span>
                 </div>
                 <div className="h-2 rounded-full bg-muted overflow-hidden">
                   <div className={`h-full rounded-full ${b.cls}`} style={{ width: `${(b.value / max) * 100}%` }} />
@@ -172,8 +170,8 @@ function ReportsPage() {
                   <p className="text-[11px] text-muted-foreground">{d.specialty}</p>
                   <div className="grid grid-cols-3 gap-2 mt-1.5 text-center">
                     <div className="bg-white rounded-lg p-1.5"><p className="text-[10px] text-slate-400">{ar ? "الحالات" : "Cases"}</p><p className="text-xs font-bold">{d.cases}</p></div>
-                    <div className="bg-white rounded-lg p-1.5"><p className="text-[10px] text-slate-400">{ar ? "الإيراد" : "Revenue"}</p><p className="text-xs font-bold">{fmtIQD(d.revenue)}</p></div>
-                    <div className="bg-white rounded-lg p-1.5"><p className="text-[10px] text-slate-400">{ar ? "المستحق" : "Due"}</p><p className="text-xs font-bold text-emerald-600">{fmtIQD(Math.round(d.revenue * d.split / 100))}</p></div>
+                    <div className="bg-white rounded-lg p-1.5"><p className="text-[10px] text-slate-400">{ar ? "الإيراد" : "Revenue"}</p><p className="text-xs font-bold">{fmt(d.revenue)}</p></div>
+                    <div className="bg-white rounded-lg p-1.5"><p className="text-[10px] text-slate-400">{ar ? "المستحق" : "Due"}</p><p className="text-xs font-bold text-emerald-600">{fmt(Math.round(d.revenue * d.split / 100))}</p></div>
                   </div>
                 </div>
               </div>

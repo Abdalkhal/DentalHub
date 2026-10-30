@@ -4,7 +4,17 @@ import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { addTransaction, clinicTotals, removeTransaction, useClinic, type TxKind } from "@/lib/clinicStore";
+import {
+  addTransaction,
+  clinicTotals,
+  fmtMoney,
+  removeTransaction,
+  txCurrency,
+  useClinic,
+  type Currency,
+  type TxKind,
+} from "@/lib/clinicStore";
+import { CurrencySwitch } from "@/components/CurrencySwitch";
 import { setClinicsStoreUser } from "@/lib/clinicsStore";
 import { useSession } from "@/lib/useAuth";
 import { Wallet, Plus, Trash2, TrendingUp, TrendingDown } from "lucide-react";
@@ -45,18 +55,23 @@ function FinancePage() {
   }, [user?.uid]);
 
   const data = useClinic();
-  const { income, expense, net, dueOrders } = clinicTotals(data);
+  // Dinars and dollars are kept apart: totals and the list show one currency.
+  const [currency, setCurrency] = useState<Currency>("IQD");
+  const { income, expense, net, dueOrders } = clinicTotals(data, currency);
+  const txs = data.transactions.filter((t) => txCurrency(t) === currency);
+  const fmt = (n: number) => fmtMoney(n, currency);
   const [open, setOpen] = useState(false);
 
   return (
     <MobileShell wide>
       <TopBar title={ar ? "المالية والحسابات" : "Finance & Accounts"} showBack wide />
       <div className="px-3 pt-3 pb-6 md:px-6 md:pt-6 md:pb-12 lg:px-8 lg:max-w-5xl lg:mx-auto">
+        <CurrencySwitch value={currency} onChange={setCurrency} ar={ar} className="mb-3 md:mb-5 md:max-w-xl" />
         <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4 md:gap-5">
-          <Stat label={ar ? "الإيرادات" : "Revenue"} value={`${income.toLocaleString()} د.ع`} tone="good" />
-          <Stat label={ar ? "المصاريف" : "Expenses"} value={`${expense.toLocaleString()} د.ع`} tone="bad" />
-          <Stat label={ar ? "الصافي" : "Net"} value={`${net.toLocaleString()} د.ع`} tone={net >= 0 ? "good" : "bad"} />
-          <Stat label={ar ? "متبقي للموردين" : "Outstanding"} value={`${dueOrders.toLocaleString()} د.ع`} tone="warn" />
+          <Stat label={ar ? "الإيرادات" : "Revenue"} value={fmt(income)} tone="good" />
+          <Stat label={ar ? "المصاريف" : "Expenses"} value={fmt(expense)} tone="bad" />
+          <Stat label={ar ? "الصافي" : "Net"} value={fmt(net)} tone={net >= 0 ? "good" : "bad"} />
+          {currency === "IQD" && <Stat label={ar ? "متبقي للموردين" : "Outstanding"} value={fmt(dueOrders)} tone="warn" />}
         </div>
 
         <button
@@ -68,10 +83,14 @@ function FinancePage() {
         </button>
 
         <ul className="mt-3 space-y-2.5 md:mt-6 md:space-y-0 md:grid md:grid-cols-2 md:gap-4 xl:grid-cols-3 md:items-start">
-          {data.transactions.length === 0 ? (
-            <EmptyState icon={Wallet} title={ar ? "لا توجد حركات مالية" : "No transactions"} sub={ar ? "سجّل أول دفعة أو مصروف" : "Add your first entry"} />
+          {txs.length === 0 ? (
+            <EmptyState
+              icon={Wallet}
+              title={ar ? (currency === "IQD" ? "لا توجد حركات بالدينار" : "لا توجد حركات بالدولار") : `No ${currency} transactions`}
+              sub={ar ? "سجّل أول دفعة أو مصروف" : "Add your first entry"}
+            />
           ) : (
-            data.transactions.map((t) => (
+            txs.map((t) => (
               <li key={t.id} className="flex items-center gap-3 rounded-2xl bg-card border border-border p-3.5 shadow-soft">
                 <span
                   className={cn(
@@ -88,7 +107,7 @@ function FinancePage() {
                   </p>
                 </div>
                 <span className={cn("font-display font-extrabold text-sm", t.kind === "income" ? "text-emerald-600" : "text-rose-600")}>
-                  {t.amount.toLocaleString()} د.ع
+                  {fmtMoney(t.amount, txCurrency(t))}
                 </span>
                 <button onClick={() => removeTransaction(t.id)} className="size-8 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
                   <Trash2 className="size-3.5" />
@@ -99,19 +118,28 @@ function FinancePage() {
         </ul>
       </div>
 
-      {open && <TxModal ar={ar} onClose={() => setOpen(false)} />}
+      {open && <TxModal ar={ar} initialCurrency={currency} onClose={() => setOpen(false)} />}
     </MobileShell>
   );
 }
 
-function TxModal({ ar, onClose }: { ar: boolean; onClose: () => void }) {
-  const [f, setF] = useState({ label: "", kind: "income" as TxKind, amount: 0, source: "patient" as (typeof SOURCES)[number]["id"] });
+function TxModal({ ar, initialCurrency, onClose }: { ar: boolean; initialCurrency: Currency; onClose: () => void }) {
+  const [f, setF] = useState({
+    label: "",
+    kind: "income" as TxKind,
+    amount: 0,
+    source: "patient" as (typeof SOURCES)[number]["id"],
+    currency: initialCurrency,
+  });
   const [amountDisplay, setAmountDisplay] = useState("");
+  const unit = f.currency === "IQD" ? (ar ? "د.ع" : "IQD") : "$";
 
-  const formatAmount = (raw: string) => {
-    const digits = raw.replace(/\D/g, "");
-    if (!digits) return "";
-    return Number(digits).toLocaleString("en-US");
+  // Dinars are whole numbers; dollars keep up to two decimals.
+  const formatAmount = (raw: string, cur: Currency = f.currency) => {
+    const cleaned = raw.replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).replace(/[^\d.]/g, "");
+    const [int, ...rest] = cleaned.split(".");
+    const grouped = int ? Number(int).toLocaleString("en-US") : rest.length ? "0" : "";
+    return cur === "USD" && rest.length ? `${grouped}.${rest.join("").slice(0, 2)}` : grouped;
   };
 
   return (
@@ -143,11 +171,23 @@ function TxModal({ ar, onClose }: { ar: boolean; onClose: () => void }) {
           <input required autoFocus value={f.label} onChange={(e) => setF({ ...f, label: e.target.value })} placeholder={ar ? "مثال: دفعة مريض" : "e.g., Patient payment"} className={inputCls} />
         </Field>
 
-        <Field label={`${ar ? "المبلغ" : "Amount"} (${ar ? "د.ع" : "IQD"})`}>
+        <Field label={ar ? "العملة" : "Currency"}>
+          <CurrencySwitch
+            value={f.currency}
+            ar={ar}
+            onChange={(c) => {
+              const shown = formatAmount(amountDisplay, c);
+              setAmountDisplay(shown);
+              setF({ ...f, currency: c, amount: Number(shown.replace(/,/g, "")) || 0 });
+            }}
+          />
+        </Field>
+
+        <Field label={`${ar ? "المبلغ" : "Amount"} (${unit})`}>
           <div className="relative">
             <input
               type="text"
-              inputMode="numeric"
+              inputMode={f.currency === "USD" ? "decimal" : "numeric"}
               value={amountDisplay}
               onChange={(e) => {
                 const formatted = formatAmount(e.target.value);
@@ -157,7 +197,7 @@ function TxModal({ ar, onClose }: { ar: boolean; onClose: () => void }) {
               placeholder="0"
               className={cn(inputCls, "text-right")}
             />
-            <span className="absolute end-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">{ar ? "د.ع" : "IQD"}</span>
+            <span className="absolute end-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">{unit}</span>
           </div>
         </Field>
 

@@ -5,6 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Package } from 'lucide-react-native';
 
 import { Button, Input, Text } from '@/components/ui';
+import { useConfirmClose, useFormDirty } from '@/lib/confirmClose';
 import { uploadProductImage, useSignedImageUrls, type Currency } from '@/lib/products';
 import { randomUUID } from '@/lib/randomId';
 
@@ -64,6 +65,10 @@ export function AddProductModal({
     }
   };
 
+  // Closing by mistake (✕ / Android back) asks first when something was typed.
+  const dirty = useFormDirty([name, brand, price, currency, stock, description, images]);
+  const requestClose = useConfirmClose(dirty, onClose, ar);
+
   const save = async () => {
     if (!name.trim() || !brand.trim()) {
       setError(ar ? 'أدخل الاسم والشركة المصنعة' : 'Enter name and brand');
@@ -91,7 +96,7 @@ export function AddProductModal({
   };
 
   return (
-    <Modal visible={open} transparent animationType="slide">
+    <Modal visible={open} transparent animationType="slide" onRequestClose={requestClose}>
       <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
       <View className="flex-1 justify-end bg-black/40">
         <View className="max-h-[85%] rounded-t-3xl bg-white p-5 pb-8">
@@ -159,7 +164,7 @@ export function AddProductModal({
           )}
 
           <View className="mt-4 flex-row gap-2">
-            <Button variant="outline" title={ar ? 'إلغاء' : 'Cancel'} onPress={onClose} className="flex-1" />
+            <Button variant="outline" title={ar ? 'إلغاء' : 'Cancel'} onPress={requestClose} className="flex-1" />
             <Button title={ar ? 'حفظ' : 'Save'} onPress={save} loading={busy} className="flex-1" />
           </View>
         </View>

@@ -10,7 +10,8 @@
 //
 // Identical in the web app and the native app (src/lib/dentistRecords.ts).
 import { collection, doc } from "firebase/firestore";
-import { deleteObject, getBlob, ref, uploadBytes, uploadString } from "firebase/storage";
+import { deleteObject, getBlob, ref } from "firebase/storage";
+import { dataUrlToBytes, uploadData } from "./uploadData";
 import { db, storage } from "@/integrations/firebase/client";
 
 export const RECORDS = "dentist_records";
@@ -34,12 +35,13 @@ export async function uploadPatientFile(
   data: Blob | Uint8Array | ArrayBuffer,
   contentType: string,
 ): Promise<void> {
-  await uploadBytes(ref(storage, path), data, { contentType: contentType || "application/octet-stream" });
+  await uploadData(ref(storage, path), data, { contentType: contentType || "application/octet-stream" });
 }
 
 /** Moves a legacy in-browser `data:` URL file to Storage. */
 export async function uploadDataUrl(path: string, dataUrl: string): Promise<void> {
-  await uploadString(ref(storage, path), dataUrl, "data_url");
+  const { bytes, contentType } = dataUrlToBytes(dataUrl);
+  await uploadData(ref(storage, path), bytes, { contentType });
 }
 
 /** Fetched through the SDK so the Storage rules are checked on every read. */

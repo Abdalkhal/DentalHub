@@ -46,3 +46,57 @@ export function SyncProfilesButton({ ar }: { ar: boolean }) {
     </button>
   );
 }
+
+// Removes products/offers/ads left behind by accounts deleted before the
+// purgeDeletedAccountContent function existed. New deletions are cleaned up
+// automatically; this is a one-off repair and is safe to re-run.
+export function CleanupOrphansButton({ ar }: { ar: boolean }) {
+  const [state, setState] = useState<"idle" | "busy" | "done" | "error">("idle");
+  const [removed, setRemoved] = useState(0);
+  const run = async () => {
+    if (
+      !window.confirm(
+        ar
+          ? "حذف المنتجات والعروض والإعلانات التابعة لحسابات محذوفة؟ لا يمكن التراجع."
+          : "Delete products, offers and ads of deleted accounts? This cannot be undone.",
+      )
+    )
+      return;
+    setState("busy");
+    try {
+      const call = httpsCallable<Record<string, never>, { accounts: number; removed: number }>(
+        getFunctions(),
+        "cleanupOrphanedContent",
+      );
+      const { data } = await call({});
+      setRemoved(data.removed);
+      setState("done");
+    } catch {
+      setState("error");
+    }
+  };
+  return (
+    <button
+      type="button"
+      onClick={run}
+      disabled={state === "busy"}
+      className="h-8 px-3 rounded-full text-[11px] font-bold border border-rose-200 bg-white text-rose-600 hover:bg-rose-50 disabled:opacity-60"
+    >
+      {state === "busy"
+        ? ar
+          ? "جارٍ التنظيف..."
+          : "Cleaning..."
+        : state === "done"
+          ? ar
+            ? `تم حذف ${removed}`
+            : `Removed ${removed}`
+          : state === "error"
+            ? ar
+              ? "فشل التنظيف — أعد المحاولة"
+              : "Cleanup failed — retry"
+            : ar
+              ? "حذف بيانات الحسابات المحذوفة"
+              : "Remove deleted accounts' listings"}
+    </button>
+  );
+}

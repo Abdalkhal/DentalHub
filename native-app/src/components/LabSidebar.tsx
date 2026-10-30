@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Animated, Dimensions, Modal, Pressable, View } from 'react-native';
 import { router } from 'expo-router';
-import { BarChart3, CreditCard, List, Megaphone, Plus, Sparkles, Users, X } from 'lucide-react-native';
+import { BarChart3, CreditCard, List, Megaphone, Plus, Sparkles, Stethoscope, UserRound, X } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 
 import { Text } from '@/components/ui';
@@ -14,9 +14,9 @@ type MenuItem = { key: string; ar: string; en: string; icon: LucideIcon; to?: st
 const MENU_ITEMS: MenuItem[] = [
   { key: 'new_order', ar: 'طلب جديد', en: 'New Order', icon: Plus, to: '/new-lab-order' },
   { key: 'orders', ar: 'الطلبات', en: 'Orders', icon: List, to: '/orders' },
-  { key: 'doctors', ar: 'الأطباء', en: 'Doctors', icon: Users, to: '/lab-doctors' },
+  { key: 'doctors', ar: 'الأطباء', en: 'Doctors', icon: Stethoscope, to: '/lab-doctors' },
   { key: 'accounts', ar: 'الحسابات', en: 'Accounts', icon: CreditCard, to: '/lab-finance' },
-  { key: 'patients', ar: 'المرضى', en: 'Patients', icon: Users, to: '/lab-patients' },
+  { key: 'patients', ar: 'المرضى', en: 'Patients', icon: UserRound, to: '/lab-patients' },
   { key: 'reports', ar: 'التقارير', en: 'Reports', icon: BarChart3, to: '/lab-reports' },
   { key: 'services', ar: 'خدمات المختبر', en: 'Lab Services', icon: Sparkles, to: '/lab-services' },
   { key: 'myads', ar: 'إعلاناتي', en: 'My Ads', icon: Megaphone, to: '/my-ads' },

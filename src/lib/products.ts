@@ -66,6 +66,18 @@ export type BoneGraftSpec = {
   features: string[];
   packSizes: BoneGraftPackSize[];
   clinicalImages?: string[];
+  // Whether the graft is used with a barrier membrane, and that membrane's details.
+  membrane?: BoneGraftMembrane;
+};
+
+export type BoneGraftMembrane = {
+  needed: boolean;
+  type?: string;
+  size?: string;
+  priceUsd?: number;
+  priceIqd?: number;
+  // Storage path, like the product images.
+  image?: string;
 };
 
 export type ProductDiscountTier = {

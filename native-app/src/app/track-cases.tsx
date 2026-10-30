@@ -5,6 +5,7 @@ import {
   CalendarDays,
   ClipboardList,
   Hash,
+  MessageCircle,
   Truck,
   User,
   Wrench,
@@ -25,6 +26,8 @@ import {
 } from '@/lib/caseTracking';
 import { useCaseUnreadCount, markCaseRead } from '@/lib/caseMessages';
 import { useSession, useUserRole } from '@/lib/useAuth';
+import { useLocalSearchParams } from 'expo-router';
+import { CaseChatModal } from '@/components/CaseChatModal';
 
 const STATUS_LABELS: Record<OrderStatus, { ar: string; en: string }> = {
   new: { ar: 'جديد', en: 'New' },
@@ -70,11 +73,13 @@ function CaseDetailModal({
   order,
   onClose,
   userId,
+  onChat,
 }: {
   labId?: string;
   order: Order;
   onClose: () => void;
   userId?: string;
+  onChat?: () => void;
 }) {
   useEffect(() => {
     if (userId) markCaseRead(order.id, userId);
@@ -135,6 +140,12 @@ function CaseDetailModal({
               </View>
             ))}
           </View>
+          {onChat && (
+            <Pressable onPress={onChat} className="mt-4 h-12 flex-row items-center justify-center gap-2 rounded-2xl bg-primary">
+              <MessageCircle size={17} color="#FFFFFF" />
+              <Text className="text-sm font-bold text-primary-foreground">{ar ? 'مراسلة المختبر' : 'Message the lab'}</Text>
+            </Pressable>
+          )}
         </View>
       </View>
     </Modal>
@@ -154,6 +165,9 @@ export default function TrackCasesScreen() {
   const { cases: remoteCases, loading } = useDentistCases(user?.uid ?? '');
   const [filter, setFilter] = useState<string>('all');
   const [selected, setSelected] = useState<{ labId?: string; order: Order } | null>(null);
+  const [chat, setChat] = useState<{ labId?: string; order: Order } | null>(null);
+  // `open` = case id from a "new message" notification.
+  const { open } = useLocalSearchParams<{ open?: string }>();
 
   const allCases = useMemo(() => {
     const remote = remoteCases.map((c) => ({ labId: c.labId, order: c.order }));
@@ -161,6 +175,12 @@ export default function TrackCasesScreen() {
     const legacy = filterLegacyOrders(localOrders, remoteIds, doctorName).map((o) => ({ labId: undefined, order: o }));
     return Array.from(new Map([...remote, ...legacy].map((c) => [c.order.id, c])).values());
   }, [remoteCases, localOrders, doctorName]);
+
+  useEffect(() => {
+    if (!open) return;
+    const c = allCases.find((x) => x.order.id === open && x.labId);
+    if (c) setChat(c);
+  }, [open, allCases]);
 
   const counts: Record<string, number> = { all: allCases.length };
   (['new', 'delayed', 'in_progress', 'completed'] as const).forEach((s) => {
@@ -300,6 +320,16 @@ export default function TrackCasesScreen() {
                       </Text>
                     </View>
                   )}
+                  {!!c.labId && (
+                    <Pressable
+                      onPress={() => setChat(c)}
+                      className="mt-1.5 h-10 flex-row items-center justify-center gap-2 rounded-xl bg-primary"
+                    >
+                      <MessageCircle size={15} color="#FFFFFF" />
+                      <Text className="text-xs font-bold text-primary-foreground">{ar ? 'مراسلة المختبر حول الحالة' : 'Message the lab about this case'}</Text>
+                      <UnreadBadge labId={c.labId} caseId={o.id} userId={user?.uid} />
+                    </Pressable>
+                  )}
                 </View>
               </Pressable>
             );
@@ -313,6 +343,27 @@ export default function TrackCasesScreen() {
           order={selected.order}
           userId={user?.uid}
           onClose={() => setSelected(null)}
+          onChat={selected.labId ? () => { setChat(selected); setSelected(null); } : undefined}
+        />
+      )}
+
+      {!!chat?.labId && !!user?.uid && (
+        <CaseChatModal
+          visible
+          onClose={() => setChat(null)}
+          ar={ar}
+          labId={chat.labId}
+          caseId={chat.order.id}
+          currentUserId={user.uid}
+          senderRole="doctor"
+          senderName={doctorName || user.displayName || user.email || (ar ? 'الطبيب' : 'Doctor')}
+          counterpartId={chat.labId}
+          context={{
+            patient: chat.order.patient,
+            orderNumber: chat.order.orderNumber,
+            workType: chat.order.workType,
+            statusLabel: ar ? STATUS_LABELS[canonicalStatus(chat.order.status)].ar : STATUS_LABELS[canonicalStatus(chat.order.status)].en,
+          }}
         />
       )}
     </Screen>

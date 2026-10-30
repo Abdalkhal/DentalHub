@@ -150,7 +150,7 @@ function More() {
       roles: ["lab"],
     },
     {
-      to: "/doctors",
+      to: "/lab-doctors",
       icon: Users,
       label: ar ? "الأطباء" : "Doctors",
       tone: "bg-cyan-50 ring-cyan-200 text-cyan-600",
@@ -283,7 +283,7 @@ function More() {
   const labLinks: MoreLink[] = [
     { to: "/labs/dashboard", icon: FlaskConical, label: ar ? "لوحة المختبر" : "Lab Dashboard", tone: "", roles: ["lab"] },
     { to: "/designer", icon: PenTool, label: ar ? "حالات التصميم" : "Design Cases", tone: "", roles: ["lab"] },
-    { to: "/doctors", icon: Stethoscope, label: ar ? "الأطباء" : "Doctors", tone: "", roles: ["lab"] },
+    { to: "/lab-doctors", icon: Stethoscope, label: ar ? "الأطباء" : "Doctors", tone: "", roles: ["lab"] },
     { to: "/doctor-invoices", icon: FileText, label: ar ? "فواتير الأطباء" : "Doctor Invoices", tone: "", roles: ["lab"] },
     { to: "/my-ads", icon: Megaphone, label: ar ? "إعلاناتي" : "My Ads", tone: "", roles: ["lab"] },
     { to: "/messages", icon: MessageSquare, label: ar ? "الرسائل" : "Messages", tone: "", roles: ["lab"] },

@@ -438,7 +438,7 @@ export function DashboardHome() {
               </span>
             </button>
             <button
-              onClick={() => navigate({ to: "/doctors" })}
+              onClick={() => navigate({ to: "/lab-doctors" })}
               className="flex flex-col items-center gap-1.5 py-2.5 rounded-2xl bg-card border border-border hover:bg-accent"
             >
               <Users className="size-5 text-foreground" />

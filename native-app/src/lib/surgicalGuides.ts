@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { db, storage } from "@/integrations/firebase/client";
 import { collection, getDocs, setDoc, doc } from "firebase/firestore";
-import { ref, uploadBytes } from "firebase/storage";
+import { ref } from "firebase/storage";
+import { uploadData } from "./uploadData";
 
 export type SurgicalGuideCompany = {
   id: string;
@@ -91,6 +92,6 @@ export function useUpsertSurgicalGuideCompany() {
 export async function uploadGuideFile(ownerId: string, file: File): Promise<string> {
   const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
   const path = `surgical-guides/${ownerId}/${crypto.randomUUID()}.${ext || "jpg"}`;
-  await uploadBytes(ref(storage, path), file, { contentType: file.type || "image/jpeg" });
+  await uploadData(ref(storage, path), file, { contentType: file.type || "image/jpeg" });
   return path;
 }

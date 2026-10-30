@@ -1,4 +1,5 @@
-import { ref, uploadBytes, uploadBytesResumable, getBlob } from "firebase/storage";
+import { ref, uploadBytesResumable, getBlob } from "firebase/storage";
+import { uploadData } from "./uploadData";
 import { Directory, File, Paths } from "expo-file-system";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { storage, db } from "@/integrations/firebase/client";
@@ -188,7 +189,7 @@ export async function uploadCaseFile(opts: CaseUploadOptions): Promise<CaseUploa
   const contentType = (file as globalThis.File).type || "model/stl";
 
   const upload = async (blob: Blob, at: string, opts?: { gzip?: boolean }) => {
-    await uploadBytes(ref(storage, at), blob, {
+    await uploadData(ref(storage, at), blob, {
       cacheControl: "private, max-age=86400",
       contentType,
       ...(opts?.gzip ? { contentEncoding: "gzip" } : {}),

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ActivityIndicator, Image, Modal, Pressable, ScrollView, Share, View, type LayoutChangeEvent } from 'react-native';
 import * as Sharing from 'expo-sharing';
-import { Check, FileBox, FileText, Hash, Layers, Paintbrush, Ruler, Share2, Smile, Syringe, X, type LucideIcon } from 'lucide-react-native';
+import { Check, FileBox, FileText, Hash, MessageCircle, Layers, Paintbrush, Ruler, Share2, Smile, Syringe, X, type LucideIcon } from 'lucide-react-native';
 
 import { Text } from '@/components/ui';
 import {
@@ -18,6 +18,8 @@ import { deriveOrderLines, deriveWorkDetailGroups, cleanDoctorNotes, resolveOrde
 import { FDI_UPPER, FDI_LOWER, UPPER_POS, LOWER_POS } from '@/components/DentalArch';
 import type { Order, OrderStatus } from '@/lib/ordersStore';
 import { resolveCaseFileUri } from '@/lib/storagePipeline';
+import { useSession } from '@/lib/useAuth';
+import { CaseChatModal } from '@/components/CaseChatModal';
 
 // A faithful port of the web app's OrderInvoiceModal (src/components/OrderInvoiceModal.tsx)
 // — tapping a case anywhere in the app (labs-office.tsx's dashboard,
@@ -234,11 +236,14 @@ export function CaseDetailModal({
   onClose,
   labName,
   onConfirm,
+  chatLabId,
 }: {
   ar: boolean;
   order: Order;
   onClose: () => void;
   labName?: string;
+  /** The lab owner's id: enables "مراسلة الطبيب" (case chat) for a case a dentist sent. */
+  chatLabId?: string;
   /** Rendered as a "تأكيد الحالة" footer button, only shown for a case the
    * lab hasn't priced yet (`source === 'incoming_doctor_case'`) — the doctor
    * who sent it has no way to set a price, so that pricing table below is
@@ -249,6 +254,9 @@ export function CaseDetailModal({
   // Flips to "internal" once the lab confirms (new-lab-order.tsx), so this
   // only ever applies to a still-unpriced, just-arrived doctor case.
   const isUnconfirmedIncoming = order.source === 'incoming_doctor_case';
+  const [chatOpen, setChatOpen] = useState(false);
+  const { user } = useSession();
+  const canChat = !!chatLabId && !!order.dentistId && !!user?.uid;
   const workDetailGroups = deriveWorkDetailGroups(order);
   const selectedShade = order.shade ? order.shade.trim() : '';
   const shadeTab = selectedShade ? classifyShade(selectedShade) : null;
@@ -609,6 +617,17 @@ export function CaseDetailModal({
             </View>
           </ScrollView>
 
+          {canChat && (
+            <View className="border-t border-slate-100 px-4 pt-3">
+              <Pressable
+                onPress={() => setChatOpen(true)}
+                className="h-12 flex-row items-center justify-center gap-2 rounded-xl border border-primary"
+              >
+                <MessageCircle size={16} color="#2563EB" />
+                <Text className="text-sm font-extrabold text-primary">{ar ? 'مراسلة الطبيب حول الحالة' : 'Message the doctor'}</Text>
+              </Pressable>
+            </View>
+          )}
           {isUnconfirmedIncoming && onConfirm && (
             <View className="border-t border-slate-100 p-4">
               <Pressable
@@ -624,6 +643,20 @@ export function CaseDetailModal({
           )}
         </View>
       </View>
+      {canChat && chatOpen && (
+        <CaseChatModal
+          visible
+          onClose={() => setChatOpen(false)}
+          ar={ar}
+          labId={chatLabId!}
+          caseId={order.id}
+          currentUserId={user!.uid}
+          senderRole="lab"
+          senderName={labName || (ar ? 'المختبر' : 'Lab')}
+          counterpartId={order.dentistId}
+          context={{ patient: order.patient, orderNumber: order.orderNumber, workType: order.workType, counterpartName: order.doctor }}
+        />
+      )}
     </Modal>
   );
 }

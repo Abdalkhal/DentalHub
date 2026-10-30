@@ -19,8 +19,11 @@ export function notificationTarget(n: Notification):
   | { to: "/messages"; search: { with: string } }
   | { to: "/doctor-invoices/$invoiceId"; params: { invoiceId: string } }
   | { to: "/orders" }
+  | { to: "/track-cases"; search: { open?: string } }
   | null {
   if (n.type === "message" && n.chatWith) return { to: "/messages", search: { with: n.chatWith } };
+  // The doctor reads case chats from case tracking; the lab from its orders.
+  if (n.type === "case_message") return n.forRole === "doctor" ? { to: "/track-cases", search: { open: n.orderId } } : { to: "/orders" };
   if (n.invoiceId) return { to: "/doctor-invoices/$invoiceId", params: { invoiceId: n.invoiceId } };
   if (n.orderId || n.type === "order_new") return { to: "/orders" };
   return null;

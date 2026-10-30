@@ -21,6 +21,7 @@ const TYPE_META: Record<Notification["type"], { icon: typeof Package; tone: stri
   order_new: { icon: Package, tone: "bg-sky-100 text-sky-600" },
   order_status: { icon: Truck, tone: "bg-amber-100 text-amber-600" },
   message: { icon: MessageCircle, tone: "bg-emerald-100 text-emerald-600" },
+  case_message: { icon: MessageCircle, tone: "bg-violet-100 text-violet-600" },
 };
 
 function NotificationsPage() {

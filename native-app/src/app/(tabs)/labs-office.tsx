@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Image, Pressable, View } from 'react-native';
+import { Alert, Image, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   Clock,
   FileText,
+  Inbox,
   Layers,
   Menu,
   Phone,
@@ -36,7 +37,7 @@ import { LabStaffPanel } from '@/components/LabStaffPanel';
 import { useUserRole } from '@/lib/useAuth';
 import { useUnreadNotificationsCount } from '@/lib/notifications';
 import { useI18n } from '@/lib/i18n';
-import { cn } from '@/lib/utils';
+import { cn, normalizeName } from '@/lib/utils';
 
 const STATUS_TONE: Record<OrderStatus, string> = {
   new: 'bg-sky-100 text-sky-700',
@@ -66,6 +67,8 @@ const STAT_CARDS: {
   fg: string;
 }[] = [
   { key: 'all', ar: 'إجمالي الطلبات', en: 'Total Orders', icon: Layers, bg: '#E0F2FE', fg: '#0369A1' },
+  // New cases are what a lab acts on first; they had no card of their own.
+  { key: 'new', ar: 'جديدة', en: 'New', icon: Inbox, bg: '#EDE9FE', fg: '#6D28D9' },
   { key: 'in_progress', ar: 'قيد التنفيذ', en: 'In Production', icon: Clock, bg: '#FEF3C7', fg: '#B45309' },
   { key: 'completed', ar: 'مكتملة', en: 'Completed', icon: CheckCircle2, bg: '#D1FAE5', fg: '#047857' },
   { key: 'delayed', ar: 'متأخرة', en: 'Delayed', icon: AlertCircle, bg: '#FEE2E2', fg: '#B91C1C' },
@@ -170,14 +173,15 @@ export default function LabsOfficeScreen() {
 
   const filtered = useMemo(() => {
     let list = filter === 'all' ? internalOrders : internalOrders.filter((o) => o.status === filter);
-    const q = search.trim().toLowerCase();
+    // normalizeName: "احمد" also finds "أحمد" (hamza/alef-maqsura variants).
+    const q = normalizeName(search);
     if (q) {
       list = list.filter(
         (o) =>
-          (o.patient || '').toLowerCase().includes(q) ||
-          (o.doctor || '').toLowerCase().includes(q) ||
-          (o.orderNumber || '').toLowerCase().includes(q) ||
-          String(o.caseId || '').toLowerCase().includes(q),
+          normalizeName(o.patient || '').includes(q) ||
+          normalizeName(o.doctor || '').includes(q) ||
+          normalizeName(o.orderNumber || '').includes(q) ||
+          String(o.caseId || '').includes(q),
       );
     }
     return list;
@@ -187,6 +191,20 @@ export default function LabsOfficeScreen() {
     if (s === 'new' || s === 'delayed') return 'in_progress';
     if (s === 'in_progress') return 'completed';
     return 'completed';
+  };
+
+  // One tap used to move a case straight on (e.g. to "completed") with no
+  // way to tell a slip from intent.
+  const confirmStatus = (o: Order, to: OrderStatus) => {
+    const label = ar ? STATUS_AR[to] : STATUS_EN[to];
+    Alert.alert(
+      ar ? 'تغيير حالة الطلب' : 'Change case status',
+      ar ? `نقل حالة ${o.patient || o.orderNumber} إلى «${label}»؟` : `Move ${o.patient || o.orderNumber} to "${label}"?`,
+      [
+        { text: ar ? 'إلغاء' : 'Cancel', style: 'cancel' },
+        { text: ar ? 'تأكيد' : 'Confirm', onPress: () => updateOrderStatus(o.id, to) },
+      ],
+    );
   };
 
   return (
@@ -324,7 +342,7 @@ export default function LabsOfficeScreen() {
                 <Pressable
                   key={c.key}
                   onPress={() => setFilter(active ? 'all' : c.key)}
-                  className="w-[48.5%] overflow-hidden rounded-2xl p-4"
+                  className={cn('overflow-hidden rounded-2xl p-4', c.key === 'all' ? 'w-full' : 'w-[48.5%]')}
                   style={{
                     backgroundColor: c.bg,
                     ...(active
@@ -400,7 +418,7 @@ export default function LabsOfficeScreen() {
                   }}
                 >
                   <View className="flex-row items-center justify-between gap-2">
-                    <Text className="min-w-0 flex-1 truncate text-sm font-extrabold text-slate-800">
+                    <Text numberOfLines={1} className="min-w-0 flex-1 text-sm font-extrabold text-slate-800">
                       {o.patient || '—'}
                     </Text>
                     <View className={cn('shrink-0 rounded-full px-2.5 py-1', STATUS_TONE[o.status])}>
@@ -432,23 +450,24 @@ export default function LabsOfficeScreen() {
                       )}
                     </View>
                   )}
-                  <View className="mt-2.5 flex-row gap-1.5">
-                    {o.status !== 'completed' && (
+                  {/* A completed case has nothing left to advance or delay. */}
+                  {o.status !== 'completed' && (
+                    <View className="mt-2.5 flex-row gap-1.5">
                       <Button
                         size="sm"
                         title={ar ? 'تقدم للمرحلة التالية' : 'Advance'}
-                        onPress={() => updateOrderStatus(o.id, nextStatus(o.status))}
+                        onPress={() => confirmStatus(o, nextStatus(o.status))}
                         className="flex-1"
                       />
-                    )}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      title={o.status === 'delayed' ? (ar ? 'إلغاء التأخير' : 'Clear delay') : ar ? 'تأخير' : 'Delay'}
-                      onPress={() => updateOrderStatus(o.id, o.status === 'delayed' ? 'in_progress' : 'delayed')}
-                      className={cn('flex-1', o.status !== 'delayed' && 'border-rose-200')}
-                    />
-                  </View>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        title={o.status === 'delayed' ? (ar ? 'إلغاء التأخير' : 'Clear delay') : ar ? 'تأخير' : 'Delay'}
+                        onPress={() => confirmStatus(o, o.status === 'delayed' ? 'in_progress' : 'delayed')}
+                        className={cn('flex-1', o.status !== 'delayed' && 'border-rose-200')}
+                      />
+                    </View>
+                  )}
                 </Pressable>
               ))}
             </View>
@@ -469,6 +488,7 @@ export default function LabsOfficeScreen() {
           order={selected}
           onClose={() => setSelected(null)}
           labName={role?.name}
+          chatLabId={role?.userId}
         />
       )}
     </Screen>

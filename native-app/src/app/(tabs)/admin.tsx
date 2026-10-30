@@ -86,7 +86,52 @@ function SyncProfilesCard({ ar }: { ar: boolean }) {
                 : ar ? 'مزامنة الملفات العامة' : 'Sync public profiles'
         }
       />
+      <CleanupOrphansButton ar={ar} />
     </Card>
+  );
+}
+
+/** Removes listings left by accounts deleted before purgeDeletedAccountContent
+ *  existed (new deletions are cleaned up automatically). Safe to re-run. */
+function CleanupOrphansButton({ ar }: { ar: boolean }) {
+  const [state, setState] = useState<'idle' | 'busy' | 'done' | 'error'>('idle');
+  const [removed, setRemoved] = useState(0);
+  const run = async () => {
+    setState('busy');
+    try {
+      const call = httpsCallable<Record<string, never>, { accounts: number; removed: number }>(getFunctions(app), 'cleanupOrphanedContent');
+      const { data } = await call({});
+      setRemoved(data.removed);
+      setState('done');
+    } catch {
+      setState('error');
+    }
+  };
+  const confirm = () =>
+    Alert.alert(
+      ar ? 'حذف بيانات الحسابات المحذوفة' : "Remove deleted accounts' listings",
+      ar ? 'حذف المنتجات والعروض والإعلانات التابعة لحسابات محذوفة؟ لا يمكن التراجع.' : 'Delete products, offers and ads of deleted accounts? This cannot be undone.',
+      [
+        { text: ar ? 'إلغاء' : 'Cancel', style: 'cancel' },
+        { text: ar ? 'حذف' : 'Delete', style: 'destructive', onPress: run },
+      ],
+    );
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      loading={state === 'busy'}
+      onPress={confirm}
+      title={
+        state === 'busy'
+          ? ar ? 'جارٍ التنظيف...' : 'Cleaning...'
+          : state === 'done'
+            ? ar ? `تم حذف ${removed}` : `Removed ${removed}`
+            : state === 'error'
+              ? ar ? 'فشل التنظيف — أعد المحاولة' : 'Cleanup failed — retry'
+              : ar ? 'حذف بيانات الحسابات المحذوفة' : "Remove deleted accounts' listings"
+      }
+    />
   );
 }
 

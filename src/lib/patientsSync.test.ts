@@ -7,6 +7,7 @@ type Listener = { path: string; clinicId?: string; next: (snap: unknown) => void
 const backend = vi.hoisted(() => ({
   docs: new Map<string, Record<string, unknown>>(),
   listeners: [] as Listener[],
+  failWrites: false,
 }));
 
 function snapshotFor(l: Listener) {
@@ -24,6 +25,7 @@ vi.mock("@/integrations/firebase/client", () => ({ db: {}, storage: {} }));
 vi.mock("firebase/storage", () => ({
   ref: (_s: unknown, path: string) => ({ path }),
   uploadBytes: async () => {},
+  uploadBytesResumable: async () => {},
   uploadString: async () => {},
   getBlob: async () => new Blob(),
   deleteObject: async () => {},
@@ -34,11 +36,14 @@ vi.mock("firebase/firestore", () => ({
   where: (_f: string, _op: string, value: string) => ({ value }),
   query: (col: { path: string }, w: { value: string }) => ({ path: col.path, clinicId: w.value }),
   setDoc: async (ref: { path: string }, data: Record<string, unknown>, opts?: { merge?: boolean }) => {
+    if (backend.failWrites && ref.path.includes("/patients/")) throw Object.assign(new Error("offline"), { code: "unavailable" });
     const prev = backend.docs.get(ref.path) ?? {};
     backend.docs.set(ref.path, structuredClone(opts?.merge ? { ...prev, ...data } : data));
     for (const l of backend.listeners) if (ref.path === l.path || ref.path.startsWith(l.path + "/")) setTimeout(() => l.next(snapshotFor(l)));
   },
-  onSnapshot: (ref: { path: string; clinicId?: string }, next: (s: unknown) => void) => {
+  // Like the SDK: (ref, next) or (ref, options, next).
+  onSnapshot: (ref: { path: string; clinicId?: string }, a: unknown, b?: unknown) => {
+    const next = (typeof a === "function" ? a : b) as (s: unknown) => void;
     const l: Listener = { path: ref.path, clinicId: ref.clinicId, next };
     backend.listeners.push(l);
     setTimeout(() => next(snapshotFor(l)));
@@ -72,6 +77,7 @@ const pat = (id: string, name: string, extra = {}) => ({
 });
 
 afterEach(() => {
+  backend.failWrites = false;
   backend.docs.clear();
   backend.listeners = [];
 });
@@ -128,3 +134,17 @@ it("keeps a guest's patients local only", async () => {
   expect(patients.getPatients()).toHaveLength(1);
   expect(backend.docs.size).toBe(0);
 });
+
+it("reports a failed upload and sends everything on \"sync now\"", async () => {
+  backend.failWrites = true;
+  const phone = await device({
+    [`dh_clinics_v1:${UID}`]: JSON.stringify({ clinics: [{ id: "A", name: "العيادة الرئيسية", address: "", workDays: "" }], activeClinicId: "A" }),
+    [`dh:patients:v1:${UID}:A`]: JSON.stringify([pat("p1", "Only on phone")]),
+  });
+  expect(backend.docs.get(`dentist_records/${UID}/patients/p1`)).toBeUndefined();
+  expect(await phone.patients.syncPatientsNow()).toMatchObject({ sent: 0, failed: 1, error: "unavailable: offline" });
+
+  backend.failWrites = false;
+  expect(await phone.patients.syncPatientsNow()).toEqual({ sent: 1, failed: 0, error: undefined });
+  expect(backend.docs.get(`dentist_records/${UID}/patients/p1`)).toMatchObject({ name: "Only on phone", clinicId: "A" });
+}, 30_000);

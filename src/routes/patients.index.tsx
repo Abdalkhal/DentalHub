@@ -7,6 +7,8 @@ import {
   addPatient,
   updatePatient,
   usePatients,
+  syncPatientsNow,
+  usePatientSyncStatus,
   EMPTY_HISTORY,
   type MedicalHistory,
   type Patient,
@@ -14,7 +16,8 @@ import {
 } from "@/lib/patientsStore";
 import { setClinicsStoreUser } from "@/lib/clinicsStore";
 import { useSession } from "@/lib/useAuth";
-import { ArrowRight, ArrowLeft, Phone, Plus, Search, Users, X, CalendarDays, ChevronDown } from "lucide-react";
+import { ArrowRight, ArrowLeft, Phone, Plus, Search, Users, X, CalendarDays, ChevronDown, CloudOff, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/patients/")({
   head: () => ({
@@ -86,6 +89,8 @@ function PatientsPage() {
             <Users className="size-5" />
           </span>
         </div>
+
+      <SyncNotice ar={ar} />
 
         <div className="md:mt-6 md:flex md:items-center md:gap-4">
         <div className="mt-3 relative md:mt-0 md:flex-1 md:max-w-md">
@@ -261,5 +266,48 @@ export function Field({ label, children }: { label: string; children: React.Reac
       <span className="text-[11px] font-bold text-muted-foreground">{label}</span>
       <div className="mt-1">{children}</div>
     </label>
+  );
+}
+
+/** Sync is automatic; this only appears when records did not reach the cloud
+ *  (they are retried on their own — the button just does it now). */
+function SyncNotice({ ar }: { ar: boolean }) {
+  const { failed, error } = usePatientSyncStatus();
+  const [busy, setBusy] = useState(false);
+  if (!error) return null;
+  const retry = async () => {
+    setBusy(true);
+    try {
+      const r = await syncPatientsNow();
+      if (r.failed === 0 && !r.error) toast.success(ar ? "تمت مزامنة المرضى" : "Patients synced");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="mt-3 flex items-start gap-2.5 rounded-2xl border border-amber-200 bg-amber-50 p-3 md:max-w-xl">
+      <CloudOff className="size-[18px] shrink-0 text-amber-700" />
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-bold text-amber-800">
+          {failed > 0
+            ? ar
+              ? `لم تُرفع بيانات ${failed} مريض إلى السحابة بعد`
+              : `${failed} patient(s) not saved to the cloud yet`
+            : ar
+              ? "تعذر الاتصال بالسحابة لمزامنة المرضى"
+              : "Could not reach the cloud to sync patients"}
+        </p>
+        <p className="mt-0.5 text-[11px] text-amber-700">{ar ? "ستُعاد المحاولة تلقائياً." : "Retrying automatically."}</p>
+        <p className="mt-0.5 break-all text-[10px] text-amber-600" dir="ltr">{error}</p>
+      </div>
+      <button
+        type="button"
+        onClick={retry}
+        disabled={busy}
+        className="h-8 shrink-0 rounded-xl bg-white px-2.5 text-[11px] font-bold text-amber-800 disabled:opacity-60"
+      >
+        {busy ? <Loader2 className="size-4 animate-spin" /> : ar ? "أعد الآن" : "Retry"}
+      </button>
+    </div>
   );
 }

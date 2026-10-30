@@ -5,6 +5,7 @@ import { X, Plus, Trash2, Upload, Image, Settings, Paperclip, Loader2, Package, 
 import { cn } from "@/lib/utils";
 import { StockVisibilityToggle } from "@/components/StockVisibilityToggle";
 import { useI18n } from "@/lib/i18n";
+import { useConfirmClose, useFormDirty } from "@/lib/confirmClose";
 import {
   useProducts,
   useUpsertProduct,
@@ -272,6 +273,10 @@ export function ImplantFormModal({
     );
   };
 
+  // Closing by mistake (✕, a click outside, the tab) asks first when something was typed.
+  const dirty = useFormDirty([productType, surgicalGuide, surgicalGuideTools, kitType, placementType, compatibility, toolsCount, kitPurchasePrice, kitSku, kitInStock, kitManufacturerMode, name, brand, country, implantCategory, line, accessoryCategory, accessorySubType, variants, accessoryPrice, accessoryCurrency, accessorySpecs, accessoryStock, accessoryStockHidden, stockHidden, price, currency, minOrderQty, description, attachmentNames, imagePreviews, existingImages, parentId]);
+  const requestClose = useConfirmClose(dirty, onClose, ar);
+
   const submit = async () => {
     setFormError("");
     if (!name.trim()) {
@@ -445,7 +450,7 @@ export function ImplantFormModal({
 
   return (
     <div className="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:p-6">
-      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={requestClose} />
       <div
         className="relative w-full max-w-md max-h-[92vh] flex flex-col rounded-t-3xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom md:max-w-2xl md:max-h-[88vh] md:rounded-3xl lg:max-w-3xl"
         style={{ background: "linear-gradient(to bottom, #F7FCFF, #DCEEFB, #BFE1F7)" }}
@@ -468,7 +473,7 @@ export function ImplantFormModal({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             className="size-9 rounded-xl bg-white/70 border border-white/80 text-slate-500 flex items-center justify-center hover:bg-white transition"
           >
             <X className="size-4" />
@@ -577,15 +582,12 @@ export function ImplantFormModal({
                         }
                         className="w-full min-h-[42px] h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
                       >
+                        {/* Traditional first (stored as non_immediate). */}
+                        <option value="non_immediate">{ar ? "تقليدية (Traditional)" : "Traditional"}</option>
                         <option value="comprehensive">
-                          {ar ? "فورية (Compressive)" : "Immediate (Compressive)"}
+                          {ar ? "فورية (Comprehensive)" : "Immediate (Comprehensive)"}
                         </option>
                         <option value="basal">{ar ? "فورية (Basal)" : "Immediate (Basal)"}</option>
-                        <option value="non_immediate">
-                          {ar
-                            ? "غير فورية (Conventional / Delayed)"
-                            : "Non-Immediate (Conventional / Delayed)"}
-                        </option>
                       </select>
                     </div>
                   </div>
@@ -1465,7 +1467,7 @@ export function ImplantFormModal({
             </button>
             <button
               type="button"
-              onClick={onClose}
+              onClick={requestClose}
               className="h-14 px-8 rounded-2xl font-display font-bold flex items-center gap-2 transition bg-[#E7F4FE] hover:bg-[#DCEEFB] text-[#1C6FB5] md:h-11"
             >
               {ar ? "إلغاء" : "Cancel"}

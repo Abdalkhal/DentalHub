@@ -358,6 +358,14 @@ export function IncomingOrderRxModal({
                 currentUserId={currentUserId}
                 senderRole={senderRole}
                 senderName={senderName || (ar ? "المختبر" : "Lab")}
+                // The doctor's messages notify the lab (owner uid = labId); the lab's notify the doctor.
+                counterpartId={senderRole === "doctor" ? labId : order.dentistId}
+                context={{
+                  patient: order.patient,
+                  orderNumber: order.orderNumber,
+                  workType: order.workType,
+                  counterpartName: senderRole === "doctor" ? undefined : order.doctor,
+                }}
               />
             </div>
           )}

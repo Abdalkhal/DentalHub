@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { X, Plus, Trash2, Upload, Image, Check, Loader2 } from "lucide-react";
+import { X, Plus, Trash2, Upload, Image, Check, Loader2, Layers, Maximize2, DollarSign } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
+import { useConfirmClose, useFormDirty } from "@/lib/confirmClose";
 import { TagInput } from "@/components/TagInput";
 import { CountryCombobox } from "@/components/CountryCombobox";
 import {
@@ -91,11 +92,21 @@ export function BoneGraftModal({
     product?.boneGraft?.clinicalImages ?? [],
   );
   const [removedClinical, setRemovedClinical] = useState<string[]>([]);
+  const savedMembrane = product?.boneGraft?.membrane;
+  const [membraneNeeded, setMembraneNeeded] = useState(savedMembrane?.needed ?? false);
+  const [membraneType, setMembraneType] = useState(savedMembrane?.type ?? "");
+  const [membraneSize, setMembraneSize] = useState(savedMembrane?.size ?? "");
+  const [membraneUsd, setMembraneUsd] = useState(savedMembrane?.priceUsd ? String(savedMembrane.priceUsd) : "");
+  const [membraneIqd, setMembraneIqd] = useState(savedMembrane?.priceIqd ? String(savedMembrane.priceIqd) : "");
+  const [membraneImage, setMembraneImage] = useState(savedMembrane?.image ?? "");
+  const [membraneFile, setMembraneFile] = useState<File | null>(null);
+  const [membranePreview, setMembranePreview] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   const { data: existingUrlMap = {} } = useSignedImageUrls(existingImages);
   const { data: clinicalUrlMap = {} } = useSignedImageUrls(existingClinical);
+  const { data: membraneUrlMap = {} } = useSignedImageUrls(membraneImage ? [membraneImage] : []);
 
   const inputCls =
     "w-full h-11 rounded-xl bg-[#F5FAFE] border border-[#D3E8F7] px-3 text-sm text-[#17324A] placeholder:text-[#7A94A8] focus:outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0]";
@@ -158,6 +169,10 @@ export function BoneGraftModal({
     setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
   };
 
+  // Closing by mistake (✕, a click outside, the tab) asks first when something was typed.
+  const dirty = useFormDirty([name, manufacturer, country, graftType, form, materialSource, composition, particleSize, sterilizationMethod, shelfLife, features, description, rows, imagePreviews, existingImages, clinicalPreviews, existingClinical, membraneNeeded, membraneType, membraneSize, membraneUsd, membraneIqd, membraneImage, membranePreview]);
+  const requestClose = useConfirmClose(dirty, onClose, ar);
+
   const submit = async () => {
     setError("");
     if (!name.trim()) {
@@ -173,7 +188,12 @@ export function BoneGraftModal({
     try {
       const productId = product?.id ?? crypto.randomUUID();
 
-      for (const path of [...removedImages, ...removedClinical]) {
+      // The membrane photo is dropped when replaced, removed, or no longer needed.
+      const membraneRemoved =
+        savedMembrane?.image && (savedMembrane.image !== membraneImage || membraneFile || !membraneNeeded)
+          ? [savedMembrane.image]
+          : [];
+      for (const path of [...removedImages, ...removedClinical, ...membraneRemoved]) {
         try {
           await removeProductImage(path);
         } catch { /* image already removed */ }
@@ -187,6 +207,9 @@ export function BoneGraftModal({
       for (const file of clinicalFiles) {
         clinicalPaths.push(await uploadProductImage(productId, file));
       }
+
+      let membranePath = membraneNeeded ? membraneImage : "";
+      if (membraneNeeded && membraneFile) membranePath = await uploadProductImage(productId, membraneFile);
 
       const packSizes = rows
         .filter((r) => r.volume.trim())
@@ -228,6 +251,17 @@ export function BoneGraftModal({
             existingClinical.length > 0 || clinicalPaths.length > 0
               ? [...existingClinical, ...clinicalPaths]
               : undefined,
+          // "Doesn't need a membrane" keeps no membrane details.
+          membrane: membraneNeeded
+            ? {
+                needed: true,
+                ...(membraneType.trim() ? { type: membraneType.trim() } : {}),
+                ...(membraneSize.trim() ? { size: membraneSize.trim() } : {}),
+                ...(parseFloat(membraneUsd) > 0 ? { priceUsd: parseFloat(membraneUsd) } : {}),
+                ...(parseFloat(membraneIqd) > 0 ? { priceIqd: parseFloat(membraneIqd) } : {}),
+                ...(membranePath ? { image: membranePath } : {}),
+              }
+            : { needed: false },
         },
       });
 
@@ -249,7 +283,7 @@ export function BoneGraftModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-[#17324A]/40 backdrop-blur-sm md:items-center md:p-6" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-[#17324A]/40 backdrop-blur-sm md:items-center md:p-6" onClick={requestClose}>
       <div
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-[440px] max-h-[92vh] flex flex-col rounded-t-3xl overflow-hidden animate-in slide-in-from-bottom md:max-w-2xl md:max-h-[88vh] md:rounded-3xl md:shadow-2xl lg:max-w-3xl"
@@ -270,7 +304,7 @@ export function BoneGraftModal({
           </h2>
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             className="size-8 rounded-full bg-white/20 backdrop-blur border border-white/40 flex items-center justify-center text-white hover:bg-white/30 transition"
           >
             <X className="size-4" />
@@ -333,6 +367,131 @@ export function BoneGraftModal({
             <div>
               <label className={labelCls}>{ar ? "مدة الصلاحية والاستخدام" : "Shelf Life & Usage"}</label>
               <input value={shelfLife} onChange={(e) => setShelfLife(e.target.value)} placeholder={ar ? "مثال: 3 سنوات" : "e.g. 3 years"} className={inputCls} />
+            </div>
+          </section>
+
+          {/* Membrane */}
+          <section className={sectionCls}>
+            <p className={sectionTitleCls}><span className="size-1.5 rounded-full bg-emerald-500" />{ar ? "الممبرن (الغشاء)" : "Membrane"}</p>
+            <div className="rounded-2xl bg-[#EEF6FD] border border-[#D3E8F7] p-3 space-y-3">
+              <div className="flex items-center justify-between gap-3 px-1" role="radiogroup">
+                {([true, false] as const).map((needed) => (
+                  <label key={String(needed)} className="flex items-center gap-2 cursor-pointer text-sm font-bold text-[#17324A]">
+                    <input
+                      type="radio"
+                      name="membrane-needed"
+                      checked={membraneNeeded === needed}
+                      onChange={() => setMembraneNeeded(needed)}
+                      className="size-5 accent-[#2E93E0]"
+                    />
+                    {needed ? (ar ? "يحتاج ممبرن" : "Needs membrane") : ar ? "لا يحتاج ممبرن" : "No membrane"}
+                  </label>
+                ))}
+              </div>
+
+              {membraneNeeded && (
+                <>
+                  <div className="flex items-center gap-3 rounded-xl bg-white border border-[#D3E8F7] px-3 py-2">
+                    <Layers className="size-5 shrink-0 text-[#1C6FB5]" />
+                    <div className="flex-1 min-w-0">
+                      <label className="text-[11px] font-bold text-[#17324A] block">{ar ? "نوع الممبرن" : "Membrane type"}</label>
+                      <input
+                        value={membraneType}
+                        onChange={(e) => setMembraneType(e.target.value)}
+                        placeholder={ar ? "مثال: Bio-Gide قابل للامتصاص" : "e.g. Bio-Gide resorbable"}
+                        className="w-full bg-transparent text-sm text-[#17324A] placeholder:text-[#7A94A8] focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="flex items-center gap-3 rounded-xl bg-white border border-[#D3E8F7] px-3 py-2">
+                      <Maximize2 className="size-4 shrink-0 text-[#1C6FB5]" />
+                      <div className="flex-1 min-w-0">
+                        <label className="text-[11px] font-bold text-[#17324A] block">{ar ? "حجم الممبرن" : "Membrane size"}</label>
+                        <input
+                          value={membraneSize}
+                          onChange={(e) => setMembraneSize(e.target.value)}
+                          placeholder={ar ? "مثال: 15 × 20 mm" : "e.g. 15 × 20 mm"}
+                          className="w-full bg-transparent text-sm text-[#17324A] placeholder:text-[#7A94A8] focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                    {/* Same two-currency pricing as the pack sizes: either or both. */}
+                    <div className="flex items-center gap-3 rounded-xl bg-white border border-[#D3E8F7] px-3 py-2">
+                      <DollarSign className="size-4 shrink-0 text-[#1C6FB5]" />
+                      <div className="flex-1 min-w-0">
+                        <label className="text-[11px] font-bold text-[#17324A] block">{ar ? "سعر الممبرن" : "Membrane price"}</label>
+                        <div className="mt-1 flex gap-2">
+                          <div className="relative flex-1">
+                            <span className="absolute start-2 top-1/2 -translate-y-1/2 text-xs font-bold text-[#7A94A8]">$</span>
+                            <input
+                              value={membraneUsd}
+                              onChange={(e) => setMembraneUsd(e.target.value.replace(/[^0-9.]/g, ""))}
+                              inputMode="decimal"
+                              placeholder="USD"
+                              dir="ltr"
+                              className="h-9 w-full rounded-lg bg-[#F5FAFE] border border-[#D3E8F7] ps-6 pe-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2E93E0]/30"
+                            />
+                          </div>
+                          <div className="relative flex-1">
+                            <span className="absolute start-2 top-1/2 -translate-y-1/2 text-xs font-bold text-[#7A94A8]">د.ع</span>
+                            <input
+                              value={membraneIqd}
+                              onChange={(e) => setMembraneIqd(e.target.value.replace(/[^0-9.]/g, ""))}
+                              inputMode="decimal"
+                              placeholder="IQD"
+                              dir="ltr"
+                              className="h-9 w-full rounded-lg bg-[#F5FAFE] border border-[#D3E8F7] ps-8 pe-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2E93E0]/30"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="rounded-xl bg-white border border-dashed border-[#D3E8F7] p-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-[#17324A]">{ar ? "صورة الممبرن" : "Membrane photo"}</label>
+                      <span className="size-9 rounded-lg bg-[#EEF6FD] flex items-center justify-center text-[#1C6FB5]">
+                        <Image className="size-4" />
+                      </span>
+                    </div>
+                    {membranePreview || (membraneImage && membraneUrlMap[membraneImage]) ? (
+                      <div className="relative mt-2 size-24 overflow-hidden rounded-xl border border-[#D3E8F7]">
+                        <img src={membranePreview || membraneUrlMap[membraneImage]} alt="" className="size-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (membranePreview) URL.revokeObjectURL(membranePreview);
+                            setMembranePreview("");
+                            setMembraneFile(null);
+                            setMembraneImage("");
+                          }}
+                          className="absolute top-1 end-1 size-6 rounded-full bg-black/60 text-white flex items-center justify-center"
+                        >
+                          <X className="size-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="mt-2 inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-xl bg-[#2E93E0] px-4 text-xs font-bold text-white hover:bg-[#1C6FB5] transition">
+                        <Plus className="size-4" />
+                        {ar ? "إضافة صورة" : "Add photo"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            setMembraneFile(file);
+                            setMembranePreview(URL.createObjectURL(file));
+                            e.target.value = "";
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </section>
 

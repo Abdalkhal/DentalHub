@@ -13,7 +13,7 @@ import { BranchesTab } from "@/components/admin/BranchesTab";
 import { OfficesTab } from "@/components/admin/OfficesTab";
 import { LabsTab } from "@/components/admin/LabsTab";
 import { ProductsTab } from "@/components/admin/ProductsTab";
-import { SyncProfilesButton } from "@/components/admin/SyncProfilesButton";
+import { CleanupOrphansButton, SyncProfilesButton } from "@/components/admin/SyncProfilesButton";
 
 export const Route = createFileRoute("/admin")({
   component: AdminPage,
@@ -80,6 +80,7 @@ function AdminPage() {
           </p>
           <div className="flex items-center gap-3">
             <SyncProfilesButton ar={lang === "ar"} />
+            <CleanupOrphansButton ar={lang === "ar"} />
             <button
               onClick={() => signOut(auth).then(() => navigate({ to: "/auth" }))}
               className="text-xs font-semibold inline-flex items-center gap-1"

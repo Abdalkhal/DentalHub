@@ -677,6 +677,7 @@ function LabOrders() {
           order={selected}
           onClose={() => setSelected(null)}
           labName={role?.name}
+          chatLabId={role?.userId}
           onConfirm={() => {
             const id = selected.id;
             setSelected(null);

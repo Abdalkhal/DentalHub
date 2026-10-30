@@ -12,9 +12,11 @@ import {
   orderBy,
   Timestamp,
 } from "firebase/firestore";
-import { ref, uploadBytes, deleteObject, getDownloadURL } from "firebase/storage";
+import { ref, deleteObject, getDownloadURL } from "firebase/storage";
+import { uploadData } from "./uploadData";
 import type { ProductSpecs } from "@/data/specs";
 import { randomUUID } from "@/lib/randomId";
+import { File } from "expo-file-system";
 
 export const MAX_PRODUCT_IMAGES = 5;
 export const PRODUCT_IMAGE_BUCKET = "product-images";
@@ -67,6 +69,18 @@ export type BoneGraftSpec = {
   features: string[];
   packSizes: BoneGraftPackSize[];
   clinicalImages?: string[];
+  // Whether the graft is used with a barrier membrane, and that membrane's details.
+  membrane?: BoneGraftMembrane;
+};
+
+export type BoneGraftMembrane = {
+  needed: boolean;
+  type?: string;
+  size?: string;
+  priceUsd?: number;
+  priceIqd?: number;
+  // Storage path, like the product images.
+  image?: string;
 };
 
 export type ProductDiscountTier = {
@@ -324,8 +338,11 @@ export async function uploadProductImage(
   const ext = (file.name?.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
   const path = `products/${productId}/${randomUUID()}.${ext || "jpg"}`;
   const storageRef = ref(storage, path);
-  const blob = await (await fetch(file.uri)).blob();
-  await uploadBytes(storageRef, blob, {
+  // Read natively: fetch(uri).blob() is unreliable on Android and failed
+  // silently there, so products were saved with no images at all.
+  const bytes = new Uint8Array(await new File(file.uri).arrayBuffer());
+  if (bytes.byteLength >= 10 * 1024 * 1024) throw new Error("Image is larger than 10 MB");
+  await uploadData(storageRef, bytes, {
     contentType: file.type || "image/jpeg",
     customMetadata: { companyId: uid },
   });

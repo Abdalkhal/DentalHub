@@ -1,31 +1,46 @@
 import { useMemo, useState } from 'react';
 import { Linking, Pressable, ScrollView, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import { MapPin, Phone, Stethoscope } from 'lucide-react-native';
 
 import { Screen, Text, Spinner } from '@/components/ui';
 import { db } from '@/integrations/firebase/client';
 import { useI18n } from '@/lib/i18n';
+import { CITIES } from '@/data/offices';
+import { useIsAdmin } from '@/lib/useAuth';
 import { cn } from '@/lib/utils';
+
+function cityName(id: string, ar: boolean): string {
+  const c = CITIES.find((x) => x.id === id.trim().toLowerCase());
+  return c ? (ar ? c.ar : c.en) : id;
+}
 
 type Doctor = { id: string; name: string; city: string; phone?: string; clinic?: string };
 
+// Every dentist on the platform, with phone numbers — admin only. Labs
+// used to reach this from their "Doctors" button; they now get /lab-doctors
+// (only the dentists who sent them cases).
 export default function DoctorsScreen() {
   const { lang } = useI18n();
   const ar = lang === 'ar';
+  const { isAdmin, loading: adminLoading } = useIsAdmin();
 
   const { data: doctors = [], isLoading } = useQuery({
-    queryKey: ['doctors-directory'],
+    queryKey: ['doctors-directory', ar],
+    enabled: isAdmin,
     queryFn: async (): Promise<Doctor[]> => {
-      const snap = await getDocs(collection(db, 'public_profiles'));
+      // user_roles, not public_profiles: the public copy no longer carries
+      // dentists' phones, and only the admin may read user_roles.
+      const snap = await getDocs(query(collection(db, 'user_roles'), where('accountType', '==', 'dentist')));
       return snap.docs
-        .map((d) => d.data() as Record<string, unknown>)
+        .map((d): Record<string, unknown> => ({ ...d.data(), userId: d.id }))
         .filter((u) => u.accountType === 'dentist')
         .map((u) => ({
-          id: String(u.userId ?? ''),
+          id: String(u.userId),
           name: [u.name, u.surname].filter(Boolean).join(' '),
-          city: String(u.city || ''),
+          // Stored as an id ("nineveh"); shown by its name.
+          city: cityName(String(u.city || ''), ar),
           phone: typeof u.phone === 'string' ? u.phone : undefined,
           clinic: typeof u.clinicName === 'string' ? u.clinicName : undefined,
         }))
@@ -43,6 +58,16 @@ export default function DoctorsScreen() {
     });
     return m;
   }, [doctors, otherLabel]);
+
+  if (!adminLoading && !isAdmin) {
+    return (
+      <Screen>
+        <Text className="mt-16 text-center text-sm text-slate-400">
+          {ar ? 'هذه الصفحة متاحة لإدارة التطبيق فقط' : 'This page is for administrators only'}
+        </Text>
+      </Screen>
+    );
+  }
 
   return (
     <Screen>

@@ -51,9 +51,10 @@ function implantCategoryOf(
 }
 
 const CATEGORY_LABEL: Record<ImplantCategory, { ar: string; en: string }> = {
-  comprehensive: { ar: "فورية (شاملة)", en: "Immediate (Comprehensive)" },
-  basal: { ar: "فورية (قاعدية)", en: "Immediate (Basal)" },
-  non_immediate: { ar: "غير فورية", en: "Non-Immediate" },
+  comprehensive: { ar: "فورية (Comprehensive)", en: "Immediate (Comprehensive)" },
+  basal: { ar: "فورية (Basal)", en: "Immediate (Basal)" },
+  // Stored value is still `non-immediate`.
+  non_immediate: { ar: "تقليدية (Traditional)", en: "Traditional" },
 };
 
 const CATEGORY_TONE: Record<ImplantCategory, string> = {
@@ -553,9 +554,10 @@ function CountryPage() {
 
   const filters: { key: ImplantFilter; ar: string; en: string }[] = [
     { key: "all", ar: "الكل", en: "All" },
-    { key: "comprehensive", ar: "فورية (شاملة)", en: "Immediate (Comprehensive)" },
-    { key: "basal", ar: "فورية (قاعدية)", en: "Immediate (Basal)" },
-    { key: "non_immediate", ar: "غير فورية", en: "Non-Immediate" },
+    // Traditional first, then the two immediate types.
+    { key: "non_immediate", ...CATEGORY_LABEL.non_immediate },
+    { key: "comprehensive", ...CATEGORY_LABEL.comprehensive },
+    { key: "basal", ...CATEGORY_LABEL.basal },
   ];
 
   return (

@@ -25,6 +25,8 @@ export function BoneGraftDetailsModal({
   const images = product.images.map((p) => urlMap[p]).filter(Boolean) as string[];
 
   const { data: clinicalUrlMap = {} } = useSignedImageUrls(product.boneGraft?.clinicalImages ?? []);
+  const membrane = product.boneGraft?.membrane;
+  const { data: membraneUrlMap = {} } = useSignedImageUrls(membrane?.image ? [membrane.image] : []);
 
   const { data: supplier } = useQuery({
     queryKey: ["bone-graft-supplier", product.companyId],
@@ -259,6 +261,42 @@ export function BoneGraftDetailsModal({
                       </span>
                     ))}
                   </div>
+                )}
+              </div>
+            )}
+
+            {membrane && (
+              <div>
+                <h4 className="text-sm font-bold text-slate-800 mb-2">{ar ? "الممبرن (الغشاء)" : "Membrane"}</h4>
+                {membrane.needed ? (
+                  <div className="flex gap-3 rounded-2xl border border-slate-200 p-3">
+                    {membrane.image && (
+                      <div className="size-20 shrink-0 overflow-hidden rounded-xl bg-slate-100">
+                        {membraneUrlMap[membrane.image] && (
+                          <img src={membraneUrlMap[membrane.image]} alt="" className="size-full object-cover" />
+                        )}
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <span className="inline-block rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                        {ar ? "يحتاج ممبرن" : "Needs a membrane"}
+                      </span>
+                      {membrane.type && <p className="text-sm font-bold text-slate-800">{membrane.type}</p>}
+                      {membrane.size && <p className="text-[12px] text-slate-500"><bdi>{membrane.size}</bdi></p>}
+                      {(membrane.priceUsd || membrane.priceIqd) && (
+                        <p className="text-[12px] font-bold text-primary">
+                          {[
+                            membrane.priceUsd ? `$${membrane.priceUsd.toLocaleString("en-US")}` : "",
+                            membrane.priceIqd ? `${membrane.priceIqd.toLocaleString("en-US")} د.ع` : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="rounded-2xl bg-slate-50 px-3 py-2.5 text-xs text-slate-500">{ar ? "لا يحتاج ممبرن" : "No membrane needed"}</p>
                 )}
               </div>
             )}

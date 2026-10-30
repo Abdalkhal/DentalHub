@@ -5,6 +5,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { Calendar, Check, Minus, Package, Plus, ScanBarcode, X } from 'lucide-react-native';
 
 import { Select, Text } from '@/components/ui';
+import { useConfirmClose, useFormDirty } from '@/lib/confirmClose';
+import { SINGLE_LINE_INPUT } from '@/components/ui/singleLineInput';
 import { CountrySelect } from '@/components/CountrySelect';
 import { DateWheelPicker } from '@/components/DateWheelPicker';
 import { BRANCH_CODE, BRANCH_OPTIONS, TECH_BRANCHES } from '@/data/branches';
@@ -100,7 +102,7 @@ function BrandAutocomplete({
         placeholder={ar ? 'اسم الشركة المصنعة' : 'Manufacturer name'}
         placeholderTextColor="#94A3B8"
         className={inputCls}
-        style={{ writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }}
+        style={{ ...SINGLE_LINE_INPUT, writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }}
       />
       {open && filtered.length > 0 && (
         <View className="mt-1.5 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -429,7 +431,7 @@ export function AddSupplyProductModal({
             placeholder={field.placeholder}
             placeholderTextColor="#94A3B8"
             className={inputCls}
-            style={{ writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }}
+            style={{ ...SINGLE_LINE_INPUT, writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }}
           />
         </Field>
       );
@@ -476,6 +478,10 @@ export function AddSupplyProductModal({
       </Field>
     );
   };
+
+  // Closing by mistake (✕ / Android back) asks first when something was typed.
+  const dirty = useFormDirty([name, brand, price, purchasePrice, currency, stock, stockHidden, description, images, branch, subCategory, country, barcode, expiryDate, specs, techSpecs]);
+  const requestClose = useConfirmClose(dirty, onClose, ar);
 
   const save = async () => {
     if (!name.trim()) {
@@ -526,7 +532,7 @@ export function AddSupplyProductModal({
   ];
 
   return (
-    <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={open} transparent animationType="slide" onRequestClose={requestClose}>
       <View style={{ flex: 1 }}>
       <View className="flex-1 justify-end bg-black/40">
         <View className="max-h-[92%] rounded-t-3xl bg-white">
@@ -539,7 +545,7 @@ export function AddSupplyProductModal({
                 {ar ? 'أدخل تفاصيل المنتج للحفظ' : 'Enter product details to save'}
               </Text>
             </View>
-            <Pressable onPress={onClose} className="h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50">
+            <Pressable onPress={requestClose} className="h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50">
               <X size={16} color="#334155" />
             </Pressable>
           </View>
@@ -553,7 +559,7 @@ export function AddSupplyProductModal({
                   placeholder={ar ? 'مثال: كومبوزيت ضوئي' : 'e.g. Light-cured composite'}
                   placeholderTextColor="#94A3B8"
                   className={inputCls}
-                  style={{ writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }}
+                  style={{ ...SINGLE_LINE_INPUT, writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }}
                 />
               </Field>
               <Field label={ar ? 'الماركة' : 'Brand'}>
@@ -644,7 +650,7 @@ export function AddSupplyProductModal({
                     placeholder={ar ? 'رمز الباركود أو امسحه' : 'Barcode or scan it'}
                     placeholderTextColor="#94A3B8"
                     className={cn(inputCls, 'flex-1')}
-                    style={{ writingDirection: 'ltr', textAlign: 'left' }}
+                    style={{ ...SINGLE_LINE_INPUT, writingDirection: 'ltr', textAlign: 'left' }}
                   />
                   <Pressable onPress={() => setShowScanner(true)} className="h-11 flex-row items-center gap-1.5 rounded-xl bg-slate-900 px-3.5">
                     <ScanBarcode size={15} color="#FFFFFF" />
@@ -697,7 +703,7 @@ export function AddSupplyProductModal({
                       placeholder="0"
                       placeholderTextColor="#94A3B8"
                       className={inputCls}
-                      style={{ writingDirection: 'ltr', textAlign: 'left' }}
+                      style={{ ...SINGLE_LINE_INPUT, writingDirection: 'ltr', textAlign: 'left' }}
                     />
                   </Field>
                 </View>
@@ -710,7 +716,7 @@ export function AddSupplyProductModal({
                       placeholder="0"
                       placeholderTextColor="#94A3B8"
                       className={inputCls}
-                      style={{ writingDirection: 'ltr', textAlign: 'left' }}
+                      style={{ ...SINGLE_LINE_INPUT, writingDirection: 'ltr', textAlign: 'left' }}
                     />
                   </Field>
                 </View>
@@ -751,7 +757,7 @@ export function AddSupplyProductModal({
                     placeholder="0"
                     placeholderTextColor="#94A3B8"
                     className="flex-1 text-center text-xl font-extrabold text-slate-900"
-                    style={{ writingDirection: 'ltr' }}
+                    style={{ ...SINGLE_LINE_INPUT, writingDirection: 'ltr' }}
                   />
                   <Pressable onPress={() => setStock((v) => v + 1)} className="h-10 w-10 items-center justify-center rounded-xl bg-emerald-600">
                     <Plus size={16} color="#FFFFFF" />

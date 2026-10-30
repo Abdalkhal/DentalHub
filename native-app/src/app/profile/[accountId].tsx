@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Image, Linking, Pressable, ScrollView, View } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { doc, getDoc } from 'firebase/firestore';
 import { Heart, MapPin, Megaphone, MessageCircle, MessageSquare, Package, Phone, Send } from 'lucide-react-native';
@@ -9,6 +9,8 @@ import { Screen, Text, Spinner } from '@/components/ui';
 import { ProductImage } from '@/components/ProductImage';
 import { SendCaseModal } from '@/components/SendCaseModal';
 import { ImplantDetailView } from '@/components/ImplantDetailView';
+import { BoneGraftDetailsModal } from '@/components/BoneGraftDetailsModal';
+import { LabServicesSection, useLabServices } from '@/components/LabServicesSection';
 import { BRANCH_BADGE, BRANCH_IMAGES, BRANCH_OPTIONS } from '@/data/branches';
 import { db } from '@/integrations/firebase/client';
 import { useProducts, useSignedImageUrls, type Product } from '@/lib/products';
@@ -52,6 +54,7 @@ export default function ProfileScreen() {
   const { user, role } = useUserRole();
   const [showSendCase, setShowSendCase] = useState(false);
   const [viewingImplant, setViewingImplant] = useState<Product | null>(null);
+  const [viewingGraft, setViewingGraft] = useState<Product | null>(null);
   const favorited = useIsFavorited(accountId ?? '');
 
   const { data: account, isLoading } = useQuery({
@@ -76,7 +79,21 @@ export default function ProfileScreen() {
   const offers = useMemo(() => rawOffers.filter((o) => !o.status || o.status === 'active'), [rawOffers]);
 
   const isSupply = account?.accountType === 'supply';
+  const labServices = useLabServices(accountId, account?.accountType === 'lab');
   const [branchFilter, setBranchFilter] = useState('all');
+  // A category is in-screen state, not a screen of its own, so "back" used to
+  // leave the whole profile (landing on search). Back now closes the category
+  // first — header back, Android back button and swipe all go through this.
+  const navigation = useNavigation();
+  useEffect(
+    () =>
+      navigation.addListener('beforeRemove', (e) => {
+        if (branchFilter === 'all') return;
+        e.preventDefault();
+        setBranchFilter('all');
+      }),
+    [navigation, branchFilter],
+  );
   const activeBranch = branchFilter !== 'all' ? BRANCH_OPTIONS.find((b) => b.value === branchFilter) : null;
 
   const filteredProducts = useMemo(() => {
@@ -118,6 +135,10 @@ export default function ProfileScreen() {
   // here so browsing to an implant from a profile page shows the exact same
   // detail, accessories included, instead of the stripped-down generic view.
   const openProduct = (p: Product) => {
+    if (p.branch === 'bone_graft') {
+      setViewingGraft(p);
+      return;
+    }
     if (type === 'implant') {
       setViewingImplant(p);
       return;
@@ -362,6 +383,14 @@ export default function ProfileScreen() {
         </View>
       )}
 
+      {type === 'lab' && (
+        <LabServicesSection
+          services={labServices}
+          ar={ar}
+          onOrder={role?.accountType === 'dentist' ? () => setShowSendCase(true) : undefined}
+        />
+      )}
+
       {/* Non-supply: simple products grid */}
       {!isSupply && products.length > 0 && (
         <View className="mt-5 pb-4">
@@ -397,7 +426,7 @@ export default function ProfileScreen() {
         </View>
       )}
 
-      {products.length === 0 && offers.length === 0 && (
+      {products.length === 0 && offers.length === 0 && labServices.length === 0 && (
         <View className="mt-12 items-center">
           <Package size={40} color="#CBD5E1" />
           <Text className="mt-3 text-center text-sm text-slate-400">
@@ -418,6 +447,7 @@ export default function ProfileScreen() {
         />
       )}
 
+      {viewingGraft && <BoneGraftDetailsModal product={viewingGraft} ar={ar} onClose={() => setViewingGraft(null)} />}
       {viewingImplant && (
         <ImplantDetailView product={viewingImplant} ar={ar} onClose={() => setViewingImplant(null)} />
       )}

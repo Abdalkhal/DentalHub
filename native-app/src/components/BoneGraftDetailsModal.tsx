@@ -1,10 +1,15 @@
 import { useMemo, useRef, useState } from 'react';
-import { Modal, Pressable, ScrollView, View } from 'react-native';
-import { ChevronLeft, ChevronRight, Package, X } from 'lucide-react-native';
+import { Image, Modal, Pressable, ScrollView, View } from 'react-native';
+import { router } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
+import { doc, getDoc } from 'firebase/firestore';
+import { ChevronLeft, ChevronRight, Package, Phone, X } from 'lucide-react-native';
 
 import { Text } from '@/components/ui';
 import { ProductImage } from '@/components/ProductImage';
 import { useSignedImageUrls, type Product } from '@/lib/products';
+import { db } from '@/integrations/firebase/client';
+import { useUserRole } from '@/lib/useAuth';
 import { cn } from '@/lib/utils';
 
 export function BoneGraftDetailsModal({
@@ -27,6 +32,27 @@ export function BoneGraftDetailsModal({
   );
 
   const { data: clinicalUrlMap = {} } = useSignedImageUrls(product.boneGraft?.clinicalImages ?? []);
+
+  // The company offering it, with a link to its profile — same card as the
+  // implant details (the web's bone graft details already had it).
+  const { user } = useUserRole();
+  const showSupplier = !!product.companyId && product.companyId !== user?.uid;
+  const { data: supplier } = useQuery({
+    queryKey: ['bone-graft-supplier', product.companyId],
+    enabled: showSupplier,
+    queryFn: async () => {
+      const snap = await getDoc(doc(db, 'public_profiles', product.companyId!));
+      return snap.exists() ? (snap.data() as { name?: string; photoURL?: string; phone?: string }) : null;
+    },
+    staleTime: 5 * 60_000,
+  });
+  const openSupplier = () => {
+    if (!product.companyId) return;
+    onClose();
+    router.push({ pathname: '/profile/[accountId]', params: { accountId: product.companyId } });
+  };
+  const membrane = product.boneGraft?.membrane;
+  const { data: membraneUrlMap = {} } = useSignedImageUrls(membrane?.image ? [membrane.image] : []);
 
   const spec = product.boneGraft;
 
@@ -74,6 +100,34 @@ export function BoneGraftDetailsModal({
           </View>
 
           <ScrollView contentContainerClassName="gap-4 pb-8">
+            {showSupplier && !!supplier && (
+              <View className="mx-4 mt-4 flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-card p-3 shadow-sm">
+                <View className="h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-indigo-50">
+                  {supplier.photoURL ? (
+                    <Image source={{ uri: supplier.photoURL }} className="h-full w-full" resizeMode="cover" />
+                  ) : (
+                    <Text className="font-bold text-indigo-600">{(supplier.name || '؟').charAt(0)}</Text>
+                  )}
+                </View>
+                <View className="min-w-0 flex-1">
+                  <Text className="text-sm font-bold text-slate-800" numberOfLines={1}>
+                    {supplier.name || (ar ? 'الشركة' : 'Company')}
+                  </Text>
+                  {!!supplier.phone && (
+                    <View className="mt-0.5 flex-row items-center gap-1">
+                      <Phone size={11} color="#94A3B8" />
+                      <Text className="text-[11px] text-slate-500" style={{ writingDirection: 'ltr' }}>
+                        {supplier.phone}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                <Pressable onPress={openSupplier} className="shrink-0 rounded-xl bg-indigo-600 px-3 py-2">
+                  <Text className="text-xs font-bold text-white">{ar ? 'زيارة الملف' : 'Visit Profile'}</Text>
+                </Pressable>
+              </View>
+            )}
+
             <View
               className="relative bg-slate-100"
               onLayout={(e) => {
@@ -225,6 +279,44 @@ export function BoneGraftDetailsModal({
                       </View>
                     ))}
                   </View>
+                </View>
+              )}
+
+              {!!membrane && (
+                <View>
+                  <Text className="mb-2 text-sm font-bold text-slate-800">{ar ? 'الممبرن (الغشاء)' : 'Membrane'}</Text>
+                  {membrane.needed ? (
+                    <View className="flex-row gap-3 rounded-2xl border border-slate-200 p-3">
+                      {!!membrane.image && (
+                        <ProductImage uri={membraneUrlMap[membrane.image]} className="h-20 w-20 rounded-xl bg-slate-100" iconSize={18} />
+                      )}
+                      <View className="min-w-0 flex-1 gap-1">
+                        <View className="self-start rounded-full bg-emerald-50 px-2 py-0.5">
+                          <Text className="text-[10px] font-bold text-emerald-700">{ar ? 'يحتاج ممبرن' : 'Needs a membrane'}</Text>
+                        </View>
+                        {!!membrane.type && <Text className="text-sm font-bold text-slate-800">{membrane.type}</Text>}
+                        {!!membrane.size && (
+                          <Text className="text-[12px] text-slate-500" style={{ writingDirection: 'ltr', textAlign: ar ? 'right' : 'left' }}>
+                            {membrane.size}
+                          </Text>
+                        )}
+                        {(!!membrane.priceUsd || !!membrane.priceIqd) && (
+                          <Text className="text-[12px] font-bold text-primary">
+                            {[
+                              membrane.priceUsd ? `$${membrane.priceUsd.toLocaleString('en-US')}` : '',
+                              membrane.priceIqd ? `${membrane.priceIqd.toLocaleString('en-US')} د.ع` : '',
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  ) : (
+                    <Text className="rounded-2xl bg-slate-50 px-3 py-2.5 text-xs text-slate-500">
+                      {ar ? 'لا يحتاج ممبرن' : 'No membrane needed'}
+                    </Text>
+                  )}
                 </View>
               )}
 

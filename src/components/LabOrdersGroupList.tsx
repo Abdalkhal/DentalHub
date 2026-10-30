@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronUp, Search, Stethoscope, Users } from "lucide-react";
-import { useOrders, connectLabOrders, disconnectLabOrders, type Order } from "@/lib/ordersStore";
+import { useOrders, connectLabOrders, disconnectLabOrders } from "@/lib/ordersStore";
 import { useSession } from "@/lib/useAuth";
 import { cn, normalizeName } from "@/lib/utils";
+import { groupOrders, type OrderGroup } from "@/lib/labFinance";
 
 // The lab's own read-only view of its cases grouped by doctor or by patient,
 // derived from the lab's real orders — same as native's lab-doctors /
 // lab-patients screens.
 
-type Entry = { name: string; orders: Order[] };
+type Entry = OrderGroup;
 
 const STATUS_META: Record<string, { ar: string; en: string; cls: string }> = {
   new: { ar: "جديد", en: "New", cls: "bg-sky-50 text-sky-600" },
@@ -35,19 +36,7 @@ export function LabOrdersGroupList({ groupBy, ar }: { groupBy: "doctor" | "patie
     return () => disconnectLabOrders();
   }, [labId]);
 
-  const groups = useMemo(() => {
-    const map = new Map<string, Order[]>();
-    for (const o of orders) {
-      const name = ((groupBy === "doctor" ? o.doctor : o.patient) || "").trim();
-      if (!name) continue;
-      const list = map.get(name) ?? [];
-      list.push(o);
-      map.set(name, list);
-    }
-    return [...map.entries()]
-      .map(([name, list]) => ({ name, orders: list }))
-      .sort((a, b) => b.orders.length - a.orders.length);
-  }, [orders, groupBy]);
+  const groups = useMemo(() => groupOrders(orders, groupBy), [orders, groupBy]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return groups;
@@ -160,7 +149,7 @@ export function LabOrdersGroupList({ groupBy, ar }: { groupBy: "doctor" | "patie
         <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
           {filtered.map((g) => (
             <button
-              key={g.name}
+              key={g.key}
               type="button"
               onClick={() => setSelected(g)}
               className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm text-start hover:shadow-md transition"

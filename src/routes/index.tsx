@@ -227,7 +227,12 @@ function DentistHome() {
 
           <Link to="/account" className="flex flex-col items-center gap-0.5 shrink-0 md:order-4 md:flex-row md:gap-2.5 md:bg-white md:border md:border-slate-200 md:rounded-full md:ps-1 md:pe-4 md:py-1 md:shadow-sm md:hover:bg-slate-50 md:transition">
             <span className="size-11 rounded-full overflow-hidden ring-2 ring-primary shadow-sm bg-primary/10 flex items-center justify-center md:size-9 md:ring-1">
-              <User className="size-5 text-primary md:size-4" />
+              {/* The account photo was never shown here — always the placeholder icon. */}
+              {role?.photoURL ? (
+                <img src={role.photoURL} alt="" className="size-full object-cover" />
+              ) : (
+                <User className="size-5 text-primary md:size-4" />
+              )}
             </span>
             <span className="text-[10px] font-bold text-slate-700 md:text-[13px]">{lang === "ar" ? "حسابي" : "Account"}</span>
           </Link>

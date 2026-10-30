@@ -5,6 +5,8 @@ import { Activity, BarChart3, DollarSign, TrendingUp } from 'lucide-react-native
 import { Screen, Text } from '@/components/ui';
 import { useOrders, connectLabOrders, disconnectLabOrders, type Order } from '@/lib/ordersStore';
 import { resolveOrderTotal } from '@/lib/orderLines';
+import { fmtLabMoney, ordersInCurrency, type LabCurrency } from '@/lib/labFinance';
+import { CurrencySwitch } from '@/components/CurrencySwitch';
 import { useUserRole } from '@/lib/useAuth';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
@@ -97,6 +99,8 @@ export default function LabReportsScreen() {
   const labId = user?.uid ?? '';
   const orders = useOrders();
   const [range, setRange] = useState<Range>('30d');
+  // Revenue is summed per currency — dinar and dollar cases are never added up.
+  const [currency, setCurrency] = useState<LabCurrency>('IQD');
 
   useEffect(() => {
     if (!labId) return;
@@ -141,12 +145,12 @@ export default function LabReportsScreen() {
 
   const revenueData = useMemo(() => {
     const sums = new Map<string, number>();
-    for (const o of filtered) {
+    for (const o of ordersInCurrency(filtered, currency)) {
       const key = o.workType || (ar ? 'غير محدد' : 'Unspecified');
       sums.set(key, (sums.get(key) ?? 0) + resolveOrderTotal(o));
     }
     return [...sums.entries()].map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value).slice(0, 6);
-  }, [filtered, ar]);
+  }, [filtered, ar, currency]);
 
   const volumeData = useMemo(() => {
     const byMonth = new Map<string, number>();
@@ -209,6 +213,12 @@ export default function LabReportsScreen() {
             </ChartCard>
 
             <ChartCard icon={<DollarSign size={15} color="#2563EB" />} title={ar ? 'توزيع الإيرادات' : 'Revenue Breakdown'}>
+              <CurrencySwitch value={currency} onChange={setCurrency} ar={ar} className="mb-3" />
+              {revenueData.length === 0 && (
+                <Text className="py-4 text-center text-xs text-slate-400">
+                  {ar ? (currency === 'IQD' ? 'لا توجد إيرادات بالدينار' : 'لا توجد إيرادات بالدولار') : `No ${currency} revenue`}
+                </Text>
+              )}
               <View className="gap-2.5">
                 {revenueData.map((d, i) => (
                   <BarRow
@@ -217,7 +227,7 @@ export default function LabReportsScreen() {
                     value={d.value}
                     max={revenueMax}
                     color={BAR_COLORS[i % BAR_COLORS.length]}
-                    valueLabel={`${d.value.toLocaleString('en-US')} ${ar ? 'د.ع' : 'IQD'}`}
+                    valueLabel={fmtLabMoney(d.value, currency)}
                   />
                 ))}
               </View>

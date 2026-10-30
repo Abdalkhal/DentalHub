@@ -8,7 +8,8 @@ import {
   orderBy,
   Timestamp,
 } from "firebase/firestore";
-import { ref, uploadBytes, deleteObject } from "firebase/storage";
+import { ref, deleteObject } from "firebase/storage";
+import { uploadData } from "./uploadData";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { db, storage } from "@/integrations/firebase/client";
 import { app } from "@/integrations/firebase/config";
@@ -95,7 +96,7 @@ export async function uploadAdImage(
   const path = `ads/${accountId}/${randomUUID()}.${ext || "jpg"}`;
   const storageRef = ref(storage, path);
   const blob = await (await fetch(file.uri)).blob();
-  await uploadBytes(storageRef, blob, { contentType: file.type || "image/jpeg" });
+  await uploadData(storageRef, blob, { contentType: file.type || "image/jpeg" });
   return path;
 }
 

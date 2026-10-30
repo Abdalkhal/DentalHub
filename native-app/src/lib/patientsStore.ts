@@ -492,6 +492,7 @@ export function setPatientSyncReady(ready: boolean) {
   if (!ready) {
     unsubscribeRemote?.();
     unsubscribeRemote = null;
+    for (const id of [...failing.keys()]) setFailing(id); // signed out / switched account
   }
 }
 const pushKey = (uid: string, clinicId: string, id: string) => `${uid}|${clinicId}|${id}`;
@@ -590,18 +591,128 @@ async function uploadInlineFiles(uid: string, clinicId: string, p: Patient): Pro
   return readPatient(uid, clinicId, p.id) ?? p;
 }
 
-async function pushPatient(uid: string, clinicId: string, id: string) {
+// A failed push used to wait for the next remote change or app restart — in
+// practice it was never retried, and the record stayed on one device only.
+const RETRY_DELAYS_MS = [15_000, 60_000, 5 * 60_000, 15 * 60_000];
+const retryCounts = new Map<string, number>();
+let lastSyncError = "";
+
+// What hasn't reached the cloud (patient id → last error), so the patients
+// screen can say so — sync itself is automatic and otherwise invisible.
+const LISTENER = "(listener)";
+const failing = new Map<string, string>();
+const statusListeners = new Set<() => void>();
+export type PatientSyncStatus = { failed: number; error: string };
+let syncStatus: PatientSyncStatus = { failed: 0, error: "" };
+
+function setFailing(id: string, error?: string) {
+  if (error === undefined) {
+    if (!failing.delete(id)) return;
+  } else {
+    failing.set(id, error);
+  }
+  const errors = [...failing.values()];
+  syncStatus = {
+    failed: [...failing.keys()].filter((k) => k !== LISTENER).length,
+    error: errors[errors.length - 1] ?? "",
+  };
+  statusListeners.forEach((l) => l());
+}
+
+export function usePatientSyncStatus(): PatientSyncStatus {
+  return useSyncExternalStore(
+    (cb) => {
+      statusListeners.add(cb);
+      return () => statusListeners.delete(cb);
+    },
+    () => syncStatus,
+    () => syncStatus,
+  );
+}
+
+/** Re-reads the cloud copy and re-sends whatever is missing there. Runs when
+ *  the app/page comes back to the foreground, so returning to it is enough. */
+export function resyncPatients() {
+  if (!syncEnabled()) return;
+  retryCounts.clear();
+  startSync();
+}
+
+function errorText(err: unknown): string {
+  const e = err as { code?: string; message?: string };
+  return [e?.code, e?.message].filter(Boolean).join(": ") || String(err);
+}
+
+function scheduleRetry(uid: string, clinicId: string, id: string) {
+  const key = pushKey(uid, clinicId, id);
+  const n = retryCounts.get(key) ?? 0;
+  if (n >= RETRY_DELAYS_MS.length) return; // "Sync now" or the next launch tries again
+  retryCounts.set(key, n + 1);
+  setTimeout(() => {
+    if (uid === currentUserId && syncReady) void pushPatient(uid, clinicId, id);
+  }, RETRY_DELAYS_MS[n]);
+}
+
+/** Uploads one patient; throws the Firestore/Storage error on failure. */
+async function sendPatient(uid: string, clinicId: string, id: string) {
   const p = readPatient(uid, clinicId, id);
   if (!p) return;
+  const ready = await uploadInlineFiles(uid, clinicId, p);
+  // Never send an inline file body, even if its upload failed above.
+  const files = ready.files.filter((f) => f.path).map(({ dataUrl: _inline, ...f }) => f);
+  await setDoc(patientDoc(uid, id), toFirestore({ ...ready, files, clinicId, deleted: false }));
+  retryCounts.delete(pushKey(uid, clinicId, id));
+  setFailing(id);
+}
+
+async function pushPatient(uid: string, clinicId: string, id: string) {
   try {
-    const ready = await uploadInlineFiles(uid, clinicId, p);
-    // Never send an inline file body, even if its upload failed above.
-    const files = ready.files.filter((f) => f.path).map(({ dataUrl: _inline, ...f }) => f);
-    await setDoc(patientDoc(uid, id), toFirestore({ ...ready, files, clinicId, deleted: false }));
+    await sendPatient(uid, clinicId, id);
   } catch (err) {
-    // Kept locally with a newer `updatedAt`, so the next sync sends it again.
+    lastSyncError = errorText(err);
+    setFailing(id, lastSyncError);
     console.warn("Patient not synced yet:", id, err);
+    scheduleRetry(uid, clinicId, id);
   }
+}
+
+export type SyncResult = { sent: number; failed: number; error?: string };
+
+/**
+ * "Sync now": sends every patient of the active clinic (and this device's
+ * deletions) to the cloud and reports what happened, so a failure is visible
+ * instead of silently leaving records on one device.
+ */
+export async function syncPatientsNow(): Promise<SyncResult> {
+  if (!currentUserId) return { sent: 0, failed: 0, error: "not-signed-in" };
+  if (!syncReady || !currentClinicId) return { sent: 0, failed: 0, error: lastSyncError || "clinic-list-not-loaded" };
+  ensure();
+  const uid = currentUserId;
+  const clinicId = currentClinicId;
+  let sent = 0;
+  let failed = 0;
+  let error: string | undefined;
+  for (const p of state) {
+    try {
+      await sendPatient(uid, clinicId, p.id);
+      sent++;
+    } catch (err) {
+      failed++;
+      error = errorText(err);
+      lastSyncError = error;
+      setFailing(p.id, error);
+    }
+  }
+  for (const [id, at] of Object.entries(readDeleted(uid, clinicId))) {
+    try {
+      await setDoc(patientDoc(uid, id), { id, clinicId, deleted: true, updatedAt: at });
+    } catch (err) {
+      failed++;
+      error = errorText(err);
+    }
+  }
+  startSync(); // re-read the cloud copy, so records from other devices appear too
+  return { sent, failed, error };
 }
 
 function pushDelete(p: Patient) {
@@ -680,13 +791,33 @@ function startSync() {
   try {
     unsubscribeRemote = onSnapshot(
       query(patientsCol(uid), where("clinicId", "==", clinicId)),
+      // With metadata changes, the server-confirmed snapshot is delivered even
+      // when it brings no new documents. Without them, a first snapshot served
+      // from cache was the only one, it never counted as "complete", and
+      // records that exist only on this device were never uploaded.
+      { includeMetadataChanges: true },
       (snap) => {
         if (uid !== currentUserId || clinicId !== currentClinicId) return;
+        if (snap.metadata.hasPendingWrites) return; // our own write echoing back
+        setFailing(LISTENER);
         mergeRemote(snap.docs, !snap.metadata.fromCache);
       },
-      (err) => console.warn("Patients sync listener error:", err),
+      (err) => {
+        lastSyncError = errorText(err);
+        setFailing(LISTENER, lastSyncError);
+        console.warn("Patients sync listener error:", err);
+      },
     );
   } catch (err) {
     console.warn("Patients sync not started:", err);
   }
+}
+
+// Web: coming back to the tab, or back online, re-syncs on its own. (The
+// native app does the same from its root layout with AppState.)
+if (typeof document !== "undefined" && typeof window !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") resyncPatients();
+  });
+  window.addEventListener("online", () => resyncPatients());
 }

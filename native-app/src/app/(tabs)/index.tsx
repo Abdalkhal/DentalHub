@@ -299,8 +299,13 @@ export default function HomeScreen() {
       {/* 1 — Header */}
       <View className="flex-row items-center justify-between">
         <Pressable onPress={() => router.push('/account')} className="items-center">
-          <View className="h-10 w-10 items-center justify-center rounded-full bg-slate-100">
-            <User size={18} color="#334155" />
+          {/* The account photo was never shown here — always the placeholder icon. */}
+          <View className="h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-slate-100">
+            {role?.photoURL ? (
+              <Image source={{ uri: role.photoURL }} style={{ width: 40, height: 40 }} resizeMode="cover" />
+            ) : (
+              <User size={18} color="#334155" />
+            )}
           </View>
           <Text className="mt-0.5 text-[9px] font-bold text-slate-600">{ar ? 'حسابي' : 'Account'}</Text>
         </Pressable>

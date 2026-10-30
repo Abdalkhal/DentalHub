@@ -16,6 +16,7 @@ import {
   Phone,
   Pill,
   Plus,
+  Check,
   Printer,
   Search,
   Send,
@@ -336,9 +337,14 @@ function RxScreen() {
       {addOpen && (
         <AddMedicineSheet
           ar={ar}
+          alreadyAdded={new Set(items.map((m) => m.id))}
           onClose={() => setAddOpen(false)}
-          onPick={(m) => {
-            setItems((prev) => [...prev, m]);
+          onAdd={(picked) => {
+            // Skip anything already on the sheet so a re-pick doesn't duplicate it.
+            setItems((prev) => {
+              const have = new Set(prev.map((m) => m.id));
+              return [...prev, ...picked.filter((m) => !have.has(m.id))];
+            });
             setAddOpen(false);
           }}
         />
@@ -401,15 +407,23 @@ function HeaderDialog({
   );
 }
 
+/** Multi-select: click rows to select (highlighted, ✓), then "Add (N)" adds
+ *  them all — it used to add one medicine and close. */
 function AddMedicineSheet({
   onClose,
-  onPick,
+  onAdd,
+  alreadyAdded,
   ar,
 }: {
   onClose: () => void;
-  onPick: (m: RxItem) => void;
+  onAdd: (items: RxItem[]) => void;
+  alreadyAdded: Set<string>;
   ar: boolean;
 }) {
+  // Selection order is kept, so the sheet lists them as they were picked.
+  const [selected, setSelected] = useState<string[]>([]);
+  const toggle = (id: string) =>
+    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   const [cat, setCat] = useState("الكل");
   const [company, setCompany] = useState<Company | "ALL">("ALL");
   const [q, setQ] = useState("");
@@ -478,7 +492,10 @@ function AddMedicineSheet({
       >
         <span className="mx-auto mb-3 h-1 w-10 rounded-full bg-muted" />
         <p className="text-[17px] font-extrabold text-foreground">
-          {ar ? "اختر دواء لإضافته للورقة" : "Pick a medicine"}
+          {ar ? "اختر الأدوية" : "Pick medicines"}
+        </p>
+        <p className="text-[11px] text-muted-foreground">
+          {ar ? "اضغط على الدواء لتحديده — يمكنك تحديد أكثر من دواء" : "Click to select — you can pick several"}
         </p>
 
         <div className="mt-3 relative shrink-0">
@@ -539,14 +556,28 @@ function AddMedicineSheet({
         <div className="flex-1 overflow-y-auto space-y-2.5 pb-2">
           {list.map((m) => {
             const fav = favs.includes(m.id);
+            const isSel = selected.includes(m.id);
             return (
               <div
                 key={m.id}
+                role="checkbox"
+                aria-checked={isSel}
+                tabIndex={0}
+                onClick={() => toggle(m.id)}
+                onKeyDown={(e) => (e.key === " " || e.key === "Enter") && (e.preventDefault(), toggle(m.id))}
                 className={cn(
-                  "w-full rounded-2xl bg-card border p-3 flex items-center gap-2",
-                  fav ? "border-primary/40" : "border-border"
+                  "w-full rounded-2xl p-3 flex items-center gap-2 cursor-pointer transition",
+                  isSel ? "border-2 border-primary bg-primary/10" : fav ? "border bg-card border-primary/40" : "border bg-card border-border"
                 )}
               >
+                <span
+                  className={cn(
+                    "size-6 shrink-0 rounded-lg flex items-center justify-center",
+                    isSel ? "bg-primary text-primary-foreground" : "border-2 border-slate-300 bg-white"
+                  )}
+                >
+                  {isSel && <Check className="size-4" strokeWidth={3} />}
+                </span>
                 <span className="size-11 shrink-0 rounded-xl bg-primary/10 text-primary flex items-center justify-center overflow-hidden">
                   {m.image ? (
                     <img src={m.image} alt={m.name} loading="lazy" className="size-full object-contain bg-white" />
@@ -555,8 +586,13 @@ function AddMedicineSheet({
                   )}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[14px] font-bold text-foreground truncate" dir="ltr">
-                    {m.name}
+                  <p className="flex items-center gap-1.5 text-[14px] font-bold text-foreground">
+                    <span className="truncate" dir="ltr">{m.name}</span>
+                    {alreadyAdded.has(m.id) && (
+                      <span className="shrink-0 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700">
+                        {ar ? "مضاف" : "Added"}
+                      </span>
+                    )}
                   </p>
                   {m.nameAr && (
                     <p className="text-[11px] font-semibold text-foreground/70 truncate">{m.nameAr}</p>
@@ -566,7 +602,10 @@ function AddMedicineSheet({
                   </p>
                 </div>
                 <button
-                  onClick={() => toggleFav(m.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleFav(m.id);
+                  }}
                   aria-label={ar ? "مفضلة" : "Favorite"}
                   className="shrink-0 p-1"
                 >
@@ -575,18 +614,15 @@ function AddMedicineSheet({
                   />
                 </button>
                 <button
-                  onClick={() => confirmHide(m)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelected((prev) => prev.filter((x) => x !== m.id));
+                    confirmHide(m);
+                  }}
                   aria-label={ar ? "حذف من القائمة" : "Remove from list"}
                   className="shrink-0 p-1 text-slate-300 hover:text-rose-500 transition"
                 >
                   <Trash2 className="size-[18px]" />
-                </button>
-                <button
-                  onClick={() => onPick(m)}
-                  aria-label={ar ? "إضافة" : "Add"}
-                  className="size-9 shrink-0 rounded-[10px] bg-primary/10 text-primary flex items-center justify-center"
-                >
-                  <Plus className="size-5" />
                 </button>
               </div>
             );
@@ -594,6 +630,26 @@ function AddMedicineSheet({
           {list.length === 0 && (
             <p className="text-center text-xs text-muted-foreground py-6">{ar ? "لا نتائج" : "No results"}</p>
           )}
+        </div>
+
+        {/* Confirm bar */}
+        <div className="shrink-0 flex gap-2 border-t border-border pt-3">
+          <button onClick={onClose} className="flex-1 h-11 rounded-xl border border-border text-[13px] font-bold">
+            {ar ? "إلغاء" : "Cancel"}
+          </button>
+          <button
+            onClick={() => {
+              const byId = new Map(PRESETS.map((m) => [m.id, m] as const));
+              onAdd(selected.map((id) => byId.get(id)).filter((m): m is RxItem => !!m));
+            }}
+            disabled={selected.length === 0}
+            className="flex-[2] h-11 rounded-xl bg-primary text-primary-foreground text-[13px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-45"
+          >
+            <Check className="size-4" strokeWidth={3} />
+            {selected.length === 0
+              ? ar ? "حدد دواءً واحداً على الأقل" : "Select at least one"
+              : ar ? `إضافة (${selected.length}) للورقة` : `Add ${selected.length} to the sheet`}
+          </button>
         </div>
       </div>
     </div>

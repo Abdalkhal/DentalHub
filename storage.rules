@@ -159,6 +159,18 @@ service firebase.storage {
         && isImage();
     }
 
+    // A lab's service photos, listed in Firestore lab_services/{labId} and
+    // shown on the lab's public page. They used to be inlined in that one
+    // document as base64, which hits Firestore's 1 MB document limit after a
+    // few photos. Only the lab writes its own.
+    match /lab_services/{labId}/{file} {
+      allow read: if true;
+      allow create, update: if isSignedIn() && uid() == labId
+        && request.resource.size < 5 * 1024 * 1024
+        && isImage();
+      allow delete: if isSignedIn() && uid() == labId;
+    }
+
     /* ── patient case files (medical data) ───────────────────── */
 
     // The dentist's scans. Readable by the referring dentist, the lab owner,
@@ -252,9 +264,11 @@ service firebase.storage {
         || (isSignedIn() && chatDentistId() == uid())
         || isAssignedStaff(labId, caseId);
 
+      // Any file type now (photos, PDF/STL/ZIP, voice notes) — it was
+      // images only, so files and voice notes were rejected. 50 MB = the
+      // CHAT_FILE_MAX_MB limit in caseMessages.ts.
       allow create: if isNewObject()
-        && request.resource.size < 10 * 1024 * 1024
-        && isImage()
+        && request.resource.size < 50 * 1024 * 1024
         && (isLabOwner(labId)
             || (isSignedIn() && chatDentistId() == uid())
             || isAssignedStaff(labId, caseId));

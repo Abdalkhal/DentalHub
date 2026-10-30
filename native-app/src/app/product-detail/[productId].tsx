@@ -7,6 +7,7 @@ import { Calendar, Check, ChevronLeft, ChevronRight, Heart, MapPin, Minus, Packa
 
 import { Screen, Text, Spinner } from '@/components/ui';
 import { ProductImage } from '@/components/ProductImage';
+import { BoneGraftDetailsModal } from '@/components/BoneGraftDetailsModal';
 import { db } from '@/integrations/firebase/client';
 import { useProducts, useSignedImageUrls, type Product } from '@/lib/products';
 import { addToCart } from '@/lib/cartStore';
@@ -154,6 +155,16 @@ export default function ProductDetailScreen() {
         <Text className="mt-10 text-center text-slate-500">
           {ar ? 'المنتج غير موجود' : 'Product not found'}
         </Text>
+      </Screen>
+    );
+  }
+
+  // Bone graft specs (source, form, composition, sizes, clinical photos)
+  // only exist in the bone graft view — this generic page showed none of them.
+  if (product.branch === 'bone_graft' && product.boneGraft) {
+    return (
+      <Screen>
+        <BoneGraftDetailsModal product={product} ar={ar} onClose={() => router.back()} />
       </Screen>
     );
   }
