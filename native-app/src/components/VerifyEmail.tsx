@@ -1,20 +1,22 @@
-// "Confirm your email" — the dialog opened by ensureVerified() (or the banner)
-// and the reminder banner. Mirrors the web's src/components/VerifyEmail.tsx;
+// Email verification screen (native). A new account must confirm its email
+// before it can use the app: until then this full screen covers everything
+// except the sign-in screen. Mirrors the web's src/components/VerifyEmail.tsx;
 // state and actions live in lib/emailVerification.ts (identical in both apps).
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, AppState, Modal, Pressable, TextInput, View } from 'react-native';
+import { ActivityIndicator, AppState, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
-import { Check, MailCheck, MailWarning, RefreshCw, X } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { usePathname } from 'expo-router';
+import { ArrowLeft, Check, Inbox, LogOut, MailCheck, MousePointerClick, PencilLine, RefreshCw } from 'lucide-react-native';
 
 import { Text } from '@/components/ui';
 import { SINGLE_LINE_INPUT } from '@/components/ui/singleLineInput';
+import { auth } from '@/integrations/firebase/client';
 import { useUserRole } from '@/lib/useAuth';
 import { checkEmail, emailError } from '@/lib/authValidation';
 import {
   changeUnverifiedEmail,
-  closeVerifyGate,
   mustVerifyAccount,
-  openVerifyGate,
   refreshVerification,
   resendSecondsLeft,
   sendVerificationEmail,
@@ -23,29 +25,27 @@ import {
 } from '@/lib/emailVerification';
 import { toast } from '@/lib/toast';
 
-/** Mounted once at the root: keeps the state in step and renders the dialog. */
-export function VerifyEmailHost() {
+const BLUE = '#1D4ED8';
+
+/** Mounted once over the root stack; covers the app while the email isn't confirmed. */
+export function VerifyEmailGate() {
   const { user, role } = useUserRole();
   const mustVerify = mustVerifyAccount(role as Parameters<typeof mustVerifyAccount>[0]);
+  const pathname = usePathname();
   useEffect(() => {
     syncVerification(user, mustVerify);
   }, [user, user?.emailVerified, mustVerify]);
-  // Back from the mail app: pick up a confirmation made meanwhile.
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (s) => {
-      if (s === 'active') void refreshVerification(mustVerify);
-    });
-    return () => sub.remove();
-  }, [mustVerify]);
   const v = useVerification();
+  if (!v.restricted || pathname.startsWith('/login')) return null;
   return (
-    <Modal visible={v.gateOpen && v.unverified} transparent animationType="fade" onRequestClose={closeVerifyGate}>
-      <VerifyDialog email={v.email} restricted={v.restricted} mustVerify={mustVerify} />
-    </Modal>
+    <View style={[StyleSheet.absoluteFill, { zIndex: 100, backgroundColor: '#F4F7FB' }]}>
+      <VerifyEmailScreen email={v.email} />
+    </View>
   );
 }
 
-function VerifyDialog({ email, restricted, mustVerify }: { email: string; restricted: boolean; mustVerify?: boolean }) {
+function VerifyEmailScreen({ email }: { email: string }) {
+  const insets = useSafeAreaInsets();
   const [checking, setChecking] = useState(false);
   const [sending, setSending] = useState(false);
   const [left, setLeft] = useState(resendSecondsLeft());
@@ -54,19 +54,27 @@ function VerifyDialog({ email, restricted, mustVerify }: { email: string; restri
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
 
+  // Countdown, a quiet re-check every few seconds, and one on returning from
+  // the mail app — so the app opens by itself once the link was clicked.
   useEffect(() => {
     const t = setInterval(() => setLeft(resendSecondsLeft()), 1000);
-    return () => clearInterval(t);
+    const poll = setInterval(() => void refreshVerification(true), 5000);
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') void refreshVerification(true);
+    });
+    return () => {
+      clearInterval(t);
+      clearInterval(poll);
+      sub.remove();
+    };
   }, []);
 
   const check = async () => {
     setChecking(true);
-    const ok = await refreshVerification(mustVerify);
+    const ok = await refreshVerification(true);
     setChecking(false);
-    if (ok) {
-      toast.success('تم تأكيد بريدك، حسابك مفعّل بالكامل ✅');
-      closeVerifyGate();
-    } else toast.error('لم يتم التأكيد بعد. افتح الرابط في رسالة البريد ثم حاول مرة أخرى.');
+    if (ok) toast.success('تم تأكيد بريدك، أهلاً بك في Dent Hub ✅');
+    else toast.error('لم يتم التأكيد بعد. افتح الرابط في رسالة البريد أولاً.');
   };
 
   const resend = async () => {
@@ -87,7 +95,7 @@ function VerifyDialog({ email, restricted, mustVerify }: { email: string; restri
     const r = await changeUnverifiedEmail(ec.email, password);
     setBusy(false);
     if (r === 'sent') {
-      toast.success(`أرسلنا رابط التأكيد إلى ${ec.email}. بعد فتحه يتغير بريد حسابك إليه.`);
+      toast.success(`أرسلنا رابط التأكيد إلى ${ec.email}`);
       setChanging(false);
       setPassword('');
     } else
@@ -96,100 +104,111 @@ function VerifyDialog({ email, restricted, mustVerify }: { email: string; restri
       );
   };
 
+  const steps = [
+    { Icon: Inbox, text: 'افتح بريدك الإلكتروني' },
+    { Icon: MousePointerClick, text: 'اضغط رابط «تأكيد البريد» في رسالة Dent Hub' },
+    { Icon: ArrowLeft, text: 'ارجع هنا — يفتح حسابك تلقائياً' },
+  ];
+
   return (
     <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
-      <Pressable className="flex-1 justify-end bg-black/50" onPress={closeVerifyGate}>
-        <Pressable className="rounded-t-3xl bg-white p-6" onPress={() => {}}>
-          <View className="flex-row items-start justify-between">
-            <View className="h-14 w-14 items-center justify-center rounded-2xl bg-sky-50">
-              <MailCheck size={28} color="#0284C7" />
-            </View>
-            <Pressable onPress={closeVerifyGate} className="h-9 w-9 items-center justify-center rounded-full bg-slate-100">
-              <X size={16} color="#64748B" />
-            </Pressable>
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 24 }} keyboardShouldPersistTaps="handled">
+        <View className="items-center px-6 pb-20" style={{ backgroundColor: BLUE, paddingTop: insets.top + 36 }}>
+          <View className="absolute -right-16 -top-10 h-56 w-56 rounded-full bg-white/10" />
+          <View className="mb-5 h-24 w-24 items-center justify-center rounded-full bg-white">
+            <MailCheck size={44} color={BLUE} />
           </View>
-          <Text className="mt-4 text-lg font-extrabold text-slate-900">{restricted ? 'أكّد بريدك أولاً' : 'أكّد بريدك الإلكتروني'}</Text>
-          <Text className="mt-1.5 text-sm leading-6 text-slate-600">
-            {restricted ? 'لنشر المنتجات وإرسال الطلبات والحالات يجب تأكيد بريدك. ' : ''}
-            أرسلنا رابط التأكيد إلى <Text className="font-bold text-slate-900">{email}</Text>. افتح الرسالة واضغط الرابط، ثم ارجع هنا.
-          </Text>
-          <Text className="mt-2 text-xs text-slate-500">لم تصلك؟ تحقق من مجلد الرسائل غير المرغوبة (Spam).</Text>
+          <Text className="text-2xl font-extrabold text-white">تحقق من بريدك الإلكتروني</Text>
+          <Text className="mt-2 text-center text-sm leading-6 text-white/85">لحماية حسابك، أرسلنا رابط تأكيد إلى</Text>
+          <Text className="mt-1 text-base font-bold text-white">{email}</Text>
+        </View>
 
-          <Pressable onPress={check} disabled={checking} className="mt-5 h-12 flex-row items-center justify-center gap-2 rounded-2xl bg-primary">
-            {checking ? <ActivityIndicator color="#fff" /> : <Check size={18} color="#fff" />}
-            <Text className="font-bold text-white">أكّدت بريدي</Text>
-          </Pressable>
-          <Pressable
-            onPress={resend}
-            disabled={sending || left > 0}
-            className="mt-2 h-11 flex-row items-center justify-center gap-2 rounded-2xl border border-slate-200"
-            style={{ opacity: sending || left > 0 ? 0.5 : 1 }}
-          >
-            {sending ? <ActivityIndicator color="#334155" size="small" /> : <RefreshCw size={16} color="#334155" />}
-            <Text className="text-sm font-bold text-slate-700">{left > 0 ? `إعادة الإرسال بعد ${left} ث` : 'إعادة إرسال الرسالة'}</Text>
-          </Pressable>
+        <View className="-mt-12 px-4">
+          <View className="rounded-3xl bg-white p-5">
+            <View className="gap-3">
+              {steps.map(({ Icon, text }, i) => (
+                <View key={i} className="flex-row items-center gap-3">
+                  <View className="h-9 w-9 items-center justify-center rounded-xl bg-sky-50">
+                    <Icon size={18} color="#0284C7" />
+                  </View>
+                  <Text className="flex-1 text-sm font-semibold text-slate-700">{text}</Text>
+                </View>
+              ))}
+            </View>
 
-          {changing ? (
-            <View className="mt-4 gap-2 rounded-2xl bg-slate-50 p-3">
-              <TextInput
-                value={newEmail}
-                onChangeText={setNewEmail}
-                placeholder="البريد الصحيح"
-                placeholderTextColor="#94A3B8"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
-                style={[SINGLE_LINE_INPUT, { textAlign: 'right' }]}
-              />
-              <TextInput
-                value={password}
-                onChangeText={setPassword}
-                placeholder="كلمة المرور الحالية"
-                placeholderTextColor="#94A3B8"
-                secureTextEntry
-                autoCapitalize="none"
-                className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
-                style={[SINGLE_LINE_INPUT, { textAlign: 'right' }]}
-              />
+            <Pressable
+              onPress={check}
+              disabled={checking}
+              className="mt-5 h-12 flex-row items-center justify-center gap-2 rounded-2xl"
+              style={{ backgroundColor: BLUE, opacity: checking ? 0.6 : 1 }}
+            >
+              {checking ? <ActivityIndicator color="#fff" /> : <Check size={18} color="#fff" />}
+              <Text className="font-bold text-white">أكّدت بريدي، متابعة</Text>
+            </Pressable>
+            <Pressable
+              onPress={resend}
+              disabled={sending || left > 0}
+              className="mt-2 h-11 flex-row items-center justify-center gap-2 rounded-2xl border border-slate-200"
+              style={{ opacity: sending || left > 0 ? 0.5 : 1 }}
+            >
+              {sending ? <ActivityIndicator color="#334155" size="small" /> : <RefreshCw size={16} color="#334155" />}
+              <Text className="text-sm font-bold text-slate-700">{left > 0 ? `إعادة الإرسال بعد ${left} ثانية` : 'إعادة إرسال الرسالة'}</Text>
+            </Pressable>
+            <View className="mt-3 rounded-xl bg-amber-50 px-3 py-2">
+              <Text className="text-center text-xs leading-5 text-amber-800">
+                لم تصلك خلال دقيقتين؟ تحقق من مجلد الرسائل غير المرغوبة (Spam) أو «الترويجات».
+              </Text>
+            </View>
+          </View>
+
+          <View className="mt-4 rounded-3xl bg-white p-4">
+            {changing ? (
+              <View className="gap-2">
+                <Text className="text-sm font-bold text-slate-800">تغيير البريد</Text>
+                <TextInput
+                  value={newEmail}
+                  onChangeText={setNewEmail}
+                  placeholder="البريد الصحيح"
+                  placeholderTextColor="#94A3B8"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  className="h-11 rounded-xl border border-slate-200 px-3 text-sm text-slate-900"
+                  style={[SINGLE_LINE_INPUT, { textAlign: 'right' }]}
+                />
+                <TextInput
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="كلمة المرور الحالية"
+                  placeholderTextColor="#94A3B8"
+                  secureTextEntry
+                  autoCapitalize="none"
+                  className="h-11 rounded-xl border border-slate-200 px-3 text-sm text-slate-900"
+                  style={[SINGLE_LINE_INPUT, { textAlign: 'right' }]}
+                />
+                <View className="flex-row gap-2">
+                  <Pressable onPress={() => setChanging(false)} className="h-10 flex-1 items-center justify-center rounded-xl border border-slate-200">
+                    <Text className="text-xs font-bold text-slate-700">رجوع</Text>
+                  </Pressable>
+                  <Pressable onPress={change} disabled={busy} className="h-10 flex-1 items-center justify-center rounded-xl bg-slate-900">
+                    {busy ? <ActivityIndicator color="#fff" size="small" /> : <Text className="text-xs font-bold text-white">إرسال للبريد الجديد</Text>}
+                  </Pressable>
+                </View>
+              </View>
+            ) : (
               <View className="flex-row gap-2">
-                <Pressable onPress={() => setChanging(false)} className="h-10 flex-1 items-center justify-center rounded-xl border border-slate-200 bg-white">
-                  <Text className="text-xs font-bold text-slate-700">رجوع</Text>
+                <Pressable onPress={() => setChanging(true)} className="h-11 flex-1 flex-row items-center justify-center gap-1.5 rounded-xl bg-slate-50">
+                  <PencilLine size={16} color="#334155" />
+                  <Text className="text-xs font-bold text-slate-700">البريد خطأ؟ غيّره</Text>
                 </Pressable>
-                <Pressable onPress={change} disabled={busy} className="h-10 flex-1 items-center justify-center rounded-xl bg-slate-900">
-                  {busy ? <ActivityIndicator color="#fff" size="small" /> : <Text className="text-xs font-bold text-white">إرسال للبريد الجديد</Text>}
+                <Pressable onPress={() => void auth.signOut()} className="h-11 flex-1 flex-row items-center justify-center gap-1.5 rounded-xl bg-slate-50">
+                  <LogOut size={16} color="#E11D48" />
+                  <Text className="text-xs font-bold text-rose-600">تسجيل الخروج</Text>
                 </Pressable>
               </View>
-            </View>
-          ) : (
-            <Pressable onPress={() => setChanging(true)} className="mt-3 items-center py-1">
-              <Text className="text-xs font-bold text-sky-700">البريد مكتوب خطأ؟ غيّره</Text>
-            </Pressable>
-          )}
-        </Pressable>
-      </Pressable>
+            )}
+          </View>
+        </View>
+      </ScrollView>
     </KeyboardAvoidingView>
-  );
-}
-
-/**
- * Reminder while the email isn't confirmed. "restricted" is for new accounts
- * that can't publish yet; "reminder" is the gentler nudge for older accounts.
- */
-export function VerifyEmailBanner({ mode, className }: { mode: 'restricted' | 'reminder'; className?: string }) {
-  const v = useVerification();
-  if (!v.unverified || v.restricted !== (mode === 'restricted')) return null;
-  return (
-    <Pressable onPress={openVerifyGate} className={`flex-row items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 ${className ?? ''}`}>
-      <MailWarning size={20} color="#D97706" />
-      <View className="flex-1">
-        <Text className="text-sm font-bold text-amber-900">أكّد بريدك الإلكتروني</Text>
-        <Text numberOfLines={1} className="text-xs text-amber-800">
-          {v.restricted ? 'لتفعيل النشر وإرسال الطلبات والحالات' : 'لحماية حسابك واسترجاعه عند الحاجة'}
-        </Text>
-      </View>
-      <View className="rounded-xl bg-amber-500 px-3 py-1.5">
-        <Text className="text-xs font-bold text-white">تأكيد</Text>
-      </View>
-    </Pressable>
   );
 }

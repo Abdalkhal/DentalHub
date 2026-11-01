@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { alertUploadError } from '@/lib/uploadAlert';
 import { Image, Modal, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { KeyboardAwareScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import { Check, Package, Plus, Sparkles, Upload, X } from 'lucide-react-native';
@@ -198,7 +199,7 @@ export function SpecializedImplantForm({ open, onClose, ar, product }: { open: b
       const path = await uploadProductImage(draftId, { uri: asset.uri, name: asset.fileName ?? undefined, type: asset.mimeType ?? undefined });
       onPath(path);
     } catch (e) {
-      toast.error(`${ar ? 'تعذر رفع الصورة' : 'Image upload failed'}${e instanceof Error ? `: ${e.message}` : ''}`);
+      alertUploadError(e, ar);
     }
   };
 

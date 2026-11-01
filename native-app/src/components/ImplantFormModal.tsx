@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { alertUploadError } from '@/lib/uploadAlert';
 import { Image, Modal, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { KeyboardAwareScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import { useQueryClient } from '@tanstack/react-query';
@@ -299,7 +300,7 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
       const path = await uploadProductImage(draftId, { uri: asset.uri, name: asset.fileName ?? undefined, type: asset.mimeType ?? undefined });
       setTarget((prev) => [...prev, path]);
     } catch (e) {
-      toast.error(`${ar ? 'تعذر رفع الصورة' : 'Image upload failed'}${e instanceof Error ? `: ${e.message}` : ''}`);
+      alertUploadError(e, ar);
     }
   };
   const pickImage = makePickImage(setImages);

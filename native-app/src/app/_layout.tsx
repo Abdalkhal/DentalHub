@@ -1,5 +1,5 @@
 import { DefaultTheme, Stack, ThemeProvider, router, usePathname, useRootNavigationState } from 'expo-router';
-import { VerifyEmailHost } from '@/components/VerifyEmail';
+import { VerifyEmailGate } from '@/components/VerifyEmail';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
 import { Cairo_400Regular, Cairo_500Medium, Cairo_600SemiBold, Cairo_700Bold, Cairo_800ExtraBold, Cairo_900Black } from '@expo-google-fonts/cairo';
@@ -130,7 +130,7 @@ function RootStack() {
         />
       ))}
     </Stack>
-    <VerifyEmailHost />
+    <VerifyEmailGate />
     </>
   );
 }

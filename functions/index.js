@@ -1090,6 +1090,7 @@ async function purgeAccountContent(uid) {
     }
   }
   await bucket.deleteFiles({ prefix: `ads/${uid}/` }).catch(() => {});
+  await bucket.deleteFiles({ prefix: `product_images/${uid}/` }).catch(() => {});
   return removed;
 }
 

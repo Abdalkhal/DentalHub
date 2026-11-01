@@ -1,5 +1,4 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { VerifyEmailBanner } from "@/components/VerifyEmail";
 import { MobileShell } from "@/components/MobileShell";
 import { useI18n } from "@/lib/i18n";
 import { useEffect, useMemo, useState } from "react";
@@ -191,7 +190,6 @@ function DentistHome() {
 
   return (
     <MobileShell wide>
-      <VerifyEmailBanner mode="reminder" className="mx-auto mt-3 w-[calc(100%-1.5rem)] max-w-3xl" />
       {/* Top Nav — phone: two stacked rows (identity row, then search).
           md:+ : one utility bar, with the search as its centrepiece and the
           actions pushed to the end edge. */}

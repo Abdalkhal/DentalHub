@@ -1,43 +1,40 @@
-// "Confirm your email" — the dialog opened by ensureVerified() (or the banner)
-// and the reminder banner for the home screens. See lib/emailVerification.ts.
-import { useEffect, useState } from "react";
+// Email verification screen. A new account must confirm its email before it
+// can use the app: until then this full screen replaces every page (except
+// the public ones). State and actions live in lib/emailVerification.ts.
+import { useEffect, useState, type ReactNode } from "react";
+import { useRouterState } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Check, Loader2, MailCheck, MailWarning, RefreshCw, X } from "lucide-react";
+import { ArrowLeft, Check, Inbox, Loader2, LogOut, MailCheck, MousePointerClick, PencilLine, RefreshCw } from "lucide-react";
+import { auth } from "@/integrations/firebase/client";
 import { useUserRole } from "@/lib/useAuth";
 import { checkEmail, emailError } from "@/lib/authValidation";
 import {
   changeUnverifiedEmail,
-  closeVerifyGate,
   mustVerifyAccount,
-  openVerifyGate,
   refreshVerification,
   resendSecondsLeft,
   sendVerificationEmail,
   syncVerification,
   useVerification,
 } from "@/lib/emailVerification";
-import { cn } from "@/lib/utils";
 
-/** Mounted once at the root: keeps the state in step and renders the dialog. */
-export function VerifyEmailHost() {
+// Reachable without a confirmed email: sign-in itself and the public pages.
+const OPEN_PATHS = [/^\/auth/, /^\/login/, /^\/book\//, /^\/privacy/];
+
+/** Wraps the app: shows the verification screen instead of `children` when needed. */
+export function VerifyEmailGate({ children }: { children: ReactNode }) {
   const { user, role } = useUserRole();
   const mustVerify = mustVerifyAccount(role as Parameters<typeof mustVerifyAccount>[0]);
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
   useEffect(() => {
     syncVerification(user, mustVerify);
   }, [user, user?.emailVerified, mustVerify]);
-  // Back from the mail app/tab: pick up a confirmation made meanwhile.
-  useEffect(() => {
-    const onVisible = () => {
-      if (document.visibilityState === "visible") void refreshVerification(mustVerify);
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [mustVerify]);
   const v = useVerification();
-  return v.gateOpen && v.unverified ? <VerifyDialog email={v.email} restricted={v.restricted} mustVerify={mustVerify} /> : null;
+  if (!v.restricted || OPEN_PATHS.some((re) => re.test(pathname))) return <>{children}</>;
+  return <VerifyEmailScreen email={v.email} />;
 }
 
-function VerifyDialog({ email, restricted, mustVerify }: { email: string; restricted: boolean; mustVerify?: boolean }) {
+function VerifyEmailScreen({ email }: { email: string }) {
   const [checking, setChecking] = useState(false);
   const [sending, setSending] = useState(false);
   const [left, setLeft] = useState(resendSecondsLeft());
@@ -46,19 +43,26 @@ function VerifyDialog({ email, restricted, mustVerify }: { email: string; restri
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // Tick the resend countdown, and quietly re-check every few seconds so the
+  // app opens by itself once the link has been clicked (here or on a phone).
   useEffect(() => {
     const t = setInterval(() => setLeft(resendSecondsLeft()), 1000);
-    return () => clearInterval(t);
+    const poll = setInterval(() => void refreshVerification(true), 5000);
+    const onVisible = () => document.visibilityState === "visible" && void refreshVerification(true);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(t);
+      clearInterval(poll);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, []);
 
   const check = async () => {
     setChecking(true);
-    const ok = await refreshVerification(mustVerify);
+    const ok = await refreshVerification(true);
     setChecking(false);
-    if (ok) {
-      toast.success("تم تأكيد بريدك، حسابك مفعّل بالكامل ✅");
-      closeVerifyGate();
-    } else toast.error("لم يتم التأكيد بعد. افتح الرابط في رسالة البريد ثم حاول مرة أخرى.");
+    if (ok) toast.success("تم تأكيد بريدك، أهلاً بك في Dent Hub ✅");
+    else toast.error("لم يتم التأكيد بعد. افتح الرابط في رسالة البريد أولاً.");
   };
 
   const resend = async () => {
@@ -79,7 +83,7 @@ function VerifyDialog({ email, restricted, mustVerify }: { email: string; restri
     const r = await changeUnverifiedEmail(ec.email, password);
     setBusy(false);
     if (r === "sent") {
-      toast.success(`أرسلنا رابط التأكيد إلى ${ec.email}. بعد فتحه يتغير بريد حسابك إليه.`);
+      toast.success(`أرسلنا رابط التأكيد إلى ${ec.email}`);
       setChanging(false);
       setPassword("");
     } else
@@ -88,118 +92,119 @@ function VerifyDialog({ email, restricted, mustVerify }: { email: string; restri
       );
   };
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-900/50 backdrop-blur-sm md:items-center md:p-6" onClick={closeVerifyGate}>
-      <div
-        dir="rtl"
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md rounded-t-3xl bg-white p-6 shadow-2xl md:rounded-3xl"
-      >
-        <div className="flex items-start justify-between">
-          <span className="flex size-14 items-center justify-center rounded-2xl bg-sky-50 text-sky-600">
-            <MailCheck className="size-7" />
-          </span>
-          <button type="button" onClick={closeVerifyGate} className="flex size-9 items-center justify-center rounded-full bg-slate-100 text-slate-500">
-            <X className="size-4" />
-          </button>
-        </div>
-        <h2 className="mt-4 text-lg font-extrabold text-slate-900">{restricted ? "أكّد بريدك أولاً" : "أكّد بريدك الإلكتروني"}</h2>
-        <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
-          {restricted ? "لنشر المنتجات وإرسال الطلبات والحالات يجب تأكيد بريدك. " : ""}
-          أرسلنا رابط التأكيد إلى{" "}
-          <b dir="ltr" className="text-slate-900">
-            {email}
-          </b>
-          . افتح الرسالة واضغط الرابط، ثم ارجع هنا.
-        </p>
-        <p className="mt-2 text-xs text-slate-500">لم تصلك؟ تحقق من مجلد الرسائل غير المرغوبة (Spam).</p>
+  const steps = [
+    { Icon: Inbox, text: "افتح بريدك الإلكتروني" },
+    { Icon: MousePointerClick, text: "اضغط رابط «تأكيد البريد» في رسالة Dent Hub" },
+    { Icon: ArrowLeft, text: "ارجع هنا — يفتح حسابك تلقائياً" },
+  ];
 
-        <div className="mt-5 space-y-2">
+  return (
+    <div dir="rtl" className="min-h-dvh bg-[#F4F7FB] font-arabic">
+      <div className="relative overflow-hidden bg-[radial-gradient(120%_100%_at_80%_0%,#3B82F6_0%,#1D4ED8_55%,#1E3A8A_100%)] px-6 pb-20 pt-14 text-center text-white">
+        <div aria-hidden className="absolute inset-0 opacity-[0.08] [background-image:radial-gradient(#fff_1px,transparent_1px)] [background-size:18px_18px]" />
+        <div className="relative mx-auto mb-5 size-24">
+          <span className="absolute inset-0 animate-ping rounded-full bg-white/20 [animation-duration:2.4s]" />
+          <span className="relative flex size-24 items-center justify-center rounded-full bg-white text-[#1D4ED8] shadow-[0_16px_40px_-14px_rgba(0,0,0,0.5)]">
+            <MailCheck className="size-11" />
+          </span>
+        </div>
+        <h1 className="relative text-2xl font-extrabold">تحقق من بريدك الإلكتروني</h1>
+        <p className="relative mx-auto mt-2 max-w-sm text-sm leading-relaxed text-white/85">
+          لحماية حسابك، أرسلنا رابط تأكيد إلى
+          <span dir="ltr" className="mt-1 block text-base font-bold text-white">
+            {email}
+          </span>
+        </p>
+      </div>
+
+      <div className="relative mx-auto -mt-12 w-full max-w-md px-4 pb-10">
+        <div className="rounded-3xl bg-white p-5 shadow-[0_18px_40px_-26px_rgba(30,58,138,0.5)]">
+          <ol className="space-y-3">
+            {steps.map(({ Icon, text }, i) => (
+              <li key={i} className="flex items-center gap-3">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
+                  <Icon className="size-[18px]" />
+                </span>
+                <span className="text-sm font-semibold text-slate-700">{text}</span>
+              </li>
+            ))}
+          </ol>
+
           <button
             type="button"
             onClick={check}
             disabled={checking}
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary font-bold text-white disabled:opacity-60"
+            className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-b from-[#3B82F6] to-[#1D4ED8] font-bold text-white shadow-[0_10px_22px_-10px_rgba(29,78,216,0.9)] disabled:opacity-60"
           >
-            {checking ? <Loader2 className="size-5 animate-spin" /> : <Check className="size-5" />} أكّدت بريدي
+            {checking ? <Loader2 className="size-5 animate-spin" /> : <Check className="size-5" />} أكّدت بريدي، متابعة
           </button>
           <button
             type="button"
             onClick={resend}
             disabled={sending || left > 0}
-            className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 text-sm font-bold text-slate-700 disabled:opacity-50"
+            className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 text-sm font-bold text-slate-700 disabled:opacity-50"
           >
             {sending ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-            {left > 0 ? `إعادة الإرسال بعد ${left} ث` : "إعادة إرسال الرسالة"}
+            {left > 0 ? `إعادة الإرسال بعد ${left} ثانية` : "إعادة إرسال الرسالة"}
           </button>
+          <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-center text-xs leading-relaxed text-amber-800">
+            لم تصلك خلال دقيقتين؟ تحقق من مجلد الرسائل غير المرغوبة (Spam) أو «الترويجات».
+          </p>
         </div>
 
-        {changing ? (
-          <div className="mt-4 space-y-2 rounded-2xl bg-slate-50 p-3">
-            <input
-              dir="ltr"
-              type="email"
-              value={newEmail}
-              onChange={(e) => setNewEmail(e.target.value)}
-              placeholder="البريد الصحيح"
-              className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-right text-sm outline-none focus:border-primary"
-            />
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="كلمة المرور الحالية"
-              className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-primary"
-            />
+        <div className="mt-4 rounded-3xl bg-white p-4">
+          {changing ? (
+            <div className="space-y-2">
+              <p className="text-sm font-bold text-slate-800">تغيير البريد</p>
+              <input
+                dir="ltr"
+                type="email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                placeholder="البريد الصحيح"
+                className="h-11 w-full rounded-xl border border-slate-200 px-3 text-right text-sm outline-none focus:border-sky-500"
+              />
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="كلمة المرور الحالية"
+                className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-sky-500"
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => setChanging(false)} className="h-10 rounded-xl border border-slate-200 text-xs font-bold">
+                  رجوع
+                </button>
+                <button
+                  type="button"
+                  onClick={change}
+                  disabled={busy}
+                  className="flex h-10 items-center justify-center rounded-xl bg-slate-900 text-xs font-bold text-white disabled:opacity-60"
+                >
+                  {busy ? <Loader2 className="size-4 animate-spin" /> : "إرسال للبريد الجديد"}
+                </button>
+              </div>
+            </div>
+          ) : (
             <div className="grid grid-cols-2 gap-2">
-              <button type="button" onClick={() => setChanging(false)} className="h-10 rounded-xl border border-slate-200 bg-white text-xs font-bold">
-                رجوع
+              <button
+                type="button"
+                onClick={() => setChanging(true)}
+                className="flex h-11 items-center justify-center gap-1.5 rounded-xl bg-slate-50 text-xs font-bold text-slate-700"
+              >
+                <PencilLine className="size-4" /> البريد خطأ؟ غيّره
               </button>
               <button
                 type="button"
-                onClick={change}
-                disabled={busy}
-                className="flex h-10 items-center justify-center rounded-xl bg-slate-900 text-xs font-bold text-white disabled:opacity-60"
+                onClick={() => void auth.signOut()}
+                className="flex h-11 items-center justify-center gap-1.5 rounded-xl bg-slate-50 text-xs font-bold text-rose-600"
               >
-                {busy ? <Loader2 className="size-4 animate-spin" /> : "إرسال للبريد الجديد"}
+                <LogOut className="size-4" /> تسجيل الخروج
               </button>
             </div>
-          </div>
-        ) : (
-          <button type="button" onClick={() => setChanging(true)} className="mt-3 w-full text-center text-xs font-bold text-sky-700">
-            البريد مكتوب خطأ؟ غيّره
-          </button>
-        )}
+          )}
+        </div>
       </div>
     </div>
-  );
-}
-
-/**
- * Reminder while the email isn't confirmed. "restricted" (in the page shell,
- * every screen) is for new accounts that can't publish yet; "reminder" (home
- * only) is the gentler nudge for older accounts, which aren't restricted.
- */
-export function VerifyEmailBanner({ className, mode }: { className?: string; mode: "restricted" | "reminder" }) {
-  const v = useVerification();
-  if (!v.unverified || v.restricted !== (mode === "restricted")) return null;
-  return (
-    <button
-      type="button"
-      onClick={openVerifyGate}
-      className={cn(
-        "flex w-full items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-start",
-        className,
-      )}
-    >
-      <MailWarning className="size-5 shrink-0 text-amber-600" />
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm font-bold text-amber-900">أكّد بريدك الإلكتروني</span>
-        <span className="block truncate text-xs text-amber-800">
-          {v.restricted ? "لتفعيل النشر وإرسال الطلبات والحالات" : "لحماية حسابك واسترجاعه عند الحاجة"}
-        </span>
-      </span>
-      <span className="shrink-0 rounded-xl bg-amber-500 px-3 py-1.5 text-xs font-bold text-white">تأكيد</span>
-    </button>
   );
 }

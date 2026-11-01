@@ -338,7 +338,12 @@ export async function uploadProductImage(
   const uid = auth.currentUser?.uid;
   if (!uid) throw new Error("Not signed in");
   const ext = (file.name?.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
-  const path = `products/${productId}/${randomUUID()}.${ext || "jpg"}`;
+  // Under the uploader's own folder: the Storage rule only has to compare the
+  // folder with the signed-in uid. The old products/{productId}/ location
+  // needed a Firestore lookup from the Storage rules to prove ownership, and
+  // that cross-service check refused every upload ("storage/unauthorized").
+  // Who may attach the image to a product is enforced on the product doc.
+  const path = `product_images/${uid}/${productId}/${randomUUID()}.${ext || "jpg"}`;
   const storageRef = ref(storage, path);
   // Read natively: fetch(uri).blob() is unreliable on Android and failed
   // silently there, so products were saved with no images at all.

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { alertUploadError } from '@/lib/uploadAlert';
 import { Image, Modal, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { KeyboardAwareScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import { Bone, Check, DollarSign, ImageIcon, Layers, Maximize2, Package, Plus, Trash2, Upload, X } from 'lucide-react-native';
@@ -75,7 +76,7 @@ async function pickAndUpload(productId: string, onPath: (path: string) => void) 
     const path = await uploadProductImage(productId, { uri: asset.uri, name: asset.fileName ?? undefined, type: asset.mimeType ?? undefined });
     onPath(path);
   } catch (e) {
-    toast.error(`تعذر رفع الصورة — Image upload failed${e instanceof Error ? `: ${e.message}` : ''}`);
+    alertUploadError(e);
   }
 }
 

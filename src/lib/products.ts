@@ -13,7 +13,8 @@ import {
   orderBy,
   Timestamp,
 } from "firebase/firestore";
-import { ref, uploadBytes, deleteObject, getDownloadURL } from "firebase/storage";
+import { ref, deleteObject, getDownloadURL } from "firebase/storage";
+import { uploadData } from "./uploadData";
 import type { ProductSpecs } from "@/data/specs";
 
 export const MAX_PRODUCT_IMAGES = 5;
@@ -332,9 +333,14 @@ export async function uploadProductImage(productId: string, file: File): Promise
   const uid = auth.currentUser?.uid;
   if (!uid) throw new Error("Not signed in");
   const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
-  const path = `products/${productId}/${crypto.randomUUID()}.${ext || "jpg"}`;
+  // Under the uploader's own folder: the Storage rule only has to compare the
+  // folder with the signed-in uid. The old products/{productId}/ location
+  // needed a Firestore lookup from the Storage rules to prove ownership, and
+  // that cross-service check refused every upload ("storage/unauthorized").
+  // Who may attach the image to a product is enforced on the product doc.
+  const path = `product_images/${uid}/${productId}/${crypto.randomUUID()}.${ext || "jpg"}`;
   const storageRef = ref(storage, path);
-  await uploadBytes(storageRef, file, {
+  await uploadData(storageRef, file, {
     contentType: file.type || "image/jpeg",
     customMetadata: { companyId: uid },
   });
