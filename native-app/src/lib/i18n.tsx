@@ -211,6 +211,7 @@ export const dict = {
   screen_patient: { ar: "المريض", en: "Patient" },
   screen_clinic: { ar: "عيادتي", en: "My Clinic" },
   screen_appointments: { ar: "المواعيد", en: "Appointments" },
+  screen_booking_link: { ar: "رابط الحجز", en: "Booking link" },
   screen_finance: { ar: "المالية", en: "Finance" },
   screen_rx: { ar: "الوصفة", en: "Prescription" },
   screen_notifications: { ar: "الإشعارات", en: "Notifications" },

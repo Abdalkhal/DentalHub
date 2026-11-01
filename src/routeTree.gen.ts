@@ -65,8 +65,10 @@ import { Route as ClinicOrdersRouteImport } from './routes/clinic.orders'
 import { Route as ClinicMaterialsRouteImport } from './routes/clinic.materials'
 import { Route as ClinicFinanceRouteImport } from './routes/clinic.finance'
 import { Route as ClinicDoctorsRouteImport } from './routes/clinic.doctors'
+import { Route as ClinicBookingRouteImport } from './routes/clinic.booking'
 import { Route as ClinicAppointmentsRouteImport } from './routes/clinic.appointments'
 import { Route as BrandsBrandIdRouteImport } from './routes/brands.$brandId'
+import { Route as BookSlugRouteImport } from './routes/book.$slug'
 import { Route as AccountSettingsRouteImport } from './routes/account.settings'
 import { Route as AccountHelpRouteImport } from './routes/account.help'
 import { Route as AccountBalancesRouteImport } from './routes/account.balances'
@@ -76,6 +78,7 @@ import { Route as SuppliesBranchBranchSlugRouteImport } from './routes/supplies.
 import { Route as SuppliesOfficeIdBranchSlugRouteImport } from './routes/supplies.$officeId.$branchSlug'
 import { Route as PatientsRxPatientIdRouteImport } from './routes/patients.rx.$patientId'
 import { Route as LabsLabIdStatementRouteImport } from './routes/labs.$labId.statement'
+import { Route as BookRRequestIdRouteImport } from './routes/book.r.$requestId'
 import { Route as AccountHelpTopicSlugRouteImport } from './routes/account.help.topic.$slug'
 
 const ReportsRoute = ReportsRouteImport.update({
@@ -360,6 +363,11 @@ const ClinicDoctorsRoute = ClinicDoctorsRouteImport.update({
   path: '/clinic/doctors',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ClinicBookingRoute = ClinicBookingRouteImport.update({
+  id: '/clinic/booking',
+  path: '/clinic/booking',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ClinicAppointmentsRoute = ClinicAppointmentsRouteImport.update({
   id: '/clinic/appointments',
   path: '/clinic/appointments',
@@ -368,6 +376,11 @@ const ClinicAppointmentsRoute = ClinicAppointmentsRouteImport.update({
 const BrandsBrandIdRoute = BrandsBrandIdRouteImport.update({
   id: '/brands/$brandId',
   path: '/brands/$brandId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BookSlugRoute = BookSlugRouteImport.update({
+  id: '/book/$slug',
+  path: '/book/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AccountSettingsRoute = AccountSettingsRouteImport.update({
@@ -417,6 +430,11 @@ const LabsLabIdStatementRoute = LabsLabIdStatementRouteImport.update({
   path: '/statement',
   getParentRoute: () => LabsLabIdRoute,
 } as any)
+const BookRRequestIdRoute = BookRRequestIdRouteImport.update({
+  id: '/book/r/$requestId',
+  path: '/book/r/$requestId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AccountHelpTopicSlugRoute = AccountHelpTopicSlugRouteImport.update({
   id: '/topic/$slug',
   path: '/topic/$slug',
@@ -450,8 +468,10 @@ export interface FileRoutesByFullPath {
   '/account/balances': typeof AccountBalancesRoute
   '/account/help': typeof AccountHelpRouteWithChildren
   '/account/settings': typeof AccountSettingsRoute
+  '/book/$slug': typeof BookSlugRoute
   '/brands/$brandId': typeof BrandsBrandIdRoute
   '/clinic/appointments': typeof ClinicAppointmentsRoute
+  '/clinic/booking': typeof ClinicBookingRoute
   '/clinic/doctors': typeof ClinicDoctorsRoute
   '/clinic/finance': typeof ClinicFinanceRoute
   '/clinic/materials': typeof ClinicMaterialsRoute
@@ -486,6 +506,7 @@ export interface FileRoutesByFullPath {
   '/supplies/': typeof SuppliesIndexRoute
   '/surgical-guide/': typeof SurgicalGuideIndexRoute
   '/track-cases/': typeof TrackCasesIndexRoute
+  '/book/r/$requestId': typeof BookRRequestIdRoute
   '/labs/$labId/statement': typeof LabsLabIdStatementRoute
   '/patients/rx/$patientId': typeof PatientsRxPatientIdRoute
   '/supplies/$officeId/$branchSlug': typeof SuppliesOfficeIdBranchSlugRoute
@@ -520,8 +541,10 @@ export interface FileRoutesByTo {
   '/account/balances': typeof AccountBalancesRoute
   '/account/help': typeof AccountHelpRouteWithChildren
   '/account/settings': typeof AccountSettingsRoute
+  '/book/$slug': typeof BookSlugRoute
   '/brands/$brandId': typeof BrandsBrandIdRoute
   '/clinic/appointments': typeof ClinicAppointmentsRoute
+  '/clinic/booking': typeof ClinicBookingRoute
   '/clinic/doctors': typeof ClinicDoctorsRoute
   '/clinic/finance': typeof ClinicFinanceRoute
   '/clinic/materials': typeof ClinicMaterialsRoute
@@ -556,6 +579,7 @@ export interface FileRoutesByTo {
   '/supplies': typeof SuppliesIndexRoute
   '/surgical-guide': typeof SurgicalGuideIndexRoute
   '/track-cases': typeof TrackCasesIndexRoute
+  '/book/r/$requestId': typeof BookRRequestIdRoute
   '/labs/$labId/statement': typeof LabsLabIdStatementRoute
   '/patients/rx/$patientId': typeof PatientsRxPatientIdRoute
   '/supplies/$officeId/$branchSlug': typeof SuppliesOfficeIdBranchSlugRoute
@@ -591,8 +615,10 @@ export interface FileRoutesById {
   '/account/balances': typeof AccountBalancesRoute
   '/account/help': typeof AccountHelpRouteWithChildren
   '/account/settings': typeof AccountSettingsRoute
+  '/book/$slug': typeof BookSlugRoute
   '/brands/$brandId': typeof BrandsBrandIdRoute
   '/clinic/appointments': typeof ClinicAppointmentsRoute
+  '/clinic/booking': typeof ClinicBookingRoute
   '/clinic/doctors': typeof ClinicDoctorsRoute
   '/clinic/finance': typeof ClinicFinanceRoute
   '/clinic/materials': typeof ClinicMaterialsRoute
@@ -627,6 +653,7 @@ export interface FileRoutesById {
   '/supplies/': typeof SuppliesIndexRoute
   '/surgical-guide/': typeof SurgicalGuideIndexRoute
   '/track-cases/': typeof TrackCasesIndexRoute
+  '/book/r/$requestId': typeof BookRRequestIdRoute
   '/labs/$labId/statement': typeof LabsLabIdStatementRoute
   '/patients/rx/$patientId': typeof PatientsRxPatientIdRoute
   '/supplies/$officeId/$branchSlug': typeof SuppliesOfficeIdBranchSlugRoute
@@ -663,8 +690,10 @@ export interface FileRouteTypes {
     | '/account/balances'
     | '/account/help'
     | '/account/settings'
+    | '/book/$slug'
     | '/brands/$brandId'
     | '/clinic/appointments'
+    | '/clinic/booking'
     | '/clinic/doctors'
     | '/clinic/finance'
     | '/clinic/materials'
@@ -699,6 +728,7 @@ export interface FileRouteTypes {
     | '/supplies/'
     | '/surgical-guide/'
     | '/track-cases/'
+    | '/book/r/$requestId'
     | '/labs/$labId/statement'
     | '/patients/rx/$patientId'
     | '/supplies/$officeId/$branchSlug'
@@ -733,8 +763,10 @@ export interface FileRouteTypes {
     | '/account/balances'
     | '/account/help'
     | '/account/settings'
+    | '/book/$slug'
     | '/brands/$brandId'
     | '/clinic/appointments'
+    | '/clinic/booking'
     | '/clinic/doctors'
     | '/clinic/finance'
     | '/clinic/materials'
@@ -769,6 +801,7 @@ export interface FileRouteTypes {
     | '/supplies'
     | '/surgical-guide'
     | '/track-cases'
+    | '/book/r/$requestId'
     | '/labs/$labId/statement'
     | '/patients/rx/$patientId'
     | '/supplies/$officeId/$branchSlug'
@@ -803,8 +836,10 @@ export interface FileRouteTypes {
     | '/account/balances'
     | '/account/help'
     | '/account/settings'
+    | '/book/$slug'
     | '/brands/$brandId'
     | '/clinic/appointments'
+    | '/clinic/booking'
     | '/clinic/doctors'
     | '/clinic/finance'
     | '/clinic/materials'
@@ -839,6 +874,7 @@ export interface FileRouteTypes {
     | '/supplies/'
     | '/surgical-guide/'
     | '/track-cases/'
+    | '/book/r/$requestId'
     | '/labs/$labId/statement'
     | '/patients/rx/$patientId'
     | '/supplies/$officeId/$branchSlug'
@@ -870,8 +906,10 @@ export interface RootRouteChildren {
   ProductionRoute: typeof ProductionRoute
   QuickOrdersRoute: typeof QuickOrdersRoute
   ReportsRoute: typeof ReportsRoute
+  BookSlugRoute: typeof BookSlugRoute
   BrandsBrandIdRoute: typeof BrandsBrandIdRoute
   ClinicAppointmentsRoute: typeof ClinicAppointmentsRoute
+  ClinicBookingRoute: typeof ClinicBookingRoute
   ClinicDoctorsRoute: typeof ClinicDoctorsRoute
   ClinicFinanceRoute: typeof ClinicFinanceRoute
   ClinicMaterialsRoute: typeof ClinicMaterialsRoute
@@ -906,6 +944,7 @@ export interface RootRouteChildren {
   SuppliesIndexRoute: typeof SuppliesIndexRoute
   SurgicalGuideIndexRoute: typeof SurgicalGuideIndexRoute
   TrackCasesIndexRoute: typeof TrackCasesIndexRoute
+  BookRRequestIdRoute: typeof BookRRequestIdRoute
   PatientsRxPatientIdRoute: typeof PatientsRxPatientIdRoute
   SuppliesOfficeIdBranchSlugRoute: typeof SuppliesOfficeIdBranchSlugRoute
   SuppliesBranchBranchSlugRoute: typeof SuppliesBranchBranchSlugRoute
@@ -1306,6 +1345,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ClinicDoctorsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/clinic/booking': {
+      id: '/clinic/booking'
+      path: '/clinic/booking'
+      fullPath: '/clinic/booking'
+      preLoaderRoute: typeof ClinicBookingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/clinic/appointments': {
       id: '/clinic/appointments'
       path: '/clinic/appointments'
@@ -1318,6 +1364,13 @@ declare module '@tanstack/react-router' {
       path: '/brands/$brandId'
       fullPath: '/brands/$brandId'
       preLoaderRoute: typeof BrandsBrandIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/book/$slug': {
+      id: '/book/$slug'
+      path: '/book/$slug'
+      fullPath: '/book/$slug'
+      preLoaderRoute: typeof BookSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/account/settings': {
@@ -1382,6 +1435,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/labs/$labId/statement'
       preLoaderRoute: typeof LabsLabIdStatementRouteImport
       parentRoute: typeof LabsLabIdRoute
+    }
+    '/book/r/$requestId': {
+      id: '/book/r/$requestId'
+      path: '/book/r/$requestId'
+      fullPath: '/book/r/$requestId'
+      preLoaderRoute: typeof BookRRequestIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/account/help/topic/$slug': {
       id: '/account/help/topic/$slug'
@@ -1457,8 +1517,10 @@ const rootRouteChildren: RootRouteChildren = {
   ProductionRoute: ProductionRoute,
   QuickOrdersRoute: QuickOrdersRoute,
   ReportsRoute: ReportsRoute,
+  BookSlugRoute: BookSlugRoute,
   BrandsBrandIdRoute: BrandsBrandIdRoute,
   ClinicAppointmentsRoute: ClinicAppointmentsRoute,
+  ClinicBookingRoute: ClinicBookingRoute,
   ClinicDoctorsRoute: ClinicDoctorsRoute,
   ClinicFinanceRoute: ClinicFinanceRoute,
   ClinicMaterialsRoute: ClinicMaterialsRoute,
@@ -1493,6 +1555,7 @@ const rootRouteChildren: RootRouteChildren = {
   SuppliesIndexRoute: SuppliesIndexRoute,
   SurgicalGuideIndexRoute: SurgicalGuideIndexRoute,
   TrackCasesIndexRoute: TrackCasesIndexRoute,
+  BookRRequestIdRoute: BookRRequestIdRoute,
   PatientsRxPatientIdRoute: PatientsRxPatientIdRoute,
   SuppliesOfficeIdBranchSlugRoute: SuppliesOfficeIdBranchSlugRoute,
   SuppliesBranchBranchSlugRoute: SuppliesBranchBranchSlugRoute,

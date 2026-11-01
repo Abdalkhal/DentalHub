@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { VerifyEmailBanner } from '@/components/VerifyEmail';
 import {
   Image,
   NativeScrollEvent,
@@ -296,6 +297,8 @@ export default function HomeScreen() {
   return (
     <>
     <Screen>
+      <VerifyEmailBanner mode="restricted" className="mb-3" />
+      <VerifyEmailBanner mode="reminder" className="mb-3" />
       {/* 1 — Header */}
       <View className="flex-row items-center justify-between">
         <Pressable onPress={() => router.push('/account')} className="items-center">

@@ -62,6 +62,19 @@ service cloud.firestore {
     // case they are absent — and indexing a missing key raises an evaluation
     // error, which denied every designer update including harmless ones like
     // advancing `currentStage`.
+    // Email verification (src/lib/emailVerification.ts): accounts created on
+    // or after the cutoff must confirm their email before they can publish
+    // (products, offers, ads, lab cases, booking page). Older accounts, and
+    // invited lab staff (no user_roles doc), are not restricted. Based on
+    // user_roles.createdAt, which create pins to the server time and update
+    // can't change — every app version already writes it.
+    function isVerifiedAccount() {
+      return request.auth.token.email_verified == true
+        || !exists(/databases/$(database)/documents/user_roles/$(request.auth.uid))
+        || get(/databases/$(database)/documents/user_roles/$(request.auth.uid)).data.get('createdAt', null) == null
+        || get(/databases/$(database)/documents/user_roles/$(request.auth.uid)).data.createdAt < timestamp.date(2026, 11, 1);
+    }
+
     function isUnchanged(field) {
       return request.resource.data.get(field, null) == resource.data.get(field, null);
     }
@@ -106,6 +119,7 @@ service cloud.firestore {
       // either field, so this costs nothing.
       allow create: if isAuthenticated() && request.auth.uid == userId
         && request.resource.data.role != 'admin'
+        && request.resource.data.get('createdAt', null) == request.time
         && !('accountStatus' in request.resource.data)
         && !('subscriptionExpiry' in request.resource.data);
 
@@ -117,7 +131,7 @@ service cloud.firestore {
       allow update: if isAdmin() || (
         isAuthenticated() && request.auth.uid == userId
         && !request.resource.data.diff(resource.data).affectedKeys()
-             .hasAny(['role', 'accountType', 'accountStatus', 'subscriptionExpiry'])
+             .hasAny(['role', 'accountType', 'accountStatus', 'subscriptionExpiry', 'createdAt', 'mustVerifyEmail'])
       );
 
       // Self-delete is how "delete my account" works, but it also let a
@@ -148,7 +162,7 @@ service cloud.firestore {
       // `request.resource` (the incoming data) instead; update/delete stay
       // checked against the existing `resource`, same as before.
       allow create: if isAdmin() ||
-        (isAuthenticated() && request.resource.data.companyId == request.auth.uid);
+        (isAuthenticated() && request.resource.data.companyId == request.auth.uid && isVerifiedAccount());
       allow update, delete: if isAdmin() ||
         (isAuthenticated() && resource != null && resource.data.companyId == request.auth.uid);
 
@@ -178,7 +192,8 @@ service cloud.firestore {
       // own offer straight to "active", bypassing admin review entirely.
       allow create: if isAdmin() || (isAuthenticated()
         && request.resource.data.supplierId == request.auth.uid
-        && request.resource.data.status == 'pending');
+        && request.resource.data.status == 'pending'
+        && isVerifiedAccount());
       // Owner may edit their offer, but only an admin can approve it: the
       // owner may keep the current status or send it back to 'pending'
       // (re-submission after an edit), never set 'active' themselves.
@@ -199,7 +214,8 @@ service cloud.firestore {
       allow read: if true;
       allow create: if isAuthenticated()
         && request.resource.data.accountId == request.auth.uid
-        && request.resource.data.status == 'pending';
+        && request.resource.data.status == 'pending'
+        && isVerifiedAccount();
       // Owners may edit their ad, but only an admin can approve it: the
       // owner may keep the current status or send it back to 'pending'
       // (re-submission), never set 'active' themselves.
@@ -409,7 +425,7 @@ service cloud.firestore {
 
         // PHASE 0: only the referring dentist or the lab owner may create a case.
         allow create: if isAuthenticated() && (
-          request.resource.data.dentistId == request.auth.uid
+          (request.resource.data.dentistId == request.auth.uid && isVerifiedAccount())
           || isLabOwner(labId)
         );
 
@@ -544,6 +560,44 @@ service cloud.firestore {
     // ============================================================
     match /dentist_records/{ownerId}/{document=**} {
       allow read, write: if isAuthenticated() && request.auth.uid == ownerId;
+    }
+
+    // ============================================================
+    // Public booking link (src/lib/booking.ts). Patients have no account:
+    // they only read a published page and the taken start times; their
+    // requests are created by the createBookingRequest function (Admin SDK),
+    // never written from a client.
+    // ============================================================
+    match /booking_pages/{slug} {
+      allow read: if true;
+      allow create: if isAuthenticated()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.slug == slug
+        && slug.matches('^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$')
+        && isVerifiedAccount();
+      allow update: if isAuthenticated()
+        && resource.data.ownerId == request.auth.uid
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.slug == slug;
+      allow delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+    }
+
+    match /booking_busy/{key} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // The dentist sees the requests sent to them and may only accept or
+    // reject a pending one (the patient's details stay as sent).
+    match /booking_requests/{requestId} {
+      allow read: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+      allow update: if isAuthenticated()
+        && resource.data.ownerId == request.auth.uid
+        && resource.data.status == 'pending'
+        && request.resource.data.status in ['accepted', 'rejected']
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['status', 'rejectReason', 'appointmentId', 'patientId', 'handledAt']);
+      allow create, delete: if false;
     }
 
     // ============================================================

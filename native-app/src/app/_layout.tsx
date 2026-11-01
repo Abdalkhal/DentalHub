@@ -1,4 +1,5 @@
 import { DefaultTheme, Stack, ThemeProvider, router, usePathname, useRootNavigationState } from 'expo-router';
+import { VerifyEmailHost } from '@/components/VerifyEmail';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
 import { Cairo_400Regular, Cairo_500Medium, Cairo_600SemiBold, Cairo_700Bold, Cairo_800ExtraBold, Cairo_900Black } from '@expo-google-fonts/cairo';
@@ -21,6 +22,7 @@ import { isGuestRoute } from '@/lib/guestAccess';
 import { useSession } from '@/lib/useAuth';
 import { registerPush } from '@/lib/push';
 import { resyncPatients } from '@/lib/patientsStore';
+import { resyncAppointments } from '@/lib/appointmentsStore';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -42,6 +44,7 @@ const TITLED_SCREENS: { name: string; title: DictKey; cart?: boolean }[] = [
   { name: 'patient/[patientId]', title: 'screen_patient' },
   { name: 'clinic', title: 'screen_clinic' },
   { name: 'clinic-appointments', title: 'screen_appointments' },
+  { name: 'clinic-booking', title: 'screen_booking_link' },
   { name: 'clinic-finance', title: 'screen_finance' },
   { name: 'rx/[patientId]', title: 'screen_rx' },
   { name: 'notifications', title: 'screen_notifications' },
@@ -106,6 +109,7 @@ function RootStack() {
   }, [uid]);
 
   return (
+    <>
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="login" />
@@ -126,6 +130,8 @@ function RootStack() {
         />
       ))}
     </Stack>
+    <VerifyEmailHost />
+    </>
   );
 }
 
@@ -156,7 +162,10 @@ export default function RootLayout() {
   // left open in the background may have been cut off by the OS).
   useEffect(() => {
     const sub = AppState.addEventListener('change', (s) => {
-      if (s === 'active') resyncPatients();
+      if (s === 'active') {
+        resyncPatients();
+        resyncAppointments();
+      }
     });
     return () => sub.remove();
   }, []);

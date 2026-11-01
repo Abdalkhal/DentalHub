@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, View } from 'react-native';
 import { router } from 'expo-router';
 import { collection, doc, onSnapshot, query, updateDoc, where, writeBatch } from 'firebase/firestore';
-import { Bell, BellRing, CheckCheck, MessageCircle, Package, Truck } from 'lucide-react-native';
+import { Bell, BellRing, CalendarCheck2, CalendarX2, CheckCheck, MessageCircle, Package, Truck } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 
 import { Screen, Text, Button } from '@/components/ui';
@@ -13,7 +13,7 @@ import { useI18n } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 
-type NotifType = 'order_new' | 'order_status' | 'message' | 'case_message';
+type NotifType = 'order_new' | 'order_status' | 'message' | 'case_message' | 'booking_new' | 'booking_cancelled';
 
 type Notif = {
   id: string;
@@ -35,6 +35,8 @@ const TYPE_META: Record<NotifType, { icon: LucideIcon; tone: string; color: stri
   order_status: { icon: Truck, tone: 'bg-amber-100', color: '#D97706' },
   message: { icon: MessageCircle, tone: 'bg-emerald-100', color: '#059669' },
   case_message: { icon: MessageCircle, tone: 'bg-violet-100', color: '#7C3AED' },
+  booking_new: { icon: CalendarCheck2, tone: 'bg-teal-100', color: '#0E6E66' },
+  booking_cancelled: { icon: CalendarX2, tone: 'bg-rose-100', color: '#E11D48' },
 };
 
 function timeAgo(ts: number | undefined, ar: boolean): string {
@@ -102,7 +104,9 @@ export default function NotificationsScreen() {
 
   const openNotif = (n: Notif) => {
     markRead(n.id);
-    if (n.type === 'message' && n.chatWith) {
+    if (n.type === 'booking_new' || n.type === 'booking_cancelled') {
+      router.push('/clinic-booking' as never);
+    } else if (n.type === 'message' && n.chatWith) {
       router.push({ pathname: '/messages', params: { with: n.chatWith } });
     } else if (n.type === 'case_message') {
       // The doctor reads case chats from case tracking; the lab from its orders.

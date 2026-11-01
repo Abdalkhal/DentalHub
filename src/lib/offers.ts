@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { assertVerified } from "./emailVerification";
 import { db } from "@/integrations/firebase/client";
 import {
   collection,
@@ -61,6 +62,7 @@ export function useUpsertOffer() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (offer: Offer) => {
+      assertVerified();
       const ref = doc(db, "offers", offer.id);
       const data: Record<string, unknown> = {
         id: offer.id,

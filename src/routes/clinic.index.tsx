@@ -10,6 +10,7 @@ import { useSession } from "@/lib/useAuth";
 import { AddAppointmentModal } from "@/components/AddAppointmentModal";
 import { cn } from "@/lib/utils";
 import clinicHero from "@/assets/clinic-hero.jpg";
+import { BookingLinkCard } from "@/components/booking/BookingLinkCard";
 import {
   ArrowRight, ArrowLeft, User, CreditCard, Users,
   Calendar, Plus, Package, ClipboardList, BarChart3, Stethoscope,
@@ -209,6 +210,8 @@ function ClinicHome() {
                 </div>
               </div>
             </div>
+
+            <BookingLinkCard className="md:col-span-2 lg:col-span-3" />
 
             {/* Section 1: Daily Services & Patients */}
             <div>

@@ -20,6 +20,7 @@ import type { LucideIcon } from 'lucide-react-native';
 
 import { Screen, Text, Input } from '@/components/ui';
 import { AddAppointmentModal } from '@/components/AddAppointmentModal';
+import { BookingLinkCard } from '@/components/BookingLinkCard';
 import { toDateStr } from '@/components/CalendarPickerModal';
 import { useUserRole } from '@/lib/useAuth';
 import { useAppointments } from '@/lib/appointmentsStore';
@@ -282,6 +283,8 @@ export default function ClinicHomeScreen() {
           />
         </View>
       </View>
+
+      <BookingLinkCard uid={user?.uid} />
 
       <View className="mt-5 gap-5">
         {renderSection(ar ? 'الخدمات اليومية والمرضى' : 'Daily Services & Patients', daily)}

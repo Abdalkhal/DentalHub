@@ -6,6 +6,7 @@
 //
 //   dentist_records/{uid}                         { clinics: Clinic[] }
 //   dentist_records/{uid}/patients/{patientId}    Patient + { clinicId, updatedAt, deleted? }
+//   dentist_records/{uid}/appointments/{id}       Appointment + { clinicId, updatedAt, deleted? }
 //   (Storage) dentist_records/{uid}/patients/{patientId}/{fileId}-{name}
 //
 // Identical in the web app and the native app (src/lib/dentistRecords.ts).
@@ -19,6 +20,8 @@ export const RECORDS = "dentist_records";
 export const clinicsDoc = (uid: string) => doc(db, RECORDS, uid);
 export const patientsCol = (uid: string) => collection(db, RECORDS, uid, "patients");
 export const patientDoc = (uid: string, patientId: string) => doc(db, RECORDS, uid, "patients", patientId);
+export const appointmentsCol = (uid: string) => collection(db, RECORDS, uid, "appointments");
+export const appointmentDoc = (uid: string, id: string) => doc(db, RECORDS, uid, "appointments", id);
 
 export function patientFilePath(uid: string, patientId: string, fileId: string, name: string): string {
   const safe = (name || "file").replace(/[^\w.\-]+/g, "_").slice(-80);

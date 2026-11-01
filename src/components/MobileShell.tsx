@@ -1,4 +1,5 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { VerifyEmailBanner } from "@/components/VerifyEmail";
 import { Home, ShoppingBag, User, Menu, Search, Heart, Tag, ShoppingCart } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useI18n } from "@/lib/i18n";
@@ -75,6 +76,7 @@ export function MobileShell({
             isWide && "lg:pt-16",
           )}
         >
+          <VerifyEmailBanner mode="restricted" className="mx-auto mt-3 w-[calc(100%-2rem)] max-w-3xl" />
           {children}
         </div>
         {/* `hideBottomNav` used to suppress both bars. A wide page still needs

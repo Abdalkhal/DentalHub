@@ -8,6 +8,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
+import { VerifyEmailHost } from "@/components/VerifyEmail";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -150,6 +151,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <LanguageProvider>
         <StoreUserScope />
+        <VerifyEmailHost />
         <Outlet />
         <Toaster position="top-center" richColors />
       </LanguageProvider>

@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { assertVerified } from "./emailVerification";
 import {
   doc, setDoc, getDoc, onSnapshot, deleteDoc, updateDoc,
   collection, query, orderBy, getDocs, collectionGroup, where,
@@ -618,6 +619,7 @@ export async function submitDentistCase(
     rxData?: Record<string, unknown>;
   },
 ) {
+  assertVerified();
   const id = `case_${Date.now().toString(36)}`;
   // Was reading `_counter + 1` directly without ever bumping/persisting
   // `_counter` — every case a dentist sent in the same session got the

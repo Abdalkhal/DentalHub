@@ -27,6 +27,8 @@ import { fetchUserRoleDoc, getAccountDashboard, type AccountDashboardHref, type 
 import { CITIES } from '@/data/offices';
 import { useI18n } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
+import { checkEmail, checkPassword, emailError, passwordError, STRENGTH_COLOR, STRENGTH_LABEL } from '@/lib/authValidation';
+import { sendVerificationEmail } from '@/lib/emailVerification';
 import { cn } from '@/lib/utils';
 import type { AccountType } from '@/integrations/firebase/types';
 
@@ -118,6 +120,7 @@ export default function LoginScreen() {
   const [city, setCity] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [resetBusy, setResetBusy] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -129,6 +132,9 @@ export default function LoginScreen() {
     setBusy(false);
     setTimeout(() => setNext(path as never), 80);
   };
+
+  const emailCheck = checkEmail(email);
+  const pwCheck = checkPassword(password);
 
   const submit = async () => {
     if (!email.trim() || !password.trim()) {
@@ -143,9 +149,12 @@ export default function LoginScreen() {
       setError(ar ? 'الرجاء اختيار الجنس' : 'Please select your gender');
       return;
     }
-    if (mode === 'signup' && password.trim().length < 6) {
-      setError(ar ? 'كلمة المرور يجب أن تكون 6 أحرف على الأقل' : 'Password must be at least 6 characters');
-      return;
+    if (mode === 'signup') {
+      const ec = checkEmail(email);
+      if (!ec.ok) return setError(emailError(ec, ar));
+      const pc = checkPassword(password);
+      if (!pc.ok) return setError(passwordError(pc, ar));
+      if (password !== confirmPassword) return setError(ar ? 'كلمتا المرور غير متطابقتين' : "Passwords don't match");
     }
 
     setBusy(true);
@@ -188,13 +197,17 @@ export default function LoginScreen() {
         }
         go(getAccountDashboard(roleDoc.role));
       } else {
-        const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+        const cleanEmail = checkEmail(email).email;
+        const cred = await createUserWithEmailAndPassword(auth, cleanEmail, password);
         const roleData: Record<string, unknown> = {
           userId: cred.user.uid,
           role: accountType,
           accountType,
           name: name.trim(),
-          email: email.trim(),
+          email: cleanEmail,
+          // New accounts can publish only after confirming their email (see
+          // emailVerification.ts); firestore.rules requires this flag on create.
+          mustVerifyEmail: true,
           city: city || null,
           createdAt: serverTimestamp(),
         };
@@ -204,6 +217,7 @@ export default function LoginScreen() {
           roleData.clinicName = clinicName.trim() || null;
         }
         await setDoc(doc(db, 'user_roles', cred.user.uid), roleData);
+        void sendVerificationEmail(cred.user);
         go(getAccountDashboard(accountType));
       }
     } catch (e: unknown) {
@@ -384,12 +398,27 @@ export default function LoginScreen() {
                   setEmail(t);
                   setError('');
                 }}
-                placeholder={ar ? 'رقم الهاتف / البريد الإلكتروني' : 'Phone number / Email'}
+                placeholder={ar ? 'البريد الإلكتروني' : 'Email'}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoComplete="email"
                 icon={<Mail size={18} color="#94A3B8" />}
               />
+              {mode === 'signup' && emailCheck.reason === 'typo' && (
+                <Pressable
+                  onPress={() => {
+                    setEmail(emailCheck.suggestion!);
+                    setError('');
+                  }}
+                  className="-mt-1 rounded-xl bg-amber-50 px-4 py-2"
+                >
+                  <Text className="text-xs font-semibold text-amber-800">
+                    {ar ? 'هل تقصد ' : 'Did you mean '}
+                    <Text className="text-xs font-bold text-amber-900 underline">{emailCheck.suggestion}</Text>
+                    {ar ? '؟ اضغط للتصحيح' : '? Tap to fix'}
+                  </Text>
+                </Pressable>
+              )}
               <LoginInput
                 value={password}
                 onChangeText={(t) => {
@@ -406,6 +435,36 @@ export default function LoginScreen() {
                   </Pressable>
                 }
               />
+              {mode === 'signup' && !!password && (
+                <View className="-mt-1 px-1">
+                  <View className="flex-row gap-1">
+                    {[1, 2, 3].map((i) => (
+                      <View
+                        key={i}
+                        className="h-1.5 flex-1 rounded-full"
+                        style={{ backgroundColor: pwCheck.score >= i ? STRENGTH_COLOR[pwCheck.score] : '#E2E8F0' }}
+                      />
+                    ))}
+                  </View>
+                  <Text className="mt-1 text-[11px] font-semibold" style={{ color: STRENGTH_COLOR[pwCheck.score] }}>
+                    {ar ? STRENGTH_LABEL.ar[pwCheck.score] : STRENGTH_LABEL.en[pwCheck.score]}
+                    {!pwCheck.ok ? ` — ${passwordError(pwCheck, ar)}` : ''}
+                  </Text>
+                </View>
+              )}
+              {mode === 'signup' && (
+                <LoginInput
+                  value={confirmPassword}
+                  onChangeText={(t) => {
+                    setConfirmPassword(t);
+                    setError('');
+                  }}
+                  placeholder={ar ? 'تأكيد كلمة المرور' : 'Confirm password'}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  icon={<Lock size={18} color="#94A3B8" />}
+                />
+              )}
             </View>
 
             {mode === 'signin' && (

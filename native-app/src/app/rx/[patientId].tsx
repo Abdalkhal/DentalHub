@@ -45,10 +45,10 @@ const FAV_KEY = 'dh:rx:favs:v1';
 const HIDDEN_KEY = 'dh:rx:hidden:v1';
 const HEADER_KEY = 'dh:rx:header:v1';
 
-// Dedicated array loader for the hidden-medicines list — `loadJSON` below
+// Array loader for the favourites and hidden-medicines lists — `loadJSON` below
 // merges its fallback as an *object* (`{ ...fallback, ...parsed }`), which
 // silently turns an array fallback into `{0: "a", 1: "b"}` instead of a real
-// array. Kept separate rather than reusing it for this new feature.
+// array (favourites loaded through it crashed the picker on `.includes`).
 function loadIdList(key: string): string[] {
   try {
     const raw = localStorage.getItem(key);
@@ -435,7 +435,7 @@ function AddMedicineScreen({
   const [selected, setSelected] = useState<string[]>([]);
 
   useEffect(() => {
-    setFavs(loadJSON<string[]>(FAV_KEY, []));
+    setFavs(loadIdList(FAV_KEY));
     setHidden(loadIdList(HIDDEN_KEY));
   }, []);
 

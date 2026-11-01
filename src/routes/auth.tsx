@@ -8,6 +8,8 @@ import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswor
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, Eye, EyeOff, Loader2, Lock, Mail, User } from "lucide-react";
+import { checkEmail, checkPassword, emailError, passwordError, STRENGTH_COLOR, STRENGTH_LABEL } from "@/lib/authValidation";
+import { sendVerificationEmail } from "@/lib/emailVerification";
 import { cn } from "@/lib/utils";
 import { CITIES } from "@/data/offices";
 import heroBg from "@/assets/login/hero-bg.jpg";
@@ -84,6 +86,7 @@ export function AuthPage() {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [resetBusy, setResetBusy] = useState(false);
   const [name, setName] = useState("");
@@ -95,6 +98,8 @@ export function AuthPage() {
   const [error, setError] = useState<string | null>(null);
 
   const clearError = () => setError(null);
+  const emailCheck = checkEmail(email);
+  const pwCheck = checkPassword(password);
 
   const handleSubmit = async () => {
     if (!email.trim() || !password.trim()) {
@@ -111,11 +116,13 @@ export function AuthPage() {
       setError(ar ? "الرجاء اختيار الجنس" : "Please select your gender");
       return;
     }
-    if (mode === "signup" && password.trim().length < 6) {
-      setError(
-        ar ? "كلمة المرور يجب أن تكون 6 أحرف على الأقل" : "Password must be at least 6 characters",
-      );
-      return;
+    if (mode === "signup") {
+      const ec = checkEmail(email);
+      if (!ec.ok) return setError(emailError(ec, ar));
+      const pc = checkPassword(password);
+      if (!pc.ok) return setError(passwordError(pc, ar));
+      if (password !== confirmPassword)
+        return setError(ar ? "كلمتا المرور غير متطابقتين" : "Passwords don't match");
     }
 
     setBusy(true);
@@ -163,13 +170,17 @@ export function AuthPage() {
         }
         navigate({ to: getAccountDashboard(roleDoc.role) });
       } else {
-        const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+        const cleanEmail = checkEmail(email).email;
+        const cred = await createUserWithEmailAndPassword(auth, cleanEmail, password);
         const roleData: Record<string, unknown> = {
           userId: cred.user.uid,
           role: accountType,
           accountType,
           name: name.trim(),
-          email: email.trim(),
+          email: cleanEmail,
+          // New accounts can publish only after confirming their email (see
+          // emailVerification.ts); firestore.rules requires this flag on create.
+          mustVerifyEmail: true,
           city: city || null,
           createdAt: serverTimestamp(),
         };
@@ -179,6 +190,7 @@ export function AuthPage() {
           roleData.clinicName = clinicName.trim() || null;
         }
         await setDoc(doc(db, "user_roles", cred.user.uid), roleData);
+        void sendVerificationEmail(cred.user);
         navigate({ to: getAccountDashboard(accountType) });
       }
     } catch (e: unknown) {
@@ -372,10 +384,26 @@ export function AuthPage() {
                 setEmail(v);
                 clearError();
               }}
-              placeholder={ar ? "رقم الهاتف / البريد الإلكتروني" : "Phone number / Email"}
+              placeholder={ar ? "البريد الإلكتروني" : "Email"}
               autoComplete="email"
               icon={<Mail className="size-[18px] text-slate-400" />}
             />
+            {mode === "signup" && emailCheck.reason === "typo" && (
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail(emailCheck.suggestion!);
+                  clearError();
+                }}
+                className="-mt-1 block w-full rounded-xl bg-amber-50 px-4 py-2 text-start text-xs font-semibold text-amber-800"
+              >
+                {ar ? "هل تقصد " : "Did you mean "}
+                <span dir="ltr" className="font-bold underline">
+                  {emailCheck.suggestion}
+                </span>
+                {ar ? "؟ اضغط للتصحيح" : "? Tap to fix"}
+              </button>
+            )}
             <LoginInput
               type={showPassword ? "text" : "password"}
               value={password}
@@ -398,6 +426,37 @@ export function AuthPage() {
                 </button>
               }
             />
+            {mode === "signup" && password && (
+              <div className="-mt-1 px-1">
+                <div className="flex gap-1">
+                  {[1, 2, 3].map((i) => (
+                    <span
+                      key={i}
+                      className="h-1.5 flex-1 rounded-full transition-colors"
+                      style={{ backgroundColor: pwCheck.score >= i ? STRENGTH_COLOR[pwCheck.score] : "#E2E8F0" }}
+                    />
+                  ))}
+                </div>
+                <p className="mt-1 text-[11px] font-semibold" style={{ color: STRENGTH_COLOR[pwCheck.score] }}>
+                  {ar ? STRENGTH_LABEL.ar[pwCheck.score] : STRENGTH_LABEL.en[pwCheck.score]}
+                  {!pwCheck.ok && ` — ${passwordError(pwCheck, ar)}`}
+                </p>
+              </div>
+            )}
+            {mode === "signup" && (
+              <LoginInput
+                type={showPassword ? "text" : "password"}
+                value={confirmPassword}
+                onChange={(v) => {
+                  setConfirmPassword(v);
+                  clearError();
+                }}
+                onEnter={handleSubmit}
+                placeholder={ar ? "تأكيد كلمة المرور" : "Confirm password"}
+                autoComplete="new-password"
+                icon={<Lock className="size-[18px] text-slate-400" />}
+              />
+            )}
           </div>
 
           {mode === "signin" && (

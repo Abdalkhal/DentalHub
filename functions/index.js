@@ -620,9 +620,27 @@ function genOrderNumber() {
   return `DNT-${Math.floor(1000 + Math.random() * 9000)}`;
 }
 
+/**
+ * Same rule as firestore.rules' isVerifiedAccount(): accounts created on or
+ * after the cutoff must have confirmed their email before ordering.
+ * @param {object} authCtx request.auth of a callable.
+ * @return {Promise<boolean>} whether the account may publish/order.
+ */
+async function isVerifiedAccount(authCtx) {
+  if (authCtx.token.email_verified === true) return true;
+  const role = await firestore.collection("user_roles").doc(authCtx.uid).get();
+  if (!role.exists) return true;
+  const created = role.get("createdAt");
+  if (!created || typeof created.toMillis !== "function") return true;
+  return created.toMillis() < Date.UTC(2026, 10, 1);
+}
+
 exports.placeVerifiedOrder = onCall({ region: "us-central1" }, async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Authentication required.");
+  }
+  if (!(await isVerifiedAccount(request.auth))) {
+    throw new HttpsError("failed-precondition", "email-not-verified");
   }
   const data = request.data || {};
   const rawItems = Array.isArray(data.items) ? data.items : [];
@@ -1049,6 +1067,7 @@ const PUBLISHED_CONTENT = [
   ["products", "companyId"],
   ["offers", "supplierId"],
   ["ads", "accountId"],
+  ["booking_pages", "ownerId"],
 ];
 
 /**
@@ -1118,5 +1137,451 @@ exports.cleanupOrphanedContent = onCall(
     let removed = 0;
     for (const uid of gone) removed += await purgeAccountContent(uid);
     return { accounts: gone.length, removed };
+  },
+);
+
+/* ============================================================
+ * BOOKING — public "book an appointment" link (src/lib/booking.ts).
+ *
+ * Patients have no account, so they never write to Firestore directly:
+ * every request goes through createBookingRequest, which checks the slot
+ * is still free (in a transaction, so two patients can't take the same
+ * one), limits how many requests a device/number can send, and notifies
+ * the dentist. The public page only ever reads the dentist's published
+ * settings and `booking_busy` — the taken start times, no names.
+ * The patient follows/cancels the request with a secret token returned
+ * once (only its hash is stored).
+ * ============================================================ */
+
+const crypto = require("crypto");
+
+const BOOKING_MAX_PER_IP_HOUR = 6;
+const BOOKING_MAX_PENDING_PER_PHONE = 2;
+const BOOKING_REASONS = [
+  "checkup",
+  "cleaning",
+  "pain",
+  "filling",
+  "ortho",
+  "cosmetic",
+  "implant",
+  "other",
+];
+const BOOKING_NOTIFY_TTL = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * @param {string} s text to hash.
+ * @return {string} hex sha256.
+ */
+function sha256(s) {
+  return crypto.createHash("sha256").update(String(s)).digest("hex");
+}
+
+/**
+ * @param {string} t "HH:MM".
+ * @return {number} minutes since midnight.
+ */
+function toMinutes(t) {
+  const parts = String(t || "0:0")
+    .split(":")
+    .map(Number);
+  return (parts[0] || 0) * 60 + (parts[1] || 0);
+}
+
+/**
+ * @param {number} n minutes since midnight.
+ * @return {string} "HH:MM".
+ */
+function fromMinutes(n) {
+  const h = String(Math.floor(n / 60)).padStart(2, "0");
+  return `${h}:${String(n % 60).padStart(2, "0")}`;
+}
+
+/**
+ * Today's date and the minutes since midnight in Baghdad (UTC+3, no DST).
+ * @return {{date: string, minutes: number}} now in Baghdad.
+ */
+function baghdadNow() {
+  const b = new Date(Date.now() + 3 * 60 * 60 * 1000);
+  return {
+    date: b.toISOString().slice(0, 10),
+    minutes: b.getUTCHours() * 60 + b.getUTCMinutes(),
+  };
+}
+
+/**
+ * Slot starts of one working day (same rules as booking.ts's daySlots).
+ * @param {object} hours DayHours.
+ * @param {number} slot minutes per appointment.
+ * @return {string[]} "HH:MM" starts.
+ */
+function daySlots(hours, slot) {
+  if (!hours || !hours.open || !(slot > 0)) return [];
+  const start = toMinutes(hours.from);
+  const end = toMinutes(hours.to);
+  const bFrom = hours.breakFrom ? toMinutes(hours.breakFrom) : -1;
+  const bTo = hours.breakTo ? toMinutes(hours.breakTo) : -1;
+  const out = [];
+  for (let t = start; t + slot <= end; t += slot) {
+    if (bFrom >= 0 && bTo > bFrom && t < bTo && t + slot > bFrom) continue;
+    out.push(fromMinutes(t));
+  }
+  return out;
+}
+
+/**
+ * @param {string} s slot start.
+ * @param {string[]} taken booked starts.
+ * @param {number} slot minutes.
+ * @return {boolean} whether any booking overlaps the slot.
+ */
+function slotTaken(s, taken, slot) {
+  const a = toMinutes(s);
+  return taken.some((t) => {
+    const b = toMinutes(t);
+    return b < a + slot && a < b + slot;
+  });
+}
+
+/**
+ * Iraqi mobile number normalised to "07XXXXXXXXX", or null.
+ * @param {string} raw as typed.
+ * @return {?string} the number, or null.
+ */
+function normalizeIraqiPhone(raw) {
+  let d = String(raw || "")
+    .replace(/[٠-٩]/g, (c) => String("٠١٢٣٤٥٦٧٨٩".indexOf(c)))
+    .replace(/\D/g, "");
+  if (d.startsWith("00964")) d = d.slice(5);
+  else if (d.startsWith("964")) d = d.slice(3);
+  if (d.startsWith("7")) d = `0${d}`;
+  return /^07[0-9]{9}$/.test(d) ? d : null;
+}
+
+/**
+ * @param {*} v any value.
+ * @param {number} max length cap.
+ * @return {string} trimmed, capped string.
+ */
+function cleanText(v, max) {
+  return String(v || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, max);
+}
+
+/**
+ * Recomputes `booking_busy/{owner}_{clinic}_{date}` from the dentist's
+ * synced appointments and the open booking requests of that day.
+ * Skipped for dentists without a booking page.
+ * @param {string} ownerId dentist uid.
+ * @param {string} clinicId clinic id.
+ * @param {string} date YYYY-MM-DD.
+ * @return {Promise<void>}
+ */
+async function recomputeBusy(ownerId, clinicId, date) {
+  if (!ownerId || !clinicId || !/^\d{4}-\d{2}-\d{2}$/.test(String(date))) {
+    return;
+  }
+  const page = await firestore
+    .collection("booking_pages")
+    .where("ownerId", "==", ownerId)
+    .limit(1)
+    .get();
+  if (page.empty) return;
+  const [appts, reqs] = await Promise.all([
+    firestore
+      .collection("dentist_records")
+      .doc(ownerId)
+      .collection("appointments")
+      .where("clinicId", "==", clinicId)
+      .where("date", "==", date)
+      .get(),
+    firestore
+      .collection("booking_requests")
+      .where("ownerId", "==", ownerId)
+      .where("date", "==", date)
+      .get(),
+  ]);
+  const times = new Set();
+  for (const d of appts.docs) {
+    const a = d.data();
+    if (a.deleted || a.status === "cancelled" || !a.time) continue;
+    times.add(String(a.time).slice(0, 5));
+  }
+  for (const d of reqs.docs) {
+    const r = d.data();
+    if (r.clinicId !== clinicId) continue;
+    if (r.status === "pending" || r.status === "accepted") times.add(r.time);
+  }
+  await firestore
+    .collection("booking_busy")
+    .doc(`${ownerId}_${clinicId}_${date}`)
+    .set({
+      ownerId,
+      clinicId,
+      date,
+      times: [...times].sort(),
+      updatedAt: Date.now(),
+    });
+}
+
+/**
+ * Writes an in-app notification (pushed by sendPushOnNotification).
+ * @param {string} id notification doc id.
+ * @param {object} fields title, body, type…
+ * @return {Promise<void>}
+ */
+async function notifyBooking(id, fields) {
+  await firestore
+    .collection("notifications")
+    .doc(id)
+    .set({
+      id,
+      senderId: "booking",
+      isRead: false,
+      createdAt: Date.now(),
+      expiresAt: Date.now() + BOOKING_NOTIFY_TTL,
+      ...fields,
+    })
+    .catch((err) => console.warn("Booking notification failed", err));
+}
+
+exports.createBookingRequest = onCall(
+  { region: "us-central1", maxInstances: 5 },
+  async (request) => {
+    const input = request.data || {};
+    // Honeypot: a field real visitors never see or fill.
+    if (input.website) {
+      throw new HttpsError("invalid-argument", "rejected");
+    }
+    const slug = cleanText(input.slug, 40);
+    const clinicId = cleanText(input.clinicId, 80);
+    const date = cleanText(input.date, 10);
+    const time = cleanText(input.time, 5);
+    const name = cleanText(input.name, 60);
+    const phone = normalizeIraqiPhone(input.phone);
+    const reason = BOOKING_REASONS.includes(input.reason) ? input.reason : "other";
+    const note = cleanText(input.note, 300);
+    if (!slug || !clinicId || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) {
+      throw new HttpsError("invalid-argument", "bad-request");
+    }
+    if (name.length < 2) throw new HttpsError("invalid-argument", "name");
+    if (!phone) throw new HttpsError("invalid-argument", "phone");
+
+    // Per-IP limit (only a hash of the address is kept).
+    const raw = request.rawRequest;
+    const ip = (raw && (raw.headers["x-forwarded-for"] || raw.ip)) || "-";
+    const ipKey = sha256(`booking|${String(ip).split(",")[0].trim()}`);
+    const limitRef = firestore.collection("booking_limits").doc(ipKey);
+    await firestore.runTransaction(async (tx) => {
+      const snap = await tx.get(limitRef);
+      const now = Date.now();
+      const d = snap.exists ? snap.data() : null;
+      if (d && now - d.windowStart < 60 * 60 * 1000) {
+        if (d.count >= BOOKING_MAX_PER_IP_HOUR) {
+          throw new HttpsError("resource-exhausted", "too-many");
+        }
+        tx.update(limitRef, { count: d.count + 1 });
+      } else {
+        tx.set(limitRef, { count: 1, windowStart: now });
+      }
+    });
+
+    const pageSnap = await firestore.collection("booking_pages").doc(slug).get();
+    const page = pageSnap.exists ? pageSnap.data() : null;
+    if (!page || !page.enabled) {
+      throw new HttpsError("failed-precondition", "closed");
+    }
+    const clinic = (page.clinics || []).find((c) => c && c.id === clinicId && c.enabled);
+    if (!clinic) throw new HttpsError("failed-precondition", "closed");
+    const slot = Number(page.slotMinutes) || 30;
+    const today = baghdadNow();
+    const last = new Date(`${today.date}T00:00:00Z`);
+    last.setUTCDate(last.getUTCDate() + Math.max(1, page.daysAhead || 14));
+    const weekday = String(new Date(`${date}T00:00:00Z`).getUTCDay());
+    const hours = clinic.hours && clinic.hours[weekday];
+    const valid =
+      date >= today.date &&
+      date <= last.toISOString().slice(0, 10) &&
+      !(page.closedDates || []).includes(date) &&
+      daySlots(hours, slot).includes(time) &&
+      !(date === today.date && toMinutes(time) <= today.minutes + 15);
+    if (!valid) throw new HttpsError("failed-precondition", "slot-taken");
+
+    const ownerId = page.ownerId;
+    const mine = await firestore
+      .collection("booking_requests")
+      .where("ownerId", "==", ownerId)
+      .where("phone", "==", phone)
+      .get();
+    const open = mine.docs.filter((d) => {
+      const r = d.data();
+      return r.status === "pending" && r.date >= today.date;
+    });
+    if (open.length >= BOOKING_MAX_PENDING_PER_PHONE) {
+      throw new HttpsError("resource-exhausted", "phone-limit");
+    }
+
+    const token = crypto.randomBytes(24).toString("hex");
+    const code = `DH-${crypto.randomInt(1000, 10000)}`;
+    const reqRef = firestore.collection("booking_requests").doc();
+    const busyRef = firestore.collection("booking_busy").doc(`${ownerId}_${clinicId}_${date}`);
+    const clinicName = cleanText(clinic.name, 80);
+    await firestore.runTransaction(async (tx) => {
+      const busy = await tx.get(busyRef);
+      const taken = busy.exists ? busy.data().times || [] : [];
+      if (slotTaken(time, taken, slot)) {
+        throw new HttpsError("failed-precondition", "slot-taken");
+      }
+      tx.set(reqRef, {
+        id: reqRef.id,
+        ownerId,
+        slug,
+        clinicId,
+        clinicName,
+        date,
+        time,
+        patientName: name,
+        phone,
+        reason,
+        note,
+        code,
+        status: "pending",
+        tokenHash: sha256(token),
+        createdAt: Date.now(),
+      });
+      tx.set(busyRef, {
+        ownerId,
+        clinicId,
+        date,
+        times: [...taken, time].sort(),
+        updatedAt: Date.now(),
+      });
+    });
+
+    await notifyBooking(`${ownerId}_booking_${reqRef.id}`, {
+      userId: ownerId,
+      title: `طلب حجز جديد: ${name}`,
+      body: `${date} · ${time} — ${clinicName}`,
+      type: "booking_new",
+      bookingRequestId: reqRef.id,
+      senderName: name,
+    });
+
+    return { id: reqRef.id, token, code };
+  },
+);
+
+/**
+ * Loads a booking request for its patient, checking the secret token.
+ * @param {object} data { id, token } from the client.
+ * @return {Promise<object>} the request's DocumentSnapshot.
+ */
+async function bookingForPatient(data) {
+  const id = cleanText(data && data.id, 40);
+  const token = String((data && data.token) || "");
+  if (!id || !token) throw new HttpsError("invalid-argument", "bad-request");
+  const snap = await firestore.collection("booking_requests").doc(id).get();
+  if (!snap.exists || snap.data().tokenHash !== sha256(token)) {
+    throw new HttpsError("not-found", "not-found");
+  }
+  return snap;
+}
+
+exports.getBookingRequest = onCall({ region: "us-central1", maxInstances: 5 }, async (request) => {
+  const r = (await bookingForPatient(request.data)).data();
+  const page = await firestore.collection("booking_pages").doc(r.slug).get();
+  const p = page.exists ? page.data() : {};
+  const clinic = (p.clinics || []).find((c) => c && c.id === r.clinicId);
+  return {
+    id: r.id,
+    code: r.code,
+    status: r.status,
+    date: r.date,
+    time: r.time,
+    patientName: r.patientName,
+    reason: r.reason,
+    rejectReason: r.rejectReason || "",
+    clinicName: r.clinicName,
+    clinicAddress: clinic ? clinic.address || "" : "",
+    mapUrl: clinic ? clinic.mapUrl || "" : "",
+    doctorName: p.doctorName || "",
+    photoURL: p.photoURL || "",
+    whatsapp: p.whatsapp || "",
+    slug: r.slug,
+  };
+});
+
+exports.cancelBookingRequest = onCall(
+  { region: "us-central1", maxInstances: 5 },
+  async (request) => {
+    const snap = await bookingForPatient(request.data);
+    const r = snap.data();
+    if (r.status !== "pending" && r.status !== "accepted") {
+      return { status: r.status };
+    }
+    await snap.ref.update({ status: "cancelled", cancelledAt: Date.now() });
+    // An accepted request is already on the dentist's calendar: mark that
+    // appointment cancelled; it syncs to every device of the dentist.
+    if (r.appointmentId) {
+      await firestore
+        .collection("dentist_records")
+        .doc(r.ownerId)
+        .collection("appointments")
+        .doc(r.appointmentId)
+        .set({ status: "cancelled", updatedAt: Date.now() }, { merge: true })
+        .catch((err) => console.warn("Appointment cancel failed", err));
+    }
+    await notifyBooking(`${r.ownerId}_booking_cancel_${snap.id}`, {
+      userId: r.ownerId,
+      title: `ألغى ${r.patientName} موعده`,
+      body: `${r.date} · ${r.time} — ${r.clinicName}`,
+      type: "booking_cancelled",
+      bookingRequestId: snap.id,
+      senderName: r.patientName,
+    });
+    return { status: "cancelled" };
+  },
+);
+
+exports.onBookingRequestWritten = onDocumentWritten(
+  { document: "booking_requests/{id}", region: "us-central1" },
+  async (event) => {
+    const before = event.data.before.exists ? event.data.before.data() : null;
+    const after = event.data.after.exists ? event.data.after.data() : null;
+    const r = after || before;
+    if (!r) return;
+    if (before && after && before.status === after.status) return;
+    await recomputeBusy(r.ownerId, r.clinicId, r.date);
+  },
+);
+
+exports.onAppointmentWritten = onDocumentWritten(
+  {
+    document: "dentist_records/{uid}/appointments/{id}",
+    region: "us-central1",
+  },
+  async (event) => {
+    const before = event.data.before.exists ? event.data.before.data() : null;
+    const after = event.data.after.exists ? event.data.after.data() : null;
+    if (
+      before &&
+      after &&
+      before.time === after.time &&
+      before.status === after.status &&
+      before.date === after.date &&
+      !!before.deleted === !!after.deleted
+    ) {
+      return;
+    }
+    const keys = new Set();
+    for (const a of [before, after]) {
+      if (a && a.clinicId && a.date) keys.add(`${a.clinicId}|${a.date}`);
+    }
+    for (const k of keys) {
+      const [clinicId, date] = k.split("|");
+      await recomputeBusy(event.params.uid, clinicId, date);
+    }
   },
 );

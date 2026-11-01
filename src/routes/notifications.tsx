@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Bell, CheckCheck, MessageCircle, Package, Truck } from "lucide-react";
+import { Bell, CalendarCheck2, CalendarX2, CheckCheck, MessageCircle, Package, Truck } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import {
@@ -22,6 +22,8 @@ const TYPE_META: Record<Notification["type"], { icon: typeof Package; tone: stri
   order_status: { icon: Truck, tone: "bg-amber-100 text-amber-600" },
   message: { icon: MessageCircle, tone: "bg-emerald-100 text-emerald-600" },
   case_message: { icon: MessageCircle, tone: "bg-violet-100 text-violet-600" },
+  booking_new: { icon: CalendarCheck2, tone: "bg-teal-100 text-teal-700" },
+  booking_cancelled: { icon: CalendarX2, tone: "bg-rose-100 text-rose-600" },
 };
 
 function NotificationsPage() {

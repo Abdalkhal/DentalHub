@@ -3,7 +3,7 @@ import { setClinicStoreUser } from "./clinicStore";
 import { onSnapshot, setDoc } from "firebase/firestore";
 import { setPatientStoreUser, setPatientSyncReady } from "./patientsStore";
 import { clinicsDoc } from "./dentistRecords";
-import { setAppointmentsStoreUser } from "./appointmentsStore";
+import { setAppointmentSyncReady, setAppointmentsStoreUser } from "./appointmentsStore";
 
 // A dentist can run more than one clinic under the same account. Every
 // clinic-scoped store (this one's own list aside — clinicStore.ts's
@@ -104,6 +104,7 @@ function pointStoresAt(uid: string, clinicId: string) {
 
 let unsubscribeClinics: (() => void) | null = null;
 const PATIENTS_PREFIX = "dh:patients:v1:";
+const APPOINTMENTS_PREFIX = "dh_appointments_v1:";
 const firstSyncKey = (uid: string) => `dh_clinics_synced:${uid}`;
 
 function pushClinics() {
@@ -114,7 +115,7 @@ function pushClinics() {
 }
 
 /** Copies one clinic's local data to another clinic id. Never deletes the
- *  source; never overwrites existing target data except patients, which are
+ *  source; never overwrites existing target data except patients and appointments, which are
  *  merged by id (the newer copy of each wins). */
 function copyLocalClinicData(uid: string, fromId: string, toId: string) {
   for (const prefix of LEGACY_PREFIXES) {
@@ -126,7 +127,7 @@ function copyLocalClinicData(uid: string, fromId: string, toId: string) {
       const existing = localStorage.getItem(to);
       if (existing == null) {
         localStorage.setItem(to, raw);
-      } else if (prefix === PATIENTS_PREFIX) {
+      } else if (prefix === PATIENTS_PREFIX || prefix === APPOINTMENTS_PREFIX) {
         type P = { id: string; updatedAt?: number };
         const merged = new Map<string, P>((JSON.parse(existing) as P[]).map((p) => [p.id, p]));
         for (const p of JSON.parse(raw) as P[]) {
@@ -177,6 +178,7 @@ function watchClinics(uid: string) {
         if (merged.some((c) => !remote.some((r) => r.id === c.id))) pushClinics();
         if (activeChanged) pointStoresAt(uid, activeClinicId);
         setPatientSyncReady(true);
+        setAppointmentSyncReady(true);
       },
       (err) => console.warn("Clinic list sync error:", err),
     );
@@ -190,7 +192,10 @@ function watchClinics(uid: string) {
  *  creates a first clinic and migrates any pre-existing un-scoped data into it. */
 export function setClinicsStoreUser(uid: string) {
   const switched = uid !== currentUserId || !unsubscribeClinics;
-  if (switched) setPatientSyncReady(false);
+  if (switched) {
+    setPatientSyncReady(false);
+    setAppointmentSyncReady(false);
+  }
   currentUserId = uid;
   const existing = loadRaw(uid);
 

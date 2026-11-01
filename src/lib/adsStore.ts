@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { assertVerified } from "./emailVerification";
 import { collection, doc, setDoc, deleteDoc, query, orderBy, Timestamp } from "firebase/firestore";
 import { ref, uploadBytes, deleteObject } from "firebase/storage";
 import { getFunctions, httpsCallable } from "firebase/functions";
@@ -104,6 +105,7 @@ export function useSubmitAd() {
       description: string;
       images: string[];
     }) => {
+      assertVerified();
       const id = crypto.randomUUID();
       await setDoc(doc(db, "ads", id), {
         id,

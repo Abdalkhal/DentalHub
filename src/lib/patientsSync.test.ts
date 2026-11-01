@@ -148,3 +148,23 @@ it("reports a failed upload and sends everything on \"sync now\"", async () => {
   expect(await phone.patients.syncPatientsNow()).toEqual({ sent: 1, failed: 0, error: undefined });
   expect(backend.docs.get(`dentist_records/${UID}/patients/p1`)).toMatchObject({ name: "Only on phone", clinicId: "A" });
 }, 30_000);
+
+it("syncs appointments between devices, including deletes", async () => {
+  const clinicsKey = `dh_clinics_v1:${UID}`;
+  const clinics = JSON.stringify({ clinics: [{ id: "W", name: "العيادة الرئيسية", address: "", workDays: "" }], activeClinicId: "W" });
+  await device({ [clinicsKey]: clinics });
+  const appts = await import("./appointmentsStore");
+  const a = appts.addAppointment({
+    patientName: "A", phone: "", date: "2026-11-03", time: "16:00", appointmentType: "", clinicRoom: "",
+    doctor: "", treatment: "", notes: "", reminder: false, status: "confirmed",
+  });
+  await settle();
+  expect(backend.docs.get(`dentist_records/${UID}/appointments/${a.id}`)).toMatchObject({ time: "16:00", clinicId: "W", deleted: false });
+
+  await device({ [clinicsKey]: clinics });
+  const other = await import("./appointmentsStore");
+  expect(other.getAppointments().map((x) => x.id)).toEqual([a.id]);
+  other.removeAppointment(a.id);
+  await settle();
+  expect(backend.docs.get(`dentist_records/${UID}/appointments/${a.id}`)).toMatchObject({ deleted: true });
+}, 30_000);

@@ -35,6 +35,8 @@ export type UserRoleDoc = {
   dob?: string;
   labDescription?: string;
   notificationsEnabled?: boolean;
+  // Set on sign-up since email verification became required (emailVerification.ts).
+  mustVerifyEmail?: boolean;
   clinicName?: string;
   accountStatus?: "active" | "suspended" | "expired";
   subscriptionExpiry?: string;

@@ -20,7 +20,9 @@ export function notificationTarget(n: Notification):
   | { to: "/doctor-invoices/$invoiceId"; params: { invoiceId: string } }
   | { to: "/orders" }
   | { to: "/track-cases"; search: { open?: string } }
+  | { to: "/clinic/booking" }
   | null {
+  if (n.type === "booking_new" || n.type === "booking_cancelled") return { to: "/clinic/booking" };
   if (n.type === "message" && n.chatWith) return { to: "/messages", search: { with: n.chatWith } };
   // The doctor reads case chats from case tracking; the lab from its orders.
   if (n.type === "case_message") return n.forRole === "doctor" ? { to: "/track-cases", search: { open: n.orderId } } : { to: "/orders" };

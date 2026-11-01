@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { assertVerified } from "./emailVerification";
 import { auth, db, storage } from "@/integrations/firebase/client";
 import {
   collection,
@@ -238,6 +239,7 @@ export function useUpsertProduct() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (p: Product) => {
+      assertVerified();
       const ref = doc(db, "products", p.id);
       const cleanSpec = p.implantSpec ? (removeUndefined(p.implantSpec) as ImplantSpec) : null;
       const cleanAccessories = p.accessories

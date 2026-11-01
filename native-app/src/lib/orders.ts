@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { assertVerified } from "./emailVerification";
 import { db } from "@/integrations/firebase/client";
 import { app } from "@/integrations/firebase/config";
 import {
@@ -75,6 +76,7 @@ export async function placeCartOrder(
     discount?: { code?: string; discountUSD?: number; discountIQD?: number };
   },
 ): Promise<{ count: number; orderId?: string }> {
+  assertVerified();
   const items = getCart();
   const call = httpsCallable<
     {

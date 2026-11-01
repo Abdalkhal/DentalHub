@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { assertVerified } from "./emailVerification";
 import {
   collection,
   doc,
@@ -137,6 +138,7 @@ export function useSubmitAd() {
       description: string;
       images: string[];
     }) => {
+      assertVerified();
       const id = randomUUID();
       await setDoc(doc(db, "ads", id), {
         id,
