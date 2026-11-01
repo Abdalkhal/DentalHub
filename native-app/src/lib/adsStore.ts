@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { uploadFileUri } from "./nativeUpload";
 import { assertVerified } from "./emailVerification";
 import {
   collection,
@@ -10,7 +11,6 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { ref, deleteObject } from "firebase/storage";
-import { uploadData } from "./uploadData";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { db, storage } from "@/integrations/firebase/client";
 import { app } from "@/integrations/firebase/config";
@@ -95,9 +95,8 @@ export async function uploadAdImage(
 ): Promise<string> {
   const ext = (file.name?.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
   const path = `ads/${accountId}/${randomUUID()}.${ext || "jpg"}`;
-  const storageRef = ref(storage, path);
-  const blob = await (await fetch(file.uri)).blob();
-  await uploadData(storageRef, blob, { contentType: file.type || "image/jpeg" });
+  // Sent by the native file uploader (see nativeUpload.ts).
+  await uploadFileUri(path, file.uri, file.type || "image/jpeg");
   return path;
 }
 

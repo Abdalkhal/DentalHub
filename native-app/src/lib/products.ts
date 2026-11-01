@@ -14,7 +14,7 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { ref, deleteObject, getDownloadURL } from "firebase/storage";
-import { uploadData } from "./uploadData";
+import { uploadFileUri } from "./nativeUpload";
 import type { ProductSpecs } from "@/data/specs";
 import { randomUUID } from "@/lib/randomId";
 import { File } from "expo-file-system";
@@ -344,15 +344,9 @@ export async function uploadProductImage(
   // that cross-service check refused every upload ("storage/unauthorized").
   // Who may attach the image to a product is enforced on the product doc.
   const path = `product_images/${uid}/${productId}/${randomUUID()}.${ext || "jpg"}`;
-  const storageRef = ref(storage, path);
-  // Read natively: fetch(uri).blob() is unreliable on Android and failed
-  // silently there, so products were saved with no images at all.
-  const bytes = new Uint8Array(await new File(file.uri).arrayBuffer());
-  if (bytes.byteLength >= 10 * 1024 * 1024) throw new Error("Image is larger than 10 MB");
-  await uploadData(storageRef, bytes, {
-    contentType: file.type || "image/jpeg",
-    customMetadata: { companyId: uid },
-  });
+  if ((new File(file.uri).size ?? 0) >= 10 * 1024 * 1024) throw new Error("Image is larger than 10 MB");
+  // Sent by the native file uploader, not as a JS byte array (see nativeUpload.ts).
+  await uploadFileUri(path, file.uri, file.type || "image/jpeg");
   return path;
 }
 
