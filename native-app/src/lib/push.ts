@@ -57,6 +57,16 @@ export async function setupAndroidChannel(): Promise<void> {
   }
 }
 
+/** Whether this phone has granted notification permission (no prompt). */
+export async function pushPermissionGranted(): Promise<boolean> {
+  if (!isPushSupported()) return false;
+  try {
+    return (await notifications().getPermissionsAsync()).status === 'granted';
+  } catch {
+    return false;
+  }
+}
+
 /** This device's tokens, once known, so signing out can remove them. */
 let deviceTokens: { expoToken?: string; fcmToken?: string } = {};
 
