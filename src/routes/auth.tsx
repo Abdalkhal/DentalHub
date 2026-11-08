@@ -158,7 +158,7 @@ export function AuthPage() {
           setBusy(false);
           return;
         }
-        if (roleDoc.accountType !== accountType) {
+        if (roleDoc.accountType !== accountType && roleDoc.accountType !== "secretary") {
           setError(
             ar
               ? "عذراً، هذا الحساب غير مسجل تحت هذا النوع. يرجى اختيار نوع الحساب الصحيح."
@@ -195,7 +195,9 @@ export function AuthPage() {
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "";
-      if (
+      if (msg.includes("user-disabled")) {
+        setError(ar ? "تم إيقاف هذا الحساب. تواصل مع الدعم." : "This account is suspended. Contact support.");
+      } else if (
         msg.includes("invalid-credential") ||
         msg.includes("user-not-found") ||
         msg.includes("wrong-password")

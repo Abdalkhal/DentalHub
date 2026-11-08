@@ -6,6 +6,7 @@ import { useI18n } from "@/lib/i18n";
 import { useInvoice } from "@/lib/invoices";
 import { useUserRole } from "@/lib/useAuth";
 import { OfficialInvoiceView } from "@/components/OfficialInvoiceView";
+import { orderMoney } from "@/lib/promo";
 import { Loader2, ReceiptText, Printer, Share2, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 
@@ -67,12 +68,7 @@ function InvoiceDetailInner() {
     );
   }
 
-  const iqdTotal = inv.items
-    .filter((i) => i.currency === "IQD")
-    .reduce((s, i) => s + i.price * i.quantity, 0);
-  const usdTotal = inv.items
-    .filter((i) => i.currency !== "IQD")
-    .reduce((s, i) => s + i.price * i.quantity, 0);
+  const { netIQD: iqdTotal, netUSD: usdTotal } = orderMoney(inv);
 
   const handlePrint = () => {
     window.print();
@@ -131,14 +127,14 @@ function InvoiceDetailInner() {
           </button>
         </div>
 
-        {inv.doctorId && (
+        {(role?.accountType === "dentist" ? inv.officeId : inv.doctorId) && (
           <Link
             to="/messages"
-            search={{ with: inv.doctorId, withName: inv.doctorName }}
+            search={role?.accountType === "dentist" ? { with: inv.officeId, withName: "" } : { with: inv.doctorId, withName: inv.doctorName }}
             className="no-print h-11 rounded-xl bg-[#2563EB] text-white font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition"
           >
             <MessageSquare className="size-4" />
-            {ar ? "مراسلة الطبيب" : "Message doctor"}
+            {role?.accountType === "dentist" ? (ar ? "مراسلة" : "Message") : ar ? "مراسلة الطبيب" : "Message doctor"}
           </Link>
         )}
 

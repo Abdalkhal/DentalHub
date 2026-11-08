@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, Share, View } from 'react-native';
 import { KeyboardAwareScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import { router } from 'expo-router';
-import { Loader2, Share2, ShoppingCart, Trash2 } from 'lucide-react-native';
+import { Check, Loader2, Share2, ShoppingCart, TicketPercent, Trash2 } from 'lucide-react-native';
 
 import { Screen, Text, Input } from '@/components/ui';
 import { ProductImage } from '@/components/ProductImage';
@@ -10,6 +10,8 @@ import { useCart, removeFromCart } from '@/lib/cartStore';
 import { placeCartOrder } from '@/lib/orders';
 import { useUserRole, useSession } from '@/lib/useAuth';
 import { useI18n } from '@/lib/i18n';
+import { toast } from '@/lib/toast';
+import { codeMessage, discountLabel, moneyRows, useCartPreview } from '@/lib/promo';
 import { cn } from '@/lib/utils';
 
 // Faithful port of the web cart drawer (src/components/CartDrawer.tsx),
@@ -38,6 +40,13 @@ export default function CartScreen() {
 
   const [placing, setPlacing] = useState(false);
   const [note, setNote] = useState('');
+  const [promoInput, setPromoInput] = useState('');
+  const [codes, setCodes] = useState<string[]>([]);
+  const previewItems = useMemo(
+    () => cart.map((i) => ({ productId: i.productId, quantity: i.quantity || 1 })),
+    [cart],
+  );
+  const preview = useCartPreview(previewItems, codes, !!user);
   const [draftNo] = useState(() => `DNT-${Math.floor(1000 + Math.random() * 9000)}`);
 
   const officeNames = [...new Set(cart.map((i) => i.officeName).filter(Boolean))];
@@ -47,12 +56,46 @@ export default function CartScreen() {
   const today = new Date();
   const dateLabel = today.toLocaleDateString(ar ? 'ar-IQ' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
-  const iqdTotal = cart.filter((i) => i.currency === 'IQD').reduce((s, i) => s + i.unitPrice * i.quantity, 0);
-  const usdTotal = cart.filter((i) => i.currency !== 'IQD').reduce((s, i) => s + i.unitPrice * i.quantity, 0);
+  // Until the server has answered, a row shows the price it was added at. The
+  // order can't be placed on those: the button waits for the real total.
+  const localIQD = cart.filter((i) => i.currency === 'IQD').reduce((s, i) => s + i.unitPrice * i.quantity, 0);
+  const localUSD = cart.filter((i) => i.currency !== 'IQD').reduce((s, i) => s + i.unitPrice * i.quantity, 0);
+  const priced = preview.data;
+  const totals = priced?.totals ?? {
+    rawUSD: localUSD,
+    rawIQD: localIQD,
+    tierSavedUSD: 0,
+    tierSavedIQD: 0,
+    discountUSD: 0,
+    discountIQD: 0,
+    netUSD: localUSD,
+    netIQD: localIQD,
+  };
+  const iqdTotal = totals.netIQD;
+  const usdTotal = totals.netUSD;
+  const lineByIndex = new Map((priced?.offices ?? []).flatMap((o) => o.lines.map((l) => [l.index, l] as const)));
+  const discounted = (priced?.offices ?? []).filter((o) => o.discountUSD > 0 || o.discountIQD > 0);
+  const summaryRows = moneyRows(
+    totals,
+    discounted.length === 1 ? discountLabel(discounted[0], ar) : ar ? 'الخصومات' : 'Discounts',
+    ar,
+    { alwaysNet: true },
+  );
+  const canOrder = !!priced && !preview.isFetching && !preview.isError;
+
+  const handleApplyPromo = () => {
+    const code = promoInput.trim().toUpperCase();
+    if (!code) return;
+    if (!codes.includes(code)) setCodes([...codes, code]);
+    setPromoInput('');
+  };
 
   const handleShare = () => {
     const lines = cart.map(
-      (i) => `• ${i.productName} ×${i.quantity} — ${i.currency === 'IQD' ? fmtIqd(i.unitPrice * i.quantity) : fmtUsd(i.unitPrice * i.quantity)}`,
+      (i, index) => {
+        const unit = lineByIndex.get(index)?.price ?? i.unitPrice;
+        return `• ${i.productName} ×${i.quantity} — ${i.currency === 'IQD' ? fmtIqd(unit * i.quantity) : fmtUsd(unit * i.quantity)}`;
+      },
     );
     const text = [
       storeName,
@@ -77,12 +120,20 @@ export default function CartScreen() {
           city: role?.city,
           clinicName: role?.clinicName,
         },
-        { note: note.trim() || undefined },
+        { note: note.trim() || undefined, codes, expected: { usd: usdTotal, iqd: iqdTotal } },
       );
       router.replace('/orders');
-    } catch {
+    } catch (e) {
       // placeCartOrder already best-effort-guards the notification write;
       // a thrown error here means the order itself failed.
+      if (String((e as { message?: string })?.message).includes('price-changed')) {
+        toast.error(
+          ar
+            ? 'تغيّر السعر أو الخصم منذ فتحت السلة. راجع الإجمالي الجديد ثم أكمل الطلب.'
+            : 'A price or discount changed. Check the new total, then complete the order.',
+        );
+        preview.refetch();
+      }
     } finally {
       setPlacing(false);
     }
@@ -137,7 +188,11 @@ export default function CartScreen() {
 
         {/* Items */}
         <View className="mt-4 divide-y divide-slate-50 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
-          {cart.map((item) => (
+          {cart.map((item, index) => {
+            const line = lineByIndex.get(index);
+            const unit = line?.price ?? item.unitPrice;
+            const tiered = !!line && line.price < line.listPrice;
+            return (
             <View key={item.id} className="flex-row items-center gap-3 px-3.5 py-3">
               <ProductImage uri={item.productImage} className="h-12 w-12 rounded-xl bg-slate-100" iconSize={20} />
               <View className="min-w-0 flex-1">
@@ -150,8 +205,13 @@ export default function CartScreen() {
                   </Text>
                 )}
                 <View className="mt-1 flex-row items-center gap-1.5">
-                  <Text className="text-xs text-slate-500">
-                    {item.currency === 'IQD' ? fmtIqd(item.unitPrice) : fmtUsd(item.unitPrice)}
+                  {tiered && (
+                    <Text className="text-xs text-slate-400 line-through">
+                      {item.currency === 'IQD' ? fmtIqd(line.listPrice) : fmtUsd(line.listPrice)}
+                    </Text>
+                  )}
+                  <Text className={tiered ? 'text-xs font-bold text-emerald-600' : 'text-xs text-slate-500'}>
+                    {item.currency === 'IQD' ? fmtIqd(unit) : fmtUsd(unit)}
                   </Text>
                   <Text className="text-xs text-slate-300">×</Text>
                   <Text className="text-xs font-bold text-slate-700">{item.quantity}</Text>
@@ -159,14 +219,63 @@ export default function CartScreen() {
               </View>
               <View className="shrink-0 items-end">
                 <Text className="text-sm font-extrabold" style={{ color: TEAL }}>
-                  {item.currency === 'IQD' ? fmtIqd(item.unitPrice * item.quantity) : fmtUsd(item.unitPrice * item.quantity)}
+                  {item.currency === 'IQD' ? fmtIqd(unit * item.quantity) : fmtUsd(unit * item.quantity)}
                 </Text>
                 <Pressable onPress={() => removeFromCart(item.id)} className="mt-1 h-8 w-8 items-center justify-center rounded-lg">
                   <Trash2 size={16} color="#94A3B8" />
                 </Pressable>
               </View>
             </View>
-          ))}
+            );
+          })}
+        </View>
+
+        {/* Discount code */}
+        <View className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+          <View className="flex-row items-center gap-1.5">
+            <TicketPercent size={16} color={TEAL} />
+            <Text className="text-sm font-bold text-slate-700">{ar ? 'رمز الخصم' : 'Discount code'}</Text>
+          </View>
+          {codes.map((code) => {
+            const result = priced?.codes.find((r) => r.code === code);
+            const good = result?.status === 'applied';
+            return (
+              <View key={code} className="mt-3 rounded-xl px-3 py-2.5" style={{ backgroundColor: good ? `${TEAL}14` : '#F8FAFC' }}>
+                <View className="flex-row items-center justify-between gap-2">
+                  <Text className="text-sm font-bold" style={{ color: good ? TEAL : '#475569', writingDirection: 'ltr' }}>
+                    {code}
+                  </Text>
+                  <Pressable onPress={() => setCodes(codes.filter((c) => c !== code))}>
+                    <Text className="text-[11px] font-bold text-slate-400">{ar ? 'إزالة' : 'Remove'}</Text>
+                  </Pressable>
+                </View>
+                {!!result && (
+                  <Text className={cn('mt-1 text-[11px]', good ? 'text-emerald-700' : result.status === 'beaten' ? 'text-slate-500' : 'text-rose-500')}>
+                    {codeMessage(result, ar)}
+                  </Text>
+                )}
+              </View>
+            );
+          })}
+          <View className="mt-3 flex-row gap-2">
+            <Input
+              className="flex-1"
+              value={promoInput}
+              onChangeText={setPromoInput}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              placeholder={ar ? 'أدخل الرمز' : 'Enter code'}
+            />
+            <Pressable
+              onPress={handleApplyPromo}
+              disabled={preview.isFetching}
+              className={cn('h-11 flex-row items-center gap-1 rounded-xl px-4', preview.isFetching && 'opacity-60')}
+              style={{ backgroundColor: TEAL }}
+            >
+              <Check size={14} color="#FFFFFF" />
+              <Text className="text-xs font-bold text-white">{ar ? 'تطبيق' : 'Apply'}</Text>
+            </Pressable>
+          </View>
         </View>
 
         {/* Note */}
@@ -185,21 +294,30 @@ export default function CartScreen() {
         <View className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
           <Text className="text-sm font-bold text-slate-700">{ar ? 'ملخص الطلب' : 'Order summary'}</Text>
           <View className="mt-3 gap-2">
-            {usdTotal > 0 && (
-              <View className="flex-row items-center justify-between">
-                <Text className="text-sm font-bold text-slate-800">{ar ? 'الإجمالي ($)' : 'Total ($)'}</Text>
-                <Text className="text-base font-extrabold" style={{ color: TEAL }}>
-                  {fmtUsd(usdTotal)}
+            {summaryRows.map((r) => (
+              <View key={r.key} className="flex-row items-center justify-between">
+                <Text className={cn('text-sm', r.tone === 'total' ? 'font-bold text-slate-800' : r.tone === 'saving' ? 'text-emerald-600' : 'text-slate-500')}>
+                  {r.label}
+                </Text>
+                <Text
+                  className={cn(r.tone === 'total' ? 'text-base font-extrabold' : 'text-sm font-semibold', r.tone === 'saving' && 'text-emerald-600')}
+                  style={r.tone === 'total' ? { color: TEAL, writingDirection: 'ltr' } : { writingDirection: 'ltr' }}
+                >
+                  {r.value}
                 </Text>
               </View>
+            ))}
+            {!!priced?.skipped.length && (
+              <Text className="text-[11px] text-amber-600">
+                {ar ? 'بعض منتجات السلة لم تعد متوفرة ولن تدخل في الطلب.' : "Some cart items are no longer available and won't be ordered."}
+              </Text>
             )}
-            {iqdTotal > 0 && (
-              <View className="flex-row items-center justify-between">
-                <Text className="text-sm font-bold text-slate-800">{ar ? 'الإجمالي (د.ع)' : 'Total (IQD)'}</Text>
-                <Text className="text-base font-extrabold" style={{ color: TEAL }}>
-                  {fmtIqd(iqdTotal)}
+            {preview.isError && (
+              <Pressable onPress={() => preview.refetch()}>
+                <Text className="text-[11px] font-bold text-rose-500">
+                  {ar ? 'تعذر حساب السعر. اضغط لإعادة المحاولة' : "Couldn't work out the price. Tap to retry"}
                 </Text>
-              </View>
+              </Pressable>
             )}
           </View>
         </View>
@@ -212,8 +330,8 @@ export default function CartScreen() {
         </Pressable>
         <Pressable
           onPress={handleComplete}
-          disabled={placing}
-          className={cn('h-12 flex-1 flex-row items-center justify-center gap-2 rounded-xl', placing && 'opacity-60')}
+          disabled={placing || (!!user && !canOrder)}
+          className={cn('h-12 flex-1 flex-row items-center justify-center gap-2 rounded-xl', (placing || (!!user && !canOrder)) && 'opacity-60')}
           style={{ backgroundColor: TEAL }}
         >
           {placing ? <Loader2 size={16} color="#FFFFFF" /> : <ShoppingCart size={16} color="#FFFFFF" />}

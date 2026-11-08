@@ -1,73 +1,99 @@
+// Messages: direct conversations with any account, and (for dentists) the
+// chats of their lab cases. Mirrors the web's src/routes/messages.tsx; data in
+// lib/directMessages.ts (identical in both apps).
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
-import { useLocalSearchParams, useNavigation } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
-import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
-import { MessageCircle, Send } from 'lucide-react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  TextInput,
+  View,
+} from 'react-native';
+import { router, useLocalSearchParams, useNavigation } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import {
+  Ban,
+  Check,
+  CheckCheck,
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
+  Flag,
+  FlaskConical,
+  ImagePlus,
+  MessageCircle,
+  MoreVertical,
+  Search,
+  Send,
+  X,
+} from 'lucide-react-native';
 
 import { Screen, Text } from '@/components/ui';
-import { db } from '@/integrations/firebase/client';
+import { CaseChatModal } from '@/components/CaseChatModal';
 import { useOrders } from '@/lib/ordersStore';
 import { useDentistCases, filterLegacyOrders } from '@/lib/caseTracking';
+import { useCaseUnreadCount } from '@/lib/caseMessages';
 import {
-  useCaseMessages,
-  sendCaseMessage,
-  messagePreview,
-  markCaseRead,
-  useCaseUnreadCount,
-  type CaseMessage,
-} from '@/lib/caseMessages';
-import {
-  useDmThreads,
-  useDmMessages,
-  sendDmMessage,
-  markDmThreadRead,
-  useDmUnreadCount,
+  ACCOUNT_TYPE_COLOR,
+  ACCOUNT_TYPE_LABEL,
+  DM_MAX_LENGTH,
+  deleteDmMessage,
+  dmDayLabel,
+  dmListTime,
   dmThreadId,
-  type DmThread,
+  dmTime,
+  isBlocked,
+  markDmThreadRead,
+  otherParticipant,
+  reportDmThread,
+  sameDay,
+  seenByOther,
+  sendDmMessage,
+  setDmBlocked,
+  unreadFor,
+  useDmMessages,
+  useDmThread,
+  useDmThreads,
   type DmMessage,
+  type DmThread,
 } from '@/lib/directMessages';
+import { uploadDmImage, useDmImageUrl } from '@/lib/dmUpload';
+import { useAccountCard, useAccountCards } from '@/lib/accountCards';
+import { alertUploadError } from '@/lib/uploadAlert';
 import { useSession, useUserRole } from '@/lib/useAuth';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
 
-type Conv = { labId: string; caseId: string; patient: string; orderNo: string };
-type ChatBubble = { id: string; senderId: string; text: string; createdAt: CaseMessage['createdAt'] };
+const BLUE = '#2563EB';
 
-function timeLabel(d?: CaseMessage['createdAt'] | null): string {
-  if (!d || !d.toDate) return '';
-  const date = d.toDate();
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
+type CaseConv = { labId: string; caseId: string; patient: string; orderNo: string; workType?: string };
+type Peer = { id: string; name: string; photo: string; type: string };
 
-function UnreadDot({ labId, caseId, uid }: { labId?: string; caseId: string; uid?: string }) {
-  const count = useCaseUnreadCount(labId ?? '', caseId, uid);
-  if (!count) return null;
+function Avatar({ photo, name, type, size = 48 }: { photo?: string; name: string; type?: string; size?: number }) {
+  if (photo) return <Image source={{ uri: photo }} style={{ width: size, height: size, borderRadius: size / 2.6 }} className="bg-slate-100" />;
   return (
-    <View className="min-w-5 h-5 shrink-0 items-center justify-center rounded-full bg-primary px-1">
-      <Text className="text-[10px] font-bold text-white">{count > 9 ? '9+' : count}</Text>
+    <View
+      style={{ width: size, height: size, borderRadius: size / 2.6, backgroundColor: ACCOUNT_TYPE_COLOR[type ?? ''] ?? '#64748B' }}
+      className="items-center justify-center"
+    >
+      <Text className="font-extrabold text-white" style={{ fontSize: size * 0.4 }}>
+        {name.trim().charAt(0) || '؟'}
+      </Text>
     </View>
   );
 }
 
-function DmUnreadDot({ threadId, uid }: { threadId: string; uid?: string }) {
-  const count = useDmUnreadCount(threadId, uid);
-  if (!count) return null;
+function CountBadge({ n }: { n: number }) {
+  if (!n) return null;
   return (
-    <View className="min-w-5 h-5 shrink-0 items-center justify-center rounded-full bg-primary px-1">
-      <Text className="text-[10px] font-bold text-white">{count > 9 ? '9+' : count}</Text>
-    </View>
-  );
-}
-
-function Avatar({ photo, label }: { photo?: string; label: string }) {
-  if (photo) {
-    return <Image source={{ uri: photo }} className="h-11 w-11 shrink-0 rounded-2xl bg-slate-100" />;
-  }
-  return (
-    <View className="h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#2563EB]">
-      <Text className="text-lg font-extrabold text-white">{label.charAt(0) || '؟'}</Text>
+    <View className="h-5 min-w-5 items-center justify-center rounded-full px-1.5" style={{ backgroundColor: BLUE }}>
+      <Text className="text-[10px] font-bold text-white">{n > 99 ? '99+' : n}</Text>
     </View>
   );
 }
@@ -78,335 +104,603 @@ export default function MessagesScreen() {
   const { user } = useSession();
   const { role } = useUserRole();
   const navigation = useNavigation();
-  const params = useLocalSearchParams<{ with?: string; withName?: string; withPhoto?: string }>();
-  const localOrders = useOrders();
-  const { cases: remoteCases } = useDentistCases(user?.uid ?? '');
-  const doctorName = [role?.name, role?.surname].filter(Boolean).join(' ').trim();
-  const myName = doctorName || user?.displayName || user?.email || (ar ? 'أنا' : 'Me');
+  const params = useLocalSearchParams<{ with?: string; withName?: string }>();
+  const uid = user?.uid;
+  const isDentist = role?.accountType === 'dentist';
+  // Invited lab staff have no account doc — never show their email as a name.
+  const myName = role
+    ? [role.name, role.surname].filter(Boolean).join(' ').trim() || role.clinicName || (ar ? 'مستخدم' : 'User')
+    : user?.displayName || (ar ? 'كادر المختبر' : 'Lab staff');
   const myPhoto = role?.photoURL || '';
 
-  const [selectedCase, setSelectedCase] = useState<Conv | null>(null);
-  const [selectedDm, setSelectedDm] = useState<DmThread | null>(null);
-  const [text, setText] = useState('');
-  const scrollRef = useRef<ScrollView>(null);
+  const { threads, loading } = useDmThreads(uid);
+  const [openThreadId, setOpenThreadId] = useState('');
+  const [openCase, setOpenCase] = useState<CaseConv | null>(null);
+  const [tab, setTab] = useState<'dm' | 'cases'>('dm');
+  const [search, setSearch] = useState('');
 
-  const { threads: dmThreads } = useDmThreads(user?.uid);
-
-  // `withPhoto` used to be passed as a router param straight from the
-  // profile/invoice screen (a Firebase Storage download URL, which itself
-  // contains `?alt=media&token=...`) — a URL-with-a-query-string riding as
-  // one query param value is exactly the kind of thing that gets mangled by
-  // href serialization, and it was: the avatar came through blank. Fetching
-  // the account doc directly here sidesteps that whole class of bug and is
-  // also the single source of truth, the same way profile/[accountId].tsx
-  // itself resolves this data.
-  const { data: withAccount } = useQuery({
-    queryKey: ['dm-with-account', params.with],
-    queryFn: async () => {
-      const snap = await getDoc(doc(db, 'public_profiles', params.with ?? ''));
-      if (!snap.exists()) return null;
-      const d = snap.data() as Record<string, unknown>;
-      return {
-        name: String(d.name || d.surname || ''),
-        photoURL: typeof d.photoURL === 'string' ? d.photoURL : '',
-      };
-    },
-    enabled: !!params.with,
-    staleTime: 60_000,
-  });
-
-  // Arriving from a profile/invoice "Message" button (?with=accountId): open
-  // that thread if it already exists, or a not-yet-created one otherwise —
-  // the thread doc itself is only written once the first message is sent.
+  // Arriving from a "مراسلة" button (?with=accountId): open that conversation,
+  // even before its first message exists.
   useEffect(() => {
-    if (!params.with || !user?.uid) return;
-    const threadId = dmThreadId(user.uid, params.with);
-    const existing = dmThreads.find((t) => t.id === threadId);
-    if (existing) {
-      setSelectedDm(existing);
-      return;
-    }
-    setSelectedDm({
-      id: threadId,
-      participants: [user.uid, params.with].sort(),
-      names: { [params.with]: withAccount?.name || params.withName || (ar ? 'مستخدم' : 'User'), [user.uid]: myName },
-      photos: { [params.with]: withAccount?.photoURL || '', [user.uid]: myPhoto },
-      lastMessage: '',
-      lastMessageAt: null,
-      lastSenderId: '',
-    });
-    // `user` comes from useSession() with no loading gate on this screen, so
-    // on first mount user?.uid is often still undefined (auth hasn't resolved
-    // yet) — without it in the deps, the effect ran once, bailed out on the
-    // guard above, and never got a second chance once the user did resolve,
-    // leaving the screen stuck on the empty list instead of opening the chat.
-    // `dmThreads`/`myName`/`myPhoto` are intentionally left out so an
-    // already-open synthesized thread isn't reset every time those update;
-    // `withAccount` IS included so the real photo/name replace the params
-    // fallback the moment the fetch resolves.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.with, user?.uid, withAccount]);
+    if (params.with && uid && params.with !== uid) setOpenThreadId(dmThreadId(uid, params.with));
+  }, [params.with, uid]);
 
-  const convs = useMemo<Conv[]>(() => {
+  const otherIds = threads.map((t) => otherParticipant(t, uid));
+  const cards = useAccountCards(otherIds);
+  const peerOf = (t: DmThread): Peer => {
+    const id = otherParticipant(t, uid);
+    const c = cards[id];
+    return { id, name: c?.name || t.names?.[id] || (ar ? 'مستخدم' : 'User'), photo: c?.photoURL || t.photos?.[id] || '', type: c?.accountType ?? '' };
+  };
+
+  // Dentist's lab case chats.
+  const localOrders = useOrders();
+  const { cases: remoteCases } = useDentistCases(isDentist ? uid ?? '' : '');
+  const caseConvs = useMemo<CaseConv[]>(() => {
+    if (!isDentist) return [];
     const remote = remoteCases.map((c) => ({
       labId: c.labId || (c.order.targetLabId as string | undefined) || '',
       caseId: c.order.id,
       patient: c.order.patient || (ar ? 'مريض' : 'Patient'),
       orderNo: c.order.orderNumber || c.order.id.slice(0, 6),
+      workType: c.order.workType,
     }));
     const ids = new Set(remote.map((r) => r.caseId));
+    const doctorName = [role?.name, role?.surname].filter(Boolean).join(' ').trim();
     const legacy = filterLegacyOrders(localOrders, ids, doctorName).map((o) => ({
       labId: (o.targetLabId as string | undefined) || '',
       caseId: o.id,
       patient: o.patient || (ar ? 'مريض' : 'Patient'),
       orderNo: o.orderNumber || o.id.slice(0, 6),
+      workType: o.workType,
     }));
-    return Array.from(new Map([...remote, ...legacy].map((c) => [c.caseId, c])).values());
-  }, [remoteCases, localOrders, doctorName, ar]);
+    return Array.from(new Map([...remote, ...legacy].map((c) => [c.caseId, c])).values()).filter((c) => c.labId);
+  }, [isDentist, remoteCases, localOrders, role?.name, role?.surname, ar]);
+  const labCards = useAccountCards(caseConvs.map((c) => c.labId));
 
-  const { data: labNames = {} } = useQuery({
-    queryKey: ['lab-names'],
-    queryFn: async () => {
-      const snap = await getDocs(collection(db, 'public_profiles'));
-      const map: Record<string, string> = {};
-      snap.docs.forEach((d) => {
-        const u = d.data() as Record<string, unknown>;
-        if (u.accountType === 'lab' && u.name) map[String(u.userId)] = String(u.name);
-      });
-      return map;
-    },
-    staleTime: 120_000,
-  });
-
-  const { messages: caseMessages } = useCaseMessages(selectedCase?.labId ?? '', selectedCase?.caseId ?? '');
-  const { messages: dmMessages } = useDmMessages(selectedDm?.id ?? '');
-
-  const otherId = selectedDm ? selectedDm.participants.find((p) => p !== user?.uid) ?? '' : '';
-  const otherName = selectedDm ? selectedDm.names[otherId] || (ar ? 'مستخدم' : 'User') : '';
-  const otherPhoto = selectedDm ? selectedDm.photos[otherId] || '' : '';
-
-  const bubbles: ChatBubble[] = selectedCase
-    ? caseMessages.map((m) => ({ id: m.id, senderId: m.senderId, text: m.text || messagePreview(m, ar), createdAt: m.createdAt }))
-    : dmMessages.map((m: DmMessage) => ({ id: m.id, senderId: m.senderId, text: m.text, createdAt: m.createdAt }));
-
+  // Android back / swipe while a conversation is open returns to the list —
+  // unless it was opened from another screen's "مراسلة" button.
+  useEffect(
+    () =>
+      navigation.addListener('beforeRemove', (e) => {
+        if (!openThreadId || params.with) return;
+        e.preventDefault();
+        setOpenThreadId('');
+      }),
+    [navigation, openThreadId, params.with],
+  );
   useEffect(() => {
-    if (selectedCase && user?.uid) markCaseRead(selectedCase.caseId, user.uid);
-  }, [selectedCase, caseMessages.length, user?.uid]);
+    navigation.setOptions({ headerShown: !openThreadId });
+  }, [openThreadId, navigation]);
 
-  useEffect(() => {
-    if (selectedDm && user?.uid) markDmThreadRead(selectedDm.id, user.uid);
-  }, [selectedDm, dmMessages.length, user?.uid]);
-
-  useEffect(() => {
-    scrollRef.current?.scrollToEnd({ animated: false });
-  }, [selectedCase, selectedDm, bubbles.length]);
-
-  const closeChat = () => {
-    setSelectedCase(null);
-    setSelectedDm(null);
-  };
-
-  const send = async () => {
-    const t = text.trim();
-    if (!t || !user) return;
-    if (!selectedCase && !selectedDm) return;
-    setText('');
-    try {
-      if (selectedCase) {
-        await sendCaseMessage(selectedCase.labId, selectedCase.caseId, {
-          senderId: user.uid,
-          senderRole: 'doctor',
-          senderName: myName,
-          text: t,
-        });
-      } else if (selectedDm) {
-        await sendDmMessage({
-          senderId: user.uid,
-          recipientId: otherId,
-          senderName: myName,
-          recipientName: otherName,
-          senderPhoto: myPhoto,
-          recipientPhoto: otherPhoto,
-          text: t,
-        });
-      }
-    } catch {
-      toast.error(ar ? 'تعذر الإرسال' : 'Could not send');
-    }
-  };
-
-  const selected = selectedCase || selectedDm;
-
-  // This screen renders its own in-chat header (back button + avatar + name)
-  // once a conversation is open, stacked underneath the native Stack header
-  // from _layout.tsx — two header bars was eating into the keyboard math:
-  // Android's `KeyboardAvoidingView behavior="height"` only shrinks its own
-  // (JS-measured) tree, so it has no idea the native header above it exists,
-  // and the input row stayed short of the keyboard by roughly that header's
-  // height. Hiding the native header while a chat is open removes the part
-  // the JS layout can't see, so "height" shrinks the right amount.
-  useEffect(() => {
-    navigation.setOptions({ headerShown: !selected });
-  }, [selected, navigation]);
-
-  if (!selected) {
-    const empty = convs.length === 0 && dmThreads.length === 0;
+  if (openThreadId && uid) {
+    const t = threads.find((x) => x.id === openThreadId);
+    const peerId = openThreadId.split('_').find((p) => p !== uid) ?? '';
     return (
-      <Screen>
-        <Text className="text-xl font-extrabold text-slate-800">{ar ? 'الرسائل' : 'Messages'}</Text>
-
-        {empty ? (
-          <View className="items-center py-16">
-            <View className="mb-4 h-20 w-20 items-center justify-center rounded-3xl bg-sky-100">
-              <MessageCircle size={34} color="#3B82F6" strokeWidth={1.8} />
-            </View>
-            <Text className="font-bold text-slate-500">{ar ? 'لا توجد محادثات' : 'No conversations'}</Text>
-            <Text className="mt-1 text-center text-xs text-slate-400">
-              {ar ? 'ابدأ محادثة من صفحة أي حساب' : 'Start a chat from any account’s profile'}
-            </Text>
-          </View>
-        ) : (
-          <View className="mt-3 gap-1.5">
-            {dmThreads.map((t) => {
-              const oid = t.participants.find((p) => p !== user?.uid) ?? '';
-              const name = t.names[oid] || (ar ? 'مستخدم' : 'User');
-              return (
-                <Pressable
-                  key={t.id}
-                  onPress={() => setSelectedDm(t)}
-                  className="flex-row items-center gap-3 rounded-2xl px-3 py-3"
-                >
-                  <Avatar photo={t.photos[oid]} label={name} />
-                  <View className="min-w-0 flex-1">
-                    <Text className="truncate text-sm font-bold text-slate-800">{name}</Text>
-                    {!!t.lastMessage && (
-                      <Text className="mt-0.5 truncate text-xs text-slate-400">{t.lastMessage}</Text>
-                    )}
-                  </View>
-                  <DmUnreadDot threadId={t.id} uid={user?.uid} />
-                </Pressable>
-              );
-            })}
-
-            {convs.length > 0 && (
-              <>
-                <Text className="mb-1 mt-4 text-xs font-bold text-slate-400">
-                  {ar ? 'محادثات حالات المختبر' : 'Lab case conversations'}
-                </Text>
-                {convs.map((c) => (
-                  <Pressable
-                    key={c.caseId}
-                    onPress={() => setSelectedCase(c)}
-                    className="flex-row items-center gap-3 rounded-2xl px-3 py-3"
-                  >
-                    <Avatar label={c.patient} />
-                    <View className="min-w-0 flex-1">
-                      <Text className="truncate text-sm font-bold text-slate-800">{c.patient}</Text>
-                      <Text className="mt-0.5 truncate text-xs text-slate-400">
-                        {labNames[c.labId] || (ar ? 'المختبر' : 'Lab')} · {c.orderNo}
-                      </Text>
-                    </View>
-                    <UnreadDot labId={c.labId} caseId={c.caseId} uid={user?.uid} />
-                  </Pressable>
-                ))}
-              </>
-            )}
-          </View>
-        )}
-      </Screen>
+      <ChatView
+        ar={ar}
+        uid={uid}
+        threadId={openThreadId}
+        peerId={peerId}
+        fallbackName={t?.names?.[peerId] || params.withName || ''}
+        fallbackPhoto={t?.photos?.[peerId] || ''}
+        myName={myName}
+        myPhoto={myPhoto}
+        onBack={() => (params.with && router.canGoBack() ? router.back() : setOpenThreadId(''))}
+      />
     );
   }
 
-  const headerName = selectedCase ? selectedCase.patient : otherName;
-  const headerSubtitle = selectedCase ? labNames[selectedCase.labId] || (ar ? 'المختبر' : 'Lab') : '';
+  const needle = search.trim().toLowerCase();
+  const visibleThreads = threads.filter((t) => !needle || peerOf(t).name.toLowerCase().includes(needle));
+  const visibleCases = caseConvs.filter(
+    (c) => !needle || c.patient.toLowerCase().includes(needle) || (labCards[c.labId]?.name ?? '').toLowerCase().includes(needle),
+  );
+  const dmUnread = threads.reduce((n, t) => n + unreadFor(t, uid), 0);
 
   return (
-    <KeyboardAvoidingView
-      // `behavior: undefined` on Android is a no-op — it does nothing and
-      // just relies on the OS resizing the window (AndroidManifest already
-      // sets windowSoftInputMode="adjustResize"), which is exactly why the
-      // input stayed hidden behind the keyboard: that resize wasn't reaching
-      // this screen's layout. "height" makes KeyboardAvoidingView shrink
-      // itself by the keyboard's height directly (JS-driven, via RN's own
-      // Keyboard show/hide events), independent of native window resize —
-      // the same approach chat apps like WhatsApp/Telegram rely on.
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={{ flex: 1 }}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-    >
-    {/* `scroll` (default true) wraps Screen's children in a ScrollView, which
-        breaks a chat layout: the input row is no longer pinned to the bottom
-        of the viewport, it just flows after the messages list — so once the
-        keyboard opens there's nothing keeping it in view. A chat screen needs
-        a plain flex column instead. */}
-    <Screen padded={false} scroll={false}>
-      {/* Chat header */}
-      <View className="flex-row items-center gap-3 border-b border-slate-200 bg-white px-4 py-3">
-        <Pressable onPress={closeChat} className="h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-card">
-          <Text className="text-slate-600">‹</Text>
-        </Pressable>
-        <Avatar photo={selectedDm ? otherPhoto : undefined} label={headerName} />
-        <View className="min-w-0 flex-1">
-          <Text className="truncate text-sm font-bold text-slate-800">{headerName}</Text>
-          {!!headerSubtitle && <Text className="text-[11px] text-slate-400">{headerSubtitle}</Text>}
-        </View>
-      </View>
-
-      {/* Messages */}
-      <ScrollView
-        ref={scrollRef}
-        className="flex-1 px-4 py-3"
-        contentContainerClassName="gap-3"
-        onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
-      >
-        {bubbles.length === 0 && (
-          <Text className="mt-10 text-center text-xs text-slate-400">
-            {ar ? 'ابدأ المحادثة…' : 'Start the conversation…'}
-          </Text>
-        )}
-        {bubbles.map((m) => {
-          const isMe = m.senderId === user?.uid;
-          return (
-            <View key={m.id} className={cn('flex-row', isMe ? 'justify-end' : 'justify-start')}>
-              <View
-                className={cn(
-                  'max-w-[85%] rounded-2xl px-4 py-2.5 shadow-sm',
-                  isMe ? 'rounded-br-md bg-[#2563EB]' : 'rounded-bl-md border border-slate-200 bg-white',
-                )}
-              >
-                {!!m.text && (
-                  <Text className={cn('text-sm leading-relaxed', isMe ? 'text-white' : 'text-slate-800')}>
-                    {m.text}
-                  </Text>
-                )}
-                <Text className={cn('mt-0.5 text-[10px]', isMe ? 'text-end text-white/60' : 'text-start text-slate-400')}>
-                  {timeLabel(m.createdAt)}
-                </Text>
-              </View>
-            </View>
-          );
-        })}
-      </ScrollView>
-
-      {/* Input */}
-      <View className="flex-row items-end gap-2 border-t border-slate-200 bg-white px-3 py-3">
+    <Screen>
+      <View className="mb-3 flex-row items-center rounded-2xl border border-slate-200 bg-white px-3">
+        <Search size={17} color="#94A3B8" />
         <TextInput
-          value={text}
-          onChangeText={setText}
-          placeholder={ar ? 'اكتب رسالتك…' : 'Type a message…'}
+          value={search}
+          onChangeText={setSearch}
+          placeholder={ar ? 'ابحث عن محادثة…' : 'Search conversations…'}
           placeholderTextColor="#94A3B8"
-          multiline
-          className="max-h-28 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-800"
+          className="h-11 flex-1 px-2 text-sm text-slate-800"
+          style={{ textAlign: ar ? 'right' : 'left' }}
         />
-        <Pressable
-          onPress={send}
-          disabled={!text.trim()}
-          className="h-10 w-10 items-center justify-center rounded-xl bg-[#2563EB] active:opacity-90 disabled:opacity-40"
-        >
-          <Send size={18} color="#FFFFFF" />
-        </Pressable>
       </View>
+
+      {isDentist && (
+        <View className="mb-3 flex-row gap-1 rounded-2xl bg-slate-100 p-1">
+          {(
+            [
+              ['dm', ar ? 'المحادثات' : 'Chats', dmUnread],
+              ['cases', ar ? 'محادثات الحالات' : 'Case chats', 0],
+            ] as const
+          ).map(([id, label, n]) => (
+            <Pressable
+              key={id}
+              onPress={() => setTab(id)}
+              className={cn('h-10 flex-1 flex-row items-center justify-center gap-1.5 rounded-xl', tab === id && 'bg-white')}
+            >
+              <Text className={cn('text-xs font-bold', tab === id ? 'text-slate-900' : 'text-slate-500')}>{label}</Text>
+              <CountBadge n={n} />
+            </Pressable>
+          ))}
+        </View>
+      )}
+
+      {tab === 'dm' || !isDentist ? (
+        loading ? (
+          <ActivityIndicator className="py-16" color={BLUE} />
+        ) : visibleThreads.length === 0 ? (
+          <EmptyState ar={ar} isDentist={isDentist} searching={!!needle} />
+        ) : (
+          <View className="overflow-hidden rounded-3xl border border-slate-100 bg-white">
+            {visibleThreads.map((t, i) => {
+              const p = peerOf(t);
+              const n = unreadFor(t, uid);
+              const mine = t.lastSenderId === uid;
+              return (
+                <Pressable
+                  key={t.id}
+                  onPress={() => setOpenThreadId(t.id)}
+                  className={cn('flex-row items-center gap-3 px-4 py-3.5 active:bg-slate-50', i > 0 && 'border-t border-slate-100')}
+                >
+                  <Avatar photo={p.photo} name={p.name} type={p.type} />
+                  <View className="flex-1">
+                    <View className="flex-row items-center gap-2">
+                      <Text numberOfLines={1} className={cn('flex-1 text-[15px] text-slate-900', n ? 'font-extrabold' : 'font-bold')}>
+                        {p.name}
+                      </Text>
+                      <Text className={cn('text-[11px]', n ? 'font-bold text-blue-600' : 'text-slate-400')}>{dmListTime(t.lastMessageAt, ar)}</Text>
+                    </View>
+                    <View className="mt-0.5 flex-row items-center gap-2">
+                      <Text numberOfLines={1} className={cn('flex-1 text-[13px]', n ? 'font-semibold text-slate-700' : 'text-slate-500')}>
+                        {mine ? (ar ? 'أنت: ' : 'You: ') : ''}
+                        {t.lastMessage}
+                      </Text>
+                      {isBlocked(t) ? <Ban size={14} color="#94A3B8" /> : <CountBadge n={n} />}
+                    </View>
+                    {!!p.type && (
+                      <Text className="mt-1 text-[10px] font-semibold" style={{ color: ACCOUNT_TYPE_COLOR[p.type] ?? '#64748B' }}>
+                        {ACCOUNT_TYPE_LABEL[p.type]?.[ar ? 'ar' : 'en']}
+                      </Text>
+                    )}
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        )
+      ) : visibleCases.length === 0 ? (
+        <View className="items-center rounded-3xl border border-dashed border-slate-200 bg-white px-6 py-14">
+          <FlaskConical size={34} color="#CBD5E1" />
+          <Text className="mt-3 font-bold text-slate-600">{ar ? 'لا توجد محادثات حالات' : 'No case chats'}</Text>
+          <Text className="mt-1 text-center text-xs leading-5 text-slate-400">
+            {ar ? 'عند إرسال حالة لمختبر تظهر محادثتها هنا.' : 'Cases you send to a lab show up here.'}
+          </Text>
+        </View>
+      ) : (
+        <View className="overflow-hidden rounded-3xl border border-slate-100 bg-white">
+          {visibleCases.map((c, i) => (
+            <CaseRow key={c.caseId} c={c} uid={uid} labName={labCards[c.labId]?.name} ar={ar} first={i === 0} onPress={() => setOpenCase(c)} />
+          ))}
+        </View>
+      )}
+
+      {openCase && uid && (
+        <CaseChatModal
+          visible
+          onClose={() => setOpenCase(null)}
+          ar={ar}
+          labId={openCase.labId}
+          caseId={openCase.caseId}
+          currentUserId={uid}
+          senderRole="doctor"
+          senderName={myName}
+          counterpartId={openCase.labId}
+          context={{
+            patient: openCase.patient,
+            orderNumber: openCase.orderNo,
+            workType: openCase.workType,
+            counterpartName: labCards[openCase.labId]?.name,
+          }}
+        />
+      )}
     </Screen>
+  );
+}
+
+function CaseRow({
+  c,
+  uid,
+  labName,
+  ar,
+  first,
+  onPress,
+}: {
+  c: CaseConv;
+  uid?: string;
+  labName?: string;
+  ar: boolean;
+  first: boolean;
+  onPress: () => void;
+}) {
+  const n = useCaseUnreadCount(c.labId, c.caseId, uid);
+  return (
+    <Pressable onPress={onPress} className={cn('flex-row items-center gap-3 px-4 py-3.5 active:bg-slate-50', !first && 'border-t border-slate-100')}>
+      <View className="h-12 w-12 items-center justify-center rounded-2xl bg-violet-50">
+        <FlaskConical size={22} color="#7C3AED" />
+      </View>
+      <View className="flex-1">
+        <Text numberOfLines={1} className={cn('text-[15px] text-slate-900', n ? 'font-extrabold' : 'font-bold')}>
+          {c.patient}
+        </Text>
+        <Text numberOfLines={1} className="mt-0.5 text-[13px] text-slate-500">
+          {labName || (ar ? 'المختبر' : 'Lab')} · {c.orderNo}
+        </Text>
+      </View>
+      <CountBadge n={n} />
+    </Pressable>
+  );
+}
+
+function EmptyState({ ar, isDentist, searching }: { ar: boolean; isDentist: boolean; searching: boolean }) {
+  return (
+    <View className="items-center rounded-3xl border border-dashed border-slate-200 bg-white px-6 py-14">
+      <View className="mb-4 h-20 w-20 items-center justify-center rounded-3xl bg-sky-50">
+        <MessageCircle size={34} color="#3B82F6" strokeWidth={1.8} />
+      </View>
+      <Text className="font-bold text-slate-600">{searching ? (ar ? 'لا نتائج' : 'No results') : ar ? 'لا توجد محادثات بعد' : 'No conversations yet'}</Text>
+      {!searching && (
+        <Text className="mt-1 text-center text-xs leading-5 text-slate-400">
+          {isDentist
+            ? ar
+              ? 'افتح صفحة أي مورد أو مختبر أو شركة زرعات واضغط «مراسلة».'
+              : 'Open any supplier, lab or implant company and tap “Message”.'
+            : ar
+              ? 'ستظهر هنا رسائل الأطباء. ويمكنك مراسلة أي طبيب من صفحة الأطباء أو من طلباته.'
+              : 'Dentists’ messages appear here. Message a dentist from Doctors or their orders.'}
+        </Text>
+      )}
+    </View>
+  );
+}
+
+/* ── Conversation ──────────────────────────────────────────── */
+
+type Pending = { id: string; text: string; localUri?: string; failed?: boolean };
+
+function ChatView({
+  ar,
+  uid,
+  threadId,
+  peerId,
+  fallbackName,
+  fallbackPhoto,
+  myName,
+  myPhoto,
+  onBack,
+}: {
+  ar: boolean;
+  uid: string;
+  threadId: string;
+  peerId: string;
+  fallbackName: string;
+  fallbackPhoto: string;
+  myName: string;
+  myPhoto: string;
+  onBack: () => void;
+}) {
+  const thread = useDmThread(threadId);
+  const { messages, loading } = useDmMessages(threadId);
+  const card = useAccountCard(peerId);
+  const peer: Peer = {
+    id: peerId,
+    name: card?.name || fallbackName || (ar ? 'مستخدم' : 'User'),
+    photo: card?.photoURL || fallbackPhoto,
+    type: card?.accountType ?? '',
+  };
+  const [text, setText] = useState('');
+  const [pending, setPending] = useState<Pending[]>([]);
+  const [busyImage, setBusyImage] = useState(false);
+  const [viewer, setViewer] = useState('');
+  const scrollRef = useRef<ScrollView>(null);
+  const BackIcon = ar ? ChevronRight : ChevronLeft;
+  const blockedByMe = !!thread?.blockedBy?.includes(uid);
+  const blocked = isBlocked(thread);
+
+  useEffect(() => {
+    markDmThreadRead(thread, uid);
+  }, [thread, uid, messages.length]);
+
+  const send = async (opts: { text?: string; image?: { uri: string; name?: string | null; type?: string | null; width?: number; height?: number } }) => {
+    const body = (opts.text ?? '').trim();
+    if (!body && !opts.image) return;
+    const id = `p_${Date.now()}`;
+    setPending((p) => [...p, { id, text: body, localUri: opts.image?.uri }]);
+    try {
+      const image = opts.image ? await uploadDmImage(threadId, opts.image) : undefined;
+      await sendDmMessage({
+        senderId: uid,
+        recipientId: peerId,
+        senderName: myName,
+        recipientName: peer.name,
+        senderPhoto: myPhoto,
+        recipientPhoto: peer.photo,
+        text: body,
+        image,
+      });
+      setPending((p) => p.filter((x) => x.id !== id));
+    } catch (e) {
+      setPending((p) => p.map((x) => (x.id === id ? { ...x, failed: true } : x)));
+      if ((e as Error)?.message === 'blocked') toast.error(ar ? 'لا يمكن الإرسال في هذه المحادثة' : 'You can’t send in this conversation');
+      else if (opts.image) alertUploadError(e, ar);
+      else toast.error(ar ? 'لم تُرسل الرسالة — اضغط عليها لإعادة المحاولة' : 'Not sent — tap it to retry');
+    }
+  };
+
+  const sendText = () => {
+    const t = text;
+    if (!t.trim()) return;
+    setText('');
+    void send({ text: t });
+  };
+
+  const retry = (p: Pending) => {
+    setPending((list) => list.filter((x) => x.id !== p.id));
+    if (p.localUri) return; // photos are re-picked
+    void send({ text: p.text });
+  };
+
+  const pickImage = async () => {
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.75 });
+    if (res.canceled || !res.assets?.length) return;
+    const a = res.assets[0];
+    setBusyImage(true);
+    await send({ image: { uri: a.uri, name: a.fileName, type: a.mimeType, width: a.width, height: a.height } });
+    setBusyImage(false);
+  };
+
+  const menu = () =>
+    Alert.alert(peer.name, undefined, [
+      { text: ar ? 'عرض الملف' : 'View profile', onPress: () => router.push({ pathname: '/profile/[accountId]', params: { accountId: peerId } }) },
+      ...(thread
+        ? [
+            {
+              text: blockedByMe ? (ar ? 'إلغاء الحظر' : 'Unblock') : ar ? 'حظر المحادثة' : 'Block',
+              style: 'destructive' as const,
+              onPress: () =>
+                setDmBlocked(threadId, uid, !blockedByMe)
+                  .then(() => toast.success(blockedByMe ? (ar ? 'تم إلغاء الحظر' : 'Unblocked') : ar ? 'تم حظر المحادثة' : 'Blocked'))
+                  .catch(() => toast.error(ar ? 'تعذّر التنفيذ' : 'Failed')),
+            },
+            {
+              text: ar ? 'إبلاغ الإدارة' : 'Report',
+              style: 'destructive' as const,
+              onPress: () =>
+                reportDmThread({ threadId, reporterId: uid, reportedId: peerId, reason: 'reported-from-app' })
+                  .then(() => toast.success(ar ? 'وصل البلاغ للإدارة، شكراً لك' : 'Reported, thank you'))
+                  .catch(() => toast.error(ar ? 'تعذّر الإبلاغ' : 'Failed')),
+            },
+          ]
+        : []),
+      { text: ar ? 'إغلاق' : 'Close', style: 'cancel' as const },
+    ]);
+
+  const confirmDelete = (m: DmMessage) =>
+    Alert.alert(ar ? 'حذف الرسالة؟' : 'Delete message?', ar ? 'ستُحذف عند الطرفين.' : 'It will be removed for both sides.', [
+      { text: ar ? 'إلغاء' : 'Cancel', style: 'cancel' },
+      { text: ar ? 'حذف' : 'Delete', style: 'destructive', onPress: () => void deleteDmMessage(threadId, m.id).catch(() => {}) },
+    ]);
+
+  return (
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }} keyboardVerticalOffset={0}>
+      <Screen padded={false} scroll={false}>
+        {/* Header */}
+        <View className="flex-row items-center gap-3 border-b border-slate-100 bg-white px-3 py-2.5">
+          <Pressable onPress={onBack} hitSlop={8} className="h-10 w-10 items-center justify-center rounded-full bg-slate-50">
+            <BackIcon size={22} color="#0F172A" />
+          </Pressable>
+          <Pressable
+            onPress={() => router.push({ pathname: '/profile/[accountId]', params: { accountId: peerId } })}
+            className="flex-1 flex-row items-center gap-2.5"
+          >
+            <Avatar photo={peer.photo} name={peer.name} type={peer.type} size={40} />
+            <View className="flex-1">
+              <Text numberOfLines={1} className="text-[15px] font-bold text-slate-900">
+                {peer.name}
+              </Text>
+              {!!peer.type && (
+                <Text numberOfLines={1} className="text-[11px] text-slate-500">
+                  {ACCOUNT_TYPE_LABEL[peer.type]?.[ar ? 'ar' : 'en']}
+                </Text>
+              )}
+            </View>
+          </Pressable>
+          <Pressable onPress={menu} hitSlop={8} className="h-10 w-10 items-center justify-center rounded-full">
+            <MoreVertical size={20} color="#475569" />
+          </Pressable>
+        </View>
+
+        {/* Messages */}
+        <ScrollView
+          ref={scrollRef}
+          className="flex-1 bg-[#F4F7FB]"
+          contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 12, gap: 4 }}
+          onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
+          keyboardShouldPersistTaps="handled"
+        >
+          {loading ? (
+            <ActivityIndicator className="py-10" color={BLUE} />
+          ) : messages.length === 0 && pending.length === 0 ? (
+            <View className="items-center py-16">
+              <Avatar photo={peer.photo} name={peer.name} type={peer.type} size={72} />
+              <Text className="mt-3 text-base font-bold text-slate-800">{peer.name}</Text>
+              <Text className="mt-1 text-xs text-slate-500">{ar ? 'ابدأ المحادثة بكتابة رسالة' : 'Say hello to start the conversation'}</Text>
+            </View>
+          ) : (
+            messages.map((m, i) => {
+              const mine = m.senderId === uid;
+              const prev = messages[i - 1];
+              const newDay = !prev || !sameDay(prev.createdAt, m.createdAt);
+              const grouped = !newDay && prev?.senderId === m.senderId;
+              return (
+                <View key={m.id}>
+                  {newDay && (
+                    <View className="my-3 items-center">
+                      <View className="rounded-full bg-white px-3 py-1">
+                        <Text className="text-[11px] font-semibold text-slate-500">{dmDayLabel(m.createdAt, ar)}</Text>
+                      </View>
+                    </View>
+                  )}
+                  <Bubble
+                    m={m}
+                    mine={mine}
+                    grouped={grouped}
+                    seen={mine && seenByOther(thread, uid, m)}
+                    ar={ar}
+                    onImage={setViewer}
+                    onLongPress={mine && !m.deleted ? () => confirmDelete(m) : undefined}
+                  />
+                </View>
+              );
+            })
+          )}
+          {pending.map((p) => (
+            <Pressable key={p.id} onPress={p.failed ? () => retry(p) : undefined} className="flex-row justify-end">
+              <View className="max-w-[80%] rounded-2xl rounded-br-md px-3.5 py-2" style={{ backgroundColor: p.failed ? '#FEE2E2' : '#93C5FD' }}>
+                {!!p.localUri && <Image source={{ uri: p.localUri }} style={{ width: 200, height: 150, borderRadius: 12 }} />}
+                {!!p.text && <Text className={cn('text-[15px] leading-6', p.failed ? 'text-rose-800' : 'text-white')}>{p.text}</Text>}
+                <View className="mt-0.5 flex-row items-center justify-end gap-1">
+                  {p.failed ? (
+                    <Text className="text-[10px] font-bold text-rose-700">{ar ? 'لم تُرسل — اضغط لإعادة المحاولة' : 'Not sent — tap to retry'}</Text>
+                  ) : (
+                    <Clock3 size={11} color="rgba(255,255,255,0.85)" />
+                  )}
+                </View>
+              </View>
+            </Pressable>
+          ))}
+        </ScrollView>
+
+        {/* Input */}
+        {blocked ? (
+          <View className="flex-row items-center gap-3 border-t border-slate-100 bg-white px-4 py-4">
+            <Ban size={18} color="#94A3B8" />
+            <Text className="flex-1 text-xs leading-5 text-slate-500">
+              {blockedByMe
+                ? ar
+                  ? 'حظرت هذه المحادثة. لن تصلك رسائل منها.'
+                  : 'You blocked this conversation.'
+                : ar
+                  ? 'لا يمكن الإرسال في هذه المحادثة.'
+                  : 'You can’t send messages here.'}
+            </Text>
+            {blockedByMe && (
+              <Pressable onPress={() => void setDmBlocked(threadId, uid, false)} className="rounded-xl bg-slate-100 px-3 py-2">
+                <Text className="text-xs font-bold text-slate-700">{ar ? 'إلغاء الحظر' : 'Unblock'}</Text>
+              </Pressable>
+            )}
+          </View>
+        ) : (
+          <View className="flex-row items-end gap-2 border-t border-slate-100 bg-white px-3 py-2.5">
+            <Pressable onPress={pickImage} disabled={busyImage} className="h-11 w-11 items-center justify-center rounded-full bg-slate-50">
+              {busyImage ? <ActivityIndicator color={BLUE} size="small" /> : <ImagePlus size={21} color="#475569" />}
+            </Pressable>
+            <TextInput
+              value={text}
+              onChangeText={setText}
+              placeholder={ar ? 'اكتب رسالتك…' : 'Type a message…'}
+              placeholderTextColor="#94A3B8"
+              multiline
+              maxLength={DM_MAX_LENGTH}
+              className="max-h-32 min-h-11 flex-1 rounded-3xl bg-slate-50 px-4 py-2.5 text-[15px] text-slate-800"
+              style={{ textAlign: ar ? 'right' : 'left', textAlignVertical: 'center' }}
+            />
+            <Pressable
+              onPress={sendText}
+              disabled={!text.trim()}
+              className="h-11 w-11 items-center justify-center rounded-full"
+              style={{ backgroundColor: text.trim() ? BLUE : '#CBD5E1' }}
+            >
+              <Send size={19} color="#FFFFFF" style={{ transform: [{ scaleX: ar ? -1 : 1 }] }} />
+            </Pressable>
+          </View>
+        )}
+      </Screen>
+
+      <Modal visible={!!viewer} transparent animationType="fade" onRequestClose={() => setViewer('')}>
+        <Pressable className="flex-1 items-center justify-center bg-black/95" onPress={() => setViewer('')}>
+          {!!viewer && <Image source={{ uri: viewer }} style={{ width: '100%', height: '80%' }} resizeMode="contain" />}
+          <View className="absolute right-5 top-12 h-10 w-10 items-center justify-center rounded-full bg-white/15">
+            <X size={20} color="#fff" />
+          </View>
+        </Pressable>
+      </Modal>
     </KeyboardAvoidingView>
+  );
+}
+
+function Bubble({
+  m,
+  mine,
+  grouped,
+  seen,
+  ar,
+  onImage,
+  onLongPress,
+}: {
+  m: DmMessage;
+  mine: boolean;
+  grouped: boolean;
+  seen: boolean;
+  ar: boolean;
+  onImage: (url: string) => void;
+  onLongPress?: () => void;
+}) {
+  const url = useDmImageUrl(m.deleted ? undefined : m.image?.path);
+  const ratio = m.image?.width && m.image?.height ? m.image.width / m.image.height : 4 / 3;
+  const w = 220;
+  return (
+    <View className={cn('flex-row', mine ? 'justify-end' : 'justify-start', !grouped && 'mt-1.5')}>
+      <Pressable
+        onLongPress={onLongPress}
+        delayLongPress={350}
+        className={cn(
+          'max-w-[80%] rounded-2xl px-3.5 py-2',
+          mine ? 'rounded-br-md' : 'rounded-bl-md border border-slate-100 bg-white',
+        )}
+        style={mine ? { backgroundColor: BLUE } : undefined}
+      >
+        {m.deleted ? (
+          <Text className={cn('text-[13px] italic', mine ? 'text-white/75' : 'text-slate-400')}>
+            {ar ? 'تم حذف هذه الرسالة' : 'This message was deleted'}
+          </Text>
+        ) : (
+          <>
+            {!!m.image && (
+              <Pressable onPress={() => url && onImage(url)} className="mb-1 overflow-hidden rounded-xl bg-black/10">
+                {url ? (
+                  <Image source={{ uri: url }} style={{ width: w, height: Math.min(320, w / ratio) }} resizeMode="cover" />
+                ) : (
+                  <View style={{ width: w, height: Math.min(320, w / ratio) }} className="items-center justify-center">
+                    <ActivityIndicator color={mine ? '#fff' : BLUE} />
+                  </View>
+                )}
+              </Pressable>
+            )}
+            {!!m.text && <Text className={cn('text-[15px] leading-6', mine ? 'text-white' : 'text-slate-800')}>{m.text}</Text>}
+          </>
+        )}
+        <View className="mt-0.5 flex-row items-center justify-end gap-1">
+          <Text className={cn('text-[10px]', mine ? 'text-white/70' : 'text-slate-400')}>{dmTime(m.createdAt, ar)}</Text>
+          {mine && !m.deleted && (seen ? <CheckCheck size={13} color="#BFDBFE" /> : <Check size={13} color="rgba(255,255,255,0.75)" />)}
+        </View>
+      </Pressable>
+    </View>
   );
 }

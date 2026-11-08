@@ -3,7 +3,7 @@
 // also synced to Firestore (see the "Cloud sync" section at the end and
 // dentistRecords.ts), so the same records appear on the phone and the web.
 import { useSyncExternalStore } from "react";
-import { onSnapshot, query, setDoc, where, type QueryDocumentSnapshot } from "firebase/firestore";
+import { getDoc, getDocs, onSnapshot, query, setDoc, where, type QueryDocumentSnapshot } from "firebase/firestore";
 import {
   deletePatientFile,
   patientDoc,
@@ -85,6 +85,32 @@ export type Payment = {
   date: string;
   amount: number;
   note?: string;
+  // Fixed when recorded: a dinar payment stays in dinars. Older payments have
+  // none until settlePatientFinance stamps them (see paymentCurrency).
+  currency?: "USD" | "IQD";
+  receiptNo?: string;
+  // The treating team member this payment counts towards (their dues).
+  doctorUid?: string;
+  byName?: string;
+};
+
+/** A change to a total fee that was already set. Nothing in the apps removes one. */
+export type FeeChange = {
+  id: string;
+  at: string;
+  currency: "USD" | "IQD";
+  from: number;
+  to: number;
+};
+
+/** A payment that was removed. Nothing in the apps removes this record. */
+export type DeletedPayment = {
+  id: string;
+  at: string;
+  amount: number;
+  currency: "USD" | "IQD";
+  date: string;
+  receiptNo?: string;
 };
 
 export type Patient = {
@@ -102,9 +128,23 @@ export type Patient = {
   teeth: Record<number, ToothStatus>;
   visits: Visit[];
   files: PatientFile[];
+  // The fee in the currency being viewed (feeCurrency). `fees` is the record;
+  // this mirrors it for anything reading a single number.
   totalFees: number;
   payments: Payment[];
+  // The currency the finance tab shows and records in. It never relabels
+  // amounts: each currency has its own fee and its own payments.
   feeCurrency?: "USD" | "IQD";
+  fees?: Partial<Record<"USD" | "IQD", number>>;
+  feeHistory?: FeeChange[];
+  // Last receipt number used for this patient; never reused after a delete.
+  receiptSeq?: number;
+  deletedPayments?: DeletedPayment[];
+  // Team members treating this patient (functions/clinicTeam.js).
+  doctorUids?: string[];
+  // Ids of visits, plan steps, payments, files and log entries that were
+  // removed, so a merge with another copy doesn't bring them back.
+  removedItems?: string[];
   dob?: string;
   avatar?: string;
   branch?: string;
@@ -265,6 +305,65 @@ export function findOrCreatePatient(name: string, phone: string): Patient {
   });
 }
 
+const withRemoved = (p: Patient, itemId: string) => [...(p.removedItems ?? []), itemId];
+
+/**
+ * Two copies of one record: the newer one's fields, and every list item either
+ * copy holds unless it was removed. Saving whole records used to let one
+ * device's save erase what another (or a team member) had just added.
+ */
+export function mergeRecords(newer: Patient, older: Patient): Patient {
+  const removed = new Set([...(newer.removedItems ?? []), ...(older.removedItems ?? [])]);
+  const list = <T extends { id: string }>(a: T[] | undefined, b: T[] | undefined): T[] => {
+    const mine = a ?? [];
+    const ids = new Set(mine.map((x) => x.id));
+    return [...(b ?? []).filter((x) => !ids.has(x.id)), ...mine].filter((x) => !removed.has(x.id));
+  };
+  const merged: Patient = {
+    ...newer,
+    visits: list(newer.visits, older.visits),
+    files: list(newer.files, older.files),
+    payments: list(newer.payments, older.payments),
+  };
+  const plan = list(newer.plan, older.plan);
+  const log = list(newer.log, older.log);
+  const feeHistory = list(newer.feeHistory, older.feeHistory);
+  const deletedPayments = list(newer.deletedPayments, older.deletedPayments);
+  if (newer.plan || older.plan) merged.plan = plan;
+  if (newer.log || older.log) merged.log = log;
+  if (newer.feeHistory || older.feeHistory) merged.feeHistory = feeHistory;
+  if (newer.deletedPayments || older.deletedPayments) merged.deletedPayments = deletedPayments;
+  if (removed.size) merged.removedItems = [...removed];
+  const seq = Math.max(newer.receiptSeq ?? 0, older.receiptSeq ?? 0);
+  if (seq) merged.receiptSeq = seq;
+  return merged;
+}
+
+/**
+ * New file numbers for patients sharing one (devices working offline each gave
+ * out the next number). The earliest registered keeps it; every device works
+ * this out the same way, so they agree without talking to each other.
+ */
+export function duplicateFileNumbers(list: Patient[]): Map<string, string> {
+  const num = (s: string) => Number(String(s || "").replace(/\D/g, ""));
+  const ordered = list
+    .filter((p) => p.fileNo)
+    .sort((a, b) => (a.createdAt ?? "").localeCompare(b.createdAt ?? "") || a.id.localeCompare(b.id));
+  const seen = new Set<number>();
+  const changes = new Map<string, string>();
+  let max = Math.max(100, ...ordered.map((p) => num(p.fileNo)));
+  for (const p of ordered) {
+    if (!seen.has(num(p.fileNo))) {
+      seen.add(num(p.fileNo));
+      continue;
+    }
+    max += 1;
+    seen.add(max);
+    changes.set(p.id, `PAT-${max}`);
+  }
+  return changes;
+}
+
 export function updatePatient(id: string, patch: Partial<Patient>) {
   ensure();
   state = state.map((p) => (p.id === id ? { ...p, ...patch, updatedAt: Date.now() } : p));
@@ -301,7 +400,12 @@ export function addVisit(id: string, v: Omit<Visit, "id">) {
 export function removeVisit(id: string, visitId: string) {
   const p = getPatient(id);
   if (!p) return;
-  updatePatient(id, { visits: p.visits.filter((v) => v.id !== visitId) });
+  updatePatient(id, { visits: p.visits.filter((v) => v.id !== visitId), removedItems: withRemoved(p, visitId) });
+}
+
+/** Chooses which team members treat this patient. */
+export function setPatientDoctors(id: string, doctorUids: string[]) {
+  updatePatient(id, { doctorUids });
 }
 
 /** `f.id` may be pre-chosen so it matches the file's Storage path. */
@@ -321,24 +425,183 @@ export function removeFile(id: string, fileId: string) {
   const p = getPatient(id);
   if (!p) return;
   const file = p.files.find((f) => f.id === fileId);
-  updatePatient(id, { files: p.files.filter((f) => f.id !== fileId) });
+  updatePatient(id, { files: p.files.filter((f) => f.id !== fileId), removedItems: withRemoved(p, fileId) });
   if (file?.path) void deletePatientFile(file.path);
 }
 
-export function addPayment(id: string, pay: Omit<Payment, "id">) {
+/** Photos attached to one treatment-plan department live in `files`, marked
+ *  by a name prefix (like X-rays' "[xray] "), so they sync with the record. */
+export const MAX_PLAN_PHOTOS = 2;
+export const planPhotoTag = (dept: string) => `[plan:${dept}] `;
+/** Oldest first, so a photo keeps its place when another one is added. */
+export const planPhotos = (p: Patient, dept: string) =>
+  p.files.filter((f) => f.name.startsWith(planPhotoTag(dept))).reverse();
+/** Not an X-ray or a department photo — those show in their own departments. */
+export const isGeneralFile = (f: PatientFile) => !/^\[(xray|plan:[^\]]+)\] /.test(f.name);
+
+/** Today on this device (toISOString would give yesterday until 3am in Iraq). */
+export function localDay(d = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** Before currencies were separated the record had one fee and one label. */
+export function patientFees(p: Patient): Record<FeeCurrency, number> {
+  if (p.fees) return { USD: Number(p.fees.USD) || 0, IQD: Number(p.fees.IQD) || 0 };
+  const fees: Record<FeeCurrency, number> = { USD: 0, IQD: 0 };
+  fees[p.feeCurrency ?? "USD"] = Number(p.totalFees) || 0;
+  return fees;
+}
+
+export function paymentCurrency(p: Patient, x: Payment): FeeCurrency {
+  return x.currency ?? p.feeCurrency ?? "USD";
+}
+
+export function balanceIn(p: Patient, c: FeeCurrency) {
+  const fees = patientFees(p)[c];
+  const paid = p.payments
+    .filter((x) => paymentCurrency(p, x) === c)
+    .reduce((s, x) => s + (Number(x.amount) || 0), 0);
+  return { fees, paid, remaining: fees - paid };
+}
+
+/** The currencies this patient has any amount in. */
+export function usedCurrencies(p: Patient): FeeCurrency[] {
+  return (["IQD", "USD"] as const).filter((c) => {
+    const b = balanceIn(p, c);
+    return b.fees > 0 || b.paid > 0;
+  });
+}
+
+export function patientFeeHistory(p: Patient): FeeChange[] {
+  return [...(p.feeHistory ?? [])].sort((a, b) => b.at.localeCompare(a.at));
+}
+
+function formatReceiptNo(p: Patient, seq: number): string {
+  // Per patient, so two devices (or an offline one) can't issue the same number.
+  const file = p.fileNo.replace(/\D/g, "") || p.id.slice(-4);
+  return `REC-${file}-${String(seq).padStart(2, "0")}`;
+}
+
+/**
+ * Fixes on the record what older data only implied through feeCurrency: the
+ * fee, each payment's and plan step's currency, and receipt numbers (oldest
+ * payment first). Must run before feeCurrency changes, or those would change
+ * currency with it.
+ */
+function settled(p: Patient): Patient {
+  let seq = p.receiptSeq ?? 0;
+  const payments = [...p.payments]
+    .reverse()
+    .map((x) => ({
+      ...x,
+      currency: paymentCurrency(p, x),
+      receiptNo: x.receiptNo ?? formatReceiptNo(p, ++seq),
+    }))
+    .reverse();
+  const plan = p.plan?.map((s) => (s.cost && !s.currency ? { ...s, currency: planCurrency(p, s) } : s));
+  return { ...p, fees: patientFees(p), payments, receiptSeq: seq, ...(plan ? { plan } : {}) };
+}
+
+export function settlePatientFinance(id: string) {
   const p = getPatient(id);
   if (!p) return;
-  updatePatient(id, { payments: [{ id: `pay_${Date.now().toString(36)}`, ...pay }, ...p.payments] });
+  const done =
+    !!p.fees &&
+    p.payments.every((x) => x.currency && x.receiptNo) &&
+    !(p.plan ?? []).some((s) => s.cost && !s.currency);
+  if (done) return;
+  const { fees, payments, receiptSeq, plan } = settled(p);
+  updatePatient(id, { fees, payments, receiptSeq, ...(plan ? { plan } : {}) });
+}
+
+/** Chooses the currency shown and recorded in. Amounts stay as they are. */
+export function setFeeCurrency(id: string, c: FeeCurrency) {
+  const p = getPatient(id);
+  if (!p) return;
+  const s = settled(p);
+  updatePatient(id, {
+    fees: s.fees,
+    payments: s.payments,
+    receiptSeq: s.receiptSeq,
+    ...(s.plan ? { plan: s.plan } : {}),
+    feeCurrency: c,
+    totalFees: patientFees(s)[c],
+  });
+}
+
+/** Sets the total fee in one currency; changing a set fee leaves a record. */
+export function setPatientFee(id: string, c: FeeCurrency, amount: number) {
+  const p = getPatient(id);
+  if (!p) return;
+  const s = settled(p);
+  const fees = patientFees(s);
+  const from = fees[c];
+  if (from === amount) return;
+  fees[c] = amount;
+  const change: FeeChange = { id: newFileId(), at: localDay(), currency: c, from, to: amount };
+  updatePatient(id, {
+    fees,
+    payments: s.payments,
+    receiptSeq: s.receiptSeq,
+    ...(s.plan ? { plan: s.plan } : {}),
+    totalFees: fees[s.feeCurrency ?? "USD"],
+    ...(from > 0 ? { feeHistory: [...(p.feeHistory ?? []), change] } : {}),
+  });
+}
+
+export function addPayment(
+  id: string,
+  pay: { amount: number; note?: string; date?: string; currency?: FeeCurrency },
+): Payment | undefined {
+  const p = getPatient(id);
+  if (!p) return undefined;
+  const s = settled(p);
+  const seq = (s.receiptSeq ?? 0) + 1;
+  const payment: Payment = {
+    id: `pay_${Date.now().toString(36)}`,
+    amount: pay.amount,
+    date: pay.date ?? localDay(),
+    currency: pay.currency ?? s.feeCurrency ?? "USD",
+    receiptNo: formatReceiptNo(s, seq),
+    ...(pay.note ? { note: pay.note } : {}),
+    ...(s.doctorUids?.[0] ? { doctorUid: s.doctorUids[0] } : {}),
+  };
+  updatePatient(id, {
+    fees: s.fees,
+    payments: [payment, ...s.payments],
+    receiptSeq: seq,
+    ...(s.plan ? { plan: s.plan } : {}),
+  });
+  return payment;
 }
 
 export function removePayment(id: string, payId: string) {
   const p = getPatient(id);
   if (!p) return;
-  updatePatient(id, { payments: p.payments.filter((x) => x.id !== payId) });
+  const s = settled(p);
+  const gone = s.payments.find((x) => x.id === payId);
+  if (!gone) return;
+  const record: DeletedPayment = {
+    id: gone.id,
+    at: localDay(),
+    amount: gone.amount,
+    currency: paymentCurrency(s, gone),
+    date: gone.date,
+    ...(gone.receiptNo ? { receiptNo: gone.receiptNo } : {}),
+  };
+  updatePatient(id, {
+    removedItems: withRemoved(s, payId),
+    fees: s.fees,
+    payments: s.payments.filter((x) => x.id !== payId),
+    receiptSeq: s.receiptSeq,
+    ...(s.plan ? { plan: s.plan } : {}),
+    deletedPayments: [...(p.deletedPayments ?? []), record],
+  });
 }
 
-export function paidTotal(p: Patient) {
-  return p.payments.reduce((s, x) => s + (Number(x.amount) || 0), 0);
+export function patientDeletedPayments(p: Patient): DeletedPayment[] {
+  return [...(p.deletedPayments ?? [])].sort((a, b) => b.at.localeCompare(a.at));
 }
 
 // ---- Treatment plan ----
@@ -369,7 +632,7 @@ export function cyclePlanStep(id: string, stepId: string) {
 export function removePlanStep(id: string, stepId: string) {
   const p = getPatient(id);
   if (!p) return;
-  updatePatient(id, { plan: getPlan(p).filter((s) => s.id !== stepId) });
+  updatePatient(id, { plan: getPlan(p).filter((s) => s.id !== stepId), removedItems: withRemoved(p, stepId) });
 }
 
 // ---- Medical history log ----
@@ -386,7 +649,7 @@ export function addLogEntry(id: string, entry: Omit<HistoryEntry, "id">) {
 export function removeLogEntry(id: string, entryId: string) {
   const p = getPatient(id);
   if (!p) return;
-  updatePatient(id, { log: getLog(p).filter((e) => e.id !== entryId) });
+  updatePatient(id, { log: getLog(p).filter((e) => e.id !== entryId), removedItems: withRemoved(p, entryId) });
 }
 
 /* ── Money (treatment plan costs) ───────────────────────────── */
@@ -635,6 +898,8 @@ export function usePatientSyncStatus(): PatientSyncStatus {
 export function resyncPatients() {
   if (!syncEnabled()) return;
   retryCounts.clear();
+  for (const uid of recoveryFailed) recoveredFor.delete(uid);
+  recoveryFailed.clear();
   startSync();
 }
 
@@ -657,10 +922,32 @@ function scheduleRetry(uid: string, clinicId: string, id: string) {
 async function sendPatient(uid: string, clinicId: string, id: string) {
   const p = readPatient(uid, clinicId, id);
   if (!p) return;
-  const ready = await uploadInlineFiles(uid, clinicId, p);
+  let ready = await uploadInlineFiles(uid, clinicId, p);
+  // Something may have been added in the cloud since this copy last saw it (a
+  // team member's visit, another device). Offline this read fails; the
+  // listener merges when the connection returns.
+  try {
+    const snap = await getDoc(patientDoc(uid, id));
+    const remote = snap.exists() ? (snap.data() as RemotePatient) : null;
+    if (remote && !remote.deleted) {
+      const merged = mergeRecords(ready, { ...(remote as Patient), id });
+      if (itemCount(merged) !== itemCount(ready)) {
+        ready = merged;
+        if (uid === currentUserId && clinicId === currentClinicId) {
+          state = state.map((x) => (x.id === id ? { ...merged, updatedAt: x.updatedAt } : x));
+          saveLocal();
+        }
+      }
+    }
+  } catch {
+    /* send what is here */
+  }
   // Never send an inline file body, even if its upload failed above.
   const files = ready.files.filter((f) => f.path).map(({ dataUrl: _inline, ...f }) => f);
-  await setDoc(patientDoc(uid, id), toFirestore({ ...ready, files, clinicId, deleted: false }));
+  // Records from before sync had no updatedAt; one is always sent so a copy
+  // is never "0" (see mergeRemote).
+  const updatedAt = ready.updatedAt || Date.parse(ready.createdAt) || Date.now();
+  await setDoc(patientDoc(uid, id), toFirestore({ ...ready, updatedAt, files, clinicId, deleted: false }));
   retryCounts.delete(pushKey(uid, clinicId, id));
   setFailing(id);
 }
@@ -705,7 +992,7 @@ export async function syncPatientsNow(): Promise<SyncResult> {
   }
   for (const [id, at] of Object.entries(readDeleted(uid, clinicId))) {
     try {
-      await setDoc(patientDoc(uid, id), { id, clinicId, deleted: true, updatedAt: at });
+      await setDoc(patientDoc(uid, id), { id, clinicId, deleted: true, updatedAt: at }, { merge: true });
     } catch (err) {
       failed++;
       error = errorText(err);
@@ -727,11 +1014,15 @@ function pushDelete(p: Patient) {
   // Recorded even while sync is off, so the next sync sends the tombstone.
   markDeleted(uid, clinicId, p.id, at);
   if (!syncEnabled()) return;
-  setDoc(patientDoc(uid, p.id), { id: p.id, clinicId, deleted: true, updatedAt: at }).catch((err) =>
+  // merge: the record's data stays in the cloud, so a delete can be undone.
+  setDoc(patientDoc(uid, p.id), { id: p.id, clinicId, deleted: true, updatedAt: at }, { merge: true }).catch((err) =>
     console.warn("Patient delete not synced yet:", p.id, err),
   );
   for (const f of p.files) if (f.path) void deletePatientFile(f.path);
 }
+
+const itemCount = (p: Patient) =>
+  (p.visits?.length ?? 0) + (p.files?.length ?? 0) + (p.payments?.length ?? 0) + (p.plan?.length ?? 0) + (p.log?.length ?? 0);
 
 function mergeRemote(docs: QueryDocumentSnapshot[], complete: boolean) {
   ensure();
@@ -752,27 +1043,56 @@ function mergeRemote(docs: QueryDocumentSnapshot[], complete: boolean) {
     const rTime = remote.updatedAt ?? 0;
     const lTime = local?.updatedAt ?? 0;
     if (deleted) {
-      if (local && lTime <= rTime) {
-        byId.delete(id);
-        changed = true;
-      } else if (local) toPush.push(id); // edited here after it was deleted elsewhere
+      // The apps have no "delete patient" action, so a cloud "deleted" marker
+      // is never trusted over a copy that exists here: the copy is sent back
+      // up and the patient is restored. (A sync bug, fixed below, used to
+      // write such markers for records that had no updatedAt — see
+      // recoverDeletedPatients.)
+      if (local) toPush.push(id);
       continue;
     }
     if (!local) {
-      // Deleted on this device after that remote copy was written.
-      if ((deletedHere[id] ?? 0) >= rTime) tombstonesToResend.push({ ...(remote as Patient), id });
+      // Deleted on this device after that remote copy was written. Only with a
+      // real local delete marker: a missing marker used to read as 0, and a
+      // record without updatedAt (also 0) passed "0 >= 0" — every device that
+      // didn't hold the patient yet deleted it for everyone.
+      const deletedAt = deletedHere[id];
+      if (deletedAt !== undefined && deletedAt >= rTime) tombstonesToResend.push({ ...(remote as Patient), id });
       else {
         byId.set(id, { ...(remote as Patient), id });
         changed = true;
       }
     } else if (rTime > lTime) {
-      byId.set(id, { ...(remote as Patient), id });
+      const merged = mergeRecords({ ...(remote as Patient), id }, local);
+      // This copy held something the newer one lacked: send it back up, marked
+      // as newer so other devices take it too.
+      const extra = itemCount(merged) !== itemCount(remote as Patient);
+      byId.set(id, extra ? { ...merged, updatedAt: Date.now() } : merged);
       changed = true;
-    } else if (lTime > rTime) toPush.push(id);
+      if (extra) toPush.push(id);
+    } else if (lTime > rTime) {
+      const merged = mergeRecords(local, { ...(remote as Patient), id });
+      if (itemCount(merged) !== itemCount(local)) {
+        byId.set(id, merged);
+        changed = true;
+      }
+      toPush.push(id);
+    }
   }
   // First sync from this device: upload what only exists locally. Only on a
   // server-complete snapshot — a partial cached one would look "missing".
   if (complete) for (const id of byId.keys()) if (!seen.has(id)) toPush.push(id);
+
+  // Only on the complete list: a partial one can't tell what is a duplicate.
+  if (complete) {
+    for (const [id, fileNo] of duplicateFileNumbers([...byId.values()])) {
+      const p = byId.get(id);
+      if (!p) continue;
+      byId.set(id, { ...p, fileNo, updatedAt: Date.now() });
+      changed = true;
+      toPush.push(id);
+    }
+  }
 
   if (changed) {
     state = [...byId.values()].sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
@@ -782,11 +1102,89 @@ function mergeRemote(docs: QueryDocumentSnapshot[], complete: boolean) {
   for (const p of tombstonesToResend) pushDelete(p);
 }
 
+/* ── Recovery of wrongly deleted patients ──────────────────────
+ * Until Nov 2026 a sync bug replaced some patients with a "deleted" marker
+ * (see mergeRemote). This finds every such marker of the account and, from
+ * any copy on this device (any clinic key, the pre-clinic legacy key) or
+ * from the marker itself when it kept the data, writes the patient back. Runs
+ * once per account each time the app starts, before the listener can act on
+ * a marker. Nothing is ever removed here. */
+
+const recoveredFor = new Set<string>();
+const recoveryFailed = new Set<string>();
+
+function localCopies(uid: string): Map<string, Patient> {
+  const best = new Map<string, Patient>();
+  if (typeof localStorage === "undefined" || typeof localStorage.key !== "function") return best;
+  const prefix = KEY_PREFIX + uid;
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k || !(k === prefix || k.startsWith(prefix + ":")) || k.endsWith(":deleted")) continue;
+    try {
+      const list = JSON.parse(localStorage.getItem(k) || "[]") as Patient[];
+      if (!Array.isArray(list)) continue;
+      for (const p of list) {
+        if (!p?.id || !p.name) continue;
+        const cur = best.get(p.id);
+        if (!cur || (p.updatedAt ?? 0) > (cur.updatedAt ?? 0)) best.set(p.id, p);
+      }
+    } catch {
+      /* unreadable entry — skip */
+    }
+  }
+  return best;
+}
+
+export async function recoverDeletedPatients(uid: string): Promise<number> {
+  if (!uid || typeof window === "undefined") return 0;
+  const snap = await getDocs(query(patientsCol(uid), where("deleted", "==", true)));
+  if (snap.empty) return 0;
+  const copies = localCopies(uid);
+  let restored = 0;
+  for (const d of snap.docs) {
+    const marker = d.data() as RemotePatient;
+    const { clinicId: _c, deleted: _d, ...fromMarker } = marker;
+    const copy = copies.get(d.id) ?? (marker.name ? (fromMarker as Patient) : undefined);
+    if (!copy) continue;
+    const files = (copy.files ?? []).filter((f) => f.path).map(({ dataUrl: _inline, ...f }) => f);
+    await setDoc(
+      patientDoc(uid, d.id),
+      toFirestore({ ...copy, id: d.id, files, clinicId: marker.clinicId, deleted: false, updatedAt: Date.now() }),
+    );
+    restored++;
+  }
+  // The device-side delete lists only ever came from that bug.
+  if (restored && typeof localStorage !== "undefined" && typeof localStorage.key === "function") {
+    const doomed: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(KEY_PREFIX + uid) && k.endsWith(":deleted")) doomed.push(k);
+    }
+    doomed.forEach((k) => localStorage.removeItem(k));
+  }
+  if (restored) console.warn(`Restored ${restored} patient(s) wrongly marked deleted`);
+  return restored;
+}
+
 function startSync() {
   unsubscribeRemote?.();
   unsubscribeRemote = null;
   if (!syncEnabled() || !currentClinicId) return;
   const uid = currentUserId;
+  if (!recoveredFor.has(uid)) {
+    recoveredFor.add(uid);
+    // Restore first, then listen — the listener then receives them as normal.
+    void recoverDeletedPatients(uid)
+      .catch((err) => {
+        // Retried when the app/page comes back (resyncPatients), not in a loop.
+        recoveryFailed.add(uid);
+        console.warn("Patient recovery not run yet:", err);
+      })
+      .finally(() => {
+        if (uid === currentUserId) startSync();
+      });
+    return;
+  }
   const clinicId = currentClinicId;
   try {
     unsubscribeRemote = onSnapshot(

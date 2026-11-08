@@ -55,6 +55,7 @@ export function patientRecordHtml(opts: {
   visits: { date: string; time?: string; procedure: string; doctor?: string; status?: string; note?: string }[];
   teeth: { tooth: number; status: string; color: string }[];
   plan: { title: string; tooth?: string; dept?: string; cost?: string; status: string; statusColor: string; note?: string }[];
+  financeHtml?: string;
 }): string {
   const t = (ar: string, en: string) => (opts.ar ? ar : en);
 
@@ -134,8 +135,12 @@ export function patientRecordHtml(opts: {
   const body = `
     <h1>${t("ملف المريض", "Patient Record")}</h1>
     <div class="meta-grid">${metaHtml}</div>
-    ${complaintHtml}${visitsHtml}${teethHtml}${planHtml}`;
+    ${complaintHtml}${visitsHtml}${teethHtml}${planHtml}${opts.financeHtml ?? ""}`;
   return SHELL(opts.title, body, opts.ar);
+}
+
+export function receiptHtml(title: string, body: string, ar: boolean): string {
+  return SHELL(title, body, ar);
 }
 
 /** Prints a standalone HTML document via a hidden iframe (no popup needed). */

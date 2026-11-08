@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { useAdminStore } from "@/lib/adminStore";
 import {
-  useProducts,
+  useAllProducts,
   useUpsertProduct,
   useDeleteProduct,
   uploadProductImage,
@@ -20,7 +20,7 @@ import { FieldRow, Card, SectionTitle } from "./AdminHelpers";
 export function ProductsTab() {
   const { lang } = useI18n();
   const { branches } = useAdminStore();
-  const { data: products = [], isLoading } = useProducts();
+  const { data: products = [], isLoading } = useAllProducts();
   const upsert = useUpsertProduct();
   type FormState = {
     id: string;

@@ -19,6 +19,8 @@ const mapItem = (o: Record<string, unknown>): InvoiceDoc["items"][number] => ({
   name: (o.name as string) ?? "",
   quantity: Number(o.quantity) || 1,
   price: Number(o.price) || 0,
+  listPrice: o.listPrice === undefined ? undefined : Number(o.listPrice),
+  discountAmount: o.discountAmount === undefined ? undefined : Number(o.discountAmount),
   currency: o.currency === "IQD" ? "IQD" : "USD",
   availability: (o.availability as "available" | "not_available" | undefined) ?? undefined,
 });
@@ -44,6 +46,7 @@ const fromDoc = (id: string, data: Record<string, unknown>): InvoiceDoc => ({
   deliveredAt: (data.deliveredAt as InvoiceDoc["deliveredAt"]) ?? null,
   rejectedAt: (data.rejectedAt as InvoiceDoc["rejectedAt"]) ?? null,
   note: (data.note as string) ?? undefined,
+  discount: (data.discount as InvoiceDoc["discount"]) ?? null,
 });
 
 /** Real-time stream of an office's invoices (sorted newest first). */

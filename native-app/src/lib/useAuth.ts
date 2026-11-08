@@ -14,7 +14,8 @@ export type AccountDashboardHref =
   | "/admin"
   | "/supplies-office"
   | "/implants-office"
-  | "/labs-office";
+  | "/labs-office"
+  | "/secretary";
 
 export function getAccountDashboard(role: AppRole): AccountDashboardHref {
   switch (role) {
@@ -28,6 +29,8 @@ export function getAccountDashboard(role: AppRole): AccountDashboardHref {
       return "/implants-office";
     case "lab":
       return "/labs-office";
+    case "secretary":
+      return "/secretary";
     default:
       return "/";
   }

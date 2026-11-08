@@ -7,6 +7,8 @@ import { useClinics, addClinic, updateClinic, setActiveClinic, setClinicsStoreUs
 import { useClinic, clinicTotals } from "@/lib/clinicStore";
 import { useAppointments } from "@/lib/appointmentsStore";
 import { useSession } from "@/lib/useAuth";
+import { CountBadge } from "@/components/ClinicMaterials";
+import { useMaterialsBadge } from "@/lib/materialsStore";
 import { AddAppointmentModal } from "@/components/AddAppointmentModal";
 import { cn } from "@/lib/utils";
 import clinicHero from "@/assets/clinic-hero.jpg";
@@ -23,6 +25,7 @@ export const Route = createFileRoute("/clinic/")({
 
 function ClinicHome() {
   const { lang, dir, toggle } = useI18n();
+  const materialsBadge = useMaterialsBadge();
   const ar = lang === "ar";
   const navigate = useNavigate();
   const BackIcon = dir === "rtl" ? ArrowRight : ArrowLeft;
@@ -245,7 +248,8 @@ function ClinicHome() {
                   <p className="font-display font-bold text-sm text-slate-800 md:text-base md:leading-snug">{ar ? "طلبيات العيادة والمختبرات" : "Clinic & Lab Orders"}</p>
                   <p className="mt-1 text-xs text-muted-foreground leading-snug md:text-sm">{ar ? "طلبات المختبرات ومستلزمات العيادة" : "Lab requests and clinic supplies"}</p>
                 </Link>
-                <Link to="/clinic/materials" className="flex flex-col bg-white border border-slate-100 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-primary/20 transition md:p-5 md:shadow-none md:border-slate-200 md:hover:shadow-lg md:hover:-translate-y-0.5">
+                <Link to="/clinic/materials" className="relative flex flex-col bg-white border border-slate-100 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-primary/20 transition md:p-5 md:shadow-none md:border-slate-200 md:hover:shadow-lg md:hover:-translate-y-0.5">
+                  <CountBadge count={materialsBadge} className="end-2 top-2" />
                   <span className="size-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-3 md:size-14 md:mb-4"><Package className="size-5 md:size-6" /></span>
                   <p className="font-display font-bold text-sm text-slate-800 md:text-base md:leading-snug">{ar ? "مواد العيادة" : "Clinic Materials"}</p>
                   <p className="mt-1 text-xs text-muted-foreground leading-snug md:text-sm">{ar ? "المخزون والمستهلكات والكيمياويات والمخدر" : "Inventory, consumables, chemicals and anesthesia"}</p>

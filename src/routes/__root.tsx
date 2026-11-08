@@ -9,6 +9,7 @@ import {
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 import { VerifyEmailGate } from "@/components/VerifyEmail";
+import { SuspendedGate } from "@/components/SuspendedGate";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -151,9 +152,11 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <LanguageProvider>
         <StoreUserScope />
+        <SuspendedGate>
         <VerifyEmailGate>
           <Outlet />
         </VerifyEmailGate>
+        </SuspendedGate>
         <Toaster position="top-center" richColors />
       </LanguageProvider>
     </QueryClientProvider>

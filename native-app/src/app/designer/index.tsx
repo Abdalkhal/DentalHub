@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { signOutDevice } from '@/lib/push';
 import { Alert, FlatList, Pressable, RefreshControl, View } from 'react-native';
 import { Redirect, router } from 'expo-router';
-import { signOut } from 'firebase/auth';
 import {
   Bell,
   Building2,
@@ -24,7 +24,7 @@ import { auth } from '@/integrations/firebase/client';
 import { useDesignerCases } from '@/lib/designerStore';
 import { useSession, useLabStaffClaim } from '@/lib/useAuth';
 import { useUnreadNotificationsCount } from '@/lib/notifications';
-import { useDmThreads, getDmLastReadMs } from '@/lib/directMessages';
+import { useDmThreads, unreadFor } from '@/lib/directMessages';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import type { Order, OrderStatus } from '@/lib/ordersStore';
@@ -117,9 +117,7 @@ export default function DesignerIndexScreen() {
   const unreadThreadsCount = useMemo(() => {
     if (!user?.uid) return 0;
     return dmThreads.filter((t) => {
-      if (!t.lastSenderId || t.lastSenderId === user.uid) return false;
-      const lastMs = t.lastMessageAt?.toMillis?.() ?? 0;
-      return lastMs > getDmLastReadMs(t.id, user.uid);
+      return unreadFor(t, user.uid) > 0;
     }).length;
   }, [dmThreads, user?.uid, dmReadTick]);
 
@@ -164,7 +162,7 @@ export default function DesignerIndexScreen() {
       ar ? 'هل تريد تسجيل الخروج من حسابك؟' : 'Do you want to sign out of your account?',
       [
         { text: ar ? 'إلغاء' : 'Cancel', style: 'cancel' },
-        { text: ar ? 'تسجيل الخروج' : 'Sign out', style: 'destructive', onPress: () => signOut(auth) },
+        { text: ar ? 'تسجيل الخروج' : 'Sign out', style: 'destructive', onPress: () => signOutDevice() },
       ],
     );
   };

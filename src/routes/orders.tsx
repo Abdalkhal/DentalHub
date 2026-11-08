@@ -32,6 +32,7 @@ import {
 } from "@/lib/dentalConfig";
 import { useCaseUnreadCount } from "@/lib/caseMessages";
 import { useCart, openCart } from "@/lib/cartStore";
+import { docMoneyRows } from "@/lib/promo";
 import { useMarkOrderSeen } from "@/lib/orderSeen";
 import {
   useOrders as useSupplierOrders,
@@ -50,6 +51,7 @@ import {
   Plus,
   Check,
   ChevronDown,
+  MessageCircle,
 } from "lucide-react";
 
 const ordersSearchSchema = z.object({
@@ -107,15 +109,20 @@ function fmtOrderMoney(usd: number, iqd: number, ar: boolean): string {
 // before the supplier can mark any item "not available" — a rejected item's
 // price stays baked into that stored total forever. The list must instead
 // total the items live, skipping whatever the supplier has since rejected.
-function availableTotals(items: { price?: number; quantity?: number; currency?: string; availability?: string }[]) {
+function availableTotals(items: { price?: number; listPrice?: number; quantity?: number; discountAmount?: number; currency?: string; availability?: string }[]) {
   let usd = 0;
   let iqd = 0;
+  let discountedIQD = false;
   for (const it of items) {
     if (it.availability === "not_available") continue;
-    const amt = (it.price ?? 0) * (it.quantity ?? 1);
-    if (it.currency === "IQD") iqd += amt;
-    else usd += amt;
+    const amt = (it.price ?? 0) * (it.quantity ?? 1) - (it.discountAmount ?? 0);
+    if (it.currency === "IQD") {
+      iqd += amt;
+      if ((it.discountAmount ?? 0) > 0 || (it.listPrice ?? 0) > (it.price ?? 0)) discountedIQD = true;
+    } else usd += amt;
   }
+  // A discounted dinar total rounds down to 250, as the server does.
+  if (discountedIQD && iqd >= 250) iqd -= iqd % 250;
   return { usd, iqd };
 }
 
@@ -669,6 +676,17 @@ function DentistOrders() {
                   )}
                   {open && (
                     <div className="mt-3 -mx-4 -mb-4 px-4 py-3 space-y-2 border-t border-slate-100 bg-slate-50/50 rounded-b-2xl md:-mx-5 md:-mb-5 md:px-5">
+                      {o.supplierId && (
+                        <Link
+                          to="/messages"
+                          search={{ with: o.supplierId, withName: "" }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex h-10 items-center justify-center gap-1.5 rounded-xl bg-[#2563EB] text-xs font-bold text-white hover:bg-[#1D4ED8]"
+                        >
+                          <MessageCircle className="size-4" />
+                          {ar ? "مراسلة" : "Message"}
+                        </Link>
+                      )}
                       {(o.items || []).length === 0 ? (
                         <p className="text-center text-xs text-slate-400">{ar ? "لا توجد تفاصيل" : "No details"}</p>
                       ) : (
@@ -698,6 +716,16 @@ function DentistOrders() {
                             </div>
                           );
                         })
+                      )}
+                      {o.discount && (
+                        <div className="mt-1 pt-2 border-t border-dashed border-slate-200 space-y-1 text-xs">
+                          {docMoneyRows(o, ar).map((r) => (
+                            <div key={r.key} className={cn("flex items-center justify-between", r.tone === "saving" && "text-emerald-600", r.tone === "plain" && "text-slate-500", r.tone === "total" && "font-bold text-slate-800")}>
+                              <span>{r.label}</span>
+                              <span dir="ltr">{r.value}</span>
+                            </div>
+                          ))}
+                        </div>
                       )}
                     </div>
                   )}

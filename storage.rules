@@ -136,6 +136,15 @@ service firebase.storage {
       allow delete: if isSignedIn() && (uid() == ownerId || isStorageAdmin());
     }
 
+    // Photos sent in a direct conversation: only its two participants (the
+    // thread id is their two uids, sorted, joined with "_").
+    match /dm_files/{threadId}/{file} {
+      allow read: if isSignedIn() && uid() in threadId.split('_');
+      allow create: if isSignedIn() && uid() in threadId.split('_')
+        && request.resource.size < 10 * 1024 * 1024
+        && isImage();
+    }
+
     match /surgical-guides/{ownerId}/{file} {
       allow read: if true;
       allow write: if isSignedIn() && uid() == ownerId
@@ -239,6 +248,14 @@ service firebase.storage {
     // overwriting someone else's file.
     // A dentist's patient files and X-rays (patients.$patientId / patient
     // screen). Private to the owning account; 25 MB per file.
+    // A team member's upload on its way into a patient's folder. The
+    // updateSharedPatient function checks the patient, then moves it.
+    match /clinic_uploads/{ownerId}/{file} {
+      allow read, delete: if isSignedIn() && uid() == ownerId;
+      allow create: if isSignedIn() && uid() == ownerId
+        && request.resource.size < 25 * 1024 * 1024;
+    }
+
     match /dentist_records/{ownerId}/{allPaths=**} {
       allow read, delete: if isSignedIn() && uid() == ownerId;
       allow create, update: if isSignedIn() && uid() == ownerId

@@ -16,6 +16,8 @@ import {
 } from "@/lib/patientsStore";
 import { setClinicsStoreUser } from "@/lib/clinicsStore";
 import { useSession } from "@/lib/useAuth";
+import { setActiveClinic, useClinics } from "@/lib/clinicsStore";
+import { usePatientCountsByClinic } from "@/lib/patientClinicCounts";
 import { ArrowRight, ArrowLeft, Phone, Plus, Search, Users, X, CalendarDays, ChevronDown, CloudOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -91,6 +93,7 @@ function PatientsPage() {
         </div>
 
       <SyncNotice ar={ar} />
+      <OtherClinicsNotice ar={ar} uid={user?.uid} />
 
         <div className="md:mt-6 md:flex md:items-center md:gap-4">
         <div className="mt-3 relative md:mt-0 md:flex-1 md:max-w-md">
@@ -308,6 +311,38 @@ function SyncNotice({ ar }: { ar: boolean }) {
       >
         {busy ? <Loader2 className="size-4 animate-spin" /> : ar ? "أعد الآن" : "Retry"}
       </button>
+    </div>
+  );
+}
+
+/** Patients belong to one clinic, and adding a clinic switches to it — an
+ *  empty list then looked like the patients were gone. Points to the others. */
+function OtherClinicsNotice({ ar, uid }: { ar: boolean; uid?: string }) {
+  const { clinics, activeClinicId } = useClinics();
+  const counts = usePatientCountsByClinic(clinics.length > 1 ? uid : undefined);
+  const others = clinics.filter((c) => c.id !== activeClinicId && (counts[c.id] ?? 0) > 0);
+  if (others.length === 0) return null;
+  return (
+    <div className="mt-3 space-y-2 md:max-w-xl">
+      {others.map((c) => (
+        <div key={c.id} className="flex items-center gap-3 rounded-2xl border border-sky-200 bg-sky-50 p-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-bold text-sky-900">
+              {ar ? `لديك ${counts[c.id]} مريض في «${c.name}»` : `You have ${counts[c.id]} patient(s) in “${c.name}”`}
+            </p>
+            <p className="mt-0.5 text-[11px] text-sky-800">
+              {ar ? "كل عيادة لها مرضاها. بدّل العيادة لعرضهم." : "Each clinic has its own patients. Switch to see them."}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActiveClinic(c.id)}
+            className="shrink-0 rounded-xl bg-sky-600 px-3 py-2 text-xs font-bold text-white hover:bg-sky-700"
+          >
+            {ar ? "عرض مرضاها" : "Show them"}
+          </button>
+        </div>
+      ))}
     </div>
   );
 }

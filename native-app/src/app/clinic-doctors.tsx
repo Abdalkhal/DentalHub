@@ -5,6 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Clock, Phone, Plus, Stethoscope, Trash2, X } from 'lucide-react-native';
 
 import { Screen, Select, Text } from '@/components/ui';
+import { ClinicTeamCard, JoinedClinicsCard } from '@/components/ClinicTeam';
+import { ClinicStaffCard } from '@/components/ClinicStaff';
 import { addDoctor, removeDoctor, useClinic } from '@/lib/clinicStore';
 import { setClinicsStoreUser } from '@/lib/clinicsStore';
 import { useUserRole } from '@/lib/useAuth';
@@ -39,6 +41,14 @@ export default function ClinicDoctorsScreen() {
 
   return (
     <Screen>
+      <View className="mb-4 gap-3">
+        <ClinicTeamCard ar={ar} />
+        <JoinedClinicsCard ar={ar} />
+        <ClinicStaffCard ar={ar} />
+      </View>
+      <Text className="mb-2 px-1 text-[11px] font-bold text-slate-500">
+        {ar ? 'أطباء بدون حساب في التطبيق (سجل داخلي)' : 'Doctors without an app account (internal list)'}
+      </Text>
       <Pressable
         onPress={() => setOpen(true)}
         className="h-12 flex-row items-center justify-center gap-2 rounded-2xl bg-primary"

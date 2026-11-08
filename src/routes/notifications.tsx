@@ -24,6 +24,8 @@ const TYPE_META: Record<Notification["type"], { icon: typeof Package; tone: stri
   case_message: { icon: MessageCircle, tone: "bg-violet-100 text-violet-600" },
   booking_new: { icon: CalendarCheck2, tone: "bg-teal-100 text-teal-700" },
   booking_cancelled: { icon: CalendarX2, tone: "bg-rose-100 text-rose-600" },
+  data_export: { icon: Package, tone: "bg-blue-100 text-blue-600" },
+  clinic_team: { icon: MessageCircle, tone: "bg-blue-100 text-blue-600" },
 };
 
 function NotificationsPage() {

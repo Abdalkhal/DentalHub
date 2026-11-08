@@ -28,6 +28,7 @@ import { useClinic, clinicTotals } from '@/lib/clinicStore';
 import { usePatients } from '@/lib/patientsStore';
 import { setClinicsStoreUser, useClinics, addClinic, updateClinic, setActiveClinic, type Clinic } from '@/lib/clinicsStore';
 import { useI18n } from '@/lib/i18n';
+import { useMaterialsBadge } from '@/lib/materialsStore';
 import { cn } from '@/lib/utils';
 
 type Item = {
@@ -43,9 +44,11 @@ type Item = {
   subtitle: string;
   chip?: { label: string; cls: string };
   to: Href;
+  badge?: number;
 };
 
 export default function ClinicHomeScreen() {
+  const materialsBadge = useMaterialsBadge();
   const { lang } = useI18n();
   const ar = lang === 'ar';
   const { user } = useUserRole();
@@ -143,6 +146,7 @@ export default function ClinicHomeScreen() {
       title: ar ? 'مواد العيادة' : 'Clinic Materials',
       subtitle: ar ? 'المخزون والمستهلكات والكيمياويات والمخدر' : 'Inventory, consumables, chemicals and anesthesia',
       to: '/clinic-materials',
+      badge: materialsBadge,
     },
   ];
 
@@ -167,6 +171,11 @@ export default function ClinicHomeScreen() {
 
   const renderItem = (it: Item) => (
     <Pressable key={it.title} onPress={() => router.push(it.to)} className="w-[48.5%]">
+      {!!it.badge && (
+        <View className="absolute right-2 top-2 z-10 h-5 min-w-5 items-center justify-center rounded-full bg-rose-600 px-1" style={{ borderWidth: 2, borderColor: '#FFFFFF' }}>
+          <Text className="text-[10px] font-extrabold text-white">{it.badge > 99 ? '99+' : it.badge}</Text>
+        </View>
+      )}
       {/* Fixed min-height so every card matches regardless of whether it
           carries a bottom chip — the chip (when present) is pushed to the
           bottom via `mt-auto` instead of just following the subtitle text,

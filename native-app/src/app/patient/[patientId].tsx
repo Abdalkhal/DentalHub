@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Linking, Alert, Modal, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import {
@@ -14,9 +14,11 @@ import {
   Grid3x3,
   HeartPulse,
   LayoutGrid,
+  MessageCircle,
   Pencil,
   Phone,
   Plus,
+  Printer,
   Grid2x2,
   RotateCcw,
   Scan,
@@ -34,7 +36,7 @@ import type { LucideIcon } from 'lucide-react-native';
 
 import { Screen, Card, Button, Input, Text } from '@/components/ui';
 import { CalendarPickerModal } from '@/components/CalendarPickerModal';
-import { XrayGallery, useXrayUpload } from '@/components/PatientXrays';
+import { PlanPhotos, XrayGallery, useXrayUpload } from '@/components/PatientXrays';
 import { DentalArch, LEGEND_ORDER, TOOTH_META } from '@/components/DentalArch';
 import { ArchViewer, ARCH_ZOOM_MIN, ARCH_ZOOM_MAX } from '@/components/ArchViewer';
 import {
@@ -46,7 +48,15 @@ import {
   setTooth,
   addPayment,
   removePayment,
-  paidTotal,
+  balanceIn,
+  localDay,
+  patientDeletedPayments,
+  patientFeeHistory,
+  paymentCurrency,
+  setFeeCurrency,
+  setPatientFee,
+  settlePatientFinance,
+  type Payment,
   getPlan,
   addPlanStep,
   updatePlanStep,
@@ -68,7 +78,11 @@ import {
 } from '@/lib/patientsStore';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
-import { sharePdf, patientRecordHtml } from '@/lib/print';
+import { sharePdf, patientRecordHtml, printDocument, receiptHtml } from '@/lib/print';
+import { deletedPaymentText, feeChangeText, financeSectionHtml, receiptBodyHtml, receiptText } from '@/lib/paymentReceipt';
+import { whatsappLink } from '@/lib/booking';
+import { PatientDoctorsCard } from '@/components/ClinicTeamFinance';
+import { useClinics } from '@/lib/clinicsStore';
 import { toast } from '@/lib/toast';
 
 type Sub = { ar: string; en: string };
@@ -277,6 +291,7 @@ export default function PatientDetailScreen() {
         })),
         teeth,
         plan,
+        financeHtml: financeSectionHtml(p, ar),
       }),
     );
     if (!ok) toast.error(ar ? 'تعذر إنشاء ملف PDF' : 'Could not create PDF');
@@ -319,6 +334,7 @@ export default function PatientDetailScreen() {
       {/* Patient info card */}
       <View className="mt-3">
         <PatientInfoCard p={p} ar={ar} />
+        <PatientDoctorsCard p={p} ar={ar} />
       </View>
 
       {/* Tabs */}
@@ -512,90 +528,87 @@ function BillingTab({ p, ar }: { p: Patient; ar: boolean }) {
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const cur = p.feeCurrency ?? 'USD';
-  const paid = paidTotal(p);
-  const remaining = (Number(p.totalFees) || 0) - paid;
+  const { fees, paid, remaining } = balanceIn(p, cur);
   const overpaid = remaining < 0;
   const sym = cur === 'IQD' ? 'د.ع' : '$';
   // Typed text kept locally so a dollar amount can pass through "12." on its
   // way to "12.50" — formatting the stored number back lost the dot.
-  const [feesText, setFeesText] = useState(() => (p.totalFees ? formatAmountInput(String(p.totalFees), cur) : ''));
+  const stored = fees ? formatAmountInput(String(fees), cur) : '';
+  const [feesText, setFeesText] = useState(stored);
+  useEffect(() => setFeesText(stored), [stored]);
+  useEffect(() => settlePatientFinance(p.id), [p.id]);
+  const feesDirty = (parseAmountInput(feesText) ?? 0) !== fees;
 
   const fmt = (n: number) => formatMoney(Math.abs(Number(n) || 0), cur);
   const plan = planTotals(p);
   const otherCur: FeeCurrency = cur === 'USD' ? 'IQD' : 'USD';
+  const other = balanceIn(p, otherCur);
+  const otherName = otherCur === 'USD' ? (ar ? 'الدولار' : 'USD') : ar ? 'الدينار' : 'IQD';
+  const history = patientFeeHistory(p);
+  const { clinics, activeClinicId } = useClinics();
+  const clinicName = clinics.find((c) => c.id === activeClinicId)?.name ?? '';
 
   const setCurrency = (c: FeeCurrency) => {
     if (c === cur) return;
-    const apply = () => {
-      updatePatient(p.id, { feeCurrency: c });
-      setFeesText(p.totalFees ? formatAmountInput(String(p.totalFees), c) : '');
-      setAmount((a) => formatAmountInput(a, c));
-    };
-    // Switching only relabels the amounts — it never converts them.
-    if ((Number(p.totalFees) || 0) > 0 || p.payments.length > 0) {
-      Alert.alert(
-        ar ? 'تغيير العملة' : 'Change currency',
-        ar
-          ? 'سيتغيّر رمز العملة فقط ولن تُحوَّل المبالغ المسجلة (مثلاً 250$ تصبح 250 د.ع). هل تريد المتابعة؟'
-          : 'Only the currency label changes — recorded amounts are not converted (e.g. $250 becomes 250 IQD). Continue?',
-        [
-          { text: ar ? 'إلغاء' : 'Cancel', style: 'cancel' },
-          { text: ar ? 'تغيير' : 'Change', onPress: apply },
-        ],
-      );
-    } else apply();
-  };
-
-  const setFees = (text: string) => {
-    const formatted = formatAmountInput(text, cur);
-    setFeesText(formatted);
-    updatePatient(p.id, { totalFees: parseAmountInput(formatted) ?? 0 });
+    setFeeCurrency(p.id, c);
+    setAmount((a) => formatAmountInput(a, c));
   };
 
   const submit = () => {
     const n = parseAmountInput(amount);
     if (!n) return;
-    addPayment(p.id, { amount: n, note: note.trim() || undefined, date: new Date().toISOString().slice(0, 10) });
+    addPayment(p.id, { amount: n, note: note.trim() || undefined, date: localDay(), currency: cur });
     setAmount('');
     setNote('');
+  };
+
+  const sendReceipt = (x: Payment) => {
+    if (!p.phone.trim()) {
+      toast.error(ar ? 'أضف رقم هاتف المريض أولاً' : "Add the patient's phone number first");
+      return;
+    }
+    void Linking.openURL(whatsappLink(p.phone, receiptText(p, x, clinicName, ar))).catch(() =>
+      toast.error(ar ? 'تعذر فتح واتساب' : 'Could not open WhatsApp'),
+    );
+  };
+  const receiptDoc = (x: Payment) => receiptHtml(receiptBodyHtml(p, x, clinicName, ar), ar);
+  const printReceipt = async (x: Payment) => {
+    if (!(await printDocument(receiptDoc(x)))) toast.error(ar ? 'تعذرت الطباعة' : 'Could not print');
+  };
+  const shareReceipt = async (x: Payment) => {
+    if (!(await sharePdf(`${x.receiptNo ?? 'receipt'}.pdf`, receiptDoc(x)))) toast.error(ar ? 'تعذر إنشاء ملف PDF' : 'Could not create PDF');
   };
 
   return (
     <View className="gap-3">
       {/* Currency selector */}
-      <View className="flex-row items-center justify-between rounded-2xl border border-slate-200 bg-white p-3">
-        <Text className="text-[11px] font-bold text-slate-500">{ar ? 'العملة' : 'Currency'}</Text>
-        <View className="flex-row gap-1.5">
-          <Pressable
-            onPress={() => setCurrency('USD')}
-            className={cn(
-              'h-8 items-center justify-center rounded-full border px-3',
-              cur === 'USD' ? 'border-primary bg-primary' : 'border-slate-200 bg-white',
-            )}
-          >
-            <Text className={cn('text-[11px] font-bold', cur === 'USD' ? 'text-primary-foreground' : 'text-slate-500')}>
-              $ {ar ? 'دولار' : 'USD'}
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setCurrency('IQD')}
-            className={cn(
-              'h-8 items-center justify-center rounded-full border px-3',
-              cur === 'IQD' ? 'border-primary bg-primary' : 'border-slate-200 bg-white',
-            )}
-          >
-            <Text className={cn('text-[11px] font-bold', cur === 'IQD' ? 'text-primary-foreground' : 'text-slate-500')}>
-              د.ع {ar ? 'دينار' : 'IQD'}
-            </Text>
-          </Pressable>
+      <View className="rounded-2xl border border-slate-200 bg-white p-3">
+        <View className="flex-row items-center justify-between">
+          <Text className="text-[11px] font-bold text-slate-500">{ar ? 'العملة' : 'Currency'}</Text>
+          <View className="flex-row gap-1.5">
+            {(['USD', 'IQD'] as const).map((c) => (
+              <Pressable
+                key={c}
+                onPress={() => setCurrency(c)}
+                className={cn('h-8 items-center justify-center rounded-full border px-3', cur === c ? 'border-primary bg-primary' : 'border-slate-200 bg-white')}
+              >
+                <Text className={cn('text-[11px] font-bold', cur === c ? 'text-primary-foreground' : 'text-slate-500')}>
+                  {c === 'USD' ? `$ ${ar ? 'دولار' : 'USD'}` : `د.ع ${ar ? 'دينار' : 'IQD'}`}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
         </View>
+        <Text className="mt-2 text-[10.5px] text-slate-400">
+          {ar ? 'لكل عملة أتعابها ودفعاتها، ولا يتحول مبلغ من عملة إلى أخرى.' : 'Each currency has its own fees and payments. Amounts never convert.'}
+        </Text>
       </View>
 
       {/* Stats */}
       <View className="flex-row gap-2">
         <View className="flex-1 items-center rounded-2xl bg-sky-50 p-3">
           <Text numberOfLines={1} className="text-base font-extrabold text-slate-800">
-            {fmt(p.totalFees ?? 0)}
+            {fmt(fees)}
           </Text>
           <Text className="mt-0.5 text-[10.5px] text-slate-500">{ar ? 'إجمالي الأتعاب' : 'Total fees'}</Text>
         </View>
@@ -619,6 +632,17 @@ function BillingTab({ p, ar }: { p: Patient; ar: boolean }) {
         </View>
       </View>
 
+      {/* The other currency's balance, so it is never out of sight. */}
+      {(other.fees > 0 || other.paid > 0) && (
+        <Pressable onPress={() => setCurrency(otherCur)} className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5">
+          <Text className="text-[11px] font-bold text-slate-600">
+            {ar
+              ? `رصيد ${otherName}: الأتعاب ${formatMoney(other.fees, otherCur)} · المدفوع ${formatMoney(other.paid, otherCur)} · المتبقي ${formatMoney(Math.abs(other.remaining), otherCur)}`
+              : `${otherName} balance: fees ${formatMoney(other.fees, otherCur)} · paid ${formatMoney(other.paid, otherCur)} · remaining ${formatMoney(Math.abs(other.remaining), otherCur)}`}
+          </Text>
+        </Pressable>
+      )}
+
       {/* Treatment plan total — the plan and the fees were two unrelated numbers. */}
       {(plan.USD > 0 || plan.IQD > 0) && (
         <Card>
@@ -629,9 +653,9 @@ function BillingTab({ p, ar }: { p: Patient; ar: boolean }) {
                 {formatMoneyTotals(getPlan(p), p)}
               </Text>
             </View>
-            {plan[cur] > 0 && plan[cur] !== (Number(p.totalFees) || 0) && (
+            {plan[cur] > 0 && plan[cur] !== fees && (
               <Pressable
-                onPress={() => setFees(String(plan[cur]))}
+                onPress={() => setPatientFee(p.id, cur, plan[cur])}
                 className="shrink-0 rounded-xl px-3 py-2"
                 style={{ backgroundColor: 'rgba(59,130,246,0.1)' }}
               >
@@ -639,34 +663,50 @@ function BillingTab({ p, ar }: { p: Patient; ar: boolean }) {
               </Pressable>
             )}
           </View>
-          {plan[otherCur] > 0 && (
+          {plan[otherCur] > 0 && other.fees !== plan[otherCur] && (
             <Text className="mt-1.5 text-[10.5px] text-amber-700">
               {ar
-                ? `جزء من الخطة بعملة ${otherCur === 'USD' ? 'الدولار' : 'الدينار'} ولا يدخل في إجمالي الأتعاب (${cur === 'USD' ? 'دولار' : 'دينار'}).`
-                : `Part of the plan is in ${otherCur} and isn't included in the ${cur} total fees.`}
+                ? `جزء من الخطة بعملة ${otherName}. اختر هذه العملة لتسجيل أتعابه.`
+                : `Part of the plan is in ${otherName}. Choose that currency to record its fees.`}
             </Text>
           )}
         </Card>
       )}
 
-      {/* Editable total fees */}
+      {/* Total fees: saved on purpose, and any change to a set fee stays on record. */}
       <Card>
         <View className="mb-2 flex-row items-center justify-between">
           <Text className="text-xs font-bold text-slate-500">{ar ? 'إجمالي الأتعاب' : 'Total fees'}</Text>
           <Wallet size={16} color="#2563EB" />
         </View>
-        <View className="h-11 flex-row items-center rounded-xl border border-slate-200 bg-slate-50 px-3">
-          <Text className="me-2 shrink-0 text-xs font-bold text-slate-400">{sym}</Text>
-          <TextInput
-            value={feesText}
-            onChangeText={setFees}
-            keyboardType={cur === 'IQD' ? 'number-pad' : 'decimal-pad'}
-            placeholder="0"
-            placeholderTextColor="#94A3B8"
-            className="flex-1 text-sm text-slate-800"
-            style={{ writingDirection: 'ltr', textAlign: 'left' }}
-          />
+        <View className="flex-row items-center gap-2">
+          <View className="h-11 flex-1 flex-row items-center rounded-xl border border-slate-200 bg-slate-50 px-3">
+            <Text className="me-2 shrink-0 text-xs font-bold text-slate-400">{sym}</Text>
+            <TextInput
+              value={feesText}
+              onChangeText={(v) => setFeesText(formatAmountInput(v, cur))}
+              keyboardType={cur === 'IQD' ? 'number-pad' : 'decimal-pad'}
+              placeholder="0"
+              placeholderTextColor="#94A3B8"
+              className="flex-1 text-sm text-slate-800"
+              style={{ writingDirection: 'ltr', textAlign: 'left' }}
+            />
+          </View>
+          {feesDirty && (
+            <Pressable onPress={() => setPatientFee(p.id, cur, parseAmountInput(feesText) ?? 0)} className="h-11 items-center justify-center rounded-xl bg-primary px-4">
+              <Text className="text-xs font-bold text-primary-foreground">{ar ? 'حفظ' : 'Save'}</Text>
+            </Pressable>
+          )}
         </View>
+        {history.length > 0 && (
+          <View className="mt-2 gap-1.5">
+            {history.map((h) => (
+              <View key={h.id} className="rounded-xl bg-amber-50 px-3 py-2">
+                <Text className="text-[11px] font-semibold text-amber-800">{feeChangeText(h, ar)}</Text>
+              </View>
+            ))}
+          </View>
+        )}
       </Card>
 
       {/* Record payment */}
@@ -709,19 +749,54 @@ function BillingTab({ p, ar }: { p: Patient; ar: boolean }) {
         {p.payments.length === 0 ? (
           <Text className="text-xs text-slate-400">{ar ? 'لا توجد مدفوعات' : 'No payments yet'}</Text>
         ) : (
-          <View className="gap-1.5">
-            {p.payments.map((x) => (
-              <View key={x.id} className="flex-row items-center gap-2 rounded-xl border border-slate-200 p-2">
-                <View className="min-w-0 flex-1">
-                  <Text className="text-xs font-bold text-slate-800">{fmt(x.amount)}</Text>
-                  <Text numberOfLines={1} className="text-[11px] text-slate-400">
-                    {x.date}
-                    {x.note ? ` · ${x.note}` : ''}
-                  </Text>
+          <View className="gap-2.5">
+            {p.payments.map((x) => {
+              const label = formatMoney(x.amount, paymentCurrency(p, x));
+              return (
+                <View key={x.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                  <View className="flex-row items-start gap-2">
+                    <View className="min-w-0 flex-1">
+                      <Text className="text-[11px] font-bold text-slate-500">{ar ? 'دفعة مالية' : 'Payment'}</Text>
+                      <Text className="mt-0.5 text-xl font-extrabold text-slate-900">{label}</Text>
+                    </View>
+                    <View className="rounded-full bg-emerald-100 px-2.5 py-1">
+                      <Text className="text-[10px] font-bold text-emerald-700">{ar ? 'مسجلة' : 'Recorded'}</Text>
+                    </View>
+                  </View>
+                  <View className="mt-2 gap-0.5">
+                    <Text className="text-[11px] text-slate-500">{ar ? 'التاريخ' : 'Date'}: {x.date}</Text>
+                    <Text className="text-[11px] text-slate-500">{ar ? 'رقم الوصل' : 'Receipt #'}: {x.receiptNo ?? '—'}</Text>
+                    {!!x.note && <Text className="text-[11px] text-slate-500">{ar ? 'ملاحظة' : 'Note'}: {x.note}</Text>}
+                  </View>
+                  <View className="mt-3 flex-row gap-2 border-t border-slate-200 pt-3">
+                    <Pressable onPress={() => sendReceipt(x)} className="h-10 flex-1 flex-row items-center justify-center gap-1.5 rounded-xl bg-emerald-600">
+                      <MessageCircle size={15} color="#FFFFFF" />
+                      <Text className="text-[11px] font-bold text-white">{ar ? 'إرسال واتساب' : 'WhatsApp'}</Text>
+                    </Pressable>
+                    <Pressable onPress={() => void printReceipt(x)} className="h-10 flex-1 flex-row items-center justify-center gap-1.5 rounded-xl bg-primary">
+                      <Printer size={15} color="#FFFFFF" />
+                      <Text className="text-[11px] font-bold text-primary-foreground">{ar ? 'طباعة الوصل' : 'Print'}</Text>
+                    </Pressable>
+                    <Pressable onPress={() => void shareReceipt(x)} className="h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white">
+                      <Share2 size={15} color="#475569" />
+                    </Pressable>
+                    <Pressable
+                      onPress={() => confirmDelete(ar, ar ? `حذف دفعة ${label}؟` : `Delete payment of ${label}?`, () => removePayment(p.id, x.id))}
+                      className="h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white"
+                    >
+                      <Trash2 size={15} color="#94A3B8" />
+                    </Pressable>
+                  </View>
                 </View>
-                <Pressable onPress={() => confirmDelete(ar, ar ? `حذف دفعة ${fmt(x.amount)}؟` : `Delete payment of ${fmt(x.amount)}?`, () => removePayment(p.id, x.id))}>
-                  <Trash2 size={14} color="#94A3B8" />
-                </Pressable>
+              );
+            })}
+          </View>
+        )}
+        {patientDeletedPayments(p).length > 0 && (
+          <View className="mt-2.5 gap-1.5">
+            {patientDeletedPayments(p).map((d) => (
+              <View key={d.id} className="rounded-xl bg-rose-50 px-3 py-2">
+                <Text className="text-[11px] font-semibold text-rose-700">{deletedPaymentText(d, ar)}</Text>
               </View>
             ))}
           </View>
@@ -1336,6 +1411,8 @@ function PlanCard({ p, ar }: { p: Patient; ar: boolean }) {
             ))}
           </View>
         )}
+
+        {!isRadio && <PlanPhotos p={p} ar={ar} dept={dept} />}
       </View>
 
       {picking && (

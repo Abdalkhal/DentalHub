@@ -18,6 +18,8 @@ export function getAccountDashboard(role: AppRole): string {
       return "/implants";
     case "lab":
       return "/labs/dashboard";
+    case "secretary":
+      return "/secretary";
     default:
       return "/";
   }

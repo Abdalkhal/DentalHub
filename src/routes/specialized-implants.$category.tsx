@@ -5,7 +5,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
-import { useProducts, useSignedImageUrls, type Product } from "@/lib/products";
+import { useProductsWhere, useSignedImageUrls, type Product } from "@/lib/products";
 import { ProductDetailsModal } from "@/components/ProductDetailsModal";
 import { SPECIALIZED_CATEGORIES, SPECIALIZED_FIELDS } from "@/data/specializedImplants";
 import { db } from "@/integrations/firebase/client";
@@ -25,7 +25,7 @@ function SpecializedCategoryPage() {
   const { category } = Route.useParams();
   const { lang } = useI18n();
   const ar = lang === "ar";
-  const { data: allProducts = [], isLoading } = useProducts();
+  const { data: allProducts = [], isLoading } = useProductsWhere("category", "specialized_implant");
   const [selected, setSelected] = useState<Product | null>(null);
 
   const categoryMeta = SPECIALIZED_CATEGORIES.find((c) => c.id === category);

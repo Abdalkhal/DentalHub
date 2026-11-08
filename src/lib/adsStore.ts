@@ -55,6 +55,12 @@ export function useMyAds(accountId: string) {
   return { data: data.filter((a) => a.accountId === accountId), isLoading: loading };
 }
 
+/** Every ad in any status, for the admin console. */
+export function useAllAds() {
+  const { data, loading } = useRealtimeQuery<Ad>(adsQuery(), mapAd);
+  return { data, isLoading: loading };
+}
+
 /** Approved, not-yet-expired ads, for the dentist home banner. */
 export function useActiveAds() {
   const { data, loading } = useRealtimeQuery<Ad>(adsQuery(), mapAd);

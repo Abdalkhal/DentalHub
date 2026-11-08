@@ -35,7 +35,7 @@ import { setClinicsStoreUser } from '@/lib/clinicsStore';
 import { setFavoritesStoreUser } from '@/lib/favoritesStore';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
-import { useProducts, useSignedImageUrls } from '@/lib/products';
+import { useProductSearch, useSignedImageUrls } from '@/lib/products';
 import { useQuickOrders, setQuickOrdersStoreUser } from '@/lib/quickOrders';
 import { useImplantOffers } from '@/lib/implantOffers';
 import { useActiveAds, type Ad } from '@/lib/adsStore';
@@ -137,7 +137,8 @@ export default function HomeScreen() {
   const { claim: labStaff, loading: claimLoading } = useLabStaffClaim();
   useSession();
 
-  const { data: products = [] } = useProducts();
+  const [productTerm, setProductTerm] = useState('');
+  const { data: foundProducts = [] } = useProductSearch(productTerm);
   const quickItems = useQuickOrders();
   const { offers: implantOffers = [] } = useImplantOffers();
 
@@ -223,13 +224,10 @@ export default function HomeScreen() {
       .slice(0, 5);
   }, [q, vendorAccounts]);
 
-  const searchResults = useMemo(() => {
-    const term = q.trim().toLowerCase();
-    if (term.length < 2) return [];
-    return products
-      .filter((p) => [p.en, p.ar, p.brand].filter(Boolean).some((v) => v!.toLowerCase().includes(term)))
-      .slice(0, 8);
-  }, [q, products]);
+  useEffect(() => {
+    setProductTerm(q.trim().length >= 2 ? q : '');
+  }, [q]);
+  const searchResults = useMemo(() => foundProducts.slice(0, 8), [foundProducts]);
 
   // Case tracking, ported from the web home ("Track Cases" banner + count):
   // a case reaches the dentist either because they sent it themselves
@@ -258,6 +256,11 @@ export default function HomeScreen() {
   // `designerId` OR `ceramistId` regardless of the staff member's role.
   if (labStaff?.role === 'DESIGNER' || labStaff?.role === 'TECHNICIAN' || labStaff?.role === 'ADMIN') {
     return <Redirect href={'/designer' as never} />;
+  }
+
+  // A secretary only ever works in their own workspace.
+  if (role?.accountType === 'secretary') {
+    return <Redirect href={'/secretary' as never} />;
   }
 
   // Match the web app: the Home tab takes each role to its own dashboard

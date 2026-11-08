@@ -21,12 +21,15 @@ import {
   ShoppingCart,
   Store,
   Stethoscope,
+  Tag,
   Users,
+  TicketPercent,
 } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 
 import { Screen, Text } from '@/components/ui';
 import { useIsAdmin, useLabStaffClaim, useUserRole } from '@/lib/useAuth';
+import { useMaterialsBadge } from '@/lib/materialsStore';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
@@ -55,6 +58,7 @@ const ITEMS: Record<string, Item[]> = {
     { icon: Users, ar: 'المرضى', en: 'Patients', to: '/patients' },
     { icon: ListChecks, ar: 'تتبع الحالات', en: 'Track Cases', to: '/track-cases' },
     { icon: Heart, ar: 'المفضلة', en: 'Favorites', to: '/favorites' },
+    { icon: Tag, ar: 'العروض', en: 'Offers', to: '/offers' },
     { icon: Crown, ar: 'البراندات', en: 'Brands', to: '/brands' },
     { icon: ShoppingBag, ar: 'المستلزمات', en: 'Supplies', to: '/supplies' },
     { icon: Megaphone, ar: 'إعلاناتي', en: 'My Ads', to: '/my-ads' },
@@ -68,6 +72,7 @@ const ITEMS: Record<string, Item[]> = {
   supply: [
     { icon: Store, ar: 'لوحة المورد', en: 'Supplier Dashboard', to: '/supplies-office' },
     { icon: FileText, ar: 'فواتير الأطباء', en: 'Doctor Invoices', to: '/doctor-invoices' },
+    { icon: TicketPercent, ar: 'الخصومات', en: 'Discounts', to: '/office-discounts' },
     { icon: Megaphone, ar: 'إعلاناتي', en: 'My Ads', to: '/my-ads' },
     { icon: MessageSquare, ar: 'الرسائل', en: 'Messages', to: '/messages' },
     { icon: Bell, ar: 'الإشعارات', en: 'Notifications', to: '/notifications' },
@@ -92,6 +97,7 @@ const ITEMS: Record<string, Item[]> = {
   ],
   implant: [
     { icon: FlaskConical, ar: 'لوحة الزرعات', en: 'Implant Dashboard', to: '/implants-office' },
+    { icon: TicketPercent, ar: 'الخصومات', en: 'Discounts', to: '/office-discounts' },
     { icon: Megaphone, ar: 'إعلاناتي', en: 'My Ads', to: '/my-ads' },
     { icon: MessageSquare, ar: 'الرسائل', en: 'Messages', to: '/messages' },
     { icon: Bell, ar: 'الإشعارات', en: 'Notifications', to: '/notifications' },
@@ -123,6 +129,7 @@ const ITEMS: Record<string, Item[]> = {
 };
 
 export default function MoreScreen() {
+  const materialsBadge = useMaterialsBadge();
   const { lang, toggle } = useI18n();
   const ar = lang === 'ar';
   const { user, role, loading } = useUserRole();
@@ -179,6 +186,9 @@ export default function MoreScreen() {
               >
                 <View className="h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50">
                   <Icon size={19} color="#334155" strokeWidth={2} />
+                  {it.to === '/clinic' && materialsBadge > 0 && (
+                    <View className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-rose-600" style={{ borderWidth: 1.5, borderColor: '#FFFFFF' }} />
+                  )}
                 </View>
                 <Text className="flex-1 text-sm font-bold text-slate-700">{ar ? it.ar : it.en}</Text>
                 <ChevronLeft size={16} color="#CBD5E1" />

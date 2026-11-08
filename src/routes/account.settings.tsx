@@ -5,6 +5,7 @@ import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
 import { useUserRole } from "@/lib/useAuth";
+import { DataExportCard } from "@/components/DataExportCard";
 import { auth, db } from "@/integrations/firebase/client";
 import { doc, updateDoc, deleteDoc } from "firebase/firestore";
 import {
@@ -618,6 +619,8 @@ function SettingsPage() {
           {ar ? "حفظ التغييرات" : "Save Changes"}
         </button>
 
+        {isDentist && <DataExportCard ar={ar} />}
+
         {/* Section 5: Danger Zone */}
         <section>
           <p className="text-xs font-bold text-muted-foreground mb-2 px-1">
@@ -677,9 +680,13 @@ function SettingsPage() {
               </div>
 
               <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
-                {ar
-                  ? "سيتم حذف جميع بياناتك نهائياً من النظام. أدخل كلمة المرور للمتابعة."
-                  : "All your data will be permanently removed. Enter your password to continue."}
+                {isDentist
+                  ? ar
+                    ? "لن تستطيع الوصول إلى ملفات مرضاك بعد حذف الحساب. للاحتفاظ بها، صدّرها أولاً من «تصدير بياناتي» في هذه الصفحة. أدخل كلمة المرور للمتابعة."
+                    : "You will lose access to your patient files. To keep them, use \"Export my data\" on this page first. Enter your password to continue."
+                  : ar
+                    ? "سيتم حذف جميع بياناتك نهائياً من النظام. أدخل كلمة المرور للمتابعة."
+                    : "All your data will be permanently removed. Enter your password to continue."}
               </p>
 
               <div className="relative">

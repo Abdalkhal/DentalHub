@@ -14,6 +14,7 @@ const ROLE_LABELS: Record<AccountType, { ar: string; en: string }> = {
   supply: { ar: "مكتب مستلزمات", en: "Supplies Office" },
   lab: { ar: "مختبر", en: "Laboratory" },
   implant: { ar: "شركة زرعات", en: "Implant Company" },
+  secretary: { ar: "سكرتارية", en: "Secretary" },
 };
 
 type Props = {

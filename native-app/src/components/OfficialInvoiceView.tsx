@@ -3,7 +3,8 @@ import { Image, View } from 'react-native';
 import { ReceiptText, Building2, Phone, MapPin, Package, StickyNote, User } from 'lucide-react-native';
 
 import { Text } from '@/components/ui';
-import { useProducts, useSignedImageUrls } from '@/lib/products';
+import { useProductsByIds, useSignedImageUrls } from '@/lib/products';
+import { docMoneyRows } from '@/lib/promo';
 import type { InvoiceDoc, InvoiceStatus } from '@/integrations/firebase/types';
 import { cn } from '@/lib/utils';
 
@@ -61,7 +62,7 @@ export function OfficialInvoiceView({
   storeAddress: string;
   ar: boolean;
 }) {
-  const { data: products = [] } = useProducts();
+  const { data: products = [] } = useProductsByIds(inv.items.map((i) => i.productId));
   const productById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
   const imagePaths = useMemo(
     () => inv.items.map((it) => productById.get(it.productId)?.images?.[0]).filter((x): x is string => !!x),
@@ -77,8 +78,6 @@ export function OfficialInvoiceView({
   const location = [inv.doctorCity, inv.doctorAddress].filter(Boolean).join('، ');
   const missingLabel = ar ? 'غير مدخل' : 'Not provided';
   const confirmDate = inv.confirmedAt || inv.createdAt;
-  const iqdTotal = inv.items.filter((i) => i.currency === 'IQD').reduce((s, i) => s + i.price * i.quantity, 0);
-  const usdTotal = inv.items.filter((i) => i.currency !== 'IQD').reduce((s, i) => s + i.price * i.quantity, 0);
 
   return (
     <View className="gap-4">
@@ -169,6 +168,9 @@ export function OfficialInvoiceView({
                 {item.name}
               </Text>
               <Text className="text-[11px] text-slate-400" style={{ writingDirection: 'ltr', textAlign: 'left' }}>
+                {(item.listPrice ?? item.price) > item.price
+                  ? `${item.currency === 'IQD' ? fmtIqd(item.listPrice ?? 0) : fmtUsd(item.listPrice ?? 0)} ← `
+                  : ''}
                 {item.currency === 'IQD' ? fmtIqd(item.price) : fmtUsd(item.price)} × {item.quantity}
               </Text>
             </View>
@@ -183,18 +185,19 @@ export function OfficialInvoiceView({
       <View className="rounded-2xl border border-slate-100 bg-white p-4">
         <Text className="text-sm font-bold text-slate-700">{ar ? 'ملخص الفاتورة' : 'Invoice summary'}</Text>
         <View className="mt-3 gap-2.5">
-          <View className="flex-row items-center justify-between">
-            <Text className="text-sm text-slate-500">{ar ? 'الإجمالي بالدينار' : 'Total (IQD)'}</Text>
-            <Text className="text-sm font-semibold" style={{ writingDirection: 'ltr' }}>
-              {fmtIqd(iqdTotal)}
-            </Text>
-          </View>
-          <View className="flex-row items-center justify-between">
-            <Text className="text-sm text-slate-500">{ar ? 'الإجمالي بالدولار' : 'Total (USD)'}</Text>
-            <Text className="text-sm font-semibold" style={{ writingDirection: 'ltr' }}>
-              {fmtUsd(usdTotal)}
-            </Text>
-          </View>
+          {docMoneyRows(inv, ar).map((r) => (
+            <View key={r.key} className="flex-row items-center justify-between">
+              <Text className={r.tone === 'saving' ? 'text-sm text-emerald-600' : r.tone === 'total' ? 'text-sm font-bold text-slate-800' : 'text-sm text-slate-500'}>
+                {r.label}
+              </Text>
+              <Text
+                className={r.tone === 'saving' ? 'text-sm font-semibold text-emerald-600' : r.tone === 'total' ? 'text-sm font-extrabold' : 'text-sm font-semibold'}
+                style={r.tone === 'total' ? { color: TEAL, writingDirection: 'ltr' } : { writingDirection: 'ltr' }}
+              >
+                {r.value}
+              </Text>
+            </View>
+          ))}
           {!!inv.note && (
             <View className="mt-1 border-t border-dashed border-slate-200 pt-3">
               <View className="mb-1 flex-row items-center gap-1">

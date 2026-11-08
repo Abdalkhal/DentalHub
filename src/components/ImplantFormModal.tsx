@@ -7,7 +7,7 @@ import { StockVisibilityToggle } from "@/components/StockVisibilityToggle";
 import { useI18n } from "@/lib/i18n";
 import { useConfirmClose, useFormDirty } from "@/lib/confirmClose";
 import {
-  useProducts,
+  useProductsByCompany,
   useUpsertProduct,
   uploadProductImage,
   removeProductImage,
@@ -135,11 +135,11 @@ export function ImplantFormModal({
 }) {
   const { lang } = useI18n();
   const ar = lang === "ar";
-  const { data: allProducts = [] } = useProducts();
   const upsert = useUpsertProduct();
   const queryClient = useQueryClient();
 
   const supplierUid = auth.currentUser?.uid ?? "";
+  const { data: allProducts = [] } = useProductsByCompany(supplierUid);
   const editing = product ?? null;
 
   const implantProducts = useMemo(

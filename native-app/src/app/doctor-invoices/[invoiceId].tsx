@@ -9,6 +9,7 @@ import { useUserRole } from '@/lib/useAuth';
 import { sharePdf, invoiceHtml } from '@/lib/print';
 import { useI18n } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
+import { docMoneyRows, orderMoney } from '@/lib/promo';
 
 const TEAL = '#0E6E66';
 
@@ -51,8 +52,7 @@ export default function InvoiceDetailScreen() {
     );
   }
 
-  const iqdTotal = inv.items.filter((i) => i.currency === 'IQD').reduce((s, i) => s + i.price * i.quantity, 0);
-  const usdTotal = inv.items.filter((i) => i.currency !== 'IQD').reduce((s, i) => s + i.price * i.quantity, 0);
+  const { netIQD: iqdTotal, netUSD: usdTotal } = orderMoney(inv);
   const missingLabel = ar ? 'غير مدخل' : 'Not provided';
   const location = [inv.doctorCity, inv.doctorAddress].filter(Boolean).join('، ');
   const statusLabel = ar ? STATUS_META[inv.status].ar : STATUS_META[inv.status].en;
@@ -101,10 +101,7 @@ export default function InvoiceDetailScreen() {
           qty: i.quantity,
           price: i.currency === 'IQD' ? fmtIqd(i.price * i.quantity) : fmtUsd(i.price * i.quantity),
         })),
-        totals: [
-          { label: ar ? 'الإجمالي بالدينار' : 'Total (IQD)', value: fmtIqd(iqdTotal) },
-          { label: ar ? 'الإجمالي بالدولار' : 'Total (USD)', value: fmtUsd(usdTotal) },
-        ],
+        totals: docMoneyRows(inv, ar).map((r) => ({ label: r.label, value: r.value })),
         note: inv.note ? { label: ar ? 'ملاحظة الطبيب' : 'Doctor note', value: inv.note } : undefined,
       }),
     );
@@ -131,18 +128,21 @@ export default function InvoiceDetailScreen() {
         </Pressable>
       </View>
 
-      {!!inv.doctorId && (
+      {!!(role?.accountType === 'dentist' ? inv.officeId : inv.doctorId) && (
         <Pressable
           onPress={() =>
             router.push({
               pathname: '/messages',
-              params: { with: inv.doctorId, withName: inv.doctorName },
+              params:
+                role?.accountType === 'dentist'
+                  ? { with: inv.officeId, withName: '' }
+                  : { with: inv.doctorId, withName: inv.doctorName },
             })
           }
           className="mt-2 h-11 flex-row items-center justify-center gap-2 rounded-xl bg-[#2563EB]"
         >
           <MessageSquare size={16} color="#FFFFFF" />
-          <Text className="text-sm font-bold text-white">{ar ? 'مراسلة الطبيب' : 'Message doctor'}</Text>
+          <Text className="text-sm font-bold text-white">{role?.accountType === 'dentist' ? (ar ? 'مراسلة' : 'Message') : ar ? 'مراسلة الطبيب' : 'Message doctor'}</Text>
         </Pressable>
       )}
 

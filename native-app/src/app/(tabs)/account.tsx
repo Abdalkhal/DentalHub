@@ -1,6 +1,6 @@
 import { Image, Pressable, View } from 'react-native';
+import { signOutDevice } from '@/lib/push';
 import { router } from 'expo-router';
-import { signOut } from 'firebase/auth';
 import { Bell, ChevronRight, FileText, Globe, Heart, LifeBuoy, LogIn, LogOut, Megaphone, MessageCircle, ShieldCheck, User } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 
@@ -154,7 +154,7 @@ export default function AccountScreen() {
       </View>
 
       <Pressable
-        onPress={() => signOut(auth)}
+        onPress={() => signOutDevice()}
         className="mt-6 h-12 flex-row items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50"
       >
         <LogOut size={17} color="#E11D48" />

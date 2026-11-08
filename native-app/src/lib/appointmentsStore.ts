@@ -19,6 +19,9 @@ export type Appointment = {
   appointmentType: string;
   clinicRoom: string;
   doctor: string;
+  // Set when the doctor is a team member: they receive a copy of this
+  // appointment (functions/clinicTeam.js).
+  doctorUid?: string;
   treatment: string;
   notes: string;
   reminder: boolean;
@@ -249,7 +252,7 @@ async function pushAppointment(uid: string, clinicId: string, id: string) {
   const a = readAppointment(uid, clinicId, id);
   if (!a) return;
   try {
-    await setDoc(appointmentDoc(uid, id), toFirestore({ ...a, clinicId, deleted: false }));
+    await setDoc(appointmentDoc(uid, id), toFirestore({ ...a, updatedAt: a.updatedAt || Date.parse(a.createdAt) || Date.now(), clinicId, deleted: false }));
     retryCounts.delete(pushKey(uid, clinicId, id));
   } catch (err) {
     console.warn("Appointment not synced yet:", id, err);
@@ -274,7 +277,7 @@ function pushDelete(id: string) {
   pushTimers.delete(key);
   markDeleted(uid, clinicId, id, at);
   if (!syncEnabled()) return;
-  setDoc(appointmentDoc(uid, id), { id, clinicId, deleted: true, updatedAt: at }).catch((err) =>
+  setDoc(appointmentDoc(uid, id), { id, clinicId, deleted: true, updatedAt: at }, { merge: true }).catch((err) =>
     console.warn("Appointment delete not synced yet:", id, err),
   );
 }
@@ -296,14 +299,18 @@ function mergeRemote(docs: QueryDocumentSnapshot[], complete: boolean) {
     const rTime = remote.updatedAt ?? 0;
     const lTime = local?.updatedAt ?? 0;
     if (deleted) {
-      if (local && lTime <= rTime) {
+      // A delete only wins over an older local copy that has a real time — a
+      // copy without updatedAt is kept and sent back (see patientsStore.ts:
+      // "0 <= 0" used to delete records for everyone).
+      if (local && lTime > 0 && lTime <= rTime) {
         byId.delete(id);
         changed = true;
       } else if (local) toPush.push(id);
       continue;
     }
     if (!local) {
-      if ((deletedHere[id] ?? 0) >= rTime) tombstones.push(id);
+      const deletedAt = deletedHere[id];
+      if (deletedAt !== undefined && deletedAt >= rTime) tombstones.push(id);
       else {
         byId.set(id, { ...(remote as Appointment), id });
         changed = true;

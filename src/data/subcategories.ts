@@ -23,6 +23,7 @@ export const SUBCATEGORIES: Record<string, SubCategory[]> = {
     { ar: "تلميع وإنهاء", en: "Finishing & Polishing" },
     { ar: "أدوات الترميم", en: "Restorative instruments" },
     { ar: "كواشف التسوس", en: "Caries Detectors/Control" },
+    { ar: "تبييض الأسنان", en: "Whitening" },
   ],
   endodontic: [
     { ar: "تحضير الحجرة اللبية", en: "Access Cavity Preparation" },
@@ -49,6 +50,7 @@ export const SUBCATEGORIES: Record<string, SubCategory[]> = {
     { ar: "أدوات جراحية", en: "Surgical instruments" },
     { ar: "خيوط جراحية", en: "Sutures" },
     { ar: "مواد مرقئة ومطهرة", en: "Hemostatic / Antiseptic" },
+    { ar: "التخدير الموضعي", en: "Local Anesthesia" },
   ],
   orthopedic: [
     { ar: "أربطة ومطاطات", en: "Ligatures & Elastics" },

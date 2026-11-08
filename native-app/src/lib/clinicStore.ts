@@ -214,7 +214,7 @@ export function periodStart(period: string, now = new Date()): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-type ReportPatient = { feeCurrency?: Currency; payments: { amount: number; date: string }[] };
+type ReportPatient = { feeCurrency?: Currency; payments: { amount: number; date: string; currency?: Currency }[] };
 
 /**
  * Report totals for a period, in one currency. Revenue = the clinic's manual
@@ -231,8 +231,9 @@ export function reportTotals(d: ClinicState, patients: ReportPatient[], period: 
   const expense = txs.filter((t) => t.kind === "expense").reduce((s, t) => s + t.amount, 0);
   let patientIncome = 0;
   for (const p of patients) {
-    if ((p.feeCurrency ?? "USD") !== currency) continue;
-    patientIncome += p.payments.filter((x) => inPeriod(x.date)).reduce((s, x) => s + (Number(x.amount) || 0), 0);
+    patientIncome += p.payments
+      .filter((x) => (x.currency ?? p.feeCurrency ?? "USD") === currency && inPeriod(x.date))
+      .reduce((s, x) => s + (Number(x.amount) || 0), 0);
   }
   const income = manualIncome + patientIncome;
   return { income, expense, net: income - expense, patientIncome };

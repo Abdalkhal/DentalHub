@@ -17,6 +17,7 @@ import {
   Plus,
   Sparkles,
   Trash2,
+  Library,
 } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 
@@ -29,7 +30,7 @@ import { ImplantFormModal } from '@/components/ImplantFormModal';
 import { SpecializedImplantForm } from '@/components/SpecializedImplantForm';
 import { BRANCH_BADGE, BRANCH_IMAGES, BRANCH_OPTIONS } from '@/data/branches';
 import {
-  useProducts,
+  useProductsByCompany,
   useSignedImageUrls,
   useUpsertProduct,
   useDeleteProduct,
@@ -68,7 +69,7 @@ export default function SuppliesOfficeScreen() {
   const ar = lang === 'ar';
   const { user, role } = useUserRole();
   const unreadCount = useUnreadNotificationsCount(user?.uid);
-  const { data: products = [], isLoading } = useProducts();
+  const { data: products = [], isLoading } = useProductsByCompany(user?.uid);
   const upsert = useUpsertProduct();
   const remove = useDeleteProduct();
   const confirmDelete = (p: Product) => {
@@ -229,6 +230,23 @@ export default function SuppliesOfficeScreen() {
       <View className="mt-4">
         {tab === 'products' && (
           <View className="gap-4">
+            <Pressable
+              onPress={() => router.push('/catalog-add' as never)}
+              className="flex-row items-center gap-3 rounded-3xl p-4"
+              style={{ backgroundColor: '#0E6E66' }}
+            >
+              <View className="h-12 w-12 items-center justify-center rounded-2xl bg-white/20">
+                <Library size={22} color="#FFFFFF" strokeWidth={2.4} />
+              </View>
+              <View className="min-w-0 flex-1">
+                <Text className="text-sm font-extrabold text-white">{ar ? 'إضافة من الدليل' : 'Add from catalog'}</Text>
+                <Text className="mt-0.5 text-[11px] text-white/80">
+                  {ar ? 'اختر منتجاتك وأدخل السعر فقط، دفعة واحدة' : 'Pick your products and just set the price, all at once'}
+                </Text>
+              </View>
+              {ar ? <ChevronLeft size={18} color="rgba(255,255,255,0.85)" /> : <ChevronRight size={18} color="rgba(255,255,255,0.85)" />}
+            </Pressable>
+
             <Pressable
               onPress={() => setModal({ open: true })}
               className="flex-row items-center gap-3 overflow-hidden rounded-3xl p-4"

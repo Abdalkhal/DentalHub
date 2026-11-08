@@ -15,6 +15,15 @@
  *                                it fails the check.
  * sendPushOnNotification (PUSH) — delivers every new `notifications` doc to
  *                                the recipient's devices via Expo Push.
+ * discounts.js (DISCOUNTS)     — office codes and a doctor's own discount; the
+ *                                price of a cart is only worked out there.
+ * clinicStaff.js (STAFF)       — secretaries, with permissions set by the doctor.
+ * clinicTeam.js (TEAM)         — doctors join each other's clinics by invite or
+ *                                request, with a role.
+ * adminConsole.js (ADMIN)      — admin actions with a server-written audit trail,
+ *                                and the console's earnings and lab figures.
+ * requestDataExport (EXPORT)   — "تصدير بياناتي": a dentist asks for a ZIP of
+ *                                their patient records (see dataExport.js).
  */
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
@@ -23,6 +32,8 @@ const {
   onDocumentCreated,
   onDocumentDeleted,
 } = require("firebase-functions/v2/firestore");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { settleOrder } = require("./discountEngine");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const admin = require("firebase-admin");
 const vision = require("@google-cloud/vision");
@@ -535,7 +546,8 @@ exports.syncPublicProfile = onDocumentWritten(
   async (event) => {
     const ref = firestore.collection("public_profiles").doc(event.params.uid);
     const after = event.data && event.data.after;
-    if (!after || !after.exists) {
+    // A secretary is staff, not someone other accounts look up.
+    if (!after || !after.exists || after.data().accountType === "secretary") {
       await ref.delete();
       return;
     }
@@ -564,7 +576,24 @@ exports.lookupPromoCode = onCall({ region: "us-central1" }, async (request) => {
   const snap = await firestore.collection("promo_codes").where("code", "==", code).limit(1).get();
   if (snap.empty) return { promo: null };
   const d = snap.docs[0];
-  return { promo: { id: d.id, ...d.data() } };
+  const x = d.data();
+  const allowed = x.doctorIds || [];
+  if (allowed.length && !allowed.includes(request.auth.uid)) return { promo: null };
+  // Only what an app still running the old cart reads; the amount it works out
+  // is ignored, since placeVerifiedOrder prices the order itself.
+  return {
+    promo: {
+      id: d.id,
+      code: x.code,
+      officeId: x.officeId,
+      type: x.type,
+      value: x.value,
+      currency: x.currency,
+      active: x.active,
+      expiresAt: x.endDate || null,
+      minSubtotal: x.minSubtotal || 0,
+    },
+  };
 });
 
 /**
@@ -635,6 +664,14 @@ async function isVerifiedAccount(authCtx) {
   return created.toMillis() < Date.UTC(2026, 10, 1);
 }
 
+const team = require("./clinicTeam")(firestore, isVerifiedAccount, () => admin.storage().bucket());
+Object.assign(exports, team.callables);
+Object.assign(exports, require("./clinicStaff")(firestore, team.staffHelpers));
+Object.assign(exports, require("./adminConsole")(admin));
+Object.assign(exports, require("./productSearch")(firestore));
+const discounts = require("./discounts")(admin);
+Object.assign(exports, discounts.functions);
+
 exports.placeVerifiedOrder = onCall({ region: "us-central1" }, async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Authentication required.");
@@ -651,137 +688,117 @@ exports.placeVerifiedOrder = onCall({ region: "us-central1" }, async (request) =
   const dentistId = request.auth.uid;
   const dentistInput = data.dentist || {};
 
-  const productIds = [...new Set(rawItems.map((i) => String((i && i.productId) || "")))].filter(
-    Boolean,
-  );
-  if (productIds.length === 0) {
-    throw new HttpsError("invalid-argument", "No valid items.");
+  const dentistDoc = await firestore.collection("user_roles").doc(dentistId).get();
+
+  // A secretary works in a clinic; the store isn't theirs.
+  if (dentistDoc.exists && dentistDoc.data().accountType === "secretary") {
+    throw new HttpsError("permission-denied", "not-allowed");
   }
-
-  const [productSnaps, dentistDoc] = await Promise.all([
-    Promise.all(productIds.map((id) => firestore.collection("products").doc(id).get())),
-    firestore.collection("user_roles").doc(dentistId).get(),
-  ]);
-  const productsById = new Map();
-  productSnaps.forEach((snap, i) => {
-    if (snap.exists) productsById.set(productIds[i], snap.data());
-  });
-
   const dentistPhotoURL = dentistDoc.exists ? dentistDoc.data().photoURL || "" : "";
   const dentistName =
     String(dentistInput.name || (dentistDoc.exists && dentistDoc.data().name) || "").trim() ||
     "طبيب";
 
-  // Group verified line items (price/currency/supplier read straight off
-  // the product doc, never off the client's cart) by supplier. A cart item
-  // whose product was deleted (or lost its companyId) between add-to-cart
-  // and checkout is dropped here — `skippedCount` is returned so the client
-  // can tell the dentist rather than silently reporting full success.
-  const bySupplier = new Map();
-  let skippedCount = 0;
-  for (const raw of rawItems) {
-    const productId = String((raw && raw.productId) || "");
-    const product = productsById.get(productId);
-    if (!product || !product.companyId) {
-      skippedCount += 1;
-      continue;
-    }
-    const quantity = Math.max(1, Math.floor(Number(raw.quantity) || 1));
-    const line = {
-      productId,
-      name: product.ar || product.en || "",
-      quantity,
-      price: Number(product.price) || 0,
-      currency: product.currency === "IQD" ? "IQD" : "USD",
-    };
-    if (!bySupplier.has(product.companyId)) bySupplier.set(product.companyId, []);
-    bySupplier.get(product.companyId).push(line);
-  }
-  if (bySupplier.size === 0) {
+  // Everything billed comes from the database: prices, tiers, the doctor's own
+  // discount, and whether a code really applies. The client sends code text and
+  // never an amount. An app still running the old cart sends `discount.code`
+  // alongside an amount it worked out itself; only the code is read from it.
+  const codes = Array.isArray(data.codes) ? data.codes : [];
+  if (data.discount && data.discount.code) codes.push(data.discount.code);
+  const priced = await discounts.priceCart(dentistId, rawItems, codes);
+  // A product deleted (or its office suspended) since it went in the cart is
+  // dropped; `skippedCount` lets the client say so instead of reporting success.
+  const skippedCount = priced.skipped.length;
+  if (priced.offices.length === 0) {
     throw new HttpsError("invalid-argument", "No valid items.");
   }
 
-  // A promo-code discount is computed client-side against the WHOLE cart's
-  // subtotal (see src/lib/promo.ts's computeDiscount), but the cart is split
-  // into one order per supplier below. Prorate the discount across those
-  // orders by each one's share of the relevant currency's subtotal, so a
-  // multi-supplier cart doesn't hand the whole discount to one order (or
-  // drop it entirely).
-  const groups = [...bySupplier.entries()].map(([supplierId, lineItems]) => ({
-    supplierId,
-    lineItems,
-    rawUSD: lineItems
-      .filter((i) => i.currency !== "IQD")
-      .reduce((s, i) => s + i.price * i.quantity, 0),
-    rawIQD: lineItems
-      .filter((i) => i.currency === "IQD")
-      .reduce((s, i) => s + i.price * i.quantity, 0),
-  }));
-  const discountInput = data.discount || null;
-  const discountUSDTotal = Math.max(0, Number(discountInput?.discountUSD) || 0);
-  const discountIQDTotal = Math.max(0, Number(discountInput?.discountIQD) || 0);
-  const grandUSD = groups.reduce((s, g) => s + g.rawUSD, 0);
-  const grandIQD = groups.reduce((s, g) => s + g.rawIQD, 0);
+  // The doctor agreed to the total they were shown. If anything moved since,
+  // they see the new one and decide again.
+  const expected = data.expected;
+  if (
+    expected &&
+    (Math.abs((Number(expected.usd) || 0) - priced.totals.netUSD) > 0.005 ||
+      Math.abs((Number(expected.iqd) || 0) - priced.totals.netIQD) > 0.5)
+  ) {
+    throw new HttpsError("failed-precondition", "price-changed");
+  }
 
+  const taken = await discounts.reserve(dentistId, priced.offices);
+  const placedOffices = new Set();
   let firstOrderId;
   const orderIds = [];
   let n = 0;
-  for (const { supplierId, lineItems, rawUSD, rawIQD } of groups) {
-    const orderRef = firestore.collection("orders").doc();
-    const orderNumber = genOrderNumber();
-    const shareDiscountUSD = grandUSD > 0 ? discountUSDTotal * (rawUSD / grandUSD) : 0;
-    const shareDiscountIQD = grandIQD > 0 ? discountIQDTotal * (rawIQD / grandIQD) : 0;
-    const totalUSD = Math.max(0, rawUSD - shareDiscountUSD);
-    const totalIQD = Math.max(0, rawIQD - shareDiscountIQD);
-    const total = totalUSD + totalIQD;
+  try {
+    for (const office of priced.offices) {
+      const supplierId = office.officeId;
+      const lineItems = office.lines.map((l) => ({
+        productId: l.productId,
+        name: l.name,
+        quantity: l.quantity,
+        price: l.price,
+        listPrice: l.listPrice,
+        discountAmount: l.discountAmount,
+        currency: l.currency,
+      }));
+      const orderRef = firestore.collection("orders").doc();
+      const orderNumber = genOrderNumber();
 
-    await orderRef.set({
-      id: orderRef.id,
-      supplierId,
-      dentistId,
-      dentistName,
-      dentistPhone: dentistInput.phone || "",
-      dentistAddress: dentistInput.address || "",
-      clinicName: dentistInput.clinicName || dentistName,
-      orderNumber,
-      items: lineItems,
-      total,
-      totalUSD,
-      totalIQD,
-      note: data.note || "",
-      discount: discountInput
-        ? { ...discountInput, discountUSD: shareDiscountUSD, discountIQD: shareDiscountIQD }
-        : null,
-      status: "pending",
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+      await orderRef.set({
+        id: orderRef.id,
+        supplierId,
+        dentistId,
+        dentistName,
+        dentistPhone: dentistInput.phone || "",
+        dentistAddress: dentistInput.address || "",
+        clinicName: dentistInput.clinicName || dentistName,
+        orderNumber,
+        items: lineItems,
+        total: office.netUSD + office.netIQD,
+        totalUSD: office.netUSD,
+        totalIQD: office.netIQD,
+        note: data.note || "",
+        discount: discounts.orderDiscount(office),
+        status: "pending",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      placedOffices.add(supplierId);
 
-    const itemLabel = lineItems.length === 1 ? "منتج" : "منتجات";
-    await firestore
-      .collection("notifications")
-      .doc(`${supplierId}_${Date.now()}_${n}`)
-      .set({
-        id: `${supplierId}_${Date.now()}_${n}`,
-        userId: supplierId,
-        title: `طلب جديد من ${dentistName}`,
-        body: dentistInput.address
-          ? `رقم الطلب ${orderNumber} · ${lineItems.length} ${itemLabel} — ${dentistInput.address}`
-          : `رقم الطلب ${orderNumber} · ${lineItems.length} ${itemLabel}`,
-        type: "order_new",
-        orderId: orderRef.id,
-        senderId: dentistId,
-        senderName: dentistName,
-        senderPhotoURL: dentistPhotoURL,
-        isRead: false,
-        createdAt: Date.now(),
-        expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
-      })
-      .catch(() => {});
+      const itemLabel = lineItems.length === 1 ? "منتج" : "منتجات";
+      await firestore
+        .collection("notifications")
+        .doc(`${supplierId}_${Date.now()}_${n}`)
+        .set({
+          id: `${supplierId}_${Date.now()}_${n}`,
+          userId: supplierId,
+          title: `طلب جديد من ${dentistName}`,
+          body: dentistInput.address
+            ? `رقم الطلب ${orderNumber} · ${lineItems.length} ${itemLabel} — ${dentistInput.address}`
+            : `رقم الطلب ${orderNumber} · ${lineItems.length} ${itemLabel}`,
+          type: "order_new",
+          orderId: orderRef.id,
+          senderId: dentistId,
+          senderName: dentistName,
+          senderPhotoURL: dentistPhotoURL,
+          isRead: false,
+          createdAt: Date.now(),
+          expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+        })
+        .catch(() => {});
 
-    if (!firstOrderId) firstOrderId = orderRef.id;
-    orderIds.push(orderRef.id);
-    n += 1;
+      if (!firstOrderId) firstOrderId = orderRef.id;
+      orderIds.push(orderRef.id);
+      n += 1;
+    }
+  } catch (e) {
+    // A code isn't spent on an order that was never written.
+    await Promise.all(
+      taken
+        .filter((use) => !placedOffices.has(use.officeId))
+        .map((use) => discounts.release(dentistId, use).catch(() => {})),
+    );
+    throw e;
   }
 
   // Stock is decremented on confirmation (confirmVerifiedOrder), not here —
@@ -821,8 +838,15 @@ exports.setOrderItemAvailability = onCall({ region: "us-central1" }, async (requ
     throw new HttpsError("invalid-argument", "index out of range.");
   }
   const nextItems = items.map((it, i) => (i === index ? { ...it, availability } : it));
+  const settled = settleOrder(
+    { ...order, items: nextItems },
+    nextItems.filter((i) => i.availability !== "not_available"),
+  );
   await orderRef.update({
     items: nextItems,
+    total: settled.total,
+    totalUSD: settled.totalUSD,
+    totalIQD: settled.totalIQD,
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
   return { ok: true };
@@ -854,21 +878,10 @@ exports.confirmVerifiedOrder = onCall({ region: "us-central1" }, async (request)
   const availableItems = items.filter((i) => i.availability !== "not_available");
   const unavailableItems = items.filter((i) => i.availability === "not_available");
 
-  const rawUSD = availableItems
-    .filter((i) => i.currency !== "IQD")
-    .reduce((s, i) => s + i.price * i.quantity, 0);
-  const rawIQD = availableItems
-    .filter((i) => i.currency === "IQD")
-    .reduce((s, i) => s + i.price * i.quantity, 0);
-  // The order's discount was already fixed (and prorated to this supplier)
-  // at placement time in placeVerifiedOrder — honor that same amount here
-  // rather than recomputing it, only capping so an item that turned out to
-  // be unavailable can't make the discount exceed what's actually billed.
-  const discountUSD = Math.max(0, Number(order.discount?.discountUSD) || 0);
-  const discountIQD = Math.max(0, Number(order.discount?.discountIQD) || 0);
-  const totalUSD = Math.max(0, rawUSD - discountUSD);
-  const totalIQD = Math.max(0, rawIQD - discountIQD);
-  const total = totalUSD + totalIQD;
+  // Each line carries its own share of the discount, so an unavailable item
+  // takes its share away with it and the percentage the doctor got still holds.
+  const settled = settleOrder(order, availableItems);
+  const { total, totalUSD, totalIQD } = settled;
 
   const invoiceRef = firestore.collection("invoices").doc();
   await invoiceRef.set({
@@ -885,7 +898,9 @@ exports.confirmVerifiedOrder = onCall({ region: "us-central1" }, async (request)
     totalUSD,
     totalIQD,
     note: order.note || "",
-    discount: order.discount || null,
+    discount: order.discount
+      ? { ...order.discount, discountUSD: settled.discountUSD, discountIQD: settled.discountIQD }
+      : null,
     status: "confirmed",
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -923,6 +938,8 @@ exports.confirmVerifiedOrder = onCall({ region: "us-central1" }, async (request)
       })
       .catch(() => {});
   }
+
+  await discounts.settleUsage(order, settled);
 
   await orderRef.update({
     status: "confirmed",
@@ -974,85 +991,8 @@ exports.confirmVerifiedOrder = onCall({ region: "us-central1" }, async (request)
  * once, with no client change needed.
  * ============================================================ */
 
-const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
-
-exports.sendPushOnNotification = onDocumentCreated(
-  { document: "notifications/{notificationId}", region: "us-central1" },
-  async (event) => {
-    const snap = event.data;
-    if (!snap) return;
-    const n = snap.data() || {};
-    if (!n.userId || !n.title) return;
-
-    const roleRef = firestore.collection("user_roles").doc(String(n.userId));
-    const roleSnap = await roleRef.get();
-    if (!roleSnap.exists) return;
-    const role = roleSnap.data() || {};
-    // The in-app settings toggle ("الإشعارات") opts the account out of pushes.
-    if (role.notificationsEnabled === false) return;
-
-    const tokens = Array.isArray(role.pushTokens)
-      ? [
-          ...new Set(
-            role.pushTokens.filter(
-              (t) => typeof t === "string" && t.startsWith("ExponentPushToken"),
-            ),
-          ),
-        ]
-      : [];
-    if (tokens.length === 0) return;
-
-    const data = { notificationId: snap.id, type: n.type || "" };
-    if (n.orderId) data.orderId = String(n.orderId);
-    const messages = tokens.map((to) => ({
-      to,
-      title: String(n.title),
-      body: n.body ? String(n.body) : "",
-      data,
-      sound: "default",
-      channelId: "default",
-      priority: "high",
-    }));
-
-    // Expo accepts at most 100 messages per request.
-    const stale = [];
-    for (let i = 0; i < messages.length; i += 100) {
-      const chunk = messages.slice(i, i + 100);
-      try {
-        const res = await fetch(EXPO_PUSH_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Accept: "application/json" },
-          body: JSON.stringify(chunk),
-        });
-        const json = await res.json().catch(() => ({}));
-        const tickets = Array.isArray(json.data) ? json.data : [];
-        tickets.forEach((ticket, idx) => {
-          if (
-            ticket &&
-            ticket.status === "error" &&
-            ticket.details &&
-            ticket.details.error === "DeviceNotRegistered"
-          ) {
-            stale.push(chunk[idx].to);
-          }
-        });
-        if (!res.ok) {
-          console.warn("Expo push request failed", res.status, JSON.stringify(json));
-        }
-      } catch (err) {
-        console.warn("Expo push request error", err);
-      }
-    }
-
-    // Uninstalled apps / revoked permission — drop the dead tokens so they
-    // are not retried on every future notification.
-    if (stale.length > 0) {
-      await roleRef.update({
-        pushTokens: admin.firestore.FieldValue.arrayRemove(...stale),
-      });
-    }
-  },
-);
+// Lives in push.js: Android through Firebase, iPhones through Expo.
+Object.assign(exports, require("./push")(admin));
 
 /* ============================================================
  * ACCOUNT DELETION — remove what a deleted account published.
@@ -1097,6 +1037,7 @@ async function purgeAccountContent(uid) {
 exports.purgeDeletedAccountContent = onDocumentDeleted(
   { document: "user_roles/{uid}", region: "us-central1" },
   async (event) => {
+    await team.removeDeletedAccount(event.params.uid);
     const removed = await purgeAccountContent(event.params.uid);
     console.log("Purged deleted account content", event.params.uid, removed);
   },
@@ -1558,6 +1499,15 @@ exports.onBookingRequestWritten = onDocumentWritten(
   },
 );
 
+// Keeps team members' copies of a patient in step with the record.
+exports.onPatientWritten = onDocumentWritten(
+  { document: "dentist_records/{uid}/patients/{id}", region: "us-central1", memory: "512MiB" },
+  async (event) => {
+    const after = event.data.after.exists ? event.data.after.data() : null;
+    await team.syncPatientCopies(event.params.uid, event.params.id, after);
+  },
+);
+
 exports.onAppointmentWritten = onDocumentWritten(
   {
     document: "dentist_records/{uid}/appointments/{id}",
@@ -1566,6 +1516,7 @@ exports.onAppointmentWritten = onDocumentWritten(
   async (event) => {
     const before = event.data.before.exists ? event.data.before.data() : null;
     const after = event.data.after.exists ? event.data.after.data() : null;
+    await team.syncSharedAppointment(event.params.uid, event.params.id, after);
     if (
       before &&
       after &&
@@ -1583,6 +1534,226 @@ exports.onAppointmentWritten = onDocumentWritten(
     for (const k of keys) {
       const [clinicId, date] = k.split("|");
       await recomputeBusy(event.params.uid, clinicId, date);
+    }
+  },
+);
+
+/* ============================================================
+ * DATA EXPORT — "تصدير بياناتي".
+ *
+ * One live export per account: data_exports/{uid}, readable by its owner and
+ * written only here. The ZIP is built on the server, so a large account does
+ * not depend on the phone staying awake. It is reachable only through a
+ * tokened link stored in that document, and removed after EXPORT_TTL.
+ * ============================================================ */
+
+const EXPORT_TTL = 48 * 60 * 60 * 1000;
+const EXPORT_COOLDOWN = 24 * 60 * 60 * 1000;
+// The longest the builder can run (its timeout), plus a margin. A "processing"
+// export older than this died and may be requested again.
+const EXPORT_STALE = 15 * 60 * 1000;
+// These are medical records: the password must have just been re-entered.
+const EXPORT_REAUTH_WINDOW = 5 * 60;
+
+exports.requestDataExport = onCall({ region: "us-central1", maxInstances: 5 }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Authentication required.");
+  }
+  const uid = request.auth.uid;
+  const authAge = Date.now() / 1000 - Number(request.auth.token.auth_time || 0);
+  if (authAge > EXPORT_REAUTH_WINDOW) {
+    throw new HttpsError("failed-precondition", "recent-login-required");
+  }
+  const clinicId =
+    typeof (request.data || {}).clinicId === "string" && request.data.clinicId
+      ? request.data.clinicId.slice(0, 128)
+      : null;
+
+  const records = firestore.collection("dentist_records").doc(uid);
+  let patients = records.collection("patients").where("deleted", "==", false);
+  if (clinicId) patients = patients.where("clinicId", "==", clinicId);
+  const any = await patients.limit(1).get();
+  if (any.empty) throw new HttpsError("failed-precondition", "no-data");
+
+  const ref = firestore.collection("data_exports").doc(uid);
+  const now = Date.now();
+  await firestore.runTransaction(async (tx) => {
+    const cur = await tx.get(ref);
+    const d = cur.exists ? cur.data() : {};
+    const working = d.status === "pending" || d.status === "processing";
+    if (working && now - (d.requestedAt || 0) < EXPORT_STALE) {
+      throw new HttpsError("already-exists", "in-progress");
+    }
+    if (
+      (d.status === "ready" || d.status === "expired") &&
+      now - (d.requestedAt || 0) < EXPORT_COOLDOWN
+    ) {
+      throw new HttpsError("resource-exhausted", "once-a-day");
+    }
+    tx.set(ref, {
+      ownerId: uid,
+      status: "pending",
+      clinicId,
+      requestedAt: now,
+      // Kept so the builder can remove the last ZIP when this one is ready.
+      previousPath: d.path || d.previousPath || null,
+    });
+    // Who exported what and when. No client can read or write this.
+    tx.create(firestore.collection("data_export_log").doc(), {
+      uid,
+      clinicId,
+      requestedAt: now,
+    });
+  });
+  return { ok: true };
+});
+
+/**
+ * Notifies the owner about their export (delivered as a push as well).
+ * @param {string} uid the account.
+ * @param {string} title the heading.
+ * @param {string} body the text.
+ * @return {Promise<void>} once written.
+ */
+async function notifyExport(uid, title, body) {
+  const now = Date.now();
+  const id = `export_${uid}_${now}`;
+  await firestore
+    .collection("notifications")
+    .doc(id)
+    .set({
+      id,
+      userId: uid,
+      title,
+      body,
+      type: "data_export",
+      senderId: "system",
+      isRead: false,
+      createdAt: now,
+      expiresAt: now + EXPORT_TTL,
+    })
+    .catch((err) => console.warn("Export notification failed", err));
+}
+
+exports.buildDataExport = onDocumentWritten(
+  {
+    document: "data_exports/{uid}",
+    region: "us-central1",
+    memory: "1GiB",
+    timeoutSeconds: 540,
+    maxInstances: 3,
+    retry: false,
+  },
+  async (event) => {
+    const after = event.data.after.exists ? event.data.after.data() : null;
+    const before = event.data.before.exists ? event.data.before.data() : {};
+    if (!after || after.status !== "pending") return;
+    if (before.status === "pending" && before.requestedAt === after.requestedAt) return;
+
+    const uid = event.params.uid;
+    const ref = event.data.after.ref;
+    // Events can be delivered twice; only one delivery may build.
+    const claimed = await firestore.runTransaction(async (tx) => {
+      const cur = await tx.get(ref);
+      if (!cur.exists || cur.data().status !== "pending") return false;
+      tx.update(ref, { status: "processing" });
+      return true;
+    });
+    if (!claimed) return;
+    const bucket = admin.storage().bucket();
+    // The link to the last ZIP went with the new request, so nothing reaches it.
+    if (after.previousPath) {
+      await bucket
+        .file(after.previousPath)
+        .delete({ ignoreNotFound: true })
+        .catch((err) => console.warn("Old export not removed", err));
+    }
+    try {
+      // Heavy libraries, needed by nothing else in this file.
+      const { buildExportZip } = require("./dataExport");
+      const { pipeline } = require("stream/promises");
+      const records = firestore.collection("dentist_records").doc(uid);
+      const [rootSnap, patientSnap, apptSnap] = await Promise.all([
+        records.get(),
+        records.collection("patients").get(),
+        records.collection("appointments").get(),
+      ]);
+      const inScope = (x) => !x.deleted && (!after.clinicId || x.clinicId === after.clinicId);
+      const clinics = (rootSnap.exists && rootSnap.data().clinics) || [];
+      const { stream, done } = buildExportZip({
+        uid,
+        clinics,
+        patients: patientSnap.docs.map((d) => ({ ...d.data(), id: d.id })).filter(inScope),
+        appointments: apptSnap.docs.map((d) => d.data()).filter(inScope),
+        readFile: async (p) => (await bucket.file(p).download())[0],
+      });
+
+      const now = Date.now();
+      const path = `data_exports/${uid}/${now}/dent-hub-export.zip`;
+      const token = crypto.randomUUID();
+      const file = bucket.file(path);
+      const day = new Date(now).toISOString().slice(0, 10);
+      const [summary] = await Promise.all([
+        done,
+        pipeline(
+          stream,
+          file.createWriteStream({
+            contentType: "application/zip",
+            metadata: {
+              contentDisposition: `attachment; filename="dent-hub-export-${day}.zip"`,
+              metadata: { firebaseStorageDownloadTokens: token },
+            },
+          }),
+        ),
+      ]);
+      const [meta] = await file.getMetadata();
+      await ref.update({
+        status: "ready",
+        path,
+        downloadUrl:
+          `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/` +
+          `${encodeURIComponent(path)}?alt=media&token=${token}`,
+        readyAt: Date.now(),
+        expiresAt: Date.now() + EXPORT_TTL,
+        sizeBytes: Number(meta.size) || 0,
+        patients: summary.patients,
+        files: summary.files,
+        missing: summary.missing.length,
+      });
+      await notifyExport(
+        uid,
+        "ملف بياناتك جاهز للتحميل",
+        "افتح الإعدادات ثم «تصدير بياناتي» لتحميله خلال 48 ساعة. إذا لم تطلب هذا التصدير، غيّر كلمة المرور فوراً.",
+      );
+    } catch (err) {
+      console.error("Data export failed", uid, err);
+      await ref.update({ status: "failed", failedAt: Date.now() });
+      await notifyExport(
+        uid,
+        "تعذر تجهيز ملف بياناتك",
+        "حاول مرة أخرى من الإعدادات ثم «تصدير بياناتي».",
+      );
+    }
+  },
+);
+
+exports.purgeExpiredDataExports = onSchedule(
+  { schedule: "every 1 hours", region: "us-central1", maxInstances: 1 },
+  async () => {
+    const bucket = admin.storage().bucket();
+    const due = await firestore
+      .collection("data_exports")
+      .where("expiresAt", "<=", Date.now())
+      .get();
+    for (const d of due.docs) {
+      const { path } = d.data();
+      if (path) await bucket.file(path).delete({ ignoreNotFound: true });
+      await d.ref.update({
+        status: "expired",
+        path: admin.firestore.FieldValue.delete(),
+        downloadUrl: admin.firestore.FieldValue.delete(),
+        expiresAt: admin.firestore.FieldValue.delete(),
+      });
     }
   },
 );

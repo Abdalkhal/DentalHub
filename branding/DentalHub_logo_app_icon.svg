@@ -1,0 +1,63 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8"/>
+      <stop offset="55%" stop-color="#0284C7"/>
+      <stop offset="100%" stop-color="#075985"/>
+    </linearGradient>
+    <linearGradient id="toothShade" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#DCEEFB"/>
+    </linearGradient>
+    <radialGradient id="shine" cx="35%" cy="25%" r="55%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- app-icon squircle background -->
+  <rect x="0" y="0" width="1024" height="1024" rx="224" fill="url(#bg)"/>
+
+  <!-- soft contact shadow under the tooth -->
+  <ellipse cx="512" cy="738" rx="150" ry="24" fill="#02304A" opacity="0.14"/>
+
+  <!-- tooth mark -->
+  <g transform="translate(512,522)">
+    <path d="
+      M 0,-232
+      C 66,-232 118,-206 138,-158
+      C 152,-124 150,-88 130,-42
+      C 118,-14 112,18 108,52
+      C 104,88 98,124 82,158
+      C 70,184 52,198 30,198
+      C 10,198 -4,182 -10,152
+      C -16,124 -18,96 -26,96
+      C -34,96 -36,124 -42,152
+      C -48,182 -62,198 -82,198
+      C -104,198 -122,184 -134,158
+      C -150,124 -156,88 -160,52
+      C -164,18 -170,-14 -182,-42
+      C -202,-88 -204,-124 -190,-158
+      C -170,-206 -66,-232 0,-232
+      Z"
+      fill="url(#toothShade)"/>
+    <path d="
+      M 0,-232
+      C 66,-232 118,-206 138,-158
+      C 152,-124 150,-88 130,-42
+      C 118,-14 112,18 108,52
+      C 104,88 98,124 82,158
+      C 70,184 52,198 30,198
+      C 10,198 -4,182 -10,152
+      C -16,124 -18,96 -26,96
+      C -34,96 -36,124 -42,152
+      C -48,182 -62,198 -82,198
+      C -104,198 -122,184 -134,158
+      C -150,124 -156,88 -160,52
+      C -164,18 -170,-14 -182,-42
+      C -202,-88 -204,-124 -190,-158
+      C -170,-206 -66,-232 0,-232
+      Z"
+      fill="url(#shine)"/>
+  </g>
+</svg>

@@ -8,7 +8,7 @@ import { Package } from 'lucide-react-native';
 import { Screen, Text, Spinner } from '@/components/ui';
 import { ProductImage } from '@/components/ProductImage';
 import { db } from '@/integrations/firebase/client';
-import { useProducts, useSignedImageUrls } from '@/lib/products';
+import { useProductsWhere, useSignedImageUrls } from '@/lib/products';
 import { SPECIALIZED_CATEGORIES, SPECIALIZED_FIELDS } from '@/data/specializedImplants';
 import { useI18n } from '@/lib/i18n';
 
@@ -22,7 +22,7 @@ export default function SpecializedCategoryScreen() {
   const ar = lang === 'ar';
 
   const categoryMeta = SPECIALIZED_CATEGORIES.find((c) => c.id === category);
-  const { data: allProducts = [], isLoading } = useProducts();
+  const { data: allProducts = [], isLoading } = useProductsWhere('category', 'specialized_implant');
 
   const items = useMemo(
     () =>

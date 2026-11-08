@@ -7,7 +7,7 @@ import { auth } from "@/integrations/firebase/client";
 import { useI18n } from "@/lib/i18n";
 import { useSession, useLabStaffClaim } from "@/lib/useAuth";
 import { useDesignerCases } from "@/lib/designerStore";
-import { useDmThreads, getDmLastReadMs } from "@/lib/directMessages";
+import { useDmThreads, unreadFor } from "@/lib/directMessages";
 import type { Order, OrderStatus } from "@/lib/ordersStore";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -111,9 +111,7 @@ function DesignerIndex() {
   const unreadThreadsCount = useMemo(() => {
     if (!user?.uid) return 0;
     return dmThreads.filter((t) => {
-      if (!t.lastSenderId || t.lastSenderId === user.uid) return false;
-      const lastMs = t.lastMessageAt?.toMillis?.() ?? 0;
-      return lastMs > getDmLastReadMs(t.id, user.uid);
+      return unreadFor(t, user.uid) > 0;
     }).length;
     // dmReadTick re-evaluates read markers after a thread is opened.
     // eslint-disable-next-line react-hooks/exhaustive-deps

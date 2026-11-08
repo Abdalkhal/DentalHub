@@ -8,6 +8,8 @@ import { addDoctor, removeDoctor, useClinic } from "@/lib/clinicStore";
 import { setClinicsStoreUser } from "@/lib/clinicsStore";
 import { useSession } from "@/lib/useAuth";
 import { Stethoscope, Plus, Trash2, Phone, Clock } from "lucide-react";
+import { ClinicTeamCard, JoinedClinicsCard } from "@/components/ClinicTeam";
+import { ClinicStaffCard } from "@/components/ClinicStaff";
 import { EmptyState, Field, Sheet, inputCls } from "./clinic.materials";
 
 export const Route = createFileRoute("/clinic/doctors")({
@@ -44,6 +46,16 @@ function DoctorsPage() {
     <MobileShell wide>
       <TopBar title={ar ? "أطباء العيادة" : "Clinic Doctors"} showBack wide />
       <div className="px-3 pt-3 pb-6 md:px-6 md:pt-6 md:pb-12 lg:px-8 lg:max-w-5xl lg:mx-auto">
+        <div className="mb-4 grid gap-3 md:grid-cols-2 md:items-start">
+          <ClinicTeamCard ar={ar} />
+          <JoinedClinicsCard ar={ar} />
+        </div>
+        <div className="mb-4">
+          <ClinicStaffCard ar={ar} />
+        </div>
+        <p className="mb-2 px-1 text-[11px] font-bold text-muted-foreground">
+          {ar ? "أطباء بدون حساب في التطبيق (سجل داخلي)" : "Doctors without an app account (internal list)"}
+        </p>
         <button
           onClick={() => setOpen(true)}
           className="w-full h-12 rounded-2xl bg-primary md:w-fit md:h-11 md:px-6 md:rounded-xl md:ms-auto text-primary-foreground font-display font-extrabold text-sm shadow-card flex items-center justify-center gap-2"

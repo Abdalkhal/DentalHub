@@ -13,7 +13,7 @@ import { BoneGraftDetailsModal } from '@/components/BoneGraftDetailsModal';
 import { LabServicesSection, useLabServices } from '@/components/LabServicesSection';
 import { BRANCH_BADGE, BRANCH_IMAGES, BRANCH_OPTIONS } from '@/data/branches';
 import { db } from '@/integrations/firebase/client';
-import { useProducts, useSignedImageUrls, type Product } from '@/lib/products';
+import { useProductsByCompany, useSignedImageUrls, type Product } from '@/lib/products';
 import { useOffers } from '@/lib/offers';
 import { useIsFavorited, toggleFavorite } from '@/lib/favoritesStore';
 import { useUserRole } from '@/lib/useAuth';
@@ -68,7 +68,7 @@ export default function ProfileScreen() {
     staleTime: 60_000,
   });
 
-  const { data: allProducts = [] } = useProducts();
+  const { data: allProducts = [] } = useProductsByCompany(accountId);
   const products = useMemo(
     () => allProducts.filter((p) => p.companyId === accountId),
     [allProducts, accountId],

@@ -1,11 +1,16 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { assertVerified } from "./emailVerification";
 import { auth, db, storage } from "@/integrations/firebase/client";
 import {
   collection,
   doc,
+  documentId,
+  getCountFromServer,
   getDoc,
   getDocs,
+  limit,
+  startAfter,
+  type QueryDocumentSnapshot,
   setDoc,
   deleteDoc,
   query,
@@ -145,6 +150,8 @@ export type Product = {
   surgicalGuideTools?: string[];
   surgicalKit?: SurgicalKitSpec;
   specializedImplant?: SpecializedImplantSpec;
+  /** The shared catalog product this office's listing is an offer on. */
+  catalogId?: string;
 };
 
 const fromDoc = (id: string, data: Record<string, unknown>): Product => {
@@ -205,21 +212,214 @@ const fromDoc = (id: string, data: Record<string, unknown>): Product => {
     surgicalGuideTools: (data.surgicalGuideTools as string[] | null) ?? undefined,
     surgicalKit: (data.surgicalKit as SurgicalKitSpec | null) ?? undefined,
     specializedImplant: (data.specializedImplant as SpecializedImplantSpec | null) ?? undefined,
+    catalogId: (data.catalogId as string) ?? undefined,
   };
 };
 
 export const productsQueryKey = ["products"] as const;
 
-export function useProducts() {
+const liveProducts = (docs: { id: string; data: () => Record<string, unknown> }[]): Product[] =>
+  docs.filter((d) => d.data().suspended !== true).map((d) => fromDoc(d.id, d.data()));
+
+const oldestFirst = (a: Product, b: Product) => (a.createdAt ?? "").localeCompare(b.createdAt ?? "");
+
+/**
+ * The whole collection. Only the admin tab uses this: everywhere else a screen
+ * asks for the products it shows, since this reads every product every time.
+ */
+export function useAllProducts() {
   return useQuery({
     queryKey: productsQueryKey,
     queryFn: async (): Promise<Product[]> => {
       const q = query(collection(db, "products"), orderBy("createdAt", "asc"));
-      const snap = await getDocs(q);
-      return snap.docs.map((d) => fromDoc(d.id, d.data()));
+      return liveProducts((await getDocs(q)).docs);
     },
     staleTime: 30_000,
   });
+}
+
+/** Products with one field equal to a value. */
+export function useProductsWhere(field: string, value: string | undefined) {
+  return useQuery({
+    queryKey: [...productsQueryKey, "where", field, value],
+    enabled: !!value,
+    staleTime: 30_000,
+    queryFn: async (): Promise<Product[]> => {
+      const snap = await getDocs(query(collection(db, "products"), where(field, "==", value)));
+      return liveProducts(snap.docs).sort(oldestFirst);
+    },
+  });
+}
+
+/** One office's products. */
+export const useProductsByCompany = (companyId: string | undefined) =>
+  useProductsWhere("companyId", companyId);
+
+/** One product. */
+export function useProduct(id: string | undefined) {
+  return useQuery({
+    queryKey: [...productsQueryKey, "one", id],
+    enabled: !!id,
+    staleTime: 30_000,
+    queryFn: async (): Promise<Product | null> => {
+      const snap = await getDoc(doc(db, "products", id!));
+      if (!snap.exists() || snap.data().suspended === true) return null;
+      return fromDoc(snap.id, snap.data());
+    },
+  });
+}
+
+/** Particular products, such as the lines of an order. */
+export function useProductsByIds(ids: string[]) {
+  const unique = [...new Set(ids.filter(Boolean))].sort();
+  return useQuery({
+    queryKey: [...productsQueryKey, "ids", unique.join("|")],
+    enabled: unique.length > 0,
+    staleTime: 60_000,
+    queryFn: async (): Promise<Product[]> => {
+      const chunks: string[][] = [];
+      // Firestore takes at most 30 values in one "in" query.
+      for (let i = 0; i < unique.length; i += 30) chunks.push(unique.slice(i, i + 30));
+      const snaps = await Promise.all(
+        chunks.map((c) => getDocs(query(collection(db, "products"), where(documentId(), "in", c)))),
+      );
+      return snaps.flatMap((s) => liveProducts(s.docs));
+    },
+  });
+}
+
+/** A brand's products, under any of the spellings it's stored with. */
+export function useProductsByBrand(names: string[]) {
+  const spellings = [
+    ...new Set(names.filter(Boolean).flatMap((n) => [n, n.toUpperCase(), n.toLowerCase()])),
+  ].slice(0, 30);
+  return useQuery({
+    queryKey: [...productsQueryKey, "brand", spellings.join("|")],
+    enabled: spellings.length > 0,
+    staleTime: 30_000,
+    queryFn: async (): Promise<Product[]> => {
+      const snap = await getDocs(query(collection(db, "products"), where("brand", "in", spellings)));
+      return liveProducts(snap.docs).sort(oldestFirst);
+    },
+  });
+}
+
+/** Every office's offer on one catalog product. */
+export const useCatalogOffers = (catalogId: string | undefined) =>
+  useProductsWhere("catalogId", catalogId);
+
+/** How many products each office lists, counted by the server. */
+export function useProductCounts(companyIds: string[]) {
+  const ids = [...new Set(companyIds.filter(Boolean))].sort();
+  return useQuery({
+    queryKey: [...productsQueryKey, "counts", ids.join("|")],
+    enabled: ids.length > 0,
+    staleTime: 60_000,
+    queryFn: async (): Promise<Record<string, number>> => {
+      const entries = await Promise.all(
+        ids.map(async (id) => {
+          const q = query(collection(db, "products"), where("companyId", "==", id));
+          return [id, (await getCountFromServer(q)).data().count] as const;
+        }),
+      );
+      return Object.fromEntries(entries);
+    },
+  });
+}
+
+const SEARCH_MAX_PREFIX = 15;
+
+function searchParts(term: string): string[] {
+  return term
+    .trim()
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((w) => w.length >= 2);
+}
+
+async function searchProductsOnce(term: string, max: number): Promise<Product[]> {
+  const parts = searchParts(term);
+  if (parts.length === 0) return [];
+  const q = query(
+    collection(db, "products"),
+    where("searchWords", "array-contains", parts[0].slice(0, SEARCH_MAX_PREFIX)),
+    limit(max),
+  );
+  const products = liveProducts((await getDocs(q)).docs);
+  // Only one word can go to the server. The rest narrow what came back.
+  return products.filter((p) => {
+    const hay = [p.en, p.ar, p.brand].filter(Boolean).join(" ").toLowerCase();
+    return parts.every((w) => hay.includes(w));
+  });
+}
+
+/** Products whose words begin with what's been typed. */
+export function useProductSearch(term: string, max = 30) {
+  const clean = term.trim().toLowerCase();
+  return useQuery({
+    queryKey: [...productsQueryKey, "search", clean, max],
+    enabled: searchParts(clean).length > 0,
+    staleTime: 30_000,
+    queryFn: () => searchProductsOnce(clean, max),
+  });
+}
+
+/** What a scanned code refers to: an id, a barcode, a SKU or a name. */
+export async function findProductByCode(code: string): Promise<Product | null> {
+  const clean = code.trim();
+  if (!clean) return null;
+  if (!clean.includes("/")) {
+    const byId = await getDoc(doc(db, "products", clean));
+    if (byId.exists() && byId.data().suspended !== true) return fromDoc(byId.id, byId.data());
+  }
+  for (const field of ["barcode", "sku"]) {
+    const snap = await getDocs(query(collection(db, "products"), where(field, "==", clean), limit(1)));
+    const [hit] = liveProducts(snap.docs);
+    if (hit) return hit;
+  }
+  return (await searchProductsOnce(clean, 1))[0] ?? null;
+}
+
+const BRANCH_PAGE = 60;
+
+/** A section's products a page at a time, or its search results while searching. */
+export function useBranchProducts(branch: string | undefined, term: string) {
+  const searching = searchParts(term).length > 0;
+  const search = useProductSearch(searching ? term : "", 60);
+  const pages = useInfiniteQuery({
+    queryKey: [...productsQueryKey, "branch", branch],
+    enabled: !!branch && !searching,
+    staleTime: 30_000,
+    initialPageParam: null as QueryDocumentSnapshot | null,
+    queryFn: async ({ pageParam }) => {
+      const base = [where("branch", "==", branch), orderBy("createdAt", "desc"), limit(BRANCH_PAGE)];
+      const q = pageParam
+        ? query(collection(db, "products"), ...base, startAfter(pageParam))
+        : query(collection(db, "products"), ...base);
+      const snap = await getDocs(q);
+      return {
+        products: liveProducts(snap.docs),
+        next: snap.docs.length === BRANCH_PAGE ? snap.docs[snap.docs.length - 1] : null,
+      };
+    },
+    getNextPageParam: (last) => last.next,
+  });
+  if (searching) {
+    return {
+      data: (search.data ?? []).filter((p) => p.branch === branch),
+      isLoading: search.isLoading,
+      hasMore: false,
+      loadMore: () => {},
+      loadingMore: false,
+    };
+  }
+  return {
+    data: (pages.data?.pages ?? []).flatMap((p) => p.products),
+    isLoading: pages.isLoading,
+    hasMore: !!pages.hasNextPage,
+    loadMore: () => pages.fetchNextPage(),
+    loadingMore: pages.isFetchingNextPage,
+  };
 }
 
 function removeUndefined(obj: unknown): unknown {
@@ -348,9 +548,14 @@ export async function uploadProductImage(productId: string, file: File): Promise
 }
 
 export async function removeProductImage(path: string): Promise<void> {
-  if (!path) return;
+  // A catalog image isn't a file of this office's: removing it from the
+  // product is all there is to do.
+  if (!path || isWebImage(path)) return;
   await deleteObject(ref(storage, path));
 }
+
+/** A catalog image is a web address; everything an office uploads is a Storage path. */
+export const isWebImage = (path: string) => /^https?:\/\//i.test(path);
 
 export function useSignedImageUrls(paths: string[]) {
   const key = ["signed-product-images", [...new Set(paths)].sort().join("|")];
@@ -364,6 +569,10 @@ export function useSignedImageUrls(paths: string[]) {
       const map: Record<string, string> = {};
       await Promise.all(
         unique.map(async (path) => {
+          if (isWebImage(path)) {
+            map[path] = path;
+            return;
+          }
           try {
             map[path] = await getDownloadURL(ref(storage, path));
           } catch {}
@@ -400,6 +609,7 @@ export function useProductsByCountry(countrySlug: string) {
       const q = query(collection(db, "products"), where("category", "==", "implant"));
       const snap = await getDocs(q);
       return snap.docs
+        .filter((d) => d.data().suspended !== true)
         .map((d) => fromDoc(d.id, d.data()))
         .filter(
           (p) =>

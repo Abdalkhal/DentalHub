@@ -8,14 +8,14 @@ import { Screen, Text, Spinner } from '@/components/ui';
 import { ProductImage } from '@/components/ProductImage';
 import { BoneGraftDetailsModal } from '@/components/BoneGraftDetailsModal';
 import { db } from '@/integrations/firebase/client';
-import { useProducts, useSignedImageUrls, type Product } from '@/lib/products';
+import { useProductsWhere, useSignedImageUrls, type Product } from '@/lib/products';
 import { useI18n } from '@/lib/i18n';
 
 export default function BoneGraftsScreen() {
   const { lang } = useI18n();
   const ar = lang === 'ar';
 
-  const { data: allProducts = [], isLoading } = useProducts();
+  const { data: allProducts = [], isLoading } = useProductsWhere('branch', 'bone_graft');
   const [selected, setSelected] = useState<Product | null>(null);
   const items = useMemo(() => allProducts.filter((p) => p.branch === 'bone_graft'), [allProducts]);
   const { data: urlMap = {} } = useSignedImageUrls(

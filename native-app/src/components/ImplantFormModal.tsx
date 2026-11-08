@@ -1,3 +1,4 @@
+import { getAuth } from 'firebase/auth';
 import { useMemo, useState } from 'react';
 import { alertUploadError } from '@/lib/uploadAlert';
 import { Image, Modal, Pressable, ScrollView, TextInput, View } from 'react-native';
@@ -16,7 +17,7 @@ import { db } from '@/integrations/firebase/client';
 import {
   uploadProductImage,
   removeProductImage,
-  useProducts,
+  useProductsByCompany,
   useSignedImageUrls,
   useUpsertProduct,
   productsQueryKey,
@@ -163,7 +164,7 @@ type ProductType = 'main_implant' | 'accessory' | 'surgical_kit';
 export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean; onClose: () => void; ar: boolean; product?: Product | null }) {
   const upsert = useUpsertProduct();
   const { user } = useUserRole();
-  const { data: allProducts = [] } = useProducts();
+  const { data: allProducts = [] } = useProductsByCompany(getAuth().currentUser?.uid);
   const queryClient = useQueryClient();
   const isEdit = !!product;
   const [draftId] = useState(() => product?.id ?? randomUUID());

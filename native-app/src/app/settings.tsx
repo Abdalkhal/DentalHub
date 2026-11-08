@@ -15,6 +15,7 @@ import { router } from 'expo-router';
 import { Bell, Camera, Link2, Lock, MapPin, Trash2, User } from 'lucide-react-native';
 
 import { Screen, Text, Spinner } from '@/components/ui';
+import { DataExportCard } from '@/components/DataExportCard';
 import { auth, db, storage } from '@/integrations/firebase/client';
 import { useUserRole } from '@/lib/useAuth';
 import { randomUUID } from '@/lib/randomId';
@@ -178,9 +179,13 @@ export default function SettingsScreen() {
   const confirmDeleteAccount = () => {
     Alert.alert(
       ar ? 'حذف الحساب' : 'Delete account',
-      ar
-        ? 'سيتم حذف جميع بياناتك نهائياً من النظام. هل أنت متأكد؟'
-        : 'All your data will be permanently removed. Are you sure?',
+      isDentist
+        ? ar
+          ? 'لن تستطيع الوصول إلى ملفات مرضاك بعد حذف الحساب. للاحتفاظ بها، صدّرها أولاً من «تصدير بياناتي» في هذه الصفحة. هل تريد الحذف الآن؟'
+          : 'You will lose access to your patient files. To keep them, use "Export my data" on this page first. Delete now?'
+        : ar
+          ? 'سيتم حذف جميع بياناتك نهائياً من النظام. هل أنت متأكد؟'
+          : 'All your data will be permanently removed. Are you sure?',
       [
         { text: ar ? 'إلغاء' : 'Cancel', style: 'cancel' },
         { text: ar ? 'حذف' : 'Delete', style: 'destructive', onPress: deleteAccount },
@@ -391,6 +396,8 @@ export default function SettingsScreen() {
           </View>
         )}
       </View>
+
+      {isDentist && <DataExportCard ar={ar} />}
 
       <Pressable
         onPress={confirmDeleteAccount}

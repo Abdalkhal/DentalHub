@@ -9,7 +9,7 @@ import { Screen, Text } from '@/components/ui';
 import { db } from '@/integrations/firebase/client';
 import { getBrand } from '@/data/brands';
 import { BRANCHES, CITIES } from '@/data/offices';
-import { useProducts, type Product } from '@/lib/products';
+import { useProductsByBrand, type Product } from '@/lib/products';
 import { useIsFavorited, toggleFavorite } from '@/lib/favoritesStore';
 import { supportWhatsAppUrl } from '@/lib/support';
 import { useI18n } from '@/lib/i18n';
@@ -59,7 +59,7 @@ export default function BrandDetailScreen() {
   const [sort, setSort] = useState<Sort>('price');
   const favorited = useIsFavorited(brand?.id ?? '');
 
-  const { data: allProducts = [], isLoading } = useProducts();
+  const { data: allProducts = [], isLoading } = useProductsByBrand(brand ? [brand.name, brand.ar] : []);
 
   const brandProducts = useMemo(
     () => (brand ? allProducts.filter((p) => matchesBrandName(p, brand.name, brand.ar)) : []),

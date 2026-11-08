@@ -1,15 +1,7 @@
-import {
-  collection,
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  query,
-  orderBy,
-  Timestamp,
-} from "firebase/firestore";
+import { collection, query, orderBy, Timestamp } from "firebase/firestore";
 import { db } from "@/integrations/firebase/client";
 import { useRealtimeQuery } from "@/lib/realtime";
+import { adActionCall, extendSubscriptionAction, setAccountStatusAction } from "@/lib/adminBusiness";
 import type { Offer } from "@/lib/offers";
 import type { UserRoleDoc } from "@/integrations/firebase/types";
 
@@ -20,6 +12,8 @@ export type AdminLog = {
   type: string;
   message: string;
   adminName: string;
+  targetName?: string;
+  reason?: string;
   createdAt: string;
 };
 
@@ -63,46 +57,24 @@ export function useAdminLogs(limit = 50) {
       type: (x.type as string) ?? "",
       message: (x.message as string) ?? "",
       adminName: (x.adminName as string) ?? "",
+      targetName: (x.targetName as string) || undefined,
+      reason: (x.reason as string) || undefined,
       createdAt: (x.createdAt as Timestamp)?.toDate?.()?.toISOString?.() ?? "",
     } as AdminLog;
   });
   return { data: data.slice(0, limit), loading };
 }
 
-async function logAction(type: string, message: string, adminName: string) {
-  try {
-    await setDoc(doc(db, "admin_logs", `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`), {
-      type,
-      message,
-      adminName,
-      createdAt: Timestamp.now(),
-    });
-  } catch {
-    /* log is best-effort */
-  }
+export async function approveAd(offerId: string, expiryDate: string, _adminName: string) {
+  await adActionCall({ id: offerId, action: "approve", expiryDate });
 }
 
-export async function approveAd(offerId: string, expiryDate: string, adminName: string) {
-  await setDoc(
-    doc(db, "offers", offerId),
-    { status: "active", expiryDate, rejectReason: null },
-    { merge: true },
-  );
-  await logAction("approve_ad", `تمت الموافقة على إعلان حتى ${expiryDate.slice(0, 10)}`, adminName);
+export async function rejectAd(offerId: string, reason: string, _adminName: string) {
+  await adActionCall({ id: offerId, action: "reject", reason: reason || "بدون سبب" });
 }
 
-export async function rejectAd(offerId: string, reason: string, adminName: string) {
-  await setDoc(
-    doc(db, "offers", offerId),
-    { status: "rejected", rejectReason: reason },
-    { merge: true },
-  );
-  await logAction("reject_ad", `تم رفض الإعلان - ${reason}`, adminName);
-}
-
-export async function deactivateAd(offerId: string, adminName: string) {
-  await setDoc(doc(db, "offers", offerId), { status: "expired" }, { merge: true });
-  await logAction("deactivate_ad", "تم إيقاف إعلان نشط", adminName);
+export async function deactivateAd(offerId: string, _adminName: string) {
+  await adActionCall({ id: offerId, action: "stop" });
 }
 
 // General "إعلاناتي" ads (`ads` collection) — separate from the
@@ -110,50 +82,27 @@ export async function deactivateAd(offerId: string, adminName: string) {
 // status values and collection differ (no "expired" state — a stopped ad
 // just goes back to "rejected" so it stops showing but stays out of the
 // pending queue).
-export async function approveGeneralAd(adId: string, expiryDate: string, adminName: string) {
-  await setDoc(
-    doc(db, "ads", adId),
-    { status: "active", expiryDate, rejectReason: null },
-    { merge: true },
-  );
-  await logAction("approve_general_ad", `تمت الموافقة على إعلان حتى ${expiryDate}`, adminName);
+export async function approveGeneralAd(adId: string, expiryDate: string, _adminName: string) {
+  await adActionCall({ collection: "ads", id: adId, action: "approve", expiryDate });
 }
 
-export async function rejectGeneralAd(adId: string, reason: string, adminName: string) {
-  await setDoc(doc(db, "ads", adId), { status: "rejected", rejectReason: reason }, { merge: true });
-  await logAction("reject_general_ad", `تم رفض إعلان - ${reason}`, adminName);
+export async function rejectGeneralAd(adId: string, reason: string, _adminName: string) {
+  await adActionCall({ collection: "ads", id: adId, action: "reject", reason: reason || "بدون سبب" });
 }
 
-export async function deactivateGeneralAd(adId: string, adminName: string) {
-  await setDoc(
-    doc(db, "ads", adId),
-    { status: "rejected", rejectReason: "أُوقف من قبل الإدارة" },
-    { merge: true },
-  );
-  await logAction("deactivate_general_ad", "تم إيقاف إعلان نشط", adminName);
+export async function deactivateGeneralAd(adId: string, _adminName: string) {
+  await adActionCall({ collection: "ads", id: adId, action: "stop" });
 }
 
 export async function setAccountStatus(
   userId: string,
   status: "active" | "suspended" | "expired",
-  adminName: string,
+  _adminName: string,
+  reason = "قرار الإدارة",
 ) {
-  await updateDoc(doc(db, "user_roles", userId), { accountStatus: status });
-  await logAction("account_status", `تم تغيير حالة الحساب إلى ${status}`, adminName);
+  await setAccountStatusAction(userId, status, reason);
 }
 
-export async function extendSubscription(userId: string, months: number, adminName: string) {
-  const ref = doc(db, "user_roles", userId);
-  const snap = await getDoc(ref);
-  const current = snap.exists()
-    ? ((snap.data() as UserRoleDoc).subscriptionExpiry as string | undefined)
-    : undefined;
-  const base = current ? Math.max(Date.now(), new Date(current).getTime()) : Date.now();
-  const expiry = new Date(base + months * 30 * 24 * 3600 * 1000).toISOString();
-  await updateDoc(ref, { subscriptionExpiry: expiry, accountStatus: "active" });
-  await logAction(
-    "extend_subscription",
-    `تم تمديد الاشتراك +${months} شهر حتى ${expiry.slice(0, 10)}`,
-    adminName,
-  );
+export async function extendSubscription(userId: string, months: number, _adminName: string) {
+  await extendSubscriptionAction(userId, months);
 }

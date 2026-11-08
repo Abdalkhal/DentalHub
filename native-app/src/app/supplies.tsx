@@ -7,7 +7,7 @@ import { MapPin, Search, Star } from 'lucide-react-native';
 
 import { Screen, Text, Spinner, Input } from '@/components/ui';
 import { db } from '@/integrations/firebase/client';
-import { useProducts } from '@/lib/products';
+import { useProductCounts } from '@/lib/products';
 import { CITIES } from '@/data/offices';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
@@ -76,19 +76,10 @@ export default function SuppliesScreen() {
     queryFn: queryCompanies,
     staleTime: 30_000,
   });
-  const { data: products = [] } = useProducts();
-
-  const itemsCountById = useMemo(() => {
-    const map = new Map<string, number>();
-    products.forEach((p) => {
-      if (!p.companyId) return;
-      map.set(p.companyId, (map.get(p.companyId) ?? 0) + 1);
-    });
-    return map;
-  }, [products]);
+  const { data: itemsCountById = {} } = useProductCounts(companies.map((c) => c.id));
 
   const withCounts: CompanyItem[] = useMemo(
-    () => companies.map((c) => ({ ...c, rating: 0, itemsCount: itemsCountById.get(c.id) ?? 0 })),
+    () => companies.map((c) => ({ ...c, rating: 0, itemsCount: itemsCountById[c.id] ?? 0 })),
     [companies, itemsCountById],
   );
 

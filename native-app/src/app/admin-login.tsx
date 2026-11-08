@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { signOutDevice } from '@/lib/push';
 import { KeyboardAvoidingView, Platform, View } from 'react-native';
-import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import { Lock, Mail, ShieldAlert, ShieldCheck } from 'lucide-react-native';
 
 import { Screen, Text, Button, Spinner } from '@/components/ui';
@@ -59,7 +60,7 @@ export default function AdminLoginScreen() {
             title={ar ? 'تسجيل الخروج' : 'Sign out'}
             variant="outline"
             className="mt-6"
-            onPress={() => signOut(auth)}
+            onPress={() => signOutDevice()}
           />
         </View>
       </Screen>

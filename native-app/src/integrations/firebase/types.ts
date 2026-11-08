@@ -1,6 +1,6 @@
 import type { Timestamp } from "firebase/firestore";
 
-export type AccountType = "dentist" | "supply" | "implant" | "lab";
+export type AccountType = "dentist" | "supply" | "implant" | "lab" | "secretary";
 export type AppRole = "admin" | AccountType;
 
 export type ProductDoc = {
@@ -47,7 +47,10 @@ export type InvoiceItem = {
   productId: string;
   name: string;
   quantity: number;
+  /** After any quantity tier. The line's share of a code or doctor discount is apart. */
   price: number;
+  listPrice?: number;
+  discountAmount?: number;
   currency: "USD" | "IQD";
   availability?: "available" | "not_available";
 };
@@ -56,6 +59,7 @@ export type InvoiceStatus = "pending" | "confirmed" | "shipped" | "delivered" | 
 
 export type InvoiceDoc = {
   id: string;
+  discount?: { code?: string; doctorPct?: number } | null;
   orderNumber: string;
   officeId: string;
   doctorId: string;
@@ -77,6 +81,15 @@ export type InvoiceDoc = {
   note?: string;
 };
 
+export type OrderDiscount = {
+  code?: string;
+  doctorPct?: number;
+  discountUSD?: number;
+  discountIQD?: number;
+  tierSavedUSD?: number;
+  tierSavedIQD?: number;
+};
+
 export type OrderStatus = "pending" | "confirmed" | "rejected";
 
 export type OrderDoc = {
@@ -94,7 +107,7 @@ export type OrderDoc = {
   totalIQD?: number;
   status: OrderStatus;
   note?: string;
-  discount?: { code?: string; discountUSD?: number; discountIQD?: number } | null;
+  discount?: OrderDiscount | null;
   invoiceId?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;

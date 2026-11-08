@@ -4,6 +4,7 @@ import { onSnapshot, setDoc } from "firebase/firestore";
 import { setPatientStoreUser, setPatientSyncReady } from "./patientsStore";
 import { clinicsDoc } from "./dentistRecords";
 import { setAppointmentSyncReady, setAppointmentsStoreUser } from "./appointmentsStore";
+import { setMaterialsStoreUser, setMaterialsSyncReady } from "./materialsStore";
 
 // A dentist can run more than one clinic under the same account. Every
 // clinic-scoped store (this one's own list aside — clinicStore.ts's
@@ -92,6 +93,7 @@ function pointStoresAt(uid: string, clinicId: string) {
   setClinicStoreUser(uid, clinicId);
   setPatientStoreUser(uid, clinicId);
   setAppointmentsStoreUser(uid, clinicId);
+  setMaterialsStoreUser(uid, clinicId);
 }
 
 /* ── Cloud sync of the clinic list ─────────────────────────────
@@ -179,6 +181,7 @@ function watchClinics(uid: string) {
         if (activeChanged) pointStoresAt(uid, activeClinicId);
         setPatientSyncReady(true);
         setAppointmentSyncReady(true);
+        setMaterialsSyncReady(true);
       },
       (err) => console.warn("Clinic list sync error:", err),
     );
@@ -195,6 +198,7 @@ export function setClinicsStoreUser(uid: string) {
   if (switched) {
     setPatientSyncReady(false);
     setAppointmentSyncReady(false);
+    setMaterialsSyncReady(false);
   }
   currentUserId = uid;
   const existing = loadRaw(uid);

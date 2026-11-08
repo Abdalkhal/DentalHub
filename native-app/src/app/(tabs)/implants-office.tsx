@@ -25,7 +25,7 @@ import { SpecializedImplantForm } from '@/components/SpecializedImplantForm';
 import { ImplantDetailView } from '@/components/ImplantDetailView';
 import { BoneGraftDetailsModal } from '@/components/BoneGraftDetailsModal';
 import { OfficeOffers } from '@/components/OfficeOffers';
-import { useProducts, useSignedImageUrls, useDeleteProduct, type Product } from '@/lib/products';
+import { useProductsByCompany, useSignedImageUrls, useDeleteProduct, type Product } from '@/lib/products';
 import { useOrders } from '@/lib/orders';
 import { useOffers } from '@/lib/offers';
 import { useUnreadNotificationsCount } from '@/lib/notifications';
@@ -39,7 +39,7 @@ export default function ImplantsOfficeScreen() {
   const { user, role } = useUserRole();
   const insets = useSafeAreaInsets();
   const unreadCount = useUnreadNotificationsCount(user?.uid);
-  const { data: products = [], isLoading } = useProducts();
+  const { data: products = [], isLoading } = useProductsByCompany(user?.uid);
   const remove = useDeleteProduct();
   const confirmDelete = (p: Product) => {
     Alert.alert(

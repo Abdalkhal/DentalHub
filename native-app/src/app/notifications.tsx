@@ -1,19 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, View } from 'react-native';
-import { router } from 'expo-router';
 import { collection, doc, onSnapshot, query, updateDoc, where, writeBatch } from 'firebase/firestore';
-import { Bell, BellRing, CalendarCheck2, CalendarX2, CheckCheck, MessageCircle, Package, Truck } from 'lucide-react-native';
+import { Bell, BellRing, CalendarCheck2, CalendarX2, CheckCheck, MessageCircle, Package, TicketPercent, Truck } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 
 import { Screen, Text, Button } from '@/components/ui';
 import { db } from '@/integrations/firebase/client';
 import { useUserRole } from '@/lib/useAuth';
 import { registerPush, isPushSupported } from '@/lib/push';
+import { openNotificationTarget } from '@/lib/notificationRoute';
 import { useI18n } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 
-type NotifType = 'order_new' | 'order_status' | 'message' | 'case_message' | 'booking_new' | 'booking_cancelled';
+type NotifType = 'order_new' | 'order_status' | 'message' | 'case_message' | 'booking_new' | 'booking_cancelled' | 'data_export' | 'clinic_team' | 'discount';
 
 type Notif = {
   id: string;
@@ -28,6 +28,7 @@ type Notif = {
   senderPhotoURL?: string;
   chatWith?: string;
   forRole?: 'doctor' | 'lab';
+  senderId?: string;
 };
 
 const TYPE_META: Record<NotifType, { icon: LucideIcon; tone: string; color: string }> = {
@@ -37,7 +38,22 @@ const TYPE_META: Record<NotifType, { icon: LucideIcon; tone: string; color: stri
   case_message: { icon: MessageCircle, tone: 'bg-violet-100', color: '#7C3AED' },
   booking_new: { icon: CalendarCheck2, tone: 'bg-teal-100', color: '#0E6E66' },
   booking_cancelled: { icon: CalendarX2, tone: 'bg-rose-100', color: '#E11D48' },
+  data_export: { icon: Package, tone: 'bg-blue-100', color: '#2563EB' },
+  clinic_team: { icon: MessageCircle, tone: 'bg-blue-100', color: '#2563EB' },
+  discount: { icon: TicketPercent, tone: 'bg-emerald-100', color: '#0E6E66' },
 };
+
+// The server adds notification types as features grow. An app that doesn't
+// know one yet shows it as a plain notification: looking it up used to give
+// undefined and the whole app closed the moment the list rendered.
+const FALLBACK_META = { icon: Bell, tone: 'bg-slate-100', color: '#64748B' };
+const metaOf = (type: unknown) => TYPE_META[type as NotifType] ?? FALLBACK_META;
+
+function createdMs(v: unknown): number {
+  if (typeof v === 'number') return v;
+  const o = v as { toMillis?: () => number } | null;
+  return o && typeof o.toMillis === 'function' ? o.toMillis() : 0;
+}
 
 function timeAgo(ts: number | undefined, ar: boolean): string {
   if (!ts) return '';
@@ -65,11 +81,26 @@ export default function NotificationsScreen() {
     // automatic single-field index; we sort client-side. See useOrders in
     // lib/orders.ts for the same pattern.
     const q = query(collection(db, 'notifications'), where('userId', '==', user.uid));
-    const unsub = onSnapshot(q, (snap) => {
-      const list = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Notif, 'id'>) }));
-      list.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
-      setNotes(list);
-    });
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const list = snap.docs.map((d) => {
+          const x = d.data() as Omit<Notif, 'id'> & { createdAt?: unknown };
+          return {
+            ...x,
+            id: d.id,
+            title: typeof x.title === 'string' ? x.title : undefined,
+            body: typeof x.body === 'string' ? x.body : undefined,
+            senderName: typeof x.senderName === 'string' ? x.senderName : undefined,
+            senderPhotoURL: typeof x.senderPhotoURL === 'string' && x.senderPhotoURL ? x.senderPhotoURL : undefined,
+            createdAt: createdMs(x.createdAt),
+          };
+        });
+        list.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+        setNotes(list);
+      },
+      () => setNotes([]),
+    );
     return unsub;
   }, [user?.uid]);
 
@@ -104,19 +135,9 @@ export default function NotificationsScreen() {
 
   const openNotif = (n: Notif) => {
     markRead(n.id);
-    if (n.type === 'booking_new' || n.type === 'booking_cancelled') {
-      router.push('/clinic-booking' as never);
-    } else if (n.type === 'message' && n.chatWith) {
-      router.push({ pathname: '/messages', params: { with: n.chatWith } });
-    } else if (n.type === 'case_message') {
-      // The doctor reads case chats from case tracking; the lab from its orders.
-      if (n.forRole === 'doctor') router.push({ pathname: '/track-cases', params: n.orderId ? { open: n.orderId } : {} });
-      else router.push('/orders' as never);
-    } else if (n.invoiceId) {
-      router.push({ pathname: '/doctor-invoices/[invoiceId]', params: { invoiceId: n.invoiceId } });
-    } else if (n.orderId || n.type === 'order_new') {
-      router.push('/orders' as never);
-    }
+    // Already on the list: a notification with no screen of its own stays here.
+    if (!n.type || !(n.type in TYPE_META)) return;
+    openNotificationTarget(n);
   };
 
   return (
@@ -168,7 +189,7 @@ export default function NotificationsScreen() {
       ) : (
         <View className="mt-3 gap-2.5 pb-6">
           {notes.map((n) => {
-            const meta = TYPE_META[n.type ?? 'message'];
+            const meta = metaOf(n.type);
             const Icon = meta.icon;
             const unread = !n.isRead;
             return (

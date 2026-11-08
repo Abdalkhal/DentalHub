@@ -19,6 +19,8 @@ import { useIsFavorited, toggleFavorite } from "@/lib/favoritesStore";
 import { doc, getDoc } from "firebase/firestore";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
+import { useSession } from "@/lib/useAuth";
+import { useMyOfficeDiscount } from "@/lib/promo";
 import { useSignedImageUrls, type Product } from "@/lib/products";
 import { ALL_COUNTRIES, countryFlagUrl } from "@/data/countries";
 import { SPEC_FIELDS, type SpecFieldId } from "@/data/specs";
@@ -27,7 +29,52 @@ import { addToCart } from "@/lib/cartStore";
 import { addToPurchaseHistory } from "@/lib/quickOrders";
 import { SURGICAL_GUIDE_TOOLS } from "@/components/ImplantFormModal";
 import { db } from "@/integrations/firebase/client";
+import { useOtherOffers } from "@/lib/catalog";
 import type { UserRoleDoc } from "@/integrations/firebase/types";
+
+function OtherOffers({
+  catalogId,
+  currentId,
+  ar,
+  onOpen,
+}: {
+  catalogId?: string;
+  currentId: string;
+  ar: boolean;
+  onOpen: (id: string) => void;
+}) {
+  const offers = useOtherOffers(catalogId, currentId);
+  if (offers.length === 0) return null;
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-white overflow-hidden">
+      <p className="px-3 py-2.5 text-sm font-bold text-slate-800 border-b border-slate-100">
+        {ar ? "هذا المنتج عند مكاتب أخرى" : "Also sold by"}
+      </p>
+      <div className="divide-y divide-slate-50">
+        {offers.map(({ product: p, officeName }) => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => onOpen(p.id)}
+            className="w-full px-3 py-2.5 flex items-center gap-2 text-start hover:bg-slate-50"
+          >
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold text-slate-700 truncate">{officeName || (ar ? "مكتب" : "Office")}</span>
+              {p.expiryDate && (
+                <span className="block text-[11px] text-slate-400" dir="ltr">
+                  {ar ? "الصلاحية" : "Expiry"} {p.expiryDate}
+                </span>
+              )}
+            </span>
+            <span className="text-sm font-extrabold text-emerald-700" dir="ltr">
+              {p.currency === "IQD" ? `${p.price.toLocaleString()} د.ع` : `$${p.price.toFixed(2)}`}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function ProductDetailsModal({
   product,
@@ -50,6 +97,8 @@ export function ProductDetailsModal({
   asPage?: boolean;
 }) {
   const { lang } = useI18n();
+  const { user: discountUser } = useSession();
+  const { data: myDiscountPct = 0 } = useMyOfficeDiscount(product?.companyId, discountUser?.uid);
   const ar = lang === "ar";
   const navigate = useNavigate();
   const [activeImg, setActiveImg] = useState(0);
@@ -365,6 +414,11 @@ export function ProductDetailsModal({
                 <p className="font-display font-extrabold text-lg text-emerald-700">
                   {money(product.price)}
                 </p>
+                {myDiscountPct > 0 && (
+                  <p className="text-[11px] font-bold text-emerald-700 mt-0.5">
+                    {ar ? "سعرك الخاص" : "Your price"}: {money(isIQD ? Math.round(product.price * (1 - myDiscountPct / 100)) : product.price * (1 - myDiscountPct / 100))} ({myDiscountPct}%)
+                  </p>
+                )}
               </div>
               <div className="text-end">
                 <p className="text-[11px] font-bold text-emerald-700/70">
@@ -548,6 +602,16 @@ export function ProductDetailsModal({
             )}
 
             {/* Volume discounts table */}
+            <OtherOffers
+              catalogId={(product as { catalogId?: string }).catalogId}
+              currentId={product.id}
+              ar={ar}
+              onOpen={(id) => {
+                onClose();
+                navigate({ to: "/products/$productId", params: { productId: id } });
+              }}
+            />
+
             {product.discountTiers && product.discountTiers.length > 0 && (
               <div>
                 <h4 className="text-sm font-bold text-slate-800 mb-2">

@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { ScanBarcode } from 'lucide-react-native';
 
 import { Screen, Text, Button } from '@/components/ui';
-import { useProducts } from '@/lib/products';
+import { findProductByCode } from '@/lib/products';
 import { hasNativeModule } from '@/lib/nativeModules';
 import { useI18n } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
@@ -70,7 +70,6 @@ function CameraBody({ cam }: { cam: CameraApi }) {
   const CameraView = cam.CameraView;
   const useCameraPermissions = cam.useCameraPermissions;
   const [permission, requestPermission] = useCameraPermissions();
-  const { data: products = [] } = useProducts();
   const [done, setDone] = useState(false);
 
   if (!permission) {
@@ -95,14 +94,10 @@ function CameraBody({ cam }: { cam: CameraApi }) {
     );
   }
 
-  const onScan = (data: string) => {
-    const code = (data || '').trim().toLowerCase();
+  const onScan = async (data: string) => {
+    const code = (data || '').trim();
     if (!code || done) return;
-    const hit =
-      products.find((p) => p.id === data || p.id === code) ||
-      products.find((p) =>
-        [p.id, p.en, p.ar, p.brand].filter(Boolean).some((v) => v!.toLowerCase().includes(code)),
-      );
+    const hit = await findProductByCode(code).catch(() => null);
     if (hit) {
       setDone(true);
       router.push({ pathname: '/product-detail/[productId]', params: { productId: hit.id } });

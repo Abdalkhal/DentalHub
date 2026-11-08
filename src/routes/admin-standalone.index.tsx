@@ -4,7 +4,7 @@ import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { auth } from "@/integrations/firebase/client";
 import { useIsAdmin, fetchUserRoleDoc } from "@/lib/useAuth";
-import { AdminStandaloneApp } from "@/components/admin/AdminStandaloneApp";
+import { AdminConsole } from "@/components/admin/console/AdminConsole";
 import { ShieldCheck, Loader2, LogOut, KeyRound } from "lucide-react";
 
 export const Route = createFileRoute("/admin-standalone/")({
@@ -187,5 +187,5 @@ function AdminStandalonePage() {
     );
   }
 
-  return <AdminStandaloneApp adminName={adminName} />;
+  return <AdminConsole adminName={adminName} />;
 }

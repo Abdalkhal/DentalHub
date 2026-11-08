@@ -6,7 +6,7 @@ import { RotateCcw, ShoppingBag } from 'lucide-react-native';
 import { Screen, Text } from '@/components/ui';
 import { ProductImage } from '@/components/ProductImage';
 import { useQuickOrders, addToPurchaseHistory } from '@/lib/quickOrders';
-import { useProducts, useSignedImageUrls } from '@/lib/products';
+import { useProductsByIds, useSignedImageUrls } from '@/lib/products';
 import { addToCart } from '@/lib/cartStore';
 import { toast } from '@/lib/toast';
 import { useI18n } from '@/lib/i18n';
@@ -19,7 +19,7 @@ export default function QuickOrdersScreen() {
   const { lang } = useI18n();
   const ar = lang === 'ar';
   const items = useQuickOrders();
-  const { data: products = [] } = useProducts();
+  const { data: products = [] } = useProductsByIds(items.map((i) => i.productId));
 
   const productsById = useMemo(
     () => Object.fromEntries(products.map((p) => [p.id, p])),

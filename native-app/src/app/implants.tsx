@@ -6,7 +6,7 @@ import { Search, SlidersHorizontal } from 'lucide-react-native';
 import { Screen, Text, Input } from '@/components/ui';
 import { COUNTRIES } from '@/data/implants';
 import { ALL_COUNTRIES, countryFlagUrl } from '@/data/countries';
-import { useProducts, COUNTRY_CODE_TO_SLUG, COUNTRY_SLUG_TO_CODE } from '@/lib/products';
+import { useProductsWhere, COUNTRY_CODE_TO_SLUG, COUNTRY_SLUG_TO_CODE } from '@/lib/products';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
@@ -86,7 +86,7 @@ export default function ImplantsScreen() {
     setShowFilter(false);
   };
 
-  const { data: products = [] } = useProducts();
+  const { data: products = [] } = useProductsWhere('category', 'implant');
 
   // The range/search filter used to just sit there — adjusting it changed
   // nothing, on web either (its inputs have no matching filter predicate

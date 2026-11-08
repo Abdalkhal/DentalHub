@@ -9,7 +9,7 @@ import { Screen, Text, Spinner } from '@/components/ui';
 import { ProductImage } from '@/components/ProductImage';
 import { BoneGraftDetailsModal } from '@/components/BoneGraftDetailsModal';
 import { db } from '@/integrations/firebase/client';
-import { useProducts, useSignedImageUrls, type Product } from '@/lib/products';
+import { useProduct, useSignedImageUrls, type Product } from '@/lib/products';
 import { addToCart } from '@/lib/cartStore';
 import { requireSignIn } from '@/lib/guestAccess';
 import { addToPurchaseHistory } from '@/lib/quickOrders';
@@ -18,6 +18,9 @@ import { ALL_COUNTRIES, countryFlagUrl } from '@/data/countries';
 import { SPEC_FIELDS, type SpecFieldId } from '@/data/specs';
 import { SPECIALIZED_CATEGORIES, SPECIALIZED_FIELDS } from '@/data/specializedImplants';
 import { useI18n } from '@/lib/i18n';
+import { useMyOfficeDiscount } from '@/lib/promo';
+import { useOtherOffers } from '@/lib/catalog';
+import { useSession } from '@/lib/useAuth';
 import { cn } from '@/lib/utils';
 import type { UserRoleDoc } from '@/integrations/firebase/types';
 
@@ -48,16 +51,71 @@ function MetaRow({ icon, label, children }: { icon: React.ReactNode; label: stri
   );
 }
 
+function OtherOffers({ catalogId, currentId, ar }: { catalogId?: string; currentId: string; ar: boolean }) {
+  const offers = useOtherOffers(catalogId, currentId);
+  if (offers.length === 0) return null;
+  return (
+    <View className="overflow-hidden rounded-2xl border border-slate-100 bg-white">
+      <Text className="border-b border-slate-100 px-3 py-2.5 text-sm font-bold text-slate-800">
+        {ar ? 'هذا المنتج عند مكاتب أخرى' : 'Also sold by'}
+      </Text>
+      {offers.map(({ product: p, officeName }) => (
+        <Pressable
+          key={p.id}
+          onPress={() => router.push({ pathname: '/product-detail/[productId]', params: { productId: p.id } })}
+          className="flex-row items-center gap-2 border-b border-slate-50 px-3 py-2.5"
+        >
+          <View className="min-w-0 flex-1">
+            <Text numberOfLines={1} className="text-sm font-semibold text-slate-700">
+              {officeName || (ar ? 'مكتب' : 'Office')}
+            </Text>
+            {!!p.expiryDate && (
+              <Text className="text-[11px] text-slate-400">
+                {ar ? 'الصلاحية' : 'Expiry'} {p.expiryDate}
+              </Text>
+            )}
+          </View>
+          <Text className="text-sm font-extrabold text-emerald-700" style={{ writingDirection: 'ltr' }}>
+            {p.currency === 'IQD' ? `${p.price.toLocaleString()} د.ع` : `$${p.price.toFixed(2)}`}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+// Only the doctor it was given to can read their own discount.
+function MyPriceLine({
+  product,
+  doctorId,
+  money,
+  ar,
+}: {
+  product: { companyId?: string; price: number; currency: string };
+  doctorId?: string;
+  money: (n: number) => string;
+  ar: boolean;
+}) {
+  const { data: pct = 0 } = useMyOfficeDiscount(product.companyId, doctorId);
+  if (pct <= 0) return null;
+  const price = product.price * (1 - pct / 100);
+  return (
+    <Text className="mt-0.5 text-[11px] font-bold text-emerald-700">
+      {ar ? 'سعرك الخاص' : 'Your price'}: {money(product.currency === 'IQD' ? Math.round(price) : price)} ({pct}%)
+    </Text>
+  );
+}
+
 export default function ProductDetailScreen() {
   const { productId } = useLocalSearchParams<{ productId: string }>();
   const { lang } = useI18n();
+  const { user: discountUser } = useSession();
   const ar = lang === 'ar';
   const [activeImg, setActiveImg] = useState(0);
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
 
-  const { data: products = [], isLoading } = useProducts();
-  const product = products.find((p) => p.id === productId);
+  const { data: product, isLoading } = useProduct(productId);
   const favorited = useIsFavorited(productId ?? '');
 
   const { data: urlMap = {} } = useSignedImageUrls(product?.images ?? []);
@@ -322,6 +380,7 @@ export default function ProductDetailScreen() {
             <View>
               <Text className="text-[11px] font-bold text-emerald-700/70">{ar ? 'السعر' : 'Price'}</Text>
               <Text className="text-lg font-extrabold text-emerald-700">{money(product.price)}</Text>
+              <MyPriceLine product={product} doctorId={discountUser?.uid} money={money} ar={ar} />
             </View>
             <View className="items-end">
               <Text className="text-[11px] font-bold text-emerald-700/70">{ar ? 'المخزون' : 'Stock'}</Text>
@@ -462,6 +521,8 @@ export default function ProductDetailScreen() {
               )}
             </View>
           )}
+
+          <OtherOffers catalogId={product.catalogId} currentId={product.id} ar={ar} />
 
           {/* Volume discounts table */}
           {!!product.discountTiers?.length && (

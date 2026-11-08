@@ -19,6 +19,9 @@ import {
 } from '@/lib/patientsStore';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
+import { useSession } from '@/lib/useAuth';
+import { setActiveClinic, useClinics } from '@/lib/clinicsStore';
+import { usePatientCountsByClinic } from '@/lib/patientClinicCounts';
 
 // Plain color values instead of NativeWind bg-*/text-* classes: this badge
 // re-renders every time `cycleStatus` fires (many at once in a long patient
@@ -130,6 +133,7 @@ export default function PatientsScreen() {
       </View>
 
       <SyncNotice ar={ar} />
+      <OtherClinicsNotice ar={ar} />
 
       <View className="relative mt-3">
         <TextInput
@@ -419,6 +423,35 @@ function SyncNotice({ ar }: { ar: boolean }) {
           <Text className="text-[11px] font-bold text-amber-800">{ar ? 'أعد الآن' : 'Retry'}</Text>
         )}
       </Pressable>
+    </View>
+  );
+}
+
+/** Patients belong to one clinic, and adding a clinic switches to it — an
+ *  empty list then looked like the patients were gone. Points to the others. */
+function OtherClinicsNotice({ ar }: { ar: boolean }) {
+  const { user } = useSession();
+  const { clinics, activeClinicId } = useClinics();
+  const counts = usePatientCountsByClinic(clinics.length > 1 ? user?.uid : undefined);
+  const others = clinics.filter((c) => c.id !== activeClinicId && (counts[c.id] ?? 0) > 0);
+  if (others.length === 0) return null;
+  return (
+    <View className="mt-3 gap-2">
+      {others.map((c) => (
+        <View key={c.id} className="flex-row items-center gap-3 rounded-2xl border border-sky-200 bg-sky-50 p-3">
+          <View className="min-w-0 flex-1">
+            <Text className="text-xs font-bold text-sky-900">
+              {ar ? `لديك ${counts[c.id]} مريض في «${c.name}»` : `You have ${counts[c.id]} patient(s) in “${c.name}”`}
+            </Text>
+            <Text className="mt-0.5 text-[11px] text-sky-800">
+              {ar ? 'كل عيادة لها مرضاها. بدّل العيادة لعرضهم.' : 'Each clinic has its own patients. Switch to see them.'}
+            </Text>
+          </View>
+          <Pressable onPress={() => setActiveClinic(c.id)} className="rounded-xl bg-sky-600 px-3 py-2">
+            <Text className="text-xs font-bold text-white">{ar ? 'عرض مرضاها' : 'Show them'}</Text>
+          </Pressable>
+        </View>
+      ))}
     </View>
   );
 }

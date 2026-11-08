@@ -29,7 +29,9 @@ const GUEST_ROUTES = new Set([
   "/privacy",
 ]);
 
-const GUEST_ROUTE_PREFIXES = ["/brand/", "/implant-country/", "/specialized-implants/", "/product-detail/"];
+// "/join/": a secretary's account starts from the invite link (the screen sends
+// anyone else to sign in).
+const GUEST_ROUTE_PREFIXES = ["/brand/", "/implant-country/", "/specialized-implants/", "/product-detail/", "/join/"];
 
 export function isGuestRoute(pathname: string): boolean {
   return GUEST_ROUTES.has(pathname) || GUEST_ROUTE_PREFIXES.some((p) => pathname.startsWith(p));

@@ -37,6 +37,8 @@ const fromDoc = (id: string, data: Record<string, unknown>): OrderDoc => ({
       name: (o.name as string) ?? "",
       quantity: Number(o.quantity) || 1,
       price: Number(o.price) || 0,
+      listPrice: o.listPrice === undefined ? undefined : Number(o.listPrice),
+      discountAmount: o.discountAmount === undefined ? undefined : Number(o.discountAmount),
       currency: o.currency === "IQD" ? "IQD" : "USD",
       availability: (o.availability as "available" | "not_available" | undefined) ?? undefined,
     };
@@ -73,7 +75,10 @@ export async function placeCartOrder(
   },
   opts?: {
     note?: string;
-    discount?: { code?: string; discountUSD?: number; discountIQD?: number };
+    /** Code text only. The server works out every amount. */
+    codes?: string[];
+    /** The totals the doctor was shown, so a changed price asks them again. */
+    expected?: { usd: number; iqd: number };
   },
 ): Promise<{ count: number; orderId?: string }> {
   assertVerified();
@@ -83,7 +88,8 @@ export async function placeCartOrder(
       items: { productId: string; quantity: number }[];
       dentist: typeof dentist;
       note?: string;
-      discount?: OrderDoc["discount"];
+      codes?: string[];
+      expected?: { usd: number; iqd: number };
     },
     { count: number; orderId?: string; skippedCount?: number }
   >(functions, "placeVerifiedOrder");
@@ -92,7 +98,8 @@ export async function placeCartOrder(
     items: items.map((i) => ({ productId: i.productId, quantity: i.quantity || 1 })),
     dentist,
     note: opts?.note,
-    discount: opts?.discount,
+    codes: opts?.codes,
+    expected: opts?.expected,
   });
 
   clearCart();

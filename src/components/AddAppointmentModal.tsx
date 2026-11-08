@@ -4,7 +4,9 @@ import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { addAppointment } from "@/lib/appointmentsStore";
 import { useClinic } from "@/lib/clinicStore";
-import { useUserRole } from "@/lib/useAuth";
+import { useSession, useUserRole } from "@/lib/useAuth";
+import { useClinics } from "@/lib/clinicsStore";
+import { useClinicTeam } from "@/lib/clinicTeam";
 import { toast } from "sonner";
 
 const APPOINTMENT_TYPES = ["استشارة", "متابعة", "مراجعة بعد العلاج", "طوارئ", "فحص دوري", "استشارة اونلاين"];
@@ -89,13 +91,17 @@ export function AddAppointmentModal({ onClose }: { onClose: () => void }) {
   const ar = lang === "ar";
   const { role } = useUserRole();
   const { doctors } = useClinic();
+  const { user } = useSession();
+  const { activeClinicId } = useClinics();
+  const team = useClinicTeam(user?.uid, activeClinicId);
 
   const mainDoctor = role?.name || (ar ? "الطبيب الرئيسي" : "Main Doctor");
   const doctorOptions = useMemo(() => {
     const list = [{ id: "main", name: mainDoctor }];
+    team.active.forEach((m) => list.push({ id: `member:${m.memberId}`, name: m.memberName }));
     doctors.forEach((d) => list.push({ id: d.id, name: d.name }));
     return list;
-  }, [doctors, mainDoctor]);
+  }, [doctors, mainDoctor, team.active]);
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -153,7 +159,8 @@ export function AddAppointmentModal({ onClose }: { onClose: () => void }) {
       time: formatFullTime(),
       appointmentType,
       clinicRoom: room.trim(),
-      doctor: doctor === "main" ? mainDoctor : (doctors.find((d) => d.id === doctor)?.name || mainDoctor),
+      doctor: doctorOptions.find((d) => d.id === doctor)?.name || mainDoctor,
+      ...(doctor.startsWith("member:") ? { doctorUid: doctor.slice(7) } : {}),
       treatment,
       notes: notes.trim(),
       reminder,

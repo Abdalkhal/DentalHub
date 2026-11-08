@@ -1,6 +1,6 @@
 import { Pressable } from 'react-native';
 import { Tabs, router } from 'expo-router';
-import { ArrowLeft, ArrowRight, Home, Heart, Menu, Search, ShoppingBag, Tag, User } from 'lucide-react-native';
+import { ArrowLeft, ArrowRight, Home, Heart, Menu, MessageCircle, Search, ShoppingBag, Tag, User } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 
 import { useUserRole } from '@/lib/useAuth';
@@ -8,8 +8,9 @@ import { useDentistOrders } from '@/lib/orders';
 import { useOrders } from '@/lib/orders';
 import { useSeenOrderIds } from '@/lib/orderSeen';
 import { useI18n } from '@/lib/i18n';
+import { useDmUnreadTotal } from '@/lib/directMessages';
 
-const ALL_NAMES = ['index', 'explore', 'favorites', 'orders', 'offers', 'account', 'more'] as const;
+const ALL_NAMES = ['index', 'explore', 'favorites', 'orders', 'offers', 'inbox', 'account', 'more'] as const;
 
 /**
  * Screens that live inside the tab navigator but are never rendered as a tab.
@@ -25,6 +26,7 @@ const ICONS: Record<(typeof ALL_NAMES)[number], LucideIcon> = {
   favorites: Heart,
   orders: ShoppingBag,
   offers: Tag,
+  inbox: MessageCircle,
   account: User,
   more: Menu,
 };
@@ -35,12 +37,15 @@ const LABELS: Record<(typeof ALL_NAMES)[number], { ar: string; en: string }> = {
   favorites: { ar: 'المفضلة', en: 'Favorites' },
   orders: { ar: 'الطلبات', en: 'Orders' },
   offers: { ar: 'العروض', en: 'Offers' },
+  inbox: { ar: 'الرسائل', en: 'Messages' },
   account: { ar: 'حسابي', en: 'Account' },
   more: { ar: 'المزيد', en: 'More' },
 };
 
-const DENTIST_TABS: readonly (typeof ALL_NAMES)[number][] = ['index', 'favorites', 'orders', 'offers', 'more'];
-const VENDOR_TABS: readonly (typeof ALL_NAMES)[number][] = ['index', 'explore', 'orders', 'account', 'more'];
+// Messages took the place of Offers (dentists; Offers is in "المزيد") and of
+// Account (vendors; the profile photo on their dashboard opens Account).
+const DENTIST_TABS: readonly (typeof ALL_NAMES)[number][] = ['index', 'favorites', 'orders', 'inbox', 'more'];
+const VENDOR_TABS: readonly (typeof ALL_NAMES)[number][] = ['index', 'explore', 'orders', 'inbox', 'more'];
 // Signed-out visitors browse the catalog (see lib/guestAccess.ts). Account
 // shows them a sign-in prompt; orders/favorites/explore need an account.
 const GUEST_TABS: readonly (typeof ALL_NAMES)[number][] = ['index', 'offers', 'account', 'more'];
@@ -82,6 +87,7 @@ export default function AppTabs() {
   const { data: dentistOrders = [] } = useDentistOrders(user?.uid);
   const { data: supplierOrders = [] } = useOrders(user?.uid);
   const seenIds = useSeenOrderIds(user?.uid);
+  const unreadMessages = useDmUnreadTotal(user?.uid);
 
   const isDentist = role?.accountType === 'dentist';
   const isGuest = !loading && !user;
@@ -126,10 +132,29 @@ export default function AppTabs() {
                     headerShown: name !== 'index',
                     headerLeft: BACK_BUTTON_TABS.has(name) ? () => <HeaderBack /> : undefined,
                     tabBarIcon: ({ color, size }) => <Icon color={color} size={size} strokeWidth={2.2} />,
-                    tabBarBadge: name === 'orders' && ordersCount > 0 ? ordersCount : undefined,
+                    tabBarBadge:
+                      name === 'orders' && ordersCount > 0
+                        ? ordersCount
+                        : name === 'inbox' && unreadMessages > 0
+                          ? unreadMessages > 99
+                            ? '99+'
+                            : unreadMessages
+                          : undefined,
                     tabBarBadgeStyle: { backgroundColor: '#EF4444', color: '#FFFFFF', fontSize: 10 },
                   }
                 : { href: null }
+            }
+            // The messages screen is a full-screen stack screen (no tab bar
+            // under an open chat); the tab only opens it.
+            listeners={
+              name === 'inbox'
+                ? {
+                    tabPress: (e) => {
+                      e.preventDefault();
+                      router.push('/messages');
+                    },
+                  }
+                : undefined
             }
           />
         );

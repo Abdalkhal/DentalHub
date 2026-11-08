@@ -18,7 +18,7 @@ import { BRANDS } from "@/data/brands";
 import { BrandLogo } from "@/components/BrandLogo";
 import { AdDetailModal } from "@/components/AdDetailModal";
 import { useVendorAccounts } from "@/lib/search";
-import { useProducts, useSignedImageUrls } from "@/lib/products";
+import { useProductSearch, useSignedImageUrls } from "@/lib/products";
 import { useActiveAds, type Ad } from "@/lib/adsStore";
 import { useQuickOrderActions } from "@/lib/quickOrders";
 import { useCart, openCart } from "@/lib/cartStore";
@@ -139,7 +139,6 @@ function DentistHome() {
   }, [banners.length]);
 
   const [searchQ, setSearchQ] = useState("");
-  const { data: allProducts = [] } = useProducts();
   const { data: vendorAccounts = [] } = useVendorAccounts();
   const searchTerm = searchQ.trim().toLowerCase();
   const accountResults = useMemo(() => {
@@ -148,12 +147,8 @@ function DentistHome() {
       .filter((a) => [a.name, a.location].filter(Boolean).some((v) => v.toLowerCase().includes(searchTerm)))
       .slice(0, 5);
   }, [searchTerm, vendorAccounts]);
-  const productResults = useMemo(() => {
-    if (searchTerm.length < 2) return [];
-    return allProducts
-      .filter((p) => [p.en, p.ar, p.brand].filter(Boolean).some((v) => v!.toLowerCase().includes(searchTerm)))
-      .slice(0, 8);
-  }, [searchTerm, allProducts]);
+  const { data: foundProducts = [] } = useProductSearch(searchTerm.length >= 2 ? searchTerm : "");
+  const productResults = useMemo(() => foundProducts.slice(0, 8), [foundProducts]);
   const { role } = useUserRole();
   const dentistName =
     role?.accountType === "dentist"

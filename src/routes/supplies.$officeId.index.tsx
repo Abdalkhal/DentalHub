@@ -4,7 +4,7 @@ import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useAdminStore } from "@/lib/adminStore";
 import { useI18n } from "@/lib/i18n";
-import { useProducts, useSignedImageUrls, type Product } from "@/lib/products";
+import { useProductsByCompany, useSignedImageUrls, type Product } from "@/lib/products";
 import { ProductImageCarousel } from "@/components/ProductImageCarousel";
 import { ProductDetailsModal } from "@/components/ProductDetailsModal";
 import {
@@ -130,7 +130,7 @@ export const Route = createFileRoute("/supplies/$officeId/")({
 function OfficePage() {
   const { officeId } = Route.useParams();
   const { offices: OFFICES, branches: BRANCHES } = useAdminStore();
-  const { data: PRODUCTS = [] } = useProducts();
+  const { data: PRODUCTS = [] } = useProductsByCompany(officeId);
   const office = OFFICES.find((o) => o.id === officeId);
   const { lang, dir } = useI18n();
   const BackIcon = BRANCH_BACK_ICON[dir] ?? ArrowRight;

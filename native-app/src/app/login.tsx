@@ -186,7 +186,7 @@ export default function LoginScreen() {
           await auth.signOut();
           return;
         }
-        if (roleDoc.accountType !== accountType) {
+        if (roleDoc.accountType !== accountType && roleDoc.accountType !== 'secretary') {
           setError(
             ar
               ? 'عذراً، هذا الحساب غير مسجل تحت هذا النوع. اختر نوع الحساب الصحيح.'
@@ -222,7 +222,9 @@ export default function LoginScreen() {
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : '';
-      if (msg.includes('invalid-credential') || msg.includes('user-not-found') || msg.includes('wrong-password')) {
+      if (msg.includes('user-disabled')) {
+        setError(ar ? 'تم إيقاف هذا الحساب. تواصل مع الدعم.' : 'This account is suspended. Contact support.');
+      } else if (msg.includes('invalid-credential') || msg.includes('user-not-found') || msg.includes('wrong-password')) {
         setError(ar ? 'بريد إلكتروني أو كلمة مرور غير صحيحة' : 'Invalid email or password');
       } else if (msg.includes('email-already-in-use')) {
         setError(ar ? 'هذا البريد الإلكتروني مسجل مسبقاً' : 'This email is already registered');
@@ -254,7 +256,7 @@ export default function LoginScreen() {
     }
   };
 
-  if (next) return <Redirect href={next} />;
+  if (next) return <Redirect href={next as never} />;
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }} className="bg-background">

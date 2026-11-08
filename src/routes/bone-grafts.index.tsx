@@ -5,7 +5,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
-import { useProducts, useSignedImageUrls, type Product } from "@/lib/products";
+import { useProductsWhere, useSignedImageUrls, type Product } from "@/lib/products";
 import { BoneGraftDetailsModal } from "@/components/BoneGraftDetailsModal";
 import { db } from "@/integrations/firebase/client";
 import type { UserRoleDoc } from "@/integrations/firebase/types";
@@ -23,7 +23,7 @@ function fmtPrice(p: Product): string {
 function BoneGraftsPage() {
   const { lang } = useI18n();
   const ar = lang === "ar";
-  const { data: allProducts = [], isLoading } = useProducts();
+  const { data: allProducts = [], isLoading } = useProductsWhere("branch", "bone_graft");
   const [selected, setSelected] = useState<Product | null>(null);
 
   const items = useMemo(() => allProducts.filter((p) => p.branch === "bone_graft"), [allProducts]);

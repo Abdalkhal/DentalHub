@@ -38,7 +38,8 @@ import {
   type SpecFieldId,
 } from "@/data/specs";
 import {
-  useProducts,
+  useProductCounts,
+  useProductsByCompany,
   useUpsertProduct,
   useDeleteProduct,
   uploadProductImage,
@@ -99,6 +100,7 @@ import {
   ScanBarcode,
   Tag,
   Anchor,
+  Library,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StockVisibilityToggle } from "@/components/StockVisibilityToggle";
@@ -258,6 +260,7 @@ function SupplyDashboard() {
         implant: { ar: "شركة زرعات", en: "Implant Co." },
         lab: { ar: "مختبر", en: "Lab" },
         dentist: { ar: "طبيب أسنان", en: "Dentist" },
+        secretary: { ar: "سكرتارية", en: "Secretary" },
       }[role.accountType]
     : { ar: "", en: "" };
 
@@ -396,12 +399,12 @@ function SupplyDashboard() {
 function ProductsPanel() {
   const { lang } = useI18n();
   const ar = lang === "ar";
-  const { data: allProducts = [], isLoading } = useProducts();
   const upsert = useUpsertProduct();
   const remove = useDeleteProduct();
 
   // Strict multi-tenant isolation: a store owner only ever sees their own items.
   const supplierUid = auth.currentUser?.uid ?? "";
+  const { data: allProducts = [], isLoading } = useProductsByCompany(supplierUid);
 
   const [branchFilter, setBranchFilter] = useState<string>("all");
   const [subFilter, setSubFilter] = useState<string>("");
@@ -981,6 +984,15 @@ function ProductsPanel() {
             {ar ? "إضافة منتج جديد" : "Add new product"}
           </span>
         </button>
+      )}
+      {!showForm && (
+        <Link
+          to="/catalog-add"
+          className="mt-2 w-full h-12 rounded-2xl bg-[#0E6E66] text-white font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition md:w-auto md:px-6 md:inline-flex md:ms-2"
+        >
+          <Library className="size-4" />
+          {ar ? "إضافة من الدليل" : "Add from catalog"}
+        </Link>
       )}
 
       {/* ── Add / Edit Product Modal (Mobile Sheet) ── */}
@@ -1811,7 +1823,7 @@ function ProductsPanel() {
 function ImplantsBoneGraftPanel() {
   const { lang } = useI18n();
   const ar = lang === "ar";
-  const { data: allProducts = [], isLoading } = useProducts();
+  const { data: allProducts = [], isLoading } = useProductsByCompany(auth.currentUser?.uid);
   const remove = useDeleteProduct();
 
   const [showBoneGraft, setShowBoneGraft] = useState(false);
@@ -2220,7 +2232,7 @@ function ImplantDashboard() {
 function ImplantProductsPanel() {
   const { lang } = useI18n();
   const ar = lang === "ar";
-  const { data: allProducts = [], isLoading } = useProducts();
+  const { data: allProducts = [], isLoading } = useProductsByCompany(auth.currentUser?.uid);
   const upsert = useUpsertProduct();
   const remove = useDeleteProduct();
 
@@ -3080,14 +3092,11 @@ function BrowseSupplies() {
     staleTime: 30000,
   });
 
-  const { data: allProducts = [] } = useProducts();
-  const allCompanies = useMemo<CompanyItem[]>(() => {
-    const counts = new Map<string, number>();
-    allProducts.forEach((p) => {
-      if (p.companyId) counts.set(p.companyId, (counts.get(p.companyId) ?? 0) + 1);
-    });
-    return firestoreSupplies.map((c) => ({ ...c, itemsCount: counts.get(c.id) ?? 0 }));
-  }, [firestoreSupplies, allProducts]);
+  const { data: counts = {} } = useProductCounts(firestoreSupplies.map((c) => c.id));
+  const allCompanies = useMemo<CompanyItem[]>(
+    () => firestoreSupplies.map((c) => ({ ...c, itemsCount: counts[c.id] ?? 0 })),
+    [firestoreSupplies, counts],
+  );
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();

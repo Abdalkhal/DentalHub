@@ -275,15 +275,20 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // Codes are checked at checkout through the lookupPromoCode Cloud
-    // Function, which returns only the typed code. Clients may only read
-    // their own office's codes, so nobody can list every code.
+    // An office reads its own codes. Everything else about a code goes through
+    // Cloud Functions: they validate it, and its usage counters and the doctors
+    // it's meant for can't be touched from a client.
     match /promo_codes/{codeId} {
       allow read: if isAdmin() || (isAuthenticated() && resource.data.officeId == request.auth.uid);
-      allow create: if isAuthenticated() &&
-        request.resource.data.officeId == request.auth.uid;
-      allow update, delete: if isAuthenticated() &&
-        resource.data.officeId == request.auth.uid;
+      allow write: if false;
+    }
+
+    // A doctor's own discount: the office that gave it and that doctor, no one
+    // else, may see it. Written by setDoctorDiscount.
+    match /office_doctor_discounts/{discountId} {
+      allow read: if isAdmin() || (isAuthenticated() &&
+        (resource.data.officeId == request.auth.uid || resource.data.doctorId == request.auth.uid));
+      allow write: if false;
     }
 
     match /notifications/{notificationId} {
@@ -512,7 +517,12 @@ service cloud.firestore {
     // matches the participants without an extra lookup.
     // ============================================================
     match /dm_threads/{threadId} {
-      allow read: if isAuthenticated() && request.auth.uid in resource.data.participants;
+      // By id too (the id is the two uids): an open conversation listens to
+      // its thread doc before the first message creates it.
+      allow read: if isAuthenticated() && (
+        request.auth.uid in threadId.split('_')
+        || request.auth.uid in resource.data.participants
+      );
 
       allow create: if isAuthenticated()
         && request.auth.uid in request.resource.data.participants
@@ -524,11 +534,18 @@ service cloud.firestore {
         );
 
       // Sending a message re-writes the thread doc (merge) to bump
-      // lastMessage/lastMessageAt — either participant may do that, but
-      // neither may change who the participants are.
+      // lastMessage/lastMessageAt and the other side's unread count — either
+      // participant may do that, but neither may change who the participants
+      // are, the other side's name/photo/"seen" marker, or the other side's
+      // block. (directMessages.ts)
       allow update: if isAuthenticated()
         && request.auth.uid in resource.data.participants
-        && request.resource.data.participants == resource.data.participants;
+        && request.resource.data.participants == resource.data.participants
+        && request.resource.data.get('names', {}).diff(resource.data.get('names', {})).affectedKeys().hasOnly([request.auth.uid])
+        && request.resource.data.get('photos', {}).diff(resource.data.get('photos', {})).affectedKeys().hasOnly([request.auth.uid])
+        && request.resource.data.get('readAt', {}).diff(resource.data.get('readAt', {})).affectedKeys().hasOnly([request.auth.uid])
+        && request.resource.data.get('blockedBy', []).toSet().difference(resource.data.get('blockedBy', []).toSet()).hasOnly([request.auth.uid])
+        && resource.data.get('blockedBy', []).toSet().difference(request.resource.data.get('blockedBy', []).toSet()).hasOnly([request.auth.uid]);
 
       allow delete: if isAdmin();
 
@@ -542,11 +559,32 @@ service cloud.firestore {
       // that's supposed to show "start the conversation".
       match /messages/{messageId} {
         allow read: if isAuthenticated() && request.auth.uid in threadId.split('_');
+        // Text up to 2000 characters; a photo must live in this thread's
+        // own Storage folder; nothing can be sent while either side blocks.
         allow create: if isAuthenticated()
           && request.resource.data.senderId == request.auth.uid
-          && request.auth.uid in threadId.split('_');
-        allow update, delete: if isAdmin();
+          && request.auth.uid in threadId.split('_')
+          && request.resource.data.get('text', '') is string
+          && request.resource.data.get('text', '').size() <= 2000
+          && (!('image' in request.resource.data)
+              || request.resource.data.image.path.matches('dm_files/' + threadId + '/.*'))
+          && (!exists(/databases/$(database)/documents/dm_threads/$(threadId))
+              || get(/databases/$(database)/documents/dm_threads/$(threadId)).data.get('blockedBy', []).size() == 0);
+        // The sender may delete their own message (kept as "deleted").
+        allow update: if isAdmin() || (isAuthenticated()
+          && resource.data.senderId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted', 'text', 'image'])
+          && request.resource.data.deleted == true);
+        allow delete: if isAdmin();
       }
+    }
+
+    // Reports from users (e.g. a conversation); only admins read them.
+    match /reports/{reportId} {
+      allow create: if isAuthenticated()
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.get('reason', '').size() <= 500;
+      allow read, update, delete: if isAdmin();
     }
 
     // ============================================================
@@ -560,6 +598,40 @@ service cloud.firestore {
     // ============================================================
     match /dentist_records/{ownerId}/{document=**} {
       allow read, write: if isAuthenticated() && request.auth.uid == ownerId;
+    }
+
+    // The admin console's audit trail: written only by functions/adminConsole.js.
+    match /admin_logs/{id} {
+      allow read: if isAdmin();
+    }
+
+    // Clinic team (functions/clinicTeam.js writes all of these). A member gets
+    // only copies of the appointments assigned to them; dentist_records above
+    // stays the owner's alone.
+    match /clinic_members/{id} {
+      allow read: if isAuthenticated() &&
+        (resource.data.ownerId == request.auth.uid || resource.data.memberId == request.auth.uid);
+    }
+    match /clinic_codes/{code} {
+      allow read: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+    }
+    match /clinic_shared_appointments/{id} {
+      allow read: if isAuthenticated() && resource.data.doctorUid == request.auth.uid;
+    }
+    // What a clinic's team did. Written only by the functions, so no one can
+    // edit or remove their own line.
+    match /clinic_activity/{id} {
+      allow read: if isAuthenticated() &&
+        (resource.data.ownerId == request.auth.uid || resource.data.memberId == request.auth.uid);
+    }
+    match /clinic_shared_patients/{id} {
+      allow read: if isAuthenticated() && resource.data.memberId == request.auth.uid;
+    }
+
+    // "تصدير بياناتي": written only by functions/index.js. It holds the link to
+    // the account's ZIP, so only its owner may read it.
+    match /data_exports/{ownerId} {
+      allow read: if isAuthenticated() && request.auth.uid == ownerId;
     }
 
     // ============================================================

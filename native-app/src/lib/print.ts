@@ -6,7 +6,10 @@ import { Directory, File, Paths } from 'expo-file-system';
 
 import { hasNativeModule } from '@/lib/nativeModules';
 
-type PrintApi = { printToFileAsync: (o: { html: string }) => Promise<{ uri: string }> };
+type PrintApi = {
+  printToFileAsync: (o: { html: string }) => Promise<{ uri: string }>;
+  printAsync: (o: { html: string }) => Promise<void>;
+};
 type ShareApi = {
   isAvailableAsync: () => Promise<boolean>;
   shareAsync: (uri: string, options: unknown) => Promise<void>;
@@ -53,6 +56,19 @@ export async function sharePdf(filename: string, html: string): Promise<boolean>
   }
 }
 
+/** Opens the system print dialog. False if it could not be opened. */
+export async function printDocument(html: string): Promise<boolean> {
+  if (!hasNativeModule('ExpoPrint')) return false;
+  try {
+    const Print = require('expo-print') as PrintApi;
+    await Print.printAsync({ html });
+    return true;
+  } catch (e) {
+    // Backing out of the dialog also lands here on iOS.
+    return /cancel/i.test(String(e));
+  }
+}
+
 // Every consumer of this shell is either fully Arabic or fully English content
 // — there is no mixed-direction body — so a single `dir`/`lang` on <html> is
 // enough. Without it the WebView that renders the PDF (and any PDF viewer
@@ -90,6 +106,10 @@ const SHELL = (body: string, ar: boolean) => `
 <div class="brand">Dent<span style="color:#0f172a"> Hub</span></div>
 ${body}
 </body></html>`;
+
+export function receiptHtml(body: string, ar: boolean): string {
+  return SHELL(body, ar);
+}
 
 export function invoiceHtml(opts: {
   ar: boolean;
@@ -143,6 +163,7 @@ export function patientRecordHtml(opts: {
   visits: { date: string; time?: string; procedure: string; doctor?: string; status?: string; note?: string }[];
   teeth: { tooth: number; status: string; color: string }[];
   plan: { title: string; tooth?: string; dept?: string; cost?: string; status: string; statusColor: string; note?: string }[];
+  financeHtml?: string;
 }): string {
   const { ar } = opts;
   const t = (ar: string, en: string) => (opts.ar ? ar : en);
@@ -241,6 +262,7 @@ export function patientRecordHtml(opts: {
     ${complaintHtml}
     ${visitsHtml}
     ${teethHtml}
-    ${planHtml}`;
+    ${planHtml}
+    ${opts.financeHtml ?? ''}`;
   return SHELL(body, ar);
 }

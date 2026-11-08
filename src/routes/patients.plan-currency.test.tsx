@@ -15,7 +15,10 @@ vi.mock("@/components/MobileShell", () => ({
 }));
 vi.mock("@/components/TopBar", () => ({ TopBar: () => null }));
 vi.mock("@/lib/useAuth", () => ({ useSession: () => ({ user: null }) }));
-vi.mock("@/lib/clinicsStore", () => ({ setClinicsStoreUser: () => {} }));
+vi.mock("@/lib/clinicsStore", () => ({
+  setClinicsStoreUser: () => {},
+  useClinics: () => ({ clinics: [], activeClinicId: "" }),
+}));
 vi.mock("@/lib/clinicStore", () => ({ useClinic: () => ({ doctors: [] }) }));
 
 // A step saved before currencies existed (no `currency`), like real data.

@@ -19,7 +19,9 @@ import {
 import { useI18n } from '@/lib/i18n';
 import { addAppointment } from '@/lib/appointmentsStore';
 import { useClinic } from '@/lib/clinicStore';
-import { useUserRole } from '@/lib/useAuth';
+import { useSession, useUserRole } from '@/lib/useAuth';
+import { useClinics } from '@/lib/clinicsStore';
+import { useClinicTeam } from '@/lib/clinicTeam';
 import { toast } from '@/lib/toast';
 import { CalendarPickerModal, toDateStr } from '@/components/CalendarPickerModal';
 
@@ -108,14 +110,18 @@ export function AddAppointmentModal({ open, onClose }: { open: boolean; onClose:
   const ar = lang === 'ar';
   const { role } = useUserRole();
   const clinic = useClinic();
+  const { user } = useSession();
+  const { activeClinicId } = useClinics();
+  const team = useClinicTeam(user?.uid, activeClinicId);
   const insets = useSafeAreaInsets();
 
   const mainDoctor = role?.name || (ar ? 'الطبيب الرئيسي' : 'Main Doctor');
   const doctorOptions = useMemo(() => {
     const list = [{ value: 'main', label: mainDoctor }];
+    team.active.forEach((m) => list.push({ value: `member:${m.memberId}`, label: m.memberName }));
     clinic.doctors.forEach((d) => list.push({ value: d.id, label: d.name }));
     return list;
-  }, [clinic.doctors, mainDoctor]);
+  }, [clinic.doctors, mainDoctor, team.active]);
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -165,7 +171,8 @@ export function AddAppointmentModal({ open, onClose }: { open: boolean; onClose:
       time: formatFullTime(),
       appointmentType,
       clinicRoom: room.trim(),
-      doctor: doctor === 'main' ? mainDoctor : clinic.doctors.find((d) => d.id === doctor)?.name || mainDoctor,
+      doctor: doctorOptions.find((d) => d.value === doctor)?.label || mainDoctor,
+      ...(doctor.startsWith('member:') ? { doctorUid: doctor.slice(7) } : {}),
       treatment,
       notes: notes.trim(),
       reminder,

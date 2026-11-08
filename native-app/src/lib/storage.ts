@@ -27,6 +27,9 @@ export const storage = {
   get length(): number {
     return memory.size;
   },
+  key(index: number): string | null {
+    return Array.from(memory.keys())[index] ?? null;
+  },
   getItem(key: string): string | null {
     return memory.has(key) ? (memory.get(key) ?? null) : null;
   },

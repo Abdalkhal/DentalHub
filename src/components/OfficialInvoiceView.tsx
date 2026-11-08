@@ -9,7 +9,8 @@ import {
   User,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
-import { useProducts, useSignedImageUrls } from "@/lib/products";
+import { docMoneyRows } from "@/lib/promo";
+import { useProductsByIds, useSignedImageUrls } from "@/lib/products";
 import type { InvoiceDoc, InvoiceStatus } from "@/integrations/firebase/types";
 
 const TEAL = "#0E6E66";
@@ -50,7 +51,7 @@ export function OfficialInvoiceView({
   const { lang } = useI18n();
   const ar = lang === "ar";
 
-  const { data: products = [] } = useProducts();
+  const { data: products = [] } = useProductsByIds((inv.items ?? []).map((i) => i.productId));
   const productById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
   const imagePaths = useMemo(
     () =>
@@ -69,12 +70,6 @@ export function OfficialInvoiceView({
   const location = [inv.doctorCity, inv.doctorAddress].filter(Boolean).join("، ");
   const missingLabel = ar ? "غير مدخل" : "Not provided";
   const confirmDate = inv.confirmedAt || inv.createdAt;
-  const iqdTotal = (inv.items ?? [])
-    .filter((i) => i.currency === "IQD")
-    .reduce((s, i) => s + i.price * i.quantity, 0);
-  const usdTotal = (inv.items ?? [])
-    .filter((i) => i.currency !== "IQD")
-    .reduce((s, i) => s + i.price * i.quantity, 0);
 
   return (
     <div className="space-y-4">
@@ -187,6 +182,11 @@ export function OfficialInvoiceView({
                 <span className="text-sm font-bold text-slate-700 text-center">{item.quantity}</span>
 
                 <span className="text-xs text-slate-500 text-center">
+                  {(item.listPrice ?? item.price) > item.price && (
+                    <span className="block text-[10px] text-slate-400 line-through">
+                      {item.currency === "IQD" ? fmtIqd(item.listPrice ?? 0) : fmtUsd(item.listPrice ?? 0)}
+                    </span>
+                  )}
                   {item.currency === "IQD" ? fmtIqd(item.price) : fmtUsd(item.price)}
                 </span>
 
@@ -205,14 +205,12 @@ export function OfficialInvoiceView({
       <div className="bg-white rounded-2xl border border-slate-100 shadow-soft p-4">
         <p className="text-sm font-bold text-slate-700">{ar ? "ملخص الفاتورة" : "Invoice summary"}</p>
         <div className="mt-3 space-y-2.5 text-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-slate-500">{ar ? "الإجمالي بالدينار" : "Total (IQD)"}</span>
-            <span className="font-semibold">{fmtIqd(iqdTotal)}</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-slate-500">{ar ? "الإجمالي بالدولار" : "Total (USD)"}</span>
-            <span className="font-semibold">{fmtUsd(usdTotal)}</span>
-          </div>
+{docMoneyRows(inv, ar).map((r) => (
+                <div key={r.key} className={`flex items-center justify-between ${r.tone === "saving" ? "text-emerald-600" : ""}`}>
+                  <span className={r.tone === "plain" ? "text-slate-500" : r.tone === "total" ? "font-bold" : ""}>{r.label}</span>
+                  <span dir="ltr" className={r.tone === "total" ? "font-display font-extrabold text-[#0E6E66]" : "font-semibold"}>{r.value}</span>
+                </div>
+              ))}
           {inv.note && (
             <div className="mt-3 pt-3 border-t border-dashed border-slate-200">
               <p className="text-[11px] font-bold text-slate-400 flex items-center gap-1 mb-1">

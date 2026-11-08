@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
-import { useProducts, useSignedImageUrls, type Product } from "@/lib/products";
+import { useProductsByCompany, useSignedImageUrls, type Product } from "@/lib/products";
 import { ProductImageCarousel } from "@/components/ProductImageCarousel";
 import { ProductDetailsModal } from "@/components/ProductDetailsModal";
 import { useOffers } from "@/lib/offers";
@@ -169,7 +169,7 @@ function ProfilePage() {
   const { data: rawOffers = [] } = useOffers(accountId);
   const offers = useMemo(() => rawOffers.filter((o) => !o.status || o.status === "active"), [rawOffers]);
 
-  const { data: allProducts = [] } = useProducts();
+  const { data: allProducts = [] } = useProductsByCompany(accountId);
   const products = useMemo(
     () => allProducts.filter((p) => p.companyId === accountId),
     [allProducts, accountId],

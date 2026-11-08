@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronUp, Search, Stethoscope, Users } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { ChevronDown, ChevronUp, MessageCircle, Search, Stethoscope, Users } from "lucide-react";
 import { useOrders, connectLabOrders, disconnectLabOrders } from "@/lib/ordersStore";
 import { useSession } from "@/lib/useAuth";
 import { cn, normalizeName } from "@/lib/utils";
@@ -54,6 +55,9 @@ export function LabOrdersGroupList({ groupBy, ar }: { groupBy: "doctor" | "patie
       : `${n} ${ar ? (n === 1 ? "حالة" : "حالات") : n === 1 ? "case" : "cases"}`;
   const EmptyIcon = groupBy === "doctor" ? Stethoscope : Users;
 
+  // The doctor's account (cases carry it; older ones may only have the typed name).
+  const selectedDentistId = selected?.orders.find((o) => o.dentistId)?.dentistId;
+
   if (selected) {
     return (
       <div className="space-y-3">
@@ -65,6 +69,15 @@ export function LabOrdersGroupList({ groupBy, ar }: { groupBy: "doctor" | "patie
             <p className="truncate text-base font-extrabold text-slate-900">{selected.name}</p>
             <p className="mt-0.5 text-xs text-slate-400">{countLabel(selected.orders.length)}</p>
           </div>
+          {groupBy === "doctor" && selectedDentistId && (
+            <Link
+              to="/messages"
+              search={{ with: selectedDentistId, withName: selected.name }}
+              className="flex h-10 items-center gap-1.5 rounded-xl bg-[#2563EB] px-4 text-xs font-bold text-white hover:bg-[#1D4ED8]"
+            >
+              <MessageCircle className="size-4" /> {ar ? "مراسلة" : "Message"}
+            </Link>
+          )}
         </div>
 
         <div className="grid gap-2 md:grid-cols-2">

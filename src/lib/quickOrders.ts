@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { toast } from "sonner";
 import { createLocalStore } from "./createLocalStore";
 import { addToCart } from "./cartStore";
-import { useProducts, useSignedImageUrls, type Product } from "./products";
+import { useProductsByIds, useSignedImageUrls, type Product } from "./products";
 
 export type QuickOrderItem = {
   productId: string;
@@ -72,7 +72,7 @@ export function addToPurchaseHistory(item: {
 /** Live products for the current quick-order items, their image URLs, and a
  * one-tap reorder (add 1 to cart + bump history) — same as native. */
 export function useQuickOrderActions(items: QuickOrderItem[], ar: boolean) {
-  const { data: products = [] } = useProducts();
+  const { data: products = [] } = useProductsByIds(items.map((i) => i.productId));
   const productsById = useMemo(
     () => Object.fromEntries(products.map((p) => [p.id, p])) as Record<string, Product>,
     [products],

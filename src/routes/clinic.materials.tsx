@@ -1,13 +1,12 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { addMaterial, addOrder, removeMaterial, updateMaterialQty, useClinic, type Material } from "@/lib/clinicStore";
 import { setClinicsStoreUser } from "@/lib/clinicsStore";
 import { useSession } from "@/lib/useAuth";
-import { Boxes, Minus, Plus, Trash2, AlertTriangle, Truck } from "lucide-react";
+import { ClinicMaterials } from "@/components/ClinicMaterials";
 
 
 export const Route = createFileRoute("/clinic/materials")({
@@ -24,14 +23,6 @@ export const Route = createFileRoute("/clinic/materials")({
   component: MaterialsPage,
 });
 
-const CATS = [
-  { id: "consumables", ar: "مستهلكات", en: "Consumables" },
-  { id: "composite", ar: "كمبوزيت", en: "Composite" },
-  { id: "anesthesia", ar: "مخدر موضعي", en: "Anesthesia" },
-  { id: "impression", ar: "مواد طبعة", en: "Impression" },
-  { id: "other", ar: "أخرى", en: "Other" },
-];
-
 function MaterialsPage() {
   const { lang } = useI18n();
   const ar = lang === "ar";
@@ -45,243 +36,11 @@ function MaterialsPage() {
     setClinicsStoreUser(user?.uid || "");
   }, [user?.uid]);
 
-  const { materials } = useClinic();
-  const navigate = useNavigate();
-  const [cat, setCat] = useState("all");
-  const [open, setOpen] = useState(false);
-
-  const list = materials.filter((m) => cat === "all" || m.category === cat);
-  const lowItems = materials.filter((m) => m.qty <= m.minQty);
-  const low = lowItems.length;
-
-  const reorderQty = (m: Material) => Math.max(1, m.minQty * 2 - m.qty);
-
-  const reorder = (m: Material) => {
-    const q = reorderQty(m);
-    addOrder({
-      kind: "supply",
-      vendor: ar ? "مكتب مستلزمات" : "Supply office",
-      title: ar ? `إعادة تزويد: ${m.name} (${q} ${m.unit})` : `Restock: ${m.name} (${q} ${m.unit})`,
-      amount: Math.round(q * m.price),
-      status: "pending",
-    });
-    navigate({ to: "/clinic/orders" });
-  };
-
-  const reorderAll = () => {
-    lowItems.forEach((m) => {
-      const q = reorderQty(m);
-      addOrder({
-        kind: "supply",
-        vendor: ar ? "مكتب مستلزمات" : "Supply office",
-        title: ar ? `إعادة تزويد: ${m.name} (${q} ${m.unit})` : `Restock: ${m.name} (${q} ${m.unit})`,
-        amount: Math.round(q * m.price),
-        status: "pending",
-      });
-    });
-    navigate({ to: "/clinic/orders" });
-  };
-
   return (
     <MobileShell wide>
       <TopBar title={ar ? "مواد العيادة" : "Clinic Materials"} showBack wide />
-      <div className="px-3 pt-3 pb-6 md:px-6 md:pt-6 md:pb-12 lg:px-8 lg:max-w-5xl lg:mx-auto">
-        <div className="grid grid-cols-2 gap-2.5 md:gap-5">
-          <Stat label={ar ? "أصناف المخزون" : "Items"} value={String(materials.length)} />
-          <Stat label={ar ? "قاربت على النفاد" : "Low stock"} value={String(low)} tone="warn" />
-        </div>
-
-        {low > 0 && (
-          <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-3.5">
-            <div className="flex items-start gap-2.5">
-              <span className="size-9 shrink-0 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
-                <AlertTriangle className="size-4" strokeWidth={2.4} />
-              </span>
-              <div className="flex-1 min-w-0">
-                <p className="font-display font-extrabold text-sm text-amber-800">
-                  {ar ? `تنبيه نقص مخزون (${low})` : `Low stock alert (${low})`}
-                </p>
-                <p className="text-[11px] text-amber-700/80 mt-0.5">
-                  {ar ? "هذه المواد وصلت للحد الأدنى — اطلب إعادة التزويد الآن" : "These items hit their minimum — request a restock now"}
-                </p>
-              </div>
-            </div>
-
-            <ul className="mt-2.5 space-y-1.5">
-              {lowItems.map((m) => (
-                <li key={m.id} className="flex items-center gap-2 rounded-xl bg-card border border-amber-200/70 px-2.5 py-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[12px] font-bold truncate">{m.name}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {m.qty}/{m.minQty} {m.unit} · {ar ? "المقترح" : "Suggested"}: {reorderQty(m)} {m.unit}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => reorder(m)}
-                    className="shrink-0 h-8 px-3 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center gap-1"
-                  >
-                    <Truck className="size-3" strokeWidth={2.6} />
-                    {ar ? "طلب تزويد" : "Reorder"}
-                  </button>
-                </li>
-              ))}
-            </ul>
-
-            <button
-              onClick={reorderAll}
-              className="mt-2.5 w-full h-10 rounded-xl border border-amber-300 bg-card text-amber-800 text-[11px] font-extrabold"
-            >
-              {ar ? "طلب إعادة تزويد للكل → طلبيات العيادة" : "Reorder all → Clinic orders"}
-            </button>
-          </div>
-        )}
-
-
-        <div className="md:mt-7 md:flex md:items-center md:justify-between md:gap-5">
-        <div className="mt-3 flex items-center gap-1.5 overflow-x-auto no-scrollbar md:mt-0 md:flex-wrap md:overflow-visible md:gap-2">
-          {[{ id: "all", ar: "الكل", en: "All" }, ...CATS].map((c) => (
-            <button
-              key={c.id}
-              onClick={() => setCat(c.id)}
-              className={cn(
-                "h-8 px-3 rounded-full text-[11px] font-bold border whitespace-nowrap transition",
-                cat === c.id ? "bg-primary text-primary-foreground border-primary" : "bg-card text-muted-foreground border-border"
-              )}
-            >
-              {ar ? c.ar : c.en}
-            </button>
-          ))}
-        </div>
-
-        <button
-          onClick={() => setOpen(true)}
-          className="mt-3 w-full h-12 rounded-2xl bg-primary md:w-auto md:h-11 md:px-6 md:rounded-xl md:mt-0 md:shrink-0 text-primary-foreground font-display font-extrabold text-sm shadow-card flex items-center justify-center gap-2"
-        >
-          <Plus className="size-4" strokeWidth={3} />
-          {ar ? "إضافة مادة" : "Add material"}
-        </button>
-        </div>
-
-        <ul className="mt-3 space-y-2.5 md:mt-6 md:space-y-0 md:grid md:grid-cols-2 md:gap-4 xl:grid-cols-3 md:items-start">
-          {list.length === 0 ? (
-            <EmptyState icon={Boxes} title={ar ? "لا توجد مواد بعد" : "No materials yet"} sub={ar ? "أضف أول مادة لبدء تتبع المخزون" : "Add your first material"} />
-          ) : (
-            list.map((m) => {
-              const isLow = m.qty <= m.minQty;
-              return (
-                <li key={m.id} className="rounded-2xl bg-card border border-border p-3.5 shadow-soft">
-                  <div className="flex items-start gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-display font-extrabold text-sm truncate">{m.name}</p>
-                        {isLow && (
-                          <span className="shrink-0 inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
-                            <AlertTriangle className="size-3" />
-                            {ar ? "منخفض" : "Low"}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">
-                        {ar ? CATS.find((c) => c.id === m.category)?.ar : CATS.find((c) => c.id === m.category)?.en} · {m.price} $
-                      </p>
-                    </div>
-                    <button onClick={() => removeMaterial(m.id)} className="size-8 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
-                      <Trash2 className="size-3.5" />
-                    </button>
-                  </div>
-                  <div className="mt-2.5 flex items-center justify-between">
-                    <span className="text-[11px] text-muted-foreground">
-                      {ar ? "الحد الأدنى" : "Min"}: {m.minQty} {m.unit}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => updateMaterialQty(m.id, m.qty - 1)} className="size-8 rounded-xl border border-border bg-card flex items-center justify-center">
-                        <Minus className="size-3.5" />
-                      </button>
-                      <span className="min-w-14 text-center font-display font-extrabold text-sm">
-                        {m.qty} <span className="text-[10px] font-semibold text-muted-foreground">{m.unit}</span>
-                      </span>
-                      <button onClick={() => updateMaterialQty(m.id, m.qty + 1)} className="size-8 rounded-xl border border-border bg-card flex items-center justify-center">
-                        <Plus className="size-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                </li>
-              );
-            })
-          )}
-        </ul>
-      </div>
-
-      {open && <MaterialModal ar={ar} onClose={() => setOpen(false)} />}
+      <ClinicMaterials ar={ar} />
     </MobileShell>
-  );
-}
-
-function MaterialModal({ ar, onClose }: { ar: boolean; onClose: () => void }) {
-  const [f, setF] = useState({ name: "", category: "consumables", qty: 0, minQty: 5, unit: ar ? "قطعة" : "pcs", price: 0, expiryDate: "", batchNumber: "", supplierName: "", storageLocation: "" });
-  const [priceDisplay, setPriceDisplay] = useState("");
-
-  const formatNum = (raw: string) => { const d = raw.replace(/\D/g, ""); return d ? Number(d).toLocaleString("en-US") : ""; };
-
-  return (
-    <Sheet onClose={onClose} title={ar ? "إضافة مادة" : "Add material"}>
-      <form onSubmit={(e) => { e.preventDefault(); if (!f.name.trim()) return; addMaterial(f); onClose(); }} className="space-y-3">
-        <Field label={ar ? "اسم المادة" : "Material name"}>
-          <input required autoFocus value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} className={inputCls} />
-        </Field>
-        <div className="grid grid-cols-2 gap-2.5">
-          <Field label={ar ? "التصنيف" : "Category"}>
-            <div className="relative">
-              <select value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })} className={cn(inputCls, "appearance-none pe-10")}>
-                {CATS.map((c) => (<option key={c.id} value={c.id}>{ar ? c.ar : c.en}</option>))}
-              </select>
-              <span className="absolute end-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</span>
-            </div>
-          </Field>
-          <Field label={ar ? "الوحدة" : "Unit"}>
-            <div className="relative">
-              <select value={f.unit} onChange={(e) => setF({ ...f, unit: e.target.value })} className={cn(inputCls, "appearance-none pe-10")}>
-                {["قطعة", "علبة", "باكيت", "سرنجة", "تيوب", "أمبول"].map((u) => (<option key={u} value={u}>{u}</option>))}
-              </select>
-              <span className="absolute end-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</span>
-            </div>
-          </Field>
-        </div>
-        <div className="grid grid-cols-2 gap-2.5">
-          <Field label={ar ? "الكمية الحالية" : "Current qty"}>
-            <input type="number" min={0} value={f.qty} onChange={(e) => setF({ ...f, qty: Number(e.target.value) })} className={inputCls} />
-          </Field>
-          <Field label={ar ? "الحد الأدنى" : "Min qty"}>
-            <input type="number" min={0} value={f.minQty} onChange={(e) => setF({ ...f, minQty: Number(e.target.value) })} className={inputCls} />
-          </Field>
-        </div>
-        <div className="grid grid-cols-2 gap-2.5">
-          <Field label={ar ? "سعر الشراء (د.ع)" : "Purchase price (IQD)"}>
-            <div className="relative">
-              <input type="text" inputMode="numeric" value={priceDisplay}
-                onChange={(e) => { const fm = formatNum(e.target.value); setPriceDisplay(fm); setF({ ...f, price: Number(fm.replace(/,/g, "")) || 0 }); }}
-                placeholder="0" className={cn(inputCls, "text-right pe-12")} />
-              <span className="absolute end-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">د.ع</span>
-            </div>
-          </Field>
-          <Field label={ar ? "تاريخ الانتهاء" : "Expiry date"}>
-            <input type="date" value={f.expiryDate} onChange={(e) => setF({ ...f, expiryDate: e.target.value })} className={inputCls} />
-          </Field>
-        </div>
-        <div className="grid grid-cols-2 gap-2.5">
-          <Field label={ar ? "رقم التشغيلة (LOT)" : "Batch number"}>
-            <input value={f.batchNumber} onChange={(e) => setF({ ...f, batchNumber: e.target.value })} className={inputCls} />
-          </Field>
-          <Field label={ar ? "اسم المورد" : "Supplier"}>
-            <input value={f.supplierName} onChange={(e) => setF({ ...f, supplierName: e.target.value })} className={inputCls} />
-          </Field>
-        </div>
-        <Field label={ar ? "مكان التخزين" : "Storage location"}>
-          <input value={f.storageLocation} onChange={(e) => setF({ ...f, storageLocation: e.target.value })} placeholder={ar ? "مثال: رف A، ثلاجة" : "e.g. Shelf A, Fridge"} className={inputCls} />
-        </Field>
-        <button type="submit" className="w-full h-12 rounded-2xl bg-primary text-primary-foreground font-display font-extrabold text-sm shadow-card">{ar ? "حفظ" : "Save"}</button>
-      </form>
-    </Sheet>
   );
 }
 

@@ -14,7 +14,11 @@ import {
   addPayment,
   addPlanStep,
   addVisit,
+  MAX_PLAN_PHOTOS,
   cyclePlanStep,
+  isGeneralFile,
+  planPhotoTag,
+  planPhotos,
   planCurrency,
   formatMoney,
   formatMoneyTotals,
@@ -23,7 +27,15 @@ import {
   type FeeCurrency,
   getLog,
   getPlan,
-  paidTotal,
+  balanceIn,
+  localDay,
+  patientDeletedPayments,
+  patientFeeHistory,
+  paymentCurrency,
+  setFeeCurrency,
+  setPatientFee,
+  settlePatientFinance,
+  type Payment,
   removeFile,
   removeLogEntry,
   removePayment,
@@ -45,7 +57,11 @@ import { listOrders } from "@/lib/ordersStore";
 import { useClinic } from "@/lib/clinicStore";
 import { setClinicsStoreUser } from "@/lib/clinicsStore";
 import { useSession } from "@/lib/useAuth";
-import { patientRecordHtml, printHtml } from "@/lib/print";
+import { patientRecordHtml, printHtml, receiptHtml } from "@/lib/print";
+import { deletedPaymentText, feeChangeText, financeSectionHtml, receiptBodyHtml, receiptText } from "@/lib/paymentReceipt";
+import { whatsappLink } from "@/lib/booking";
+import { PatientDoctorsCard } from "@/components/ClinicTeamFinance";
+import { useClinics } from "@/lib/clinicsStore";
 import {
   Baby,
   Brush,
@@ -65,10 +81,12 @@ import {
   Cloud,
   FileImage,
   Info,
+  MessageCircle,
   Paperclip,
   Pencil,
   Phone,
   Plus,
+  Printer,
   RotateCcw,
   Scan,
   Share2,
@@ -287,6 +305,9 @@ function PatientProfile() {
         <div className="rounded-2xl bg-card border border-border p-4 shadow-sm">
           <PatientInfoCard p={p} ar={ar} />
         </div>
+        <div className="mt-3">
+          <PatientDoctorsCard p={p} ar={ar} />
+        </div>
       </section>
 
       {/* Tabs */}
@@ -402,6 +423,7 @@ function exportPatientRecord(p: P, ar: boolean) {
       })),
       teeth,
       plan,
+      financeHtml: financeSectionHtml(p, ar),
     }),
   );
 }
@@ -832,6 +854,8 @@ function PlanCard({ p, ar }: { p: P; ar: boolean }) {
             ))}
           </ul>
         )}
+
+        {!isRadio && <PlanPhotos p={p} ar={ar} dept={dept} />}
       </Card>
 
       {picking && (
@@ -896,7 +920,7 @@ const XRAY_TAG = "[xray] ";
  *  only the path. They used to be embedded as data URLs in the browser's
  *  storage, which holds ~5 MB — a few photos filled it and saving failed
  *  silently. A guest (no account) still keeps them inline, locally. */
-async function addPatientFiles(p: P, files: FileList | null, uid: string | undefined, namePrefix = "") {
+async function addPatientFiles(p: P, files: FileList | File[] | null, uid: string | undefined, namePrefix = "") {
   if (!files) return;
   for (const f of Array.from(files)) {
     const name = namePrefix + f.name;
@@ -981,10 +1005,9 @@ function RadiologyGallery({
   inputRef: React.RefObject<HTMLInputElement | null>;
 }) {
   const xrays = p.files.filter((f) => f.name.startsWith(XRAY_TAG));
-  const [viewer, setViewer] = useState<{ idx: number; zoom: number; rotate: number } | null>(null);
+  const [open, setOpen] = useState<number | null>(null);
   const { user } = useSession();
   const [uploading, setUploading] = useState(false);
-  const viewerUrl = useFileUrl(viewer ? xrays[viewer.idx] : undefined);
 
   const onPick = async (files: FileList | null) => {
     setUploading(true);
@@ -1008,7 +1031,7 @@ function RadiologyGallery({
         <div className="grid grid-cols-3 gap-2">
           {xrays.map((f, i) => (
             <div key={f.id} className="relative group">
-              <button onClick={() => setViewer({ idx: i, zoom: 1, rotate: 0 })} className="block w-full rounded-xl overflow-hidden border border-border bg-card hover:ring-2 hover:ring-primary/50 transition">
+              <button onClick={() => setOpen(i)} className="block w-full rounded-xl overflow-hidden border border-border bg-card hover:ring-2 hover:ring-primary/50 transition">
                 {f.type.startsWith("image/") ? (
                   <div className="relative">
                     <FileImage_ f={f} className="w-full aspect-square object-cover" />
@@ -1023,38 +1046,109 @@ function RadiologyGallery({
         </div>
       )}
 
-      {viewer && xrays[viewer.idx] && (
-        <div className="fixed inset-0 z-[70] bg-black flex flex-col" onClick={() => setViewer(null)}>
-          <div className="flex items-center justify-between px-4 py-3 bg-black/80 text-white shrink-0">
-            <button onClick={() => setViewer(null)} className="size-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20"><X className="size-4" /></button>
-            <span className="text-xs font-bold">{viewer.idx + 1}/{xrays.length}</span>
-            <div className="flex items-center gap-1">
-              <button onClick={(e) => { e.stopPropagation(); setViewer((v) => v && { ...v, zoom: Math.min(3, v.zoom + 0.5) }); }} className="size-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20"><Plus className="size-4" /></button>
-              <button onClick={(e) => { e.stopPropagation(); setViewer((v) => v && { ...v, zoom: Math.max(0.5, v.zoom - 0.5) }); }} className="size-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20"><Minus className="size-4" /></button>
-              <button onClick={(e) => { e.stopPropagation(); setViewer((v) => v && { ...v, zoom: 1 }); }} className="size-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20 text-[10px] font-bold">1:1</button>
-              <button onClick={(e) => { e.stopPropagation(); setViewer((v) => v && { ...v, rotate: v.rotate + 90 }); }} className="size-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20"><RotateCcw className="size-4" /></button>
-              <FileLink f={xrays[viewer.idx]} download className="size-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20"><Download className="size-4" /></FileLink>
-            </div>
-          </div>
-          <div className="flex-1 flex items-center justify-center overflow-auto p-8" onClick={() => setViewer(null)}>
-            <img
-              src={viewerUrl}
-              alt=""
-              onClick={(e) => e.stopPropagation()}
-              className="max-w-none"
-              style={{ transform: `scale(${viewer.zoom}) rotate(${viewer.rotate}deg)`, transition: "transform 0.2s" }}
-              onError={(e) => { (e.target as HTMLImageElement).src = ""; }}
-            />
-          </div>
-          {xrays.length > 1 && (
-            <div className="flex items-center justify-center gap-2 py-3 bg-black/80 shrink-0">
-              <button onClick={(e) => { e.stopPropagation(); setViewer((v) => v && { idx: Math.max(0, v.idx - 1), zoom: 1, rotate: 0 }); }} disabled={viewer.idx === 0} className="size-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20 disabled:opacity-30"><ChevronLeft className="size-4 text-white" /></button>
-              <span className="text-xs text-white">{viewer.idx + 1} / {xrays.length}</span>
-              <button onClick={(e) => { e.stopPropagation(); setViewer((v) => v && { idx: Math.min(xrays.length - 1, v.idx + 1), zoom: 1, rotate: 0 }); }} disabled={viewer.idx === xrays.length - 1} className="size-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20 disabled:opacity-30"><ChevronRight className="size-4 text-white" /></button>
-            </div>
-          )}
+      {open !== null && <FileViewer files={xrays} start={open} onClose={() => setOpen(null)} />}
+    </div>
+  );
+}
+
+function FileViewer({ files, start, onClose }: { files: P["files"]; start: number; onClose: () => void }) {
+  const [viewer, setViewer] = useState({ idx: start, zoom: 1, rotate: 0 });
+  const viewerUrl = useFileUrl(files[viewer.idx]);
+  if (!files[viewer.idx]) return null;
+  return (
+    <div className="fixed inset-0 z-[70] bg-black flex flex-col" onClick={() => onClose()}>
+      <div className="flex items-center justify-between px-4 py-3 bg-black/80 text-white shrink-0">
+        <button onClick={() => onClose()} className="size-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20"><X className="size-4" /></button>
+        <span className="text-xs font-bold">{viewer.idx + 1}/{files.length}</span>
+        <div className="flex items-center gap-1">
+          <button onClick={(e) => { e.stopPropagation(); setViewer((v) => v && { ...v, zoom: Math.min(3, v.zoom + 0.5) }); }} className="size-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20"><Plus className="size-4" /></button>
+          <button onClick={(e) => { e.stopPropagation(); setViewer((v) => v && { ...v, zoom: Math.max(0.5, v.zoom - 0.5) }); }} className="size-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20"><Minus className="size-4" /></button>
+          <button onClick={(e) => { e.stopPropagation(); setViewer((v) => v && { ...v, zoom: 1 }); }} className="size-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20 text-[10px] font-bold">1:1</button>
+          <button onClick={(e) => { e.stopPropagation(); setViewer((v) => v && { ...v, rotate: v.rotate + 90 }); }} className="size-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20"><RotateCcw className="size-4" /></button>
+          <FileLink f={files[viewer.idx]} download className="size-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20"><Download className="size-4" /></FileLink>
+        </div>
+      </div>
+      <div className="flex-1 flex items-center justify-center overflow-auto p-8" onClick={() => onClose()}>
+        <img
+          src={viewerUrl}
+          alt=""
+          onClick={(e) => e.stopPropagation()}
+          className="max-w-none"
+          style={{ transform: `scale(${viewer.zoom}) rotate(${viewer.rotate}deg)`, transition: "transform 0.2s" }}
+          onError={(e) => { (e.target as HTMLImageElement).src = ""; }}
+        />
+      </div>
+      {files.length > 1 && (
+        <div className="flex items-center justify-center gap-2 py-3 bg-black/80 shrink-0">
+          <button onClick={(e) => { e.stopPropagation(); setViewer((v) => v && { idx: Math.max(0, v.idx - 1), zoom: 1, rotate: 0 }); }} disabled={viewer.idx === 0} className="size-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20 disabled:opacity-30"><ChevronLeft className="size-4 text-white" /></button>
+          <span className="text-xs text-white">{viewer.idx + 1} / {files.length}</span>
+          <button onClick={(e) => { e.stopPropagation(); setViewer((v) => v && { idx: Math.min(files.length - 1, v.idx + 1), zoom: 1, rotate: 0 }); }} disabled={viewer.idx === files.length - 1} className="size-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20 disabled:opacity-30"><ChevronRight className="size-4 text-white" /></button>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Up to two photos for one treatment-plan department. */
+function PlanPhotos({ p, ar, dept }: { p: P; ar: boolean; dept: string }) {
+  const photos = planPhotos(p, dept);
+  const free = Math.max(0, MAX_PLAN_PHOTOS - photos.length);
+  const { user } = useSession();
+  const ref = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [open, setOpen] = useState<number | null>(null);
+
+  const onPick = async (input: HTMLInputElement) => {
+    const picked = Array.from(input.files ?? []).slice(0, free);
+    input.value = "";
+    setUploading(true);
+    try {
+      await addPatientFiles(p, picked, user?.uid, planPhotoTag(dept));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="mt-3 border-t border-border pt-3">
+      <div className="mb-2 flex items-center gap-1.5">
+        <Camera className="size-3.5 text-primary" />
+        <p className="flex-1 text-[12px] font-bold">{ar ? "صور الحالة" : "Case photos"}</p>
+        <span className="text-[10px] text-muted-foreground" dir="ltr">{photos.length}/{MAX_PLAN_PHOTOS}</span>
+      </div>
+      <input ref={ref} type="file" accept="image/*" multiple className="hidden" onChange={(e) => void onPick(e.target)} />
+      <div className="grid grid-cols-2 gap-2 md:max-w-sm">
+        {photos.map((f, i) => (
+          <div key={f.id} className="relative">
+            <button type="button" onClick={() => setOpen(i)} className="block w-full overflow-hidden rounded-xl border border-border bg-card transition hover:ring-2 hover:ring-primary/50">
+              <FileImage_ f={f} className="block w-full aspect-square object-cover" />
+            </button>
+            <button
+              type="button"
+              onClick={() => confirmDelete(ar ? "حذف هذه الصورة؟" : "Delete this photo?") && removeFile(p.id, f.id)}
+              aria-label={ar ? "حذف" : "Delete"}
+              className="absolute top-1 end-1 size-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
+          </div>
+        ))}
+        {Array.from({ length: free }, (_, i) => (
+          <button
+            key={i}
+            type="button"
+            disabled={uploading}
+            onClick={() => ref.current?.click()}
+            className="aspect-square rounded-xl border-2 border-dashed border-border bg-[oklch(0.98_0.01_240)] flex flex-col items-center justify-center gap-1.5 text-muted-foreground"
+          >
+            <Cloud className={cn("size-5 text-primary", uploading && i === 0 && "animate-pulse")} />
+            <span className="text-[11px] font-bold">
+              {uploading && i === 0 ? (ar ? "جارٍ الرفع…" : "Uploading…") : ar ? "رفع صورة" : "Upload photo"}
+            </span>
+          </button>
+        ))}
+      </div>
+      {open !== null && <FileViewer files={photos} start={open} onClose={() => setOpen(null)} />}
     </div>
   );
 }
@@ -1284,7 +1378,7 @@ function FilesCard({ p, ar }: { p: P; ar: boolean }) {
         </button>
         <input ref={ref} type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={(e) => onPick(e.target.files)} />
 
-        {p.files.filter((f) => !f.name.startsWith("[xray] ")).map((f) => (
+        {p.files.filter(isGeneralFile).map((f) => (
           <div key={f.id} className="relative">
             <FileLink f={f} className="block rounded-2xl overflow-hidden border border-border bg-card">
               <FileImage_ f={f} alt={f.name} className="w-full aspect-square object-cover" />
@@ -1416,87 +1510,88 @@ function Billing({ p, ar }: { p: P; ar: boolean }) {
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const cur = p.feeCurrency ?? "USD";
-  const paid = paidTotal(p);
-  const remaining = (Number(p.totalFees) || 0) - paid;
+  const { fees, paid, remaining } = balanceIn(p, cur);
   const overpaid = remaining < 0;
 
   const sym = cur === "IQD" ? "د.ع" : "$";
   // Typed text kept locally so a dollar amount can pass through "12." on its
   // way to "12.50" — formatting the stored number back lost the dot.
-  const [feesText, setFeesText] = useState(() => (p.totalFees ? formatAmountInput(String(p.totalFees), cur) : ""));
+  const stored = fees ? formatAmountInput(String(fees), cur) : "";
+  const [feesText, setFeesText] = useState(stored);
+  useEffect(() => setFeesText(stored), [stored]);
+  useEffect(() => settlePatientFinance(p.id), [p.id]);
+  const feesDirty = (parseAmountInput(feesText) ?? 0) !== fees;
   const fmt = (n: number) => formatMoney(Math.abs(Number(n) || 0), cur);
   const plan = planTotals(p);
   const otherCur: FeeCurrency = cur === "USD" ? "IQD" : "USD";
+  const other = balanceIn(p, otherCur);
+  const otherName = otherCur === "USD" ? (ar ? "الدولار" : "USD") : ar ? "الدينار" : "IQD";
+  const history = patientFeeHistory(p);
+  const { clinics, activeClinicId } = useClinics();
+  const clinicName = clinics.find((c) => c.id === activeClinicId)?.name ?? "";
 
   const setCurrency = (c: FeeCurrency) => {
     if (c === cur) return;
-    // Switching only relabels the amounts — it never converts them.
-    if (
-      ((Number(p.totalFees) || 0) > 0 || p.payments.length > 0) &&
-      !window.confirm(
-        ar
-          ? "سيتغيّر رمز العملة فقط ولن تُحوَّل المبالغ المسجلة (مثلاً 250$ تصبح 250 د.ع). هل تريد المتابعة؟"
-          : "Only the currency label changes — recorded amounts are not converted (e.g. $250 becomes 250 IQD). Continue?",
-      )
-    )
-      return;
-    updatePatient(p.id, { feeCurrency: c });
-    setFeesText(p.totalFees ? formatAmountInput(String(p.totalFees), c) : "");
+    setFeeCurrency(p.id, c);
     setAmount((a) => formatAmountInput(a, c));
-  };
-
-  const setFees = (text: string) => {
-    const formatted = formatAmountInput(text, cur);
-    setFeesText(formatted);
-    updatePatient(p.id, { totalFees: parseAmountInput(formatted) ?? 0 });
   };
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const n = parseAmountInput(amount);
     if (!n) return;
-    addPayment(p.id, { amount: n, note, date: new Date().toISOString().slice(0, 10) });
+    addPayment(p.id, { amount: n, note: note.trim() || undefined, date: localDay(), currency: cur });
     setAmount("");
     setNote("");
+  };
+
+  const sendReceipt = (x: Payment) => {
+    if (!p.phone.trim()) {
+      window.alert(ar ? "أضف رقم هاتف المريض أولاً" : "Add the patient's phone number first");
+      return;
+    }
+    window.open(whatsappLink(p.phone, receiptText(p, x, clinicName, ar)), "_blank", "noopener");
+  };
+  const printReceipt = (x: Payment) =>
+    printHtml(receiptHtml(x.receiptNo ?? "", receiptBodyHtml(p, x, clinicName, ar), ar));
+  const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
+  const shareReceipt = (x: Payment) => {
+    void navigator.share({ title: x.receiptNo, text: receiptText(p, x, clinicName, ar) }).catch(() => {});
   };
 
   return (
     <div className="space-y-2.5">
       {/* Currency selector */}
-      <div className="flex items-center justify-between rounded-2xl border border-border p-3 bg-card">
-        <span className="text-[11px] font-bold text-muted-foreground">
-          {ar ? "العملة" : "Currency"}
-        </span>
-        <div className="flex gap-1.5">
-          <button
-            type="button"
-            onClick={() => setCurrency("USD")}
-            className={cn(
-              "h-8 px-3 rounded-full text-[11px] font-bold border transition",
-              cur === "USD"
-                ? "bg-primary text-primary-foreground border-primary"
-                : "bg-card text-muted-foreground border-border",
-            )}
-          >
-            $ {ar ? "دولار" : "USD"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setCurrency("IQD")}
-            className={cn(
-              "h-8 px-3 rounded-full text-[11px] font-bold border transition",
-              cur === "IQD"
-                ? "bg-primary text-primary-foreground border-primary"
-                : "bg-card text-muted-foreground border-border",
-            )}
-          >
-            د.ع {ar ? "دينار" : "IQD"}
-          </button>
+      <div className="rounded-2xl border border-border p-3 bg-card">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-bold text-muted-foreground">
+            {ar ? "العملة" : "Currency"}
+          </span>
+          <div className="flex gap-1.5">
+            {(["USD", "IQD"] as const).map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setCurrency(c)}
+                className={cn(
+                  "h-8 px-3 rounded-full text-[11px] font-bold border transition",
+                  cur === c
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-card text-muted-foreground border-border",
+                )}
+              >
+                {c === "USD" ? `$ ${ar ? "دولار" : "USD"}` : `د.ع ${ar ? "دينار" : "IQD"}`}
+              </button>
+            ))}
+          </div>
         </div>
+        <p className="mt-2 text-[10.5px] text-muted-foreground">
+          {ar ? "لكل عملة أتعابها ودفعاتها، ولا يتحول مبلغ من عملة إلى أخرى." : "Each currency has its own fees and payments. Amounts never convert."}
+        </p>
       </div>
 
       <div className="grid grid-cols-3 gap-2">
-        <Stat label={ar ? "إجمالي الأتعاب" : "Total fees"} value={fmt(p.totalFees)} cls="bg-[oklch(0.96_0.03_240)] text-foreground" />
+        <Stat label={ar ? "إجمالي الأتعاب" : "Total fees"} value={fmt(fees)} cls="bg-[oklch(0.96_0.03_240)] text-foreground" />
         <Stat label={ar ? "المدفوع" : "Paid"} value={fmt(paid)} cls="bg-emerald-50 text-emerald-700" />
         {/* An overpayment used to show as a green negative "remaining". */}
         <Stat
@@ -1506,47 +1601,80 @@ function Billing({ p, ar }: { p: P; ar: boolean }) {
         />
       </div>
 
+      {/* The other currency's balance, so it is never out of sight. */}
+      {(other.fees > 0 || other.paid > 0) && (
+        <button
+          type="button"
+          onClick={() => setCurrency(otherCur)}
+          className="w-full rounded-2xl border border-border bg-card px-3 py-2.5 text-start text-[11px] font-bold text-muted-foreground"
+        >
+          {ar
+            ? `رصيد ${otherName}: الأتعاب ${formatMoney(other.fees, otherCur)} · المدفوع ${formatMoney(other.paid, otherCur)} · المتبقي ${formatMoney(Math.abs(other.remaining), otherCur)}`
+            : `${otherName} balance: fees ${formatMoney(other.fees, otherCur)} · paid ${formatMoney(other.paid, otherCur)} · remaining ${formatMoney(Math.abs(other.remaining), otherCur)}`}
+        </button>
+      )}
+
       {/* Treatment plan total — the plan and the fees were two unrelated numbers. */}
       {(plan.USD > 0 || plan.IQD > 0) && (
         <Card title={ar ? "مجموع خطة العلاج" : "Treatment plan total"}>
           <div className="flex items-center justify-between gap-2">
             <p className="font-display font-extrabold text-[14px]" dir="ltr">{formatMoneyTotals(getPlan(p), p)}</p>
-            {plan[cur] > 0 && plan[cur] !== (Number(p.totalFees) || 0) && (
+            {plan[cur] > 0 && plan[cur] !== fees && (
               <button
                 type="button"
-                onClick={() => setFees(String(plan[cur]))}
+                onClick={() => setPatientFee(p.id, cur, plan[cur])}
                 className="shrink-0 h-8 px-3 rounded-xl bg-primary/10 text-primary text-[11px] font-bold"
               >
                 {ar ? "اعتماده كإجمالي" : "Use as total"}
               </button>
             )}
           </div>
-          {plan[otherCur] > 0 && (
+          {plan[otherCur] > 0 && other.fees !== plan[otherCur] && (
             <p className="mt-1.5 text-[10.5px] text-amber-700">
               {ar
-                ? `جزء من الخطة بعملة ${otherCur === "USD" ? "الدولار" : "الدينار"} ولا يدخل في إجمالي الأتعاب (${cur === "USD" ? "دولار" : "دينار"}).`
-                : `Part of the plan is in ${otherCur} and isn't included in the ${cur} total fees.`}
+                ? `جزء من الخطة بعملة ${otherName}. اختر هذه العملة لتسجيل أتعابه.`
+                : `Part of the plan is in ${otherName}. Choose that currency to record its fees.`}
             </p>
           )}
         </Card>
       )}
 
+      {/* Total fees: saved on purpose, and any change to a set fee stays on record. */}
       <Card title={ar ? "إجمالي الأتعاب" : "Total fees"} action={<Wallet className="size-4 text-primary" />}>
-        <div className="relative">
-          <span className="absolute start-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">
-            {sym}
-          </span>
-          <input
-            type="text"
-            inputMode={cur === "IQD" ? "numeric" : "decimal"}
-            min={0}
-            value={feesText}
-            onChange={(e) => setFees(e.target.value)}
-            placeholder="0"
-            dir="ltr"
-            className={cn(inputCls, "pe-8 text-start")}
-          />
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <span className="absolute start-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">
+              {sym}
+            </span>
+            <input
+              type="text"
+              inputMode={cur === "IQD" ? "numeric" : "decimal"}
+              value={feesText}
+              onChange={(e) => setFeesText(formatAmountInput(e.target.value, cur))}
+              placeholder="0"
+              dir="ltr"
+              className={cn(inputCls, "pe-8 text-start")}
+            />
+          </div>
+          {feesDirty && (
+            <button
+              type="button"
+              onClick={() => setPatientFee(p.id, cur, parseAmountInput(feesText) ?? 0)}
+              className="h-10 shrink-0 rounded-xl bg-primary px-4 text-[12px] font-bold text-primary-foreground"
+            >
+              {ar ? "حفظ" : "Save"}
+            </button>
+          )}
         </div>
+        {history.length > 0 && (
+          <ul className="mt-2 space-y-1.5">
+            {history.map((h) => (
+              <li key={h.id} className="rounded-xl bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800">
+                {feeChangeText(h, ar)}
+              </li>
+            ))}
+          </ul>
+        )}
       </Card>
 
       <Card title={ar ? "تسجيل دفعة" : "Record payment"}>
@@ -1583,16 +1711,58 @@ function Billing({ p, ar }: { p: P; ar: boolean }) {
         {p.payments.length === 0 ? (
           <p className="text-[12px] text-muted-foreground">{ar ? "لا توجد مدفوعات" : "No payments yet"}</p>
         ) : (
-          <ul className="space-y-1.5">
-            {p.payments.map((x) => (
-              <li key={x.id} className="flex items-center gap-2 rounded-xl border border-border p-2">
-                <div className="flex-1 min-w-0">
-                  <p className="text-[12px] font-bold">{fmt(x.amount)}</p>
-                  <p className="text-[11px] text-muted-foreground truncate">{x.date}{x.note ? ` · ${x.note}` : ""}</p>
-                </div>
-                <button onClick={() => confirmDelete(ar ? `حذف دفعة ${fmt(x.amount)}؟` : `Delete payment of ${fmt(x.amount)}?`) && removePayment(p.id, x.id)} className="text-muted-foreground hover:text-destructive">
-                  <Trash2 className="size-4" />
-                </button>
+          <ul className="space-y-2.5">
+            {p.payments.map((x) => {
+              const label = formatMoney(x.amount, paymentCurrency(p, x));
+              return (
+                <li key={x.id} className="rounded-2xl border border-border bg-background p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-bold text-muted-foreground">{ar ? "دفعة مالية" : "Payment"}</p>
+                      <p className="mt-0.5 font-display text-xl font-extrabold">{label}</p>
+                    </div>
+                    <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold text-emerald-700">
+                      {ar ? "مسجلة" : "Recorded"}
+                    </span>
+                  </div>
+                  <div className="mt-2 space-y-0.5 text-[11px] text-muted-foreground">
+                    <p>{ar ? "التاريخ" : "Date"}: {x.date}</p>
+                    <p>{ar ? "رقم الوصل" : "Receipt #"}: {x.receiptNo ?? "—"}</p>
+                    {x.note && <p>{ar ? "ملاحظة" : "Note"}: {x.note}</p>}
+                  </div>
+                  <div className="mt-3 flex gap-2 border-t border-border pt-3">
+                    <button type="button" onClick={() => sendReceipt(x)} className="h-10 flex-1 rounded-xl bg-emerald-600 text-[11px] font-bold text-white inline-flex items-center justify-center gap-1.5 hover:bg-emerald-700">
+                      <MessageCircle className="size-4" />
+                      {ar ? "إرسال واتساب" : "WhatsApp"}
+                    </button>
+                    <button type="button" onClick={() => printReceipt(x)} className="h-10 flex-1 rounded-xl bg-primary text-[11px] font-bold text-primary-foreground inline-flex items-center justify-center gap-1.5">
+                      <Printer className="size-4" />
+                      {ar ? "طباعة الوصل" : "Print"}
+                    </button>
+                    {canShare && (
+                      <button type="button" onClick={() => shareReceipt(x)} aria-label={ar ? "مشاركة" : "Share"} className="size-10 shrink-0 rounded-xl border border-border bg-card text-muted-foreground inline-flex items-center justify-center">
+                        <Share2 className="size-4" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => confirmDelete(ar ? `حذف دفعة ${label}؟` : `Delete payment of ${label}?`) && removePayment(p.id, x.id)}
+                      aria-label={ar ? "حذف" : "Delete"}
+                      className="size-10 shrink-0 rounded-xl border border-border bg-card text-muted-foreground inline-flex items-center justify-center hover:text-destructive"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {patientDeletedPayments(p).length > 0 && (
+          <ul className="mt-2.5 space-y-1.5">
+            {patientDeletedPayments(p).map((d) => (
+              <li key={d.id} className="rounded-xl bg-rose-50 px-3 py-2 text-[11px] font-semibold text-rose-700">
+                {deletedPaymentText(d, ar)}
               </li>
             ))}
           </ul>

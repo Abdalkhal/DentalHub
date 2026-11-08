@@ -1,5 +1,6 @@
 import { DefaultTheme, Stack, ThemeProvider, router, usePathname, useRootNavigationState } from 'expo-router';
 import { VerifyEmailGate } from '@/components/VerifyEmail';
+import { SuspendedGate } from '@/components/SuspendedGate';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
 import { Cairo_400Regular, Cairo_500Medium, Cairo_600SemiBold, Cairo_700Bold, Cairo_800ExtraBold, Cairo_900Black } from '@expo-google-fonts/cairo';
@@ -20,9 +21,13 @@ import { ToastHost } from '@/components/ToastHost';
 import { CartHeaderButton } from '@/components/CartHeaderButton';
 import { isGuestRoute } from '@/lib/guestAccess';
 import { useSession } from '@/lib/useAuth';
-import { registerPush } from '@/lib/push';
+import { listenForNotificationTaps, registerPush } from '@/lib/push';
+import { openNotificationTarget } from '@/lib/notificationRoute';
+import { doc as fsDoc, updateDoc as fsUpdate } from 'firebase/firestore';
+import { db } from '@/integrations/firebase/client';
 import { resyncPatients } from '@/lib/patientsStore';
 import { resyncAppointments } from '@/lib/appointmentsStore';
+import { resyncMaterials } from '@/lib/materialsStore';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -67,7 +72,12 @@ const TITLED_SCREENS: { name: string; title: DictKey; cart?: boolean }[] = [
   { name: 'clinic-reports', title: 'screen_reports' },
   { name: 'doctors', title: 'screen_doctors' },
   { name: 'clinic-doctors', title: 'screen_clinic_doctors' },
+  { name: 'joined-clinic', title: 'screen_joined_clinic' },
+  { name: 'shared-patient', title: 'screen_shared_patient' },
+  { name: 'join/[code]', title: 'screen_join_clinic' },
   { name: 'clinic-materials', title: 'screen_clinic_materials' },
+  { name: 'office-discounts', title: 'screen_office_discounts' },
+  { name: 'catalog-add', title: 'screen_catalog_add' },
   { name: 'designer/[caseId]', title: 'screen_case_details' },
   { name: 'new-lab-order', title: 'screen_new_lab_order' },
   { name: 'lab-finance', title: 'screen_lab_finance' },
@@ -108,6 +118,24 @@ function RootStack() {
     if (uid) void registerPush(uid);
   }, [uid]);
 
+  // A tapped phone notification opens the screen it's about, and counts as read.
+  useEffect(() => {
+    if (!navigationKey || !uid) return;
+    return listenForNotificationTaps((data) => {
+      const id = typeof data.notificationId === 'string' ? data.notificationId : '';
+      if (id) void fsUpdate(fsDoc(db, 'notifications', id), { isRead: true }).catch(() => {});
+      const str = (k: string) => (typeof data[k] === 'string' ? (data[k] as string) : undefined);
+      openNotificationTarget({
+        type: str('type'),
+        orderId: str('orderId'),
+        invoiceId: str('invoiceId'),
+        chatWith: str('chatWith'),
+        forRole: str('forRole'),
+        senderId: str('senderId'),
+      });
+    });
+  }, [navigationKey, uid]);
+
   return (
     <>
     <Stack screenOptions={{ headerShown: false }}>
@@ -131,6 +159,7 @@ function RootStack() {
       ))}
     </Stack>
     <VerifyEmailGate />
+    <SuspendedGate />
     </>
   );
 }
@@ -165,6 +194,7 @@ export default function RootLayout() {
       if (s === 'active') {
         resyncPatients();
         resyncAppointments();
+        resyncMaterials();
       }
     });
     return () => sub.remove();

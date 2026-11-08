@@ -4,7 +4,7 @@ import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
 import { useAdminStore } from "@/lib/adminStore";
-import { useProducts, useSignedImageUrls, type Product } from "@/lib/products";
+import { useProductsByCompany, useSignedImageUrls, type Product } from "@/lib/products";
 import { ProductImageCarousel } from "@/components/ProductImageCarousel";
 import { ProductDetailsModal } from "@/components/ProductDetailsModal";
 import { SearchX, ArrowUpDown, ImageOff, Heart } from "lucide-react";
@@ -46,7 +46,7 @@ type Sort = "default" | "price_asc" | "price_desc" | "name_asc" | "name_desc" | 
 function BranchPage() {
   const { officeId, branchSlug } = Route.useParams();
   const { offices: OFFICES, branches: BRANCHES } = useAdminStore();
-  const { data: PRODUCTS = [], isLoading } = useProducts();
+  const { data: PRODUCTS = [], isLoading } = useProductsByCompany(officeId);
   const office = OFFICES.find((o) => o.id === officeId);
   const branch = BRANCHES.find((b) => b.slug === branchSlug);
   const { t, lang } = useI18n();

@@ -3,6 +3,7 @@
 import { afterEach, expect, it, vi } from "vitest";
 
 type Listener = { path: string; clinicId?: string; next: (snap: unknown) => void };
+type Q = { path: string; field?: string; value?: unknown; clinicId?: string };
 
 const backend = vi.hoisted(() => ({
   docs: new Map<string, Record<string, unknown>>(),
@@ -33,8 +34,15 @@ vi.mock("firebase/storage", () => ({
 vi.mock("firebase/firestore", () => ({
   doc: (_db: unknown, ...segs: string[]) => ({ path: segs.join("/") }),
   collection: (_db: unknown, ...segs: string[]) => ({ path: segs.join("/") }),
-  where: (_f: string, _op: string, value: string) => ({ value }),
-  query: (col: { path: string }, w: { value: string }) => ({ path: col.path, clinicId: w.value }),
+  where: (field: string, _op: string, value: unknown) => ({ field, value }),
+  query: (col: { path: string }, w: { field: string; value: unknown }) =>
+    w.field === "clinicId" ? { path: col.path, clinicId: w.value as string } : { path: col.path, field: w.field, value: w.value },
+  getDocs: async (q: Q) => {
+    const docs = [...backend.docs.entries()]
+      .filter(([p, d]) => p.startsWith(q.path + "/") && (!q.field || d[q.field] === q.value))
+      .map(([p, d]) => ({ id: p.split("/").pop()!, data: () => structuredClone(d) }));
+    return { empty: docs.length === 0, docs };
+  },
   setDoc: async (ref: { path: string }, data: Record<string, unknown>, opts?: { merge?: boolean }) => {
     if (backend.failWrites && ref.path.includes("/patients/")) throw Object.assign(new Error("offline"), { code: "unavailable" });
     const prev = backend.docs.get(ref.path) ?? {};
@@ -113,13 +121,17 @@ it("merges two devices' clinics and patients without losing anything, and syncs 
   await settle();
   expect(backend.docs.get(`dentist_records/${UID}/patients/p1`)).toMatchObject({ deleted: true });
 
-  // Web relaunches with its old cache: gets p2 + the edit, drops p1, and
-  // does NOT resurrect p1 from its stale local copy.
+  // The tombstone keeps the record's data (merge), so it can be undone.
+  expect(backend.docs.get(`dentist_records/${UID}/patients/p1`)).toMatchObject({ name: "From web" });
+
+  // Web relaunches with its old cache: gets p2 + the edit, and — since the
+  // apps have no delete action — a "deleted" marker never removes a patient
+  // that a device still has: p1 is restored for everyone.
   const webAgain = await device(webStorage);
   const list = webAgain.patients.getPatients();
-  expect(list.map((p) => p.id)).toEqual(["p2"]);
-  expect(list[0].complaint).toBe("pain");
-  expect(backend.docs.get(`dentist_records/${UID}/patients/p1`)).toMatchObject({ deleted: true });
+  expect(list.map((p) => p.id).sort()).toEqual(["p1", "p2"]);
+  expect(list.find((p) => p.id === "p2")?.complaint).toBe("pain");
+  expect(backend.docs.get(`dentist_records/${UID}/patients/p1`)).toMatchObject({ deleted: false, name: "From web" });
 }, 30_000);
 
 it("keeps a guest's patients local only", async () => {
@@ -167,4 +179,34 @@ it("syncs appointments between devices, including deletes", async () => {
   other.removeAppointment(a.id);
   await settle();
   expect(backend.docs.get(`dentist_records/${UID}/appointments/${a.id}`)).toMatchObject({ deleted: true });
+}, 30_000);
+
+it("never deletes a record without updatedAt that another device doesn't hold yet (the Oct 2026 bug)", async () => {
+  const clinicsKey = `dh_clinics_v1:${UID}`;
+  const clinics = JSON.stringify({ clinics: [{ id: "W", name: "العيادة الرئيسية", address: "", workDays: "" }], activeClinicId: "W" });
+  // A pre-sync record in the cloud, without updatedAt.
+  backend.docs.set(`dentist_records/${UID}`, { clinics: [{ id: "W", name: "العيادة الرئيسية", address: "", workDays: "" }] });
+  const legacy = pat("p7", "Legacy patient", { updatedAt: undefined });
+  delete (legacy as Record<string, unknown>).updatedAt;
+  backend.docs.set(`dentist_records/${UID}/patients/p7`, { ...legacy, clinicId: "W", deleted: false });
+
+  // A device that has never seen it opens the account.
+  const other = await device({ [clinicsKey]: clinics });
+  expect(other.patients.getPatients().map((p) => p.id)).toEqual(["p7"]);
+  expect(backend.docs.get(`dentist_records/${UID}/patients/p7`)).toMatchObject({ deleted: false, name: "Legacy patient" });
+}, 30_000);
+
+it("restores patients the bug already replaced with a deleted marker, from a copy on the device", async () => {
+  const clinicsKey = `dh_clinics_v1:${UID}`;
+  backend.docs.set(`dentist_records/${UID}`, { clinics: [{ id: "W", name: "العيادة الرئيسية", address: "", workDays: "" }] });
+  // What the bug left in the cloud: an id with no data.
+  backend.docs.set(`dentist_records/${UID}/patients/p8`, { id: "p8", clinicId: "W", deleted: true, updatedAt: 5 });
+  // The device still has it under its old (pre-merge) clinic key.
+  const phone = await device({
+    [clinicsKey]: JSON.stringify({ clinics: [{ id: "W", name: "العيادة الرئيسية", address: "", workDays: "" }], activeClinicId: "W" }),
+    [`dh:patients:v1:${UID}:OLD`]: JSON.stringify([pat("p8", "Lost patient")]),
+  });
+  await settle();
+  expect(backend.docs.get(`dentist_records/${UID}/patients/p8`)).toMatchObject({ deleted: false, name: "Lost patient", clinicId: "W" });
+  expect(phone.patients.getPatients().map((p) => p.id)).toContain("p8");
 }, 30_000);

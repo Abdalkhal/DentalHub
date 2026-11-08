@@ -2,12 +2,21 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Sharing from 'expo-sharing';
-import { File } from 'expo-file-system';
-import { Cloud, FileImage, Share2, Trash2, X } from 'lucide-react-native';
+import { Camera, Cloud, FileImage, Share2, Trash2, X } from 'lucide-react-native';
 
 import { Text } from '@/components/ui';
-import { addFile, newFileId, removeFile, type Patient, type PatientFile } from '@/lib/patientsStore';
-import { patientFilePath, uploadPatientFile } from '@/lib/dentistRecords';
+import {
+  MAX_PLAN_PHOTOS,
+  addFile,
+  newFileId,
+  planPhotoTag,
+  planPhotos,
+  removeFile,
+  type Patient,
+  type PatientFile,
+} from '@/lib/patientsStore';
+import { patientFilePath } from '@/lib/dentistRecords';
+import { uploadFileUri } from '@/lib/nativeUpload';
 import { resolveCaseFileUri } from '@/lib/storagePipeline';
 import { useSession } from '@/lib/useAuth';
 import { toast } from '@/lib/toast';
@@ -48,34 +57,37 @@ function useLocalUri(f: PatientFile | undefined): string | undefined {
   return uri;
 }
 
-/** Picks images and uploads them to the patient's private Storage folder.
- *  The "رفع أشعة" button used to do nothing ("coming soon"). */
-export function useXrayUpload(p: Patient, ar: boolean) {
+/** Picks images and uploads them to the patient's private Storage folder,
+ *  through the native uploader (the JS SDK's byte upload fails inside the app). */
+function usePhotoUpload(p: Patient, ar: boolean) {
   const { user } = useSession();
   const [uploading, setUploading] = useState(false);
 
-  const upload = async () => {
+  const upload = async (tag: string, limit?: number) => {
     if (!user?.uid) {
-      toast.error(ar ? 'سجّل الدخول لرفع الأشعة' : 'Sign in to upload X-rays');
+      toast.error(ar ? 'سجّل الدخول لرفع الصور' : 'Sign in to upload images');
       return;
     }
-    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, quality: 0.85 });
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: true,
+      selectionLimit: limit,
+      quality: 0.85,
+    });
     if (res.canceled || !res.assets?.length) return;
     setUploading(true);
     let failed = 0;
-    for (const a of res.assets) {
+    for (const a of res.assets.slice(0, limit)) {
       try {
         const type = a.mimeType ?? 'image/jpeg';
-        const name = a.fileName ?? `xray-${Date.now()}.${type.split('/')[1] ?? 'jpg'}`;
-        // Native read — fetch(uri).blob() is unreliable on Android.
-        const bytes = new Uint8Array(await new File(a.uri).arrayBuffer());
+        const name = a.fileName ?? `image-${Date.now()}.${type.split('/')[1] ?? 'jpg'}`;
         const fileId = newFileId();
         const path = patientFilePath(user.uid, p.id, fileId, name);
-        await uploadPatientFile(path, bytes, type);
-        addFile(p.id, { id: fileId, name: XRAY_TAG + name, path, type });
+        await uploadFileUri(path, a.uri, type);
+        addFile(p.id, { id: fileId, name: tag + name, path, type });
       } catch (err) {
         failed += 1;
-        console.warn('X-ray upload failed:', err);
+        console.warn('Patient image upload failed:', err);
       }
     }
     setUploading(false);
@@ -85,10 +97,15 @@ export function useXrayUpload(p: Patient, ar: boolean) {
   return { upload, uploading };
 }
 
-function Thumb({ f, onPress }: { f: PatientFile; onPress: () => void }) {
+export function useXrayUpload(p: Patient, ar: boolean) {
+  const { upload, uploading } = usePhotoUpload(p, ar);
+  return { upload: () => upload(XRAY_TAG), uploading };
+}
+
+function Thumb({ f, onPress, width = '31.5%' }: { f: PatientFile; onPress: () => void; width?: '31.5%' | '48.5%' }) {
   const uri = useLocalUri(f);
   return (
-    <Pressable onPress={onPress} style={{ width: '31.5%' }} className="aspect-square overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
+    <Pressable onPress={onPress} style={{ width }} className="aspect-square overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
       {uri && f.type.startsWith('image/') ? (
         <Image source={{ uri }} className="h-full w-full" resizeMode="cover" />
       ) : (
@@ -176,6 +193,60 @@ export function XrayGallery({ p, ar, uploading }: { p: Patient; ar: boolean; upl
           ))}
         </View>
       )}
+      {open && <Viewer f={open} ar={ar} onClose={() => setOpenId(null)} onDelete={() => confirmDelete(open)} />}
+    </View>
+  );
+}
+
+/** Up to two photos for one treatment-plan department. */
+export function PlanPhotos({ p, ar, dept }: { p: Patient; ar: boolean; dept: string }) {
+  const photos = planPhotos(p, dept);
+  const { upload, uploading } = usePhotoUpload(p, ar);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const open = photos.find((f) => f.id === openId);
+  const free = Math.max(0, MAX_PLAN_PHOTOS - photos.length);
+
+  const confirmDelete = (f: PatientFile) =>
+    Alert.alert(ar ? 'حذف الصورة' : 'Delete photo', ar ? 'حذف هذه الصورة؟' : 'Delete this photo?', [
+      { text: ar ? 'إلغاء' : 'Cancel', style: 'cancel' },
+      {
+        text: ar ? 'حذف' : 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          setOpenId(null);
+          removeFile(p.id, f.id);
+        },
+      },
+    ]);
+
+  return (
+    <View className="mt-3 border-t border-slate-100 pt-3">
+      <View className="mb-2 flex-row items-center gap-1.5">
+        <Camera size={14} color="#2563EB" />
+        <Text className="flex-1 text-xs font-bold text-slate-800">{ar ? 'صور الحالة' : 'Case photos'}</Text>
+        <Text className="text-[10px] text-slate-400" style={{ writingDirection: 'ltr' }}>
+          {photos.length}/{MAX_PLAN_PHOTOS}
+        </Text>
+      </View>
+      <View className="flex-row flex-wrap gap-2">
+        {photos.map((f) => (
+          <Thumb key={f.id} f={f} width="48.5%" onPress={() => setOpenId(f.id)} />
+        ))}
+        {Array.from({ length: free }, (_, i) => (
+          <Pressable
+            key={i}
+            disabled={uploading}
+            onPress={() => void upload(planPhotoTag(dept), free)}
+            style={{ width: '48.5%' }}
+            className="aspect-square items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50"
+          >
+            {uploading && i === 0 ? <ActivityIndicator color="#2563EB" /> : <Cloud size={22} color="#2563EB" />}
+            <Text className="text-[11px] font-bold text-slate-500">
+              {uploading && i === 0 ? (ar ? 'جارٍ الرفع…' : 'Uploading…') : ar ? 'رفع صورة' : 'Upload photo'}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
       {open && <Viewer f={open} ar={ar} onClose={() => setOpenId(null)} onDelete={() => confirmDelete(open)} />}
     </View>
   );

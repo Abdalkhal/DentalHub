@@ -2,7 +2,7 @@
 import { FlatList, Pressable, View } from 'react-native';
 import { router } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { Check, ChevronDown, FlaskConical, MapPin, Package, Phone, Search, X } from 'lucide-react-native';
+import { Check, ChevronDown, FlaskConical, MapPin, MessageCircle, Package, Phone, Search, X } from 'lucide-react-native';
 
 import { Screen, Text, Spinner, Input, Button } from '@/components/ui';
 import { ProductImage } from '@/components/ProductImage';
@@ -15,7 +15,7 @@ import {
   ordersQueryKey,
 } from '@/lib/orders';
 import { useMarkOrderSeen } from '@/lib/orderSeen';
-import { useProducts, useSignedImageUrls } from '@/lib/products';
+import { useProductsByIds, useSignedImageUrls } from '@/lib/products';
 import { useLabCases } from '@/lib/caseTracking';
 import type { Order as LabOrder, OrderStatus as LabOrderStatus } from '@/lib/ordersStore';
 import { CaseDetailModal, LAB_STATUS_AR, LAB_STATUS_EN, formatShortDate } from '@/components/CaseDetailModal';
@@ -23,6 +23,7 @@ import { useUserRole } from '@/lib/useAuth';
 import { useI18n } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
+import { docMoneyRows } from '@/lib/promo';
 
 // The real order-status model (see OrderStatus in integrations/firebase/types
 // on the web side, mirrored here): an order is only ever pending, confirmed,
@@ -101,15 +102,20 @@ function money(o: { totalUSD?: number; total?: number; totalIQD?: number }): str
 // the supplier can mark any item "not available" — a rejected item's price
 // stays baked into that stored total forever. The dentist's list must instead
 // total the items live, skipping whatever the supplier has since rejected.
-function availableMoney(items: { price?: number; quantity?: number; currency?: string; availability?: string }[]): string {
+function availableMoney(items: { price?: number; listPrice?: number; quantity?: number; discountAmount?: number; currency?: string; availability?: string }[]): string {
   let usd = 0;
   let iqd = 0;
+  let discountedIQD = false;
   for (const it of items) {
     if (it.availability === 'not_available') continue;
-    const amt = (it.price ?? 0) * (it.quantity ?? 1);
-    if (it.currency === 'IQD') iqd += amt;
-    else usd += amt;
+    const amt = (it.price ?? 0) * (it.quantity ?? 1) - (it.discountAmount ?? 0);
+    if (it.currency === 'IQD') {
+      iqd += amt;
+      if ((it.discountAmount ?? 0) > 0 || (it.listPrice ?? 0) > (it.price ?? 0)) discountedIQD = true;
+    } else usd += amt;
   }
+  // A discounted dinar total rounds down to 250, as the server does.
+  if (discountedIQD && iqd >= 250) iqd -= iqd % 250;
   if (usd) return `$${usd.toFixed(2)}`;
   if (iqd) return `${iqd.toLocaleString()} د.ع`;
   return '0';
@@ -210,6 +216,16 @@ function DentistOrders() {
               </View>
               {open && (
                 <View className="gap-2 border-t border-slate-100 bg-slate-50/50 px-4 py-3">
+                  {!!o.supplierId && (
+                    <Pressable
+                      onPress={() => router.push({ pathname: '/messages', params: { with: o.supplierId, withName: '' } })}
+                      className="h-10 flex-row items-center justify-center gap-1.5 rounded-xl bg-[#2563EB]"
+                    >
+                      <MessageCircle size={15} color="#FFFFFF" />
+                      <Text className="text-xs font-bold text-white">{ar ? 'مراسلة' : 'Message'}</Text>
+                    </Pressable>
+                  )}
+
                   {items.length === 0 ? (
                     <Text className="text-center text-xs text-slate-400">
                       {ar ? 'لا توجد تفاصيل' : 'No details'}
@@ -249,6 +265,16 @@ function DentistOrders() {
                       );
                     })
                   )}
+                  {!!o.discount && (
+                    <View className="mt-1 gap-1 border-t border-dashed border-slate-200 pt-2">
+                      {docMoneyRows(o, ar).map((r) => (
+                        <View key={r.key} className="flex-row items-center justify-between">
+                          <Text className={cn('text-xs', r.tone === 'saving' ? 'text-emerald-600' : r.tone === 'total' ? 'font-bold text-slate-800' : 'text-slate-500')}>{r.label}</Text>
+                          <Text className={cn('text-xs', r.tone === 'saving' ? 'text-emerald-600' : r.tone === 'total' ? 'font-bold text-slate-800' : 'text-slate-500')} style={{ writingDirection: 'ltr' }}>{r.value}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
                 </View>
               )}
             </Pressable>
@@ -279,7 +305,9 @@ function SupplierOrders() {
   const { data: orders = [], isLoading } = useOrders(user?.uid);
   const markSeen = useMarkOrderSeen(user?.uid);
 
-  const { data: products = [] } = useProducts();
+  const { data: products = [] } = useProductsByIds(
+    orders.flatMap((o) => (o.items ?? []).map((i) => i.productId)),
+  );
   const productById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
   const imagePaths = useMemo(
     () =>
@@ -507,6 +535,17 @@ function SupplierOrders() {
                         </View>
                       );
                     })
+                  )}
+
+                  {!!o.discount && (
+                    <View className="mt-1 gap-1 border-t border-dashed border-slate-200 pt-2">
+                      {docMoneyRows(o, ar).map((r) => (
+                        <View key={r.key} className="flex-row items-center justify-between">
+                          <Text className={cn('text-xs', r.tone === 'saving' ? 'text-emerald-600' : r.tone === 'total' ? 'font-bold text-slate-800' : 'text-slate-500')}>{r.label}</Text>
+                          <Text className={cn('text-xs', r.tone === 'saving' ? 'text-emerald-600' : r.tone === 'total' ? 'font-bold text-slate-800' : 'text-slate-500')} style={{ writingDirection: 'ltr' }}>{r.value}</Text>
+                        </View>
+                      ))}
+                    </View>
                   )}
 
                   {pending && (

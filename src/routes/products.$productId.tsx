@@ -5,7 +5,7 @@ import { Loader2, Package } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { ProductDetailsModal } from "@/components/ProductDetailsModal";
-import { useProducts } from "@/lib/products";
+import { useProduct } from "@/lib/products";
 import { useI18n } from "@/lib/i18n";
 import { db } from "@/integrations/firebase/client";
 import type { UserRoleDoc } from "@/integrations/firebase/types";
@@ -21,8 +21,7 @@ function ProductDetailsPage() {
   const { lang } = useI18n();
   const ar = lang === "ar";
   const router = useRouter();
-  const { data: products = [], isLoading } = useProducts();
-  const product = products.find((p) => p.id === productId);
+  const { data: product, isLoading } = useProduct(productId);
 
   const { data: supplier } = useQuery({
     queryKey: ["product-supplier", product?.companyId],

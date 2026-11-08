@@ -3,6 +3,7 @@ import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
 import { useUserRole, useIsAdmin, useLabStaffClaim } from "@/lib/useAuth";
+import { useMaterialsBadge } from "@/lib/materialsStore";
 import {
   ShoppingBag,
   FlaskConical,
@@ -29,6 +30,9 @@ import {
   Bell,
   ShoppingCart,
   PenTool,
+  Tag,
+  TicketPercent,
+  Library,
 } from "lucide-react";
 import { openCart } from "@/lib/cartStore";
 
@@ -46,6 +50,7 @@ type MoreLink = {
 
 function More() {
   const { t, lang, toggle } = useI18n();
+  const materialsBadge = useMaterialsBadge();
   const { role } = useUserRole();
   const { isAdmin } = useIsAdmin();
   const { claim: labStaff } = useLabStaffClaim();
@@ -252,6 +257,7 @@ function More() {
     { to: "/patients", icon: Users, label: ar ? "المرضى" : "Patients", tone: "", roles: ["dentist"] },
     { to: "/track-cases", icon: ListChecks, label: ar ? "تتبع الحالات" : "Track Cases", tone: "", roles: ["dentist"] },
     { to: "/favorites", icon: Heart, label: ar ? "المفضلة" : "Favorites", tone: "", roles: ["dentist"] },
+    { to: "/offers", icon: Tag, label: ar ? "العروض" : "Offers", tone: "", roles: ["dentist"] },
     { to: "/brands", icon: Crown, label: ar ? "البراندات" : "Brands", tone: "", roles: ["dentist"] },
     { to: "/supplies", icon: ShoppingBag, label: ar ? "المستلزمات" : "Supplies", tone: "", roles: ["dentist"] },
     { to: "/my-ads", icon: Megaphone, label: ar ? "إعلاناتي" : "My Ads", tone: "", roles: ["dentist"] },
@@ -264,6 +270,8 @@ function More() {
   const supplyLinks: MoreLink[] = [
     { to: "/supplies", icon: Store, label: ar ? "لوحة المورد" : "Supplier Dashboard", tone: "", roles: ["supply"] },
     { to: "/doctor-invoices", icon: FileText, label: ar ? "فواتير الأطباء" : "Doctor Invoices", tone: "", roles: ["supply"] },
+    { to: "/catalog-add", icon: Library, label: ar ? "إضافة من الدليل" : "Add from catalog", tone: "", roles: ["supply"] },
+    { to: "/office-discounts", icon: TicketPercent, label: ar ? "الخصومات" : "Discounts", tone: "", roles: ["supply"] },
     { to: "/my-ads", icon: Megaphone, label: ar ? "إعلاناتي" : "My Ads", tone: "", roles: ["supply"] },
     { to: "/messages", icon: MessageSquare, label: ar ? "الرسائل" : "Messages", tone: "", roles: ["supply"] },
     { to: "/notifications", icon: Bell, label: ar ? "الإشعارات" : "Notifications", tone: "", roles: ["supply"] },
@@ -273,6 +281,7 @@ function More() {
   ];
   const implantLinks: MoreLink[] = [
     { to: "/implants", icon: FlaskConical, label: ar ? "لوحة الزرعات" : "Implant Dashboard", tone: "", roles: ["implant"] },
+    { to: "/office-discounts", icon: TicketPercent, label: ar ? "الخصومات" : "Discounts", tone: "", roles: ["implant"] },
     { to: "/my-ads", icon: Megaphone, label: ar ? "إعلاناتي" : "My Ads", tone: "", roles: ["implant"] },
     { to: "/messages", icon: MessageSquare, label: ar ? "الرسائل" : "Messages", tone: "", roles: ["implant"] },
     { to: "/notifications", icon: Bell, label: ar ? "الإشعارات" : "Notifications", tone: "", roles: ["implant"] },
@@ -347,8 +356,9 @@ function More() {
                 to={l.to}
                 className="flex items-center gap-3 px-4 py-3.5 hover:bg-accent transition-colors md:flex-col md:justify-center md:gap-2.5 md:py-6 md:text-center"
               >
-                <span className="size-10 rounded-2xl ring-1 shadow-sm flex items-center justify-center shrink-0 md:size-12" style={{ backgroundColor: "oklch(0.98 0.01 240)" }}>
+                <span className="relative size-10 rounded-2xl ring-1 shadow-sm flex items-center justify-center shrink-0 md:size-12" style={{ backgroundColor: "oklch(0.98 0.01 240)" }}>
                   <l.icon className="size-5 drop-shadow-sm md:size-6" strokeWidth={2} />
+                  {l.to === "/clinic" && materialsBadge > 0 && <span className="absolute -end-0.5 -top-0.5 size-2.5 rounded-full bg-rose-600 ring-2 ring-white" />}
                 </span>
                 <span className="flex-1 text-sm font-semibold text-slate-700 md:flex-none md:text-base">{l.label}</span>
                 <ChevronRight className="size-4 text-slate-300 md:hidden" />

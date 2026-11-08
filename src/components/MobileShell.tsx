@@ -1,5 +1,6 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Home, ShoppingBag, User, Menu, Search, Heart, Tag, ShoppingCart } from "lucide-react";
+import { Home, ShoppingBag, Menu, Search, Heart, ShoppingCart, MessageCircle } from "lucide-react";
+import { useDmUnreadTotal } from "@/lib/directMessages";
 import { useEffect, useState, type ReactNode } from "react";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -42,8 +43,16 @@ export function MobileShell({
   // without an account (App Store/Play Store require a public privacy
   // policy URL) and is static text with no user data.
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const isPublicRoute = pathname === "/auth" || pathname === "/login" || pathname === "/privacy";
+  const isPublicRoute =
+    pathname === "/auth" || pathname === "/login" || pathname === "/privacy" || pathname.startsWith("/join/");
   const navigate = useNavigate();
+  const isStaff = role?.accountType === "secretary";
+  const onStaffRoute = pathname === "/secretary" || isPublicRoute;
+  // No store navigation for staff, or for someone answering an invite signed out.
+  const noNav = isStaff || (!user && pathname.startsWith("/join/"));
+  useEffect(() => {
+    if (isStaff && !onStaffRoute) navigate({ to: "/secretary", replace: true });
+  }, [isStaff, onStaffRoute, navigate]);
   useEffect(() => {
     if (!loading && !user && !isPublicRoute) {
       navigate({ to: "/auth", replace: true });
@@ -72,7 +81,7 @@ export function MobileShell({
             // Clears the fixed lg:+ top nav BottomTabBar renders on wide
             // pages. Applies even with `hideBottomNav`, because such a page
             // still gets the top nav at lg:+ — see the render condition below.
-            isWide && "lg:pt-16",
+            isWide && !noNav && "lg:pt-16",
           )}
         >
           {children}
@@ -82,7 +91,7 @@ export function MobileShell({
             bottom bar itself stay hidden — the phone keeps exactly today's
             (bar-less) layout while lg:+ gains the top nav. Labs get the same
             vendor tabs as native (Home/Explore/Orders/Account/More). */}
-        {(!hideBottomNav || isWide) && (
+        {(!hideBottomNav || isWide) && !noNav && (
           <BottomTabBar
             onCartClick={() => setCartOpen(true)}
             wide={isWide}
@@ -136,19 +145,22 @@ function BottomTabBar({
           logo: "from-[oklch(0.62_0.19_256)] to-[oklch(0.5_0.2_262)]",
         };
 
+  // Messages took the place of Offers (dentists; Offers is in "المزيد") and of
+  // Account (vendors; the profile photo on their dashboard opens Account).
+  const unreadMessages = useDmUnreadTotal(uid);
   const tabs = isDentist
     ? [
         { to: "/", icon: Home, label: t("tab_home"), match: (p: string) => p === "/" },
         { to: "/favorites", icon: Heart, label: t("tab_favorites"), match: (p: string) => p.startsWith("/favorites") },
         { to: "/orders", icon: ShoppingBag, label: t("tab_orders"), match: (p: string) => p.startsWith("/orders") },
-        { to: "/offers", icon: Tag, label: t("tab_offers"), match: (p: string) => p.startsWith("/offers") },
+        { to: "/messages", icon: MessageCircle, label: lang === "ar" ? "الرسائل" : "Messages", match: (p: string) => p.startsWith("/messages") },
         { to: "/more", icon: Menu, label: t("tab_more"), match: (p: string) => p.startsWith("/more") },
       ]
     : ([
         { to: homeTo, icon: Home, label: t("tab_home"), match: (p: string) => p === homeTo },
         { to: "/explore", icon: Search, label: lang === "ar" ? "بحث" : "Search", match: (p: string) => p.startsWith("/explore") },
         { to: "/orders", icon: ShoppingBag, label: t("tab_orders"), match: (p: string) => p.startsWith("/orders") },
-        { to: "/account", icon: User, label: t("tab_account"), match: (p: string) => p.startsWith("/account") },
+        { to: "/messages", icon: MessageCircle, label: lang === "ar" ? "الرسائل" : "Messages", match: (p: string) => p.startsWith("/messages") },
         { to: "/more", icon: Menu, label: t("tab_more"), match: (p: string) => p.startsWith("/more") },
       ]);
 
@@ -187,6 +199,11 @@ function BottomTabBar({
                     {to === "/orders" && unseenOrders > 0 && (
                       <span className="absolute -top-0.5 -end-0.5 h-4 min-w-4 px-1 rounded-full bg-[#EF4444] text-white text-[10px] font-bold flex items-center justify-center">
                         {unseenOrders > 9 ? "9+" : unseenOrders}
+                      </span>
+                    )}
+                    {to === "/messages" && unreadMessages > 0 && (
+                      <span className="absolute -top-0.5 -end-0.5 h-4 min-w-4 px-1 rounded-full bg-[#EF4444] text-white text-[10px] font-bold flex items-center justify-center">
+                        {unreadMessages > 9 ? "9+" : unreadMessages}
                       </span>
                     )}
                   </span>
@@ -254,6 +271,11 @@ function BottomTabBar({
                     {to === "/orders" && unseenOrders > 0 && (
                       <span className="h-5 min-w-5 px-1 rounded-full bg-[#EF4444] text-white text-[10px] font-bold flex items-center justify-center">
                         {unseenOrders > 9 ? "9+" : unseenOrders}
+                      </span>
+                    )}
+                    {to === "/messages" && unreadMessages > 0 && (
+                      <span className="h-5 min-w-5 px-1 rounded-full bg-[#EF4444] text-white text-[10px] font-bold flex items-center justify-center">
+                        {unreadMessages > 9 ? "9+" : unreadMessages}
                       </span>
                     )}
                   </Link>

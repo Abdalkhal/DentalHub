@@ -10,7 +10,7 @@ import { SpecializedImplantForm } from "@/components/SpecializedImplantForm";
 import { NotificationBell } from "@/components/NotificationBell";
 import { COUNTRIES } from "@/data/implants";
 import {
-  useProducts,
+  useProductsByCompany, useProductsWhere,
   useDeleteProduct,
   useSignedImageUrls,
   COUNTRY_CODE_TO_SLUG,
@@ -107,7 +107,7 @@ function ImplantCompanyDashboard() {
 
   const mapsUrl = getMapsUrl(role ?? {});
 
-  const { data: allProducts = [] } = useProducts();
+  const { data: allProducts = [] } = useProductsByCompany(auth.currentUser?.uid);
   const productsCount = allProducts.filter(
     (p) =>
       (p.category === "implant" ||
@@ -320,7 +320,7 @@ const ACCESSORY_CATEGORIES: {
 function ImplantProductsPanel() {
   const { lang } = useI18n();
   const ar = lang === "ar";
-  const { data: allProducts = [], isLoading } = useProducts();
+  const { data: allProducts = [], isLoading } = useProductsByCompany(auth.currentUser?.uid);
   const remove = useDeleteProduct();
 
   const companyId = auth.currentUser?.uid ?? "";
@@ -1143,7 +1143,7 @@ function BrowseImplants() {
     diaMin: String(DIA_BOUNDS[0]),
     diaMax: String(DIA_BOUNDS[1]),
   });
-  const { data: products = [] } = useProducts();
+  const { data: products = [] } = useProductsWhere("category", "implant");
 
   const openFilter = () => {
     setDraft({

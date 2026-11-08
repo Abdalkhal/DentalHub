@@ -8,7 +8,7 @@ import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
 import { useAdminStore } from "@/lib/adminStore";
-import { useProducts, useSignedImageUrls, type Product } from "@/lib/products";
+import { useBranchProducts, useSignedImageUrls, type Product } from "@/lib/products";
 import { ProductGallery } from "@/components/ProductGallery";
 import { ProductDetailsModal } from "@/components/ProductDetailsModal";
 import { Plus, SearchX, Store, ArrowUpDown, ImageOff } from "lucide-react";
@@ -23,10 +23,16 @@ type Sort = "default" | "price_asc" | "price_desc" | "name_asc" | "name_desc" | 
 function BranchAllPage() {
   const { branchSlug } = Route.useParams();
   const { branches: BRANCHES, offices: OFFICES } = useAdminStore();
-  const { data: PRODUCTS = [], isLoading } = useProducts();
   const branch = BRANCHES.find((b) => b.slug === branchSlug);
   const { t, lang } = useI18n();
   const [q, setQ] = useState("");
+  const {
+    data: PRODUCTS,
+    isLoading,
+    hasMore,
+    loadMore,
+    loadingMore,
+  } = useBranchProducts(branch?.slug, q);
   const [filter, setFilter] = useState<Filter>("all");
   const [sort, setSort] = useState<Sort>("default");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -256,6 +262,16 @@ function BranchAllPage() {
               );
             })}
           </ul>
+        )}
+        {hasMore && (
+          <button
+            type="button"
+            onClick={() => loadMore()}
+            disabled={loadingMore}
+            className="mt-4 w-full h-11 rounded-xl bg-white border border-slate-200 text-sm font-bold text-slate-600 disabled:opacity-60"
+          >
+            {loadingMore ? "…" : lang === "ar" ? "عرض المزيد" : "Show more"}
+          </button>
         )}
       </div>
       {selectedProduct && (

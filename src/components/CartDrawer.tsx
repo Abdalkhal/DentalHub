@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   X,
   Trash2,
@@ -18,7 +18,7 @@ import { useI18n } from "@/lib/i18n";
 import { useNavigate } from "@tanstack/react-router";
 import { useUserRole, useSession } from "@/lib/useAuth";
 import { placeCartOrder } from "@/lib/orders";
-import { findPromoCode, isPromoValid, computeDiscount, type DiscountResult } from "@/lib/promo";
+import { codeMessage, discountLabel, moneyRows, useCartPreview } from "@/lib/promo";
 import { toast } from "sonner";
 
 const TEAL = "#0E6E66";
@@ -60,14 +60,16 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
   const [placing, setPlacing] = useState(false);
   const [note, setNote] = useState("");
   const [promoInput, setPromoInput] = useState("");
-  const [applying, setApplying] = useState(false);
-  const [applied, setApplied] = useState<DiscountResult | null>(null);
-  const [promoError, setPromoError] = useState("");
+  const [codes, setCodes] = useState<string[]>([]);
+  const previewItems = useMemo(
+    () => cart.map((i) => ({ productId: i.productId, quantity: i.quantity || 1 })),
+    [cart],
+  );
+  const preview = useCartPreview(previewItems, codes, open && !!user);
   const [draftNo] = useState(() => `DNT-${Math.floor(1000 + Math.random() * 9000)}`);
 
   if (!open) return null;
 
-  const officeIds = [...new Set(cart.map((i) => i.officeId).filter(Boolean))];
   const officeNames = [...new Set(cart.map((i) => i.officeName).filter(Boolean))];
   const storeName =
     officeNames.length === 1
@@ -81,57 +83,44 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
     ? today.toLocaleDateString("ar-IQ", { year: "numeric", month: "long", day: "numeric" })
     : today.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
 
-  const iqdSubtotal = cart
+  // Until the server has answered, a row shows the price it was added at. The
+  // order can't be placed on those: the button waits for the real total.
+  const localIQD = cart
     .filter((i) => i.currency === "IQD")
     .reduce((s, i) => s + i.unitPrice * i.quantity, 0);
-  const usdSubtotal = cart
+  const localUSD = cart
     .filter((i) => i.currency !== "IQD")
     .reduce((s, i) => s + i.unitPrice * i.quantity, 0);
+  const priced = preview.data;
+  const totals = priced?.totals ?? {
+    rawUSD: localUSD,
+    rawIQD: localIQD,
+    tierSavedUSD: 0,
+    tierSavedIQD: 0,
+    discountUSD: 0,
+    discountIQD: 0,
+    netUSD: localUSD,
+    netIQD: localIQD,
+  };
+  const iqdTotal = totals.netIQD;
+  const usdTotal = totals.netUSD;
+  const lineByIndex = new Map(
+    (priced?.offices ?? []).flatMap((o) => o.lines.map((l) => [l.index, l] as const)),
+  );
+  const discounted = (priced?.offices ?? []).filter((o) => o.discountUSD > 0 || o.discountIQD > 0);
+  const summaryRows = moneyRows(
+    totals,
+    discounted.length === 1 ? discountLabel(discounted[0], ar) : ar ? "الخصومات" : "Discounts",
+    ar,
+    { alwaysNet: true },
+  );
+  const canOrder = !!priced && !preview.isFetching && !preview.isError;
 
-  const discountUSD = applied?.discountUSD ?? 0;
-  const discountIQD = applied?.discountIQD ?? 0;
-
-  const taxIQD = (iqdSubtotal - discountIQD) * (TAX_RATE / 100);
-  const taxUSD = (usdSubtotal - discountUSD) * (TAX_RATE / 100);
-
-  const iqdTotal = Math.max(0, iqdSubtotal - discountIQD) + DELIVERY_IQD + taxIQD;
-  const usdTotal = Math.max(0, usdSubtotal - discountUSD) + taxUSD;
-
-  const handleApplyPromo = async () => {
-    setPromoError("");
-    if (!promoInput.trim()) return;
-    setApplying(true);
-    try {
-      const promo = await findPromoCode(promoInput);
-      if (!promo) {
-        setPromoError(ar ? "رمز الخصم غير صالح" : "Invalid discount code");
-        setApplied(null);
-        return;
-      }
-      if (!isPromoValid(promo)) {
-        setPromoError(ar ? "انتهت صلاحية الرمز" : "This code has expired");
-        setApplied(null);
-        return;
-      }
-      const d = computeDiscount(promo, officeIds, iqdSubtotal, usdSubtotal);
-      if (d.discountUSD === 0 && d.discountIQD === 0) {
-        setPromoError(ar ? "الرمز غير مطبق على هذه السلة" : "Code not applicable to this cart");
-        setApplied(null);
-        return;
-      }
-      setApplied({
-        code: promo.code,
-        type: promo.type,
-        value: promo.value,
-        currency: promo.currency,
-        ...d,
-      });
-      toast.success(ar ? "تم تطبيق الخصم" : "Discount applied");
-    } catch (e: any) {
-      setPromoError(e?.message || String(e));
-    } finally {
-      setApplying(false);
-    }
+  const handleApplyPromo = () => {
+    const code = promoInput.trim().toUpperCase();
+    if (!code) return;
+    if (!codes.includes(code)) setCodes([...codes, code]);
+    setPromoInput("");
   };
 
   const handleShare = async () => {
@@ -178,13 +167,8 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
         },
         {
           note: note.trim() || undefined,
-          discount: applied
-            ? {
-                code: applied.code,
-                discountUSD: applied.discountUSD,
-                discountIQD: applied.discountIQD,
-              }
-            : undefined,
+          codes,
+          expected: { usd: usdTotal, iqd: iqdTotal },
         },
       );
       await queryClient.invalidateQueries({ queryKey: ["orders", "dentist", user.uid] });
@@ -192,6 +176,15 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
       onClose();
       navigate({ to: "/orders" });
     } catch (e: any) {
+      if (String(e?.message).includes("price-changed")) {
+        toast.error(
+          ar
+            ? "تغيّر السعر أو الخصم منذ فتحت السلة. راجع الإجمالي الجديد ثم أكمل الطلب."
+            : "A price or discount changed. Check the new total, then complete the order.",
+        );
+        preview.refetch();
+        return;
+      }
       toast.error(ar ? `فشل إرسال الطلب: ${e?.message || e}` : `Order failed: ${e?.message || e}`);
     } finally {
       setPlacing(false);
@@ -267,7 +260,11 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
 
             {/* Items */}
             <div className="bg-white rounded-2xl border border-slate-100 shadow-soft overflow-hidden divide-y divide-slate-50">
-              {cart.map((item) => (
+              {cart.map((item, index) => {
+                const line = lineByIndex.get(index);
+                const unit = line?.price ?? item.unitPrice;
+                const tiered = !!line && line.price < line.listPrice;
+                return (
                 <div key={item.id} className="px-3.5 py-3 flex items-center gap-3">
                   {item.productImage ? (
                     <img
@@ -286,10 +283,13 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                       <p className="text-[10px] text-slate-400 truncate">{item.category}</p>
                     )}
                     <div className="flex items-center gap-1.5 mt-1 text-xs">
-                      <span className="text-slate-500">
-                        {item.currency === "IQD"
-                          ? `${item.unitPrice.toLocaleString()} د.ع`
-                          : `$${item.unitPrice.toFixed(2)}`}
+                      {tiered && (
+                        <span className="text-slate-400 line-through">
+                          {item.currency === "IQD" ? line.listPrice.toLocaleString() : `$${line.listPrice.toFixed(2)}`}
+                        </span>
+                      )}
+                      <span className={tiered ? "font-bold text-emerald-600" : "text-slate-500"}>
+                        {item.currency === "IQD" ? `${unit.toLocaleString()} د.ع` : `$${unit.toFixed(2)}`}
                       </span>
                       <span className="text-slate-300">×</span>
                       <span className="font-bold text-slate-700">{item.quantity}</span>
@@ -298,8 +298,8 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                   <div className="text-end shrink-0">
                     <p className="text-sm font-display font-extrabold" style={{ color: TEAL }}>
                       {item.currency === "IQD"
-                        ? (item.unitPrice * item.quantity).toLocaleString()
-                        : `$${(item.unitPrice * item.quantity).toFixed(2)}`}
+                        ? (unit * item.quantity).toLocaleString()
+                        : `$${(unit * item.quantity).toFixed(2)}`}
                     </p>
                     <button
                       onClick={() => removeFromCart(item.id)}
@@ -309,7 +309,8 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                     </button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Discount + note + summary */}
@@ -322,48 +323,54 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                     <TicketPercent className="size-4" style={{ color: TEAL }} />
                     {ar ? "رمز الخصم" : "Discount code"}
                   </p>
-                  {applied ? (
-                    <div className="mt-3 flex items-center justify-between rounded-xl px-3 py-2.5 text-sm" style={{ backgroundColor: `${TEAL}14` }}>
-                      <span className="font-bold" style={{ color: TEAL }}>
-                        {applied.code}
-                        <span className="text-xs font-normal ms-2">
-                          {applied.type === "percent"
-                            ? `${applied.value}%`
-                            : applied.currency === "IQD"
-                              ? fmtIqd(applied.value)
-                              : fmtUsd(applied.value)}
-                        </span>
-                      </span>
-                      <button
-                        onClick={() => {
-                          setApplied(null);
-                          setPromoInput("");
-                        }}
-                        className="text-[11px] font-bold text-slate-400 hover:text-rose-500"
+                  {codes.map((code) => {
+                    const result = priced?.codes.find((r) => r.code === code);
+                    const good = result?.status === "applied";
+                    return (
+                      <div
+                        key={code}
+                        className="mt-3 rounded-xl px-3 py-2.5 text-sm"
+                        style={{ backgroundColor: good ? `${TEAL}14` : "#F8FAFC" }}
                       >
-                        {ar ? "إزالة" : "Remove"}
-                      </button>
-                    </div>
-                  ) : (
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-bold font-mono" dir="ltr" style={{ color: good ? TEAL : "#475569" }}>
+                            {code}
+                          </span>
+                          <button
+                            onClick={() => setCodes(codes.filter((c) => c !== code))}
+                            className="text-[11px] font-bold text-slate-400 hover:text-rose-500"
+                          >
+                            {ar ? "إزالة" : "Remove"}
+                          </button>
+                        </div>
+                        {result && (
+                          <p className={`text-[11px] mt-1 ${good ? "text-emerald-700" : result.status === "beaten" ? "text-slate-500" : "text-rose-500"}`}>
+                            {codeMessage(result, ar)}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {(
                     <>
                       <div className="flex gap-2 mt-3">
                         <input
                           value={promoInput}
                           onChange={(e) => setPromoInput(e.target.value)}
+                          dir="ltr"
                           placeholder={ar ? "أدخل الرمز" : "Enter code"}
                           className="flex-1 h-10 rounded-xl bg-slate-50 border border-slate-200 px-3 text-sm outline-none focus:ring-2 focus:ring-[#0E6E66]/20 focus:border-[#0E6E66] uppercase"
                         />
                         <button
                           onClick={handleApplyPromo}
-                          disabled={applying}
+                          disabled={preview.isFetching}
                           className="h-10 px-4 rounded-xl text-white text-xs font-bold flex items-center gap-1 disabled:opacity-60"
                           style={{ backgroundColor: TEAL }}
                         >
-                          {applying ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+                          {preview.isFetching ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
                           {ar ? "تطبيق" : "Apply"}
                         </button>
                       </div>
-                      {promoError && <p className="text-[11px] text-rose-500 mt-1.5">{promoError}</p>}
                     </>
                   )}
                 </div>
@@ -388,26 +395,14 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
               <div className="bg-white rounded-2xl border border-slate-100 shadow-soft p-4 h-fit">
                 <p className="text-sm font-bold text-slate-700">{ar ? "ملخص الطلب" : "Order summary"}</p>
                 <div className="mt-3 space-y-2.5 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">{ar ? "الإجمالي بالدينار" : "Total (IQD)"}</span>
-                    <span className="font-semibold">{fmtIqd(iqdSubtotal)}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">{ar ? "الإجمالي بالدولار" : "Total (USD)"}</span>
-                    <span className="font-semibold">{fmtUsd(usdSubtotal)}</span>
-                  </div>
-
-                  {(discountUSD > 0 || discountIQD > 0) && (
-                    <div className="flex items-center justify-between text-emerald-600">
-                      <span className="flex items-center gap-1">
-                        {ar ? "الخصم" : "Discount"}
-                        {applied?.code && <span className="text-[10px] font-mono">({applied.code})</span>}
-                      </span>
-                      <span className="font-semibold">
-                        -{discountIQD > 0 ? fmtIqd(discountIQD) : fmtUsd(discountUSD)}
-                      </span>
-                    </div>
-                  )}
+                  {summaryRows
+                    .filter((r) => r.tone !== "total")
+                    .map((r) => (
+                      <div key={r.key} className={`flex items-center justify-between ${r.tone === "saving" ? "text-emerald-600" : ""}`}>
+                        <span className={r.tone === "saving" ? "" : "text-slate-500"}>{r.label}</span>
+                        <span className="font-semibold" dir="ltr">{r.value}</span>
+                      </div>
+                    ))}
 
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500">{ar ? "تكلفة التوصيل" : "Delivery"}</span>
@@ -422,18 +417,28 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
 
                   <div className="border-t border-dashed border-slate-200 my-2" />
 
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold">{ar ? "المجموع (د.ع)" : "Subtotal (IQD)"}</span>
-                    <span className="font-display font-extrabold" style={{ color: TEAL }}>
-                      {fmtIqd(iqdTotal)}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold">{ar ? "المجموع ($)" : "Subtotal (USD)"}</span>
-                    <span className="font-display font-extrabold" style={{ color: TEAL }}>
-                      {fmtUsd(usdTotal)}
-                    </span>
-                  </div>
+                  {summaryRows
+                    .filter((r) => r.tone === "total")
+                    .map((r) => (
+                      <div key={r.key} className="flex items-center justify-between">
+                        <span className="font-bold">{r.label}</span>
+                        <span className="font-display font-extrabold" style={{ color: TEAL }}>
+                          {r.value}
+                        </span>
+                      </div>
+                    ))}
+                  {!!priced?.skipped.length && (
+                    <p className="text-[11px] text-amber-600">
+                      {ar
+                        ? "بعض منتجات السلة لم تعد متوفرة ولن تدخل في الطلب."
+                        : "Some cart items are no longer available and won't be ordered."}
+                    </p>
+                  )}
+                  {preview.isError && (
+                    <button onClick={() => preview.refetch()} className="text-[11px] font-bold text-rose-500">
+                      {ar ? "تعذر حساب السعر. اضغط لإعادة المحاولة" : "Couldn't work out the price. Tap to retry"}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -461,7 +466,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
             </button>
             <button
               onClick={handleComplete}
-              disabled={placing}
+              disabled={placing || (!!user && !canOrder)}
               className="flex-1 h-12 rounded-xl text-white font-bold flex items-center justify-center gap-2 disabled:opacity-60 hover:opacity-90 transition"
               style={{ backgroundColor: TEAL }}
             >

@@ -8,7 +8,7 @@ import { BrandLogo } from "@/components/BrandLogo";
 import { FavoriteButton } from "@/components/FavoriteButton";
 import { getBrand } from "@/data/brands";
 import { BRANCHES, CITIES } from "@/data/offices";
-import { useProducts, type Product } from "@/lib/products";
+import { useProductsByBrand, type Product } from "@/lib/products";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { doc, getDoc } from "firebase/firestore";
@@ -99,7 +99,7 @@ function BrandDetail() {
   const [gov, setGov] = useState<string>("all");
   const [sort, setSort] = useState<Sort>("price");
 
-  const { data: allProducts = [], isLoading } = useProducts();
+  const { data: allProducts = [], isLoading } = useProductsByBrand([brand.name, brand.ar]);
 
   const brandProducts = useMemo(
     () => allProducts.filter((p) => matchesBrandName(p, brand.name, brand.ar)),

@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { Link } from "@tanstack/react-router";
+import { MessageCircle } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   X,
@@ -13,13 +15,14 @@ import {
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useUserRole } from "@/lib/useAuth";
-import { useProducts, useSignedImageUrls, productsQueryKey } from "@/lib/products";
+import { useProductsByIds, useSignedImageUrls, productsQueryKey } from "@/lib/products";
 import {
   updateOrderItemAvailability,
   confirmOrder,
   markOrderUnavailable,
   ordersQueryKey,
 } from "@/lib/orders";
+import { docMoneyRows } from "@/lib/promo";
 import type { OrderDoc } from "@/integrations/firebase/types";
 import { toast } from "sonner";
 
@@ -53,7 +56,7 @@ export function SupplierOrderDetailModal({
   const [busyIdx, setBusyIdx] = useState<number | null>(null);
   const [acting, setActing] = useState<"confirm" | "reject" | null>(null);
 
-  const { data: products = [] } = useProducts();
+  const { data: products = [] } = useProductsByIds((order.items ?? []).map((i) => i.productId));
   const productById = new Map(products.map((p) => [p.id, p]));
   const imagePaths = (order.items ?? [])
     .map((it) => productById.get(it.productId)?.images?.[0])
@@ -68,12 +71,6 @@ export function SupplierOrderDetailModal({
   const storePhone = role?.phone || "";
   const storeAddress = [role?.address, role?.city].filter(Boolean).join("، ");
   const doctorLocation = order.dentistAddress || "";
-  const iqdTotal = (order.items ?? [])
-    .filter((i) => i.currency === "IQD")
-    .reduce((s, i) => s + i.price * i.quantity, 0);
-  const usdTotal = (order.items ?? [])
-    .filter((i) => i.currency !== "IQD")
-    .reduce((s, i) => s + i.price * i.quantity, 0);
 
   const isPending = order.status === "pending";
 
@@ -195,9 +192,18 @@ export function SupplierOrderDetailModal({
           <div className="bg-white rounded-2xl border border-slate-100 shadow-soft overflow-hidden">
             <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
               <User className="size-4 text-slate-400" />
-              <span className="text-sm font-bold text-slate-700">
+              <span className="flex-1 text-sm font-bold text-slate-700">
                 {ar ? "معلومات الطبيب" : "Doctor Information"}
               </span>
+              {order.dentistId && (
+                <Link
+                  to="/messages"
+                  search={{ with: order.dentistId, withName: order.dentistName || "" }}
+                  className="flex h-8 items-center gap-1.5 rounded-lg bg-[#2563EB] px-3 text-xs font-bold text-white hover:bg-[#1D4ED8]"
+                >
+                  <MessageCircle className="size-3.5" /> {ar ? "مراسلة الطبيب" : "Message"}
+                </Link>
+              )}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2">
               <div className="px-4 py-3 border-b sm:border-b-0 sm:border-e border-slate-100">
@@ -257,6 +263,11 @@ export function SupplierOrderDetailModal({
                       <span className="text-sm font-bold text-slate-700 text-center">{item.quantity}</span>
 
                       <span className="text-xs text-slate-500 text-center">
+                        {(item.listPrice ?? item.price) > item.price && (
+                          <span className="block text-[10px] text-slate-400 line-through">
+                            {item.currency === "IQD" ? fmtIqd(item.listPrice ?? 0) : fmtUsd(item.listPrice ?? 0)}
+                          </span>
+                        )}
                         {item.currency === "IQD" ? fmtIqd(item.price) : fmtUsd(item.price)}
                       </span>
 
@@ -305,14 +316,12 @@ export function SupplierOrderDetailModal({
           <div className="bg-white rounded-2xl border border-slate-100 shadow-soft p-4">
             <p className="text-sm font-bold text-slate-700">{ar ? "ملخص الطلب" : "Order summary"}</p>
             <div className="mt-3 space-y-2.5 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-slate-500">{ar ? "الإجمالي بالدينار" : "Total (IQD)"}</span>
-                <span className="font-semibold">{fmtIqd(iqdTotal)}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-500">{ar ? "الإجمالي بالدولار" : "Total (USD)"}</span>
-                <span className="font-semibold">{fmtUsd(usdTotal)}</span>
-              </div>
+{docMoneyRows(order, ar).map((r) => (
+                <div key={r.key} className={`flex items-center justify-between ${r.tone === "saving" ? "text-emerald-600" : ""}`}>
+                  <span className={r.tone === "plain" ? "text-slate-500" : r.tone === "total" ? "font-bold" : ""}>{r.label}</span>
+                  <span dir="ltr" className={r.tone === "total" ? "font-display font-extrabold text-[#0E6E66]" : "font-semibold"}>{r.value}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>

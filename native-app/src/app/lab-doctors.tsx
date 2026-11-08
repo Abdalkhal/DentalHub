@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { ChevronDown, ChevronUp, Search, Stethoscope } from 'lucide-react-native';
+import { router } from 'expo-router';
+import { ChevronDown, ChevronUp, MessageCircle, Search, Stethoscope } from 'lucide-react-native';
 
 import { Screen, Text, Input } from '@/components/ui';
 import { useOrders, connectLabOrders, disconnectLabOrders } from '@/lib/ordersStore';
@@ -66,6 +67,9 @@ export default function LabDoctorsScreen() {
     return doctors.filter((d) => normalize(d.name).includes(q));
   }, [search, doctors]);
 
+  // The doctor's account (cases carry it; older ones may only have the typed name).
+  const selectedDentistId = selected?.orders.find((o) => o.dentistId)?.dentistId;
+
   if (selected) {
     return (
       <Screen>
@@ -78,6 +82,15 @@ export default function LabDoctorsScreen() {
               <Text numberOfLines={1} className="text-base font-extrabold text-slate-900">{selected.name}</Text>
               <Text className="mt-0.5 text-xs text-slate-400">{orderCountLabel(selected.orders.length, ar)}</Text>
             </View>
+            {!!selectedDentistId && (
+              <Pressable
+                onPress={() => router.push({ pathname: '/messages', params: { with: selectedDentistId, withName: selected.name } })}
+                className="h-10 flex-row items-center gap-1.5 rounded-xl bg-[#2563EB] px-3"
+              >
+                <MessageCircle size={16} color="#FFFFFF" />
+                <Text className="text-xs font-bold text-white">{ar ? 'مراسلة' : 'Message'}</Text>
+              </Pressable>
+            )}
           </View>
 
           <View className="gap-2">
