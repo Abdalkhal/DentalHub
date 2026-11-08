@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Image, Pressable, View } from 'react-native';
+import { Alert, Image, Linking, Pressable, View } from 'react-native';
 import { collection, doc, onSnapshot, query, updateDoc, where, writeBatch } from 'firebase/firestore';
 import { Bell, BellRing, CalendarCheck2, CalendarX2, CheckCheck, MessageCircle, Package, TicketPercent, Truck } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
@@ -7,7 +7,7 @@ import type { LucideIcon } from 'lucide-react-native';
 import { Screen, Text, Button } from '@/components/ui';
 import { db } from '@/integrations/firebase/client';
 import { useUserRole } from '@/lib/useAuth';
-import { registerPush, isPushSupported } from '@/lib/push';
+import { registerPush, isPushSupported, pushPermissionGranted } from '@/lib/push';
 import { openNotificationTarget } from '@/lib/notificationRoute';
 import { useI18n } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
@@ -72,8 +72,33 @@ export default function NotificationsScreen() {
   const { user } = useUserRole();
   const [notes, setNotes] = useState<Notif[]>([]);
   const [enabling, setEnabling] = useState(false);
-  const [pushOn, setPushOn] = useState(false);
+  // null while checking. This used to be a plain `false` on every visit —
+  // never read from the phone — so the "Enable" banner came back even after
+  // notifications were enabled.
+  const [pushOn, setPushOn] = useState<boolean | null>(null);
   const pushSupported = isPushSupported();
+
+  // Real state on open: if the phone already allows notifications, register
+  // this device silently (refreshing a missing or stale server record) and
+  // only offer "Enable" when it is actually off or registration failed.
+  useEffect(() => {
+    if (!user?.uid || !pushSupported) {
+      setPushOn(false);
+      return;
+    }
+    let live = true;
+    (async () => {
+      if (!(await pushPermissionGranted())) {
+        if (live) setPushOn(false);
+        return;
+      }
+      const { token } = await registerPush(user.uid);
+      if (live) setPushOn(!!token);
+    })();
+    return () => {
+      live = false;
+    };
+  }, [user?.uid, pushSupported]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -114,13 +139,28 @@ export default function NotificationsScreen() {
     if (token) {
       setPushOn(true);
       toast.success(ar ? 'تم تفعيل إشعارات الجهاز' : 'Push notifications enabled');
+    } else if (reason === 'permission-denied') {
+      // Once declined, Android/iOS won't show the prompt again — only the
+      // system settings can turn it back on. A dialog, not a toast: the toast
+      // was easy to miss, so tapping "Enable" looked like it did nothing.
+      Alert.alert(
+        ar ? 'الإشعارات متوقفة' : 'Notifications are off',
+        ar
+          ? 'فعّل الإشعارات لتطبيق Dent Hub من إعدادات الهاتف، ثم ارجع واضغط "تفعيل".'
+          : 'Turn on notifications for Dent Hub in your phone settings, then come back and tap "Enable".',
+        [
+          { text: ar ? 'إلغاء' : 'Cancel', style: 'cancel' },
+          { text: ar ? 'فتح الإعدادات' : 'Open settings', onPress: () => void Linking.openSettings() },
+        ],
+      );
     } else {
-      toast.error(
-        reason
-          ? `${ar ? 'تعذر التفعيل' : 'Could not enable'}: ${reason}`
-          : ar
-            ? 'تعذر تفعيل الإشعارات'
-            : 'Could not enable notifications',
+      Alert.alert(
+        ar ? 'تعذر تفعيل الإشعارات' : 'Could not enable notifications',
+        ar
+          ? `حاول مرة أخرى بعد التأكد من الاتصال بالإنترنت.${reason ? `
+(${reason})` : ''}`
+          : `Check your internet connection and try again.${reason ? `
+(${reason})` : ''}`,
       );
     }
   };
@@ -142,7 +182,7 @@ export default function NotificationsScreen() {
 
   return (
     <Screen>
-      {!pushOn && (
+      {pushOn === false && (
         <View className="flex-row items-center gap-3 rounded-2xl border border-sky-100 bg-sky-50 p-3.5">
           <View className="h-11 w-11 items-center justify-center rounded-2xl bg-sky-100">
             <BellRing size={20} color="#0369A1" />

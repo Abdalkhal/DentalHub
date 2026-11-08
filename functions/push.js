@@ -82,14 +82,15 @@ module.exports = function push(admin, fetchImpl) {
     // An Android phone with a Firebase token is reached through Firebase only;
     // its Expo token would deliver the same notification twice once Expo can.
     const viaFcm = !!fcm;
-    await devicesRef(uid).set(
-      {
-        fcm: viaFcm ? FV.arrayUnion(fcm) : FV.arrayUnion(),
-        expo: !viaFcm && expo ? FV.arrayUnion(expo) : FV.arrayUnion(),
-        updatedAt: Date.now(),
-      },
-      { merge: true },
-    );
+    // Only the list that gets a token is written. An empty
+    // `FV.arrayUnion()` (meant as "leave this list alone") is rejected by
+    // Firestore ("requires at least 1 argument"), which made every
+    // registration throw — no device was ever saved, so no push could be
+    // delivered and the app's "Enable" button never took.
+    const update = { updatedAt: Date.now() };
+    if (viaFcm) update.fcm = FV.arrayUnion(fcm);
+    else update.expo = FV.arrayUnion(expo);
+    await devicesRef(uid).set(update, { merge: true });
     if (viaFcm && expo) {
       await devicesRef(uid).update({ expo: FV.arrayRemove(expo) });
     }
