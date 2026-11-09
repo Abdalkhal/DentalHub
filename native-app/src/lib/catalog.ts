@@ -20,11 +20,13 @@ export type CatalogItem = {
   sub: string;
   /** English country name, when known. */
   country: string;
-  /** Product photo URL from the source store; empty when none was found. */
+  /** Main product photo URL; empty when the product has none. */
   image: string;
+  /** All the product's photos, main one first; empty when none. */
+  images: string[];
 };
 
-type RawItem = { i: string; n: string; b: string; s: string; u: string; c: string; g?: string };
+type RawItem = { i: string; n: string; b: string; s: string; u: string; c: string; g?: string; x?: string[] };
 
 const HOSTED = "https://dental-hub-df069.web.app";
 
@@ -42,7 +44,10 @@ export function useCatalog() {
       const res = await fetch(catalogUrl());
       if (!res.ok) throw new Error(`catalog ${res.status}`);
       const raw = (await res.json()) as RawItem[];
-      return raw.map((r) => ({ id: r.i, en: r.n, brand: r.b, branch: r.s, sub: r.u, country: r.c, image: r.g ?? "" }));
+      return raw.map((r) => ({
+        id: r.i, en: r.n, brand: r.b, branch: r.s, sub: r.u, country: r.c, image: r.g ?? "",
+        images: [r.g ?? "", ...(r.x ?? [])].filter(Boolean),
+      }));
     },
   });
 }
@@ -162,10 +167,10 @@ export function draftError(d: ListingDraft, ar: boolean): string | null {
  * @return how many products were updated.
  */
 export async function fillMissingImages(mine: Product[], items: CatalogItem[]): Promise<number> {
-  const byId = new Map(items.map((i) => [i.id, i.image]));
-  const todo = mine.filter((p) => p.catalogId && p.images.length === 0 && byId.get(p.catalogId));
+  const byId = new Map(items.map((i) => [i.id, i.images]));
+  const todo = mine.filter((p) => p.catalogId && p.images.length === 0 && byId.get(p.catalogId)?.length);
   await Promise.all(
-    todo.map((p) => updateDoc(doc(db, "products", p.id), { images: [byId.get(p.catalogId!)!] }).catch(() => {})),
+    todo.map((p) => updateDoc(doc(db, "products", p.id), { images: byId.get(p.catalogId!)! }).catch(() => {})),
   );
   return todo.length;
 }
@@ -199,7 +204,7 @@ export async function publishListings(officeId: string, drafts: ListingDraft[]):
           purchasePrice: d.purchasePrice.trim() ? parseAmount(d.purchasePrice) : null,
           countryOrigin: d.countryAr || null,
           expiryDate: d.expiryDate.trim() || null,
-          images: d.item.image ? [d.item.image] : [],
+          images: d.item.images,
           createdAt: serverTimestamp(),
         },
         { merge: true },

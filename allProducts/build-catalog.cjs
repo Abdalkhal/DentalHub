@@ -2,7 +2,7 @@
 //
 //   node allProducts/build-catalog.cjs
 //
-// Keeps the name, brand, section, sub-section, country and product image.
+// Keeps the name, brand, section, sub-section, country and product photos.
 // Prices and source links are never carried over. Writes:
 //   public/catalog/products.json   what the app loads
 //   allProducts/catalog.csv        the same thing, to read or edit by eye
@@ -12,10 +12,21 @@ const path = require("path");
 
 const ROOT = path.join(__dirname, "..");
 
-// Source image URL -> our Firebase Storage copy, or "" where the source image
-// no longer exists (see upload-images-to-storage.mjs).
-const STORAGE_IMAGES_PATH = path.join(__dirname, "storage-images.json");
-const STORAGE_IMAGES = fs.existsSync(STORAGE_IMAGES_PATH) ? JSON.parse(fs.readFileSync(STORAGE_IMAGES_PATH, "utf8")) : {};
+// Product slug (last part of its `url`) -> its photos in Firebase Storage,
+// first one the main photo. Written by upload-photos.mjs from "dental photos".
+const PHOTOS_PATH = path.join(__dirname, "catalog-photos.json");
+const PHOTOS = fs.existsSync(PHOTOS_PATH) ? JSON.parse(fs.readFileSync(PHOTOS_PATH, "utf8")) : {};
+const PHOTO_SLUGS = Object.keys(PHOTOS);
+
+/** A product's photos, by the slug of its source url. Some photo folders carry
+ *  a shortened or lengthened slug, so a unique prefix match is accepted too. */
+function photosFor(url) {
+  const slug = (url || "").split("/").pop();
+  if (!slug) return [];
+  if (PHOTOS[slug]) return PHOTOS[slug];
+  const near = PHOTO_SLUGS.filter((k) => k.startsWith(slug) || slug.startsWith(k));
+  return near.length === 1 ? PHOTOS[near[0]] : [];
+}
 
 /* ── Reading the CSV ─────────────────────────────── */
 
@@ -470,7 +481,7 @@ for (const d of data) {
   let id = slug(`${unbranded ? "generic" : brand}-${en}`);
   while (ids.has(id)) id += "-2";
   ids.add(id);
-  const row = { id, en, brand: unbranded ? "" : brand, branch, sub: sub || "", image: (d.image in STORAGE_IMAGES ? STORAGE_IMAGES[d.image] : d.image) || "" };
+  const row = { id, en, brand: unbranded ? "" : brand, branch, sub: sub || "", images: photosFor(d.url) };
   const country = countryOf(brand);
   if (country) row.country = country;
   seen.set(key, row);
@@ -483,11 +494,17 @@ fs.mkdirSync(path.join(ROOT, "public/catalog"), { recursive: true });
 // Short keys: this file is fetched by phones.
 fs.writeFileSync(
   path.join(ROOT, "public/catalog/products.json"),
-  JSON.stringify(out.map((r) => ({ i: r.id, n: r.en, b: r.brand, s: r.branch, u: r.sub, c: r.country || "", g: r.image || "" }))),
+  // g: main photo; x: the product's other photos, only when it has more.
+  JSON.stringify(
+    out.map((r) => ({
+      i: r.id, n: r.en, b: r.brand, s: r.branch, u: r.sub, c: r.country || "", g: r.images[0] || "",
+      ...(r.images.length > 1 ? { x: r.images.slice(1) } : {}),
+    })),
+  ),
 );
 fs.writeFileSync(
   path.join(__dirname, "catalog.csv"),
-  "﻿" + ["id,name,brand,section,subsection,country,image", ...out.map((r) => [r.id, r.en, r.brand, r.branch, r.sub, r.country || "", r.image || ""].map(csvCell).join(","))].join("\n"),
+  "﻿" + ["id,name,brand,section,subsection,country,image", ...out.map((r) => [r.id, r.en, r.brand, r.branch, r.sub, r.country || "", r.images[0] || ""].map(csvCell).join(","))].join("\n"),
 );
 fs.writeFileSync(
   path.join(__dirname, "review.csv"),
