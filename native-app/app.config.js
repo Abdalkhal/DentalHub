@@ -10,7 +10,7 @@ module.exports = {
   expo: {
     name: "Dent Hub",
     slug: "native-app",
-    version: "1.0.1",
+    version: "1.0.2",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
     scheme: "dentalhub",

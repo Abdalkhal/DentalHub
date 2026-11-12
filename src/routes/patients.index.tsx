@@ -18,7 +18,10 @@ import { setClinicsStoreUser } from "@/lib/clinicsStore";
 import { useSession } from "@/lib/useAuth";
 import { setActiveClinic, useClinics } from "@/lib/clinicsStore";
 import { usePatientCountsByClinic } from "@/lib/patientClinicCounts";
-import { ArrowRight, ArrowLeft, Phone, Plus, Search, Users, X, CalendarDays, ChevronDown, CloudOff, Loader2 } from "lucide-react";
+import { ArrowRight, ArrowLeft, Phone, Plus, Search, Users, X, CalendarClock, ChevronDown, CloudOff, Loader2, MessageCircle } from "lucide-react";
+import { useAppointments, type Appointment } from "@/lib/appointmentsStore";
+import { avatarColor, initial, nextVisits, patientsCount, shortDate } from "@/lib/patientList";
+import { whatsappLink } from "@/lib/booking";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/patients/")({
@@ -63,6 +66,8 @@ function PatientsPage() {
   }, [user?.uid]);
 
   const patients = usePatients();
+  const appointments = useAppointments();
+  const upcoming = useMemo(() => nextVisits(patients, appointments), [patients, appointments]);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<PatientStatus | "all">("all");
   const [open, setOpen] = useState(false);
@@ -75,21 +80,31 @@ function PatientsPage() {
       return okQ && (status === "all" || p.status === status);
     });
   }, [patients, q, status]);
+  const counts = useMemo(() => {
+    const c: Record<PatientStatus | "all", number> = { all: patients.length, new: 0, in_treatment: 0, completed: 0 };
+    for (const p of patients) c[p.status] += 1;
+    return c;
+  }, [patients]);
 
   return (
     <MobileShell wide>
       <header className="px-3 pt-4 pb-3 bg-gradient-to-b from-[oklch(0.97_0.02_240)] to-transparent md:px-6 md:pt-8 md:pb-5 lg:px-8 lg:max-w-6xl lg:mx-auto">
-        <div className="flex items-center gap-2">
-          <Link to="/clinic" className="size-9 rounded-full bg-card border border-border flex items-center justify-center shadow-sm">
+        <div className="flex items-center gap-2.5">
+          <Link to="/clinic" className="size-9 rounded-full bg-white border border-[#DCE7F5] flex items-center justify-center text-[#0F2747] shadow-sm" aria-label={ar ? "رجوع" : "Back"}>
             <Back className="size-4" />
           </Link>
           <div className="flex-1 min-w-0">
-            <h1 className="font-display font-extrabold text-lg leading-tight md:text-3xl">{ar ? "سجل المرضى" : "Patient Records"}</h1>
-            <p className="text-[11px] text-muted-foreground md:text-sm md:mt-1">{ar ? "إدارة ملفات ومعلومات المرضى" : "Manage patient files & info"}</p>
+            <h1 className="font-display font-extrabold text-lg leading-tight text-[#0F2747] md:text-3xl">{ar ? "المرضى" : "Patients"}</h1>
+            <p className="text-xs font-bold text-[#5B6B82] md:mt-1 md:text-sm">{patientsCount(patients.length, ar)}</p>
           </div>
-          <span className="size-10 rounded-2xl bg-[oklch(0.93_0.06_250)] ring-1 ring-[oklch(0.82_0.1_250)] text-[oklch(0.45_0.18_256)] flex items-center justify-center md:size-14">
-            <Users className="size-5" />
-          </span>
+          {/* md:+ : the add button sits with the title; phones get a floating one. */}
+          <button
+            onClick={() => setOpen(true)}
+            className="hidden h-11 items-center gap-2 rounded-xl bg-[#1D6FE8] px-5 font-display text-sm font-extrabold text-white shadow-[0_8px_18px_-8px_rgba(29,78,216,0.6)] transition hover:brightness-110 md:flex"
+          >
+            <Plus className="size-4" strokeWidth={3} />
+            {ar ? "مريض جديد" : "New patient"}
+          </button>
         </div>
 
       <SyncNotice ar={ar} />
@@ -102,9 +117,9 @@ function PatientsPage() {
             onChange={(e) => setQ(e.target.value)}
             type="search"
             placeholder={ar ? "ابحث بالاسم أو الهاتف أو رقم الملف…" : "Search name, phone or file ID…"}
-            className="w-full h-12 rounded-2xl bg-card border border-border ps-4 pe-11 text-sm focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-primary shadow-sm"
+            className="w-full h-12 rounded-2xl bg-white border border-[#CFDDF0] ps-4 pe-11 text-sm text-[#0F2747] placeholder:text-[#8A9AB0] focus:outline-none focus:ring-2 focus:ring-[#1D6FE8]/25 focus:border-[#1D6FE8] shadow-[0_4px_14px_-8px_rgba(30,58,138,0.25)]"
           />
-          <Search className="size-4 absolute top-1/2 -translate-y-1/2 end-4 text-muted-foreground pointer-events-none" />
+          <Search className="size-[18px] absolute top-1/2 -translate-y-1/2 end-4 text-[#1D6FE8] pointer-events-none" />
         </div>
 
         <div className="mt-2.5 flex items-center gap-1.5 overflow-x-auto no-scrollbar md:mt-0 md:overflow-visible md:gap-2">
@@ -113,26 +128,22 @@ function PatientsPage() {
               key={s}
               onClick={() => setStatus(s)}
               className={cn(
-                "h-8 px-3 rounded-full text-[11px] font-bold border whitespace-nowrap transition",
-                status === s ? "bg-primary text-primary-foreground border-primary" : "bg-card text-muted-foreground border-border"
+                "h-8 ps-3 pe-1.5 rounded-full text-[11px] font-bold border whitespace-nowrap transition inline-flex items-center gap-1.5",
+                status === s ? "bg-[#1D6FE8] text-white border-[#1D6FE8]" : "bg-white text-[#5B6B82] border-[#DCE7F5] hover:border-[#1D6FE8]/40"
               )}
             >
               {s === "all" ? (ar ? "الكل" : "All") : ar ? STATUS_META[s].ar : STATUS_META[s].en}
+              <span className={cn("min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-extrabold flex items-center justify-center", status === s ? "bg-white/25 text-white" : "bg-[#EEF3FA] text-[#0F2747]")}>
+                {counts[s]}
+              </span>
             </button>
           ))}
         </div>
 
-        <button
-          onClick={() => setOpen(true)}
-          className="mt-3 w-full h-12 rounded-2xl bg-primary text-primary-foreground font-display font-extrabold text-sm shadow-card flex items-center justify-center gap-2 hover:brightness-105 transition md:mt-0 md:w-auto md:h-11 md:px-6 md:ms-auto md:rounded-xl"
-        >
-          <Plus className="size-4" strokeWidth={3} />
-          {ar ? "إضافة مريض جديد" : "Add new patient"}
-        </button>
         </div>
       </header>
 
-      <section className="px-3 pb-6 space-y-2.5 md:px-6 md:pb-12 md:space-y-0 md:grid md:grid-cols-2 md:gap-4 xl:grid-cols-3 md:items-start lg:px-8 lg:max-w-6xl lg:mx-auto">
+      <section className="px-3 pb-28 space-y-2 md:px-6 md:pb-12 md:space-y-0 md:grid md:grid-cols-2 md:gap-4 xl:grid-cols-3 md:items-start lg:px-8 lg:max-w-6xl lg:mx-auto">
         {list.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center md:col-span-full md:py-16">
             <Users className="size-8 mx-auto text-muted-foreground/50" />
@@ -142,67 +153,113 @@ function PatientsPage() {
             </p>
           </div>
         ) : (
-          list.map((p) => <PatientCard key={p.id} p={p} ar={ar} />)
+          list.map((p) => <PatientCard key={p.id} p={p} ar={ar} next={upcoming.get(p.id)} />)
         )}
       </section>
+
+      {/* Phones: a floating add button, so it doesn't split the filters from their results. */}
+      <button
+        onClick={() => setOpen(true)}
+        className="fixed bottom-20 end-4 z-30 flex h-14 items-center gap-2 rounded-full bg-[#1D6FE8] px-5 font-display text-sm font-extrabold text-white shadow-[0_10px_24px_-8px_rgba(29,78,216,0.7)] md:hidden"
+        aria-label={ar ? "إضافة مريض جديد" : "Add new patient"}
+      >
+        <Plus className="size-5" strokeWidth={2.8} />
+        {ar ? "مريض جديد" : "New patient"}
+      </button>
 
       {open && <PatientModal ar={ar} onClose={() => setOpen(false)} />}
     </MobileShell>
   );
 }
 
-function PatientCard({ p, ar }: { p: Patient; ar: boolean }) {
+/**
+ * One patient on a compact row: avatar, name and status, then the next visit
+ * (or the last one), with call / WhatsApp buttons when there is a phone.
+ * Empty fields are left out instead of showing a dash.
+ */
+function PatientCard({ p, ar, next }: { p: Patient; ar: boolean; next?: Appointment }) {
   const meta = STATUS_META[p.status];
+  const av = avatarColor(p.name);
+  const age = p.age ? `${p.age} ${ar ? "سنة" : "yrs"}` : "";
+  const last = p.lastVisit ? `${ar ? "آخر زيارة" : "Last visit"} ${shortDate(p.lastVisit, ar)}` : "";
+  const stop = (e: React.SyntheticEvent) => e.stopPropagation();
   return (
     <Link
       to="/patients/$patientId"
       params={{ patientId: p.id }}
-      className="block rounded-2xl bg-card border border-border p-3.5 shadow-soft hover:shadow-card transition md:h-full md:p-4 md:shadow-none md:hover:shadow-lg md:hover:border-primary/30"
+      className="flex items-center gap-3 rounded-[18px] border border-[#DCE7F5] bg-white px-3 py-2.5 shadow-[0_4px_14px_-8px_rgba(30,58,138,0.25)] transition hover:border-[#1D6FE8]/40 hover:shadow-md md:px-4 md:py-3"
     >
-      <div className="flex items-start gap-3">
-        <span className="size-11 shrink-0 rounded-2xl bg-[oklch(0.95_0.04_250)] text-[oklch(0.45_0.18_256)] font-display font-extrabold flex items-center justify-center md:size-12 md:text-lg">
-          {p.name.trim().charAt(0) || "?"}
-        </span>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <p className="font-display font-extrabold text-sm truncate">{p.name}</p>
-            <div
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-              }}
-              className={cn(
-                "shrink-0 inline-flex items-center rounded-full ring-1 ring-black/10 shadow-sm cursor-pointer",
-                meta.cls,
-              )}
+      <span
+        className="size-11 shrink-0 rounded-full font-display text-base font-extrabold flex items-center justify-center md:size-12"
+        style={{ backgroundColor: av.bg, color: av.fg }}
+      >
+        {initial(p.name)}
+      </span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5">
+          <p className="font-display font-extrabold text-[14px] text-[#0F2747] truncate">{p.name}</p>
+          <div
+            onPointerDown={stop}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            className={cn("shrink-0 inline-flex items-center rounded-full cursor-pointer", meta.cls)}
+          >
+            <select
+              value={p.status}
+              onChange={(e) => updatePatient(p.id, { status: e.target.value as PatientStatus })}
+              title={ar ? "تغيير حالة العلاج من هنا" : "Change treatment status here"}
+              className="bg-transparent text-[10px] font-bold appearance-none outline-none cursor-pointer ps-2 py-0.5 pe-0.5 text-center"
             >
-              <select
-                value={p.status}
-                onChange={(e) => updatePatient(p.id, { status: e.target.value as PatientStatus })}
-                title={ar ? "تغيير حالة العلاج من هنا" : "Change treatment status here"}
-                className="bg-transparent text-[10px] font-bold appearance-none outline-none cursor-pointer ps-2 py-1 pe-0.5 text-center"
-              >
-                {(["new", "in_treatment", "completed"] as const).map((s) => (
-                  <option key={s} value={s}>
-                    {ar ? STATUS_META[s].ar : STATUS_META[s].en}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="size-3 me-1.5 pointer-events-none opacity-70" />
-            </div>
-          </div>
-          <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground flex-wrap">
-            <span className="font-semibold whitespace-nowrap">{p.fileNo}</span>
-            <span className="text-slate-300">·</span>
-            <span className="whitespace-nowrap">{p.age || "—"} {ar ? "سنة" : "yrs"}</span>
-          </div>
-          <div className="mt-1.5 flex items-center gap-3 text-[11px] text-muted-foreground">
-            <span className="flex items-center gap-1"><Phone className="size-3" />{p.phone || "—"}</span>
-            <span className="flex items-center gap-1"><CalendarDays className="size-3" />{p.lastVisit}</span>
+              {(["new", "in_treatment", "completed"] as const).map((st) => (
+                <option key={st} value={st}>
+                  {ar ? STATUS_META[st].ar : STATUS_META[st].en}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="size-3 me-1.5 pointer-events-none opacity-70" />
           </div>
         </div>
+        {next ? (
+          <p className="mt-1 flex items-center gap-1 truncate text-[11.5px] font-bold text-[#1D6FE8]">
+            <CalendarClock className="size-3.5 shrink-0" />
+            {ar ? "موعد قادم" : "Next visit"} {shortDate(next.date, ar)}
+            {next.time && (
+              <>
+                {" · "}
+                <bdi dir="ltr">{next.time}</bdi>
+              </>
+            )}
+          </p>
+        ) : (
+          <p className="mt-1 truncate text-[11.5px] text-[#5B6B82]">{[age, last].filter(Boolean).join(" · ")}</p>
+        )}
+        <p className="mt-0.5 truncate text-[10px] text-slate-400">{[next ? age : "", p.fileNo].filter(Boolean).join(" · ")}</p>
       </div>
+      {p.phone && (
+        <div className="flex shrink-0 items-center gap-1.5">
+          <a
+            href={`tel:${p.phone}`}
+            onClick={stop}
+            className="flex size-9 items-center justify-center rounded-full bg-[#E8F1FE] text-[#1D6FE8] hover:bg-[#d8e8fe]"
+            aria-label={ar ? "اتصال" : "Call"}
+            title={p.phone}
+          >
+            <Phone className="size-4" />
+          </a>
+          <a
+            href={whatsappLink(p.phone, "")}
+            target="_blank"
+            rel="noreferrer"
+            onClick={stop}
+            className="flex size-9 items-center justify-center rounded-full bg-[#E3F7EC] text-[#15803D] hover:bg-[#d2f2df]"
+            aria-label="WhatsApp"
+          >
+            <MessageCircle className="size-4" />
+          </a>
+        </div>
+      )}
     </Link>
   );
 }
@@ -320,26 +377,26 @@ function SyncNotice({ ar }: { ar: boolean }) {
 function OtherClinicsNotice({ ar, uid }: { ar: boolean; uid?: string }) {
   const { clinics, activeClinicId } = useClinics();
   const counts = usePatientCountsByClinic(clinics.length > 1 ? uid : undefined);
+  const [hidden, setHidden] = useState(false);
   const others = clinics.filter((c) => c.id !== activeClinicId && (counts[c.id] ?? 0) > 0);
-  if (others.length === 0) return null;
+  if (hidden || others.length === 0) return null;
   return (
-    <div className="mt-3 space-y-2 md:max-w-xl">
+    <div className="mt-2.5 space-y-1.5 md:max-w-xl">
       {others.map((c) => (
-        <div key={c.id} className="flex items-center gap-3 rounded-2xl border border-sky-200 bg-sky-50 p-3">
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-bold text-sky-900">
-              {ar ? `لديك ${counts[c.id]} مريض في «${c.name}»` : `You have ${counts[c.id]} patient(s) in “${c.name}”`}
-            </p>
-            <p className="mt-0.5 text-[11px] text-sky-800">
-              {ar ? "كل عيادة لها مرضاها. بدّل العيادة لعرضهم." : "Each clinic has its own patients. Switch to see them."}
-            </p>
-          </div>
+        <div key={c.id} className="flex h-10 items-center gap-2 rounded-xl border border-[#DCE7F5] bg-white ps-3 pe-1.5 text-xs text-[#5B6B82]">
+          <Users className="size-3.5 shrink-0" />
+          <span className="min-w-0 flex-1 truncate">
+            {ar ? `${patientsCount(counts[c.id], true)} في «${c.name}»` : `${patientsCount(counts[c.id], false)} in “${c.name}”`}
+          </span>
           <button
             type="button"
             onClick={() => setActiveClinic(c.id)}
-            className="shrink-0 rounded-xl bg-sky-600 px-3 py-2 text-xs font-bold text-white hover:bg-sky-700"
+            className="h-7 shrink-0 rounded-lg bg-[#E8F1FE] px-2.5 text-[11px] font-extrabold text-[#1D6FE8] hover:bg-[#d8e8fe]"
           >
-            {ar ? "عرض مرضاها" : "Show them"}
+            {ar ? "عرض" : "Show"}
+          </button>
+          <button type="button" onClick={() => setHidden(true)} className="flex size-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100" aria-label={ar ? "إخفاء" : "Hide"}>
+            <X className="size-3.5" />
           </button>
         </div>
       ))}

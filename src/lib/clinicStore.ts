@@ -144,6 +144,17 @@ export function clinicTotals(d: ClinicState, currency: Currency = "IQD") {
   return { income, expense, net: income - expense, dueOrders };
 }
 
+/**
+ * Income recorded today, per currency. Movements are dated with the UTC day
+ * when they are added (addTransaction), so today is read the same way.
+ */
+export function todayIncome(d: ClinicState): Record<Currency, number> {
+  const day = new Date().toISOString().split("T")[0];
+  const out: Record<Currency, number> = { IQD: 0, USD: 0 };
+  for (const t of d.transactions) if (t.kind === "income" && t.date === day) out[txCurrency(t)] += t.amount;
+  return out;
+}
+
 /* ── Mutations ─────────────────────────────── */
 
 export function addTransaction(t: Omit<Transaction, "id" | "date">) {

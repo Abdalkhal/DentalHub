@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { KeyboardAwareScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import { router } from 'expo-router';
-import { CalendarDays, ChevronLeft, ChevronRight, CloudOff, Phone, Plus, Search, Users, X } from 'lucide-react-native';
+import { CalendarClock, CloudOff, MessageCircle, Phone, Plus, Search, Users, X } from 'lucide-react-native';
 import { toast } from '@/lib/toast';
 
 import { Screen, Text } from '@/components/ui';
@@ -22,6 +22,23 @@ import { cn } from '@/lib/utils';
 import { useSession } from '@/lib/useAuth';
 import { setActiveClinic, useClinics } from '@/lib/clinicsStore';
 import { usePatientCountsByClinic } from '@/lib/patientClinicCounts';
+import { useAppointments, type Appointment } from '@/lib/appointmentsStore';
+import { avatarColor, initial, nextVisits, patientsCount, shortDate } from '@/lib/patientList';
+import { whatsappLink } from '@/lib/booking';
+
+// The clinic's blue, navy text and soft lines (same as Home and My Clinic).
+const BLUE = '#1D6FE8';
+const NAVY = '#0F2747';
+const MUTED = '#5B6B82';
+const LINE = '#DCE7F5';
+const softShadow = {
+  shadowColor: '#1E3A8A',
+  shadowOpacity: 0.07,
+  shadowRadius: 10,
+  shadowOffset: { width: 0, height: 4 },
+  elevation: 2,
+} as const;
+
 
 // Plain color values instead of NativeWind bg-*/text-* classes: this badge
 // re-renders every time `cycleStatus` fires (many at once in a long patient
@@ -47,52 +64,85 @@ const HISTORY_LABELS: Array<{ key: keyof MedicalHistory; ar: string; en: string 
 
 const FILTERS = ['all', 'in_treatment', 'completed', 'new'] as const;
 
-function PatientCard({ p, ar }: { p: Patient; ar: boolean }) {
+/**
+ * One patient on a compact row: avatar, name and status, then the next visit
+ * (or the last one), with call / WhatsApp buttons when there is a phone.
+ * Empty fields are left out instead of showing a dash.
+ */
+function PatientCard({ p, ar, next }: { p: Patient; ar: boolean; next?: Appointment }) {
   const meta = STATUS_META[p.status];
+  const av = avatarColor(p.name);
   const cycleStatus = () => {
-    const next = STATUS_CYCLE[(STATUS_CYCLE.indexOf(p.status) + 1) % STATUS_CYCLE.length];
-    updatePatient(p.id, { status: next });
+    const nextStatus = STATUS_CYCLE[(STATUS_CYCLE.indexOf(p.status) + 1) % STATUS_CYCLE.length];
+    updatePatient(p.id, { status: nextStatus });
   };
+  const age = p.age ? `${p.age} ${ar ? 'سنة' : 'yrs'}` : '';
+  const last = p.lastVisit ? `${ar ? 'آخر زيارة' : 'Last visit'} ${shortDate(p.lastVisit, ar)}` : '';
   return (
     <Pressable
       onPress={() => router.push({ pathname: '/patient/[patientId]', params: { patientId: p.id } })}
-      className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm"
+      className="flex-row items-center gap-3 rounded-[18px] border bg-white px-3 py-2.5"
+      style={{ borderColor: LINE, ...softShadow }}
     >
-      <View className="flex-row items-start gap-3">
-        <View className="h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sky-50">
-          <Text className="text-base font-extrabold text-sky-700">{p.name.trim().charAt(0) || '؟'}</Text>
-        </View>
-        <View className="min-w-0 flex-1">
-          <View className="flex-row items-center gap-2">
-            <Text numberOfLines={1} className="flex-shrink text-sm font-extrabold text-slate-900">
-              {p.name}
-            </Text>
-            <Pressable
-              onPress={cycleStatus}
-              style={{ flexShrink: 0, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: meta.bg }}
-            >
-              <Text className="font-bold" style={{ fontSize: 10, color: meta.text }}>{ar ? meta.ar : meta.en}</Text>
-            </Pressable>
-          </View>
-          <View className="mt-0.5 flex-row flex-wrap items-center gap-1.5">
-            <Text className="text-[11px] font-semibold text-slate-500">{p.fileNo}</Text>
-            <Text className="text-[11px] text-slate-300">·</Text>
-            <Text className="text-[11px] text-slate-500">
-              {p.age || '—'} {ar ? 'سنة' : 'yrs'}
-            </Text>
-          </View>
-          <View className="mt-1.5 flex-row items-center gap-3">
-            <View className="flex-row items-center gap-1">
-              <Phone size={11} color="#94A3B8" />
-              <Text className="text-[11px] text-slate-500">{p.phone || '—'}</Text>
-            </View>
-            <View className="flex-row items-center gap-1">
-              <CalendarDays size={11} color="#94A3B8" />
-              <Text className="text-[11px] text-slate-500">{p.lastVisit}</Text>
-            </View>
-          </View>
-        </View>
+      <View className="h-11 w-11 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: av.bg }}>
+        <Text className="text-base font-extrabold" style={{ color: av.fg }}>
+          {initial(p.name)}
+        </Text>
       </View>
+      <View className="min-w-0 flex-1">
+        <View className="flex-row items-center gap-1.5">
+          <Text numberOfLines={1} className="flex-shrink text-[14px] font-extrabold" style={{ color: NAVY }}>
+            {p.name}
+          </Text>
+          <Pressable
+            onPress={cycleStatus}
+            hitSlop={4}
+            style={{ flexShrink: 0, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, backgroundColor: meta.bg }}
+          >
+            <Text className="font-bold" style={{ fontSize: 10, color: meta.text }}>
+              {ar ? meta.ar : meta.en}
+            </Text>
+          </Pressable>
+        </View>
+        {next ? (
+          <View className="mt-1 flex-row items-center gap-1">
+            <CalendarClock size={12} color={BLUE} />
+            <Text numberOfLines={1} className="flex-shrink text-[11.5px] font-bold" style={{ color: BLUE }}>
+              {ar ? 'موعد قادم' : 'Next visit'} {shortDate(next.date, ar)}
+              {next.time ? ` · ${'\u2066' + next.time + '\u2069'}` : ''}
+            </Text>
+          </View>
+        ) : (
+          <Text numberOfLines={1} className="mt-1 text-[11.5px]" style={{ color: MUTED }}>
+            {[age, last].filter(Boolean).join(' · ')}
+          </Text>
+        )}
+        <Text numberOfLines={1} className="mt-0.5 text-[10px]" style={{ color: '#94A3B8' }}>
+          {[next ? age : '', p.fileNo].filter(Boolean).join(' · ')}
+        </Text>
+      </View>
+      {!!p.phone && (
+        <View className="flex-row items-center gap-1.5">
+          <Pressable
+            onPress={() => Linking.openURL(`tel:${p.phone}`)}
+            hitSlop={4}
+            className="h-9 w-9 items-center justify-center rounded-full"
+            style={{ backgroundColor: '#E8F1FE' }}
+            accessibilityLabel={ar ? 'اتصال' : 'Call'}
+          >
+            <Phone size={16} color={BLUE} />
+          </Pressable>
+          <Pressable
+            onPress={() => Linking.openURL(whatsappLink(p.phone, ''))}
+            hitSlop={4}
+            className="h-9 w-9 items-center justify-center rounded-full"
+            style={{ backgroundColor: '#E3F7EC' }}
+            accessibilityLabel="WhatsApp"
+          >
+            <MessageCircle size={16} color="#15803D" />
+          </Pressable>
+        </View>
+      )}
     </Pressable>
   );
 }
@@ -101,6 +151,8 @@ export default function PatientsScreen() {
   const { lang } = useI18n();
   const ar = lang === 'ar';
   const patients = usePatients();
+  const appointments = useAppointments();
+  const upcoming = useMemo(() => nextVisits(patients, appointments), [patients, appointments]);
   const [q, setQ] = useState('');
   const [status, setStatus] = useState<PatientStatus | 'all'>('all');
   const [showAdd, setShowAdd] = useState(false);
@@ -112,25 +164,18 @@ export default function PatientsScreen() {
       return okQ && (status === 'all' || p.status === status);
     });
   }, [patients, q, status]);
+  const counts = useMemo(() => {
+    const c: Record<PatientStatus | 'all', number> = { all: patients.length, new: 0, in_treatment: 0, completed: 0 };
+    for (const p of patients) c[p.status] += 1;
+    return c;
+  }, [patients]);
 
   return (
     <Screen scroll={false}>
-      <View className="flex-row items-center gap-2">
-        <Pressable onPress={() => router.back()} className="h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm">
-          {ar ? <ChevronRight size={16} color="#334155" /> : <ChevronLeft size={16} color="#334155" />}
-        </Pressable>
-        <View className="min-w-0 flex-1">
-          <Text className="text-lg font-extrabold leading-tight text-slate-900">
-            {ar ? 'سجل المرضى' : 'Patient Records'}
-          </Text>
-          <Text className="text-[11px] text-slate-400">
-            {ar ? 'إدارة ملفات ومعلومات المرضى' : 'Manage patient files & info'}
-          </Text>
-        </View>
-        <View className="h-10 w-10 items-center justify-center rounded-2xl bg-sky-50">
-          <Users size={18} color="#0369A1" />
-        </View>
-      </View>
+      {/* The screen title is in the header; here only how many patients there are. */}
+      <Text className="text-[12px] font-bold" style={{ color: MUTED }}>
+        {patientsCount(patients.length, ar)}
+      </Text>
 
       <SyncNotice ar={ar} />
       <OtherClinicsNotice ar={ar} />
@@ -140,11 +185,12 @@ export default function PatientsScreen() {
           value={q}
           onChangeText={setQ}
           placeholder={ar ? 'ابحث بالاسم أو الهاتف أو رقم الملف…' : 'Search name, phone or file ID…'}
-          placeholderTextColor="#94A3B8"
-          className="h-12 rounded-2xl border border-slate-200 bg-white pl-4 pr-11 text-sm text-slate-700 shadow-sm"
+          placeholderTextColor="#8A9AB0"
+          className="h-12 rounded-2xl border bg-white pl-4 pr-11 text-sm"
+          style={{ borderColor: '#CFDDF0', color: NAVY, ...softShadow }}
         />
         <View className="absolute bottom-0 right-4 top-0 justify-center">
-          <Search size={16} color="#94A3B8" />
+          <Search size={17} color={BLUE} />
         </View>
       </View>
 
@@ -168,29 +214,36 @@ export default function PatientsScreen() {
                 borderRadius: 999,
                 borderWidth: 1,
                 paddingHorizontal: 12,
-                borderColor: active ? '#3B82F6' : '#E2E8F0',
-                backgroundColor: active ? '#3B82F6' : '#FFFFFF',
+                flexDirection: 'row',
+                gap: 6,
+                borderColor: active ? BLUE : LINE,
+                backgroundColor: active ? BLUE : '#FFFFFF',
               }}
             >
-              <Text className="font-bold" style={{ fontSize: 11, color: active ? '#FFFFFF' : '#64748B' }}>
+              <Text className="font-bold" style={{ fontSize: 11, color: active ? '#FFFFFF' : MUTED }}>
                 {s === 'all' ? (ar ? 'الكل' : 'All') : ar ? STATUS_META[s].ar : STATUS_META[s].en}
               </Text>
+              <View
+                style={{
+                  minWidth: 18,
+                  height: 18,
+                  borderRadius: 9,
+                  paddingHorizontal: 4,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: active ? 'rgba(255,255,255,0.25)' : '#EEF3FA',
+                }}
+              >
+                <Text className="font-extrabold" style={{ fontSize: 10, color: active ? '#FFFFFF' : NAVY }}>
+                  {counts[s]}
+                </Text>
+              </View>
             </Pressable>
           );
         })}
       </ScrollView>
 
-      <Pressable
-        onPress={() => setShowAdd(true)}
-        className="mt-3 h-12 flex-row items-center justify-center gap-2 rounded-2xl bg-primary shadow-lg"
-      >
-        <Plus size={16} color="#FFFFFF" strokeWidth={3} />
-        <Text className="text-sm font-extrabold text-primary-foreground">
-          {ar ? 'إضافة مريض جديد' : 'Add new patient'}
-        </Text>
-      </Pressable>
-
-      <ScrollView className="mt-3 flex-1" showsVerticalScrollIndicator={false} contentContainerClassName="gap-2.5 pb-6">
+      <ScrollView className="mt-3 flex-1" showsVerticalScrollIndicator={false} contentContainerClassName="gap-2 pb-24">
         {list.length === 0 ? (
           <View className="items-center rounded-2xl border border-dashed border-slate-200 bg-white p-8">
             <Users size={32} color="#94A3B8" />
@@ -202,9 +255,28 @@ export default function PatientsScreen() {
             </Text>
           </View>
         ) : (
-          list.map((p) => <PatientCard key={p.id} p={p} ar={ar} />)
+          list.map((p) => <PatientCard key={p.id} p={p} ar={ar} next={upcoming.get(p.id)} />)
         )}
       </ScrollView>
+
+      {/* Add a patient: a floating button, so it doesn't split the filters from their results. */}
+      <Pressable
+        onPress={() => setShowAdd(true)}
+        className="absolute bottom-6 h-14 flex-row items-center gap-2 rounded-full px-5"
+        style={{
+          right: 16,
+          backgroundColor: BLUE,
+          shadowColor: '#1D4ED8',
+          shadowOpacity: 0.35,
+          shadowRadius: 12,
+          shadowOffset: { width: 0, height: 6 },
+          elevation: 6,
+        }}
+        accessibilityLabel={ar ? 'إضافة مريض جديد' : 'Add new patient'}
+      >
+        <Plus size={20} color="#FFFFFF" strokeWidth={2.8} />
+        <Text className="text-[14px] font-extrabold text-white">{ar ? 'مريض جديد' : 'New patient'}</Text>
+      </Pressable>
 
       <AddPatientModal open={showAdd} onClose={() => setShowAdd(false)} ar={ar} />
     </Screen>
@@ -433,22 +505,24 @@ function OtherClinicsNotice({ ar }: { ar: boolean }) {
   const { user } = useSession();
   const { clinics, activeClinicId } = useClinics();
   const counts = usePatientCountsByClinic(clinics.length > 1 ? user?.uid : undefined);
+  const [hidden, setHidden] = useState(false);
   const others = clinics.filter((c) => c.id !== activeClinicId && (counts[c.id] ?? 0) > 0);
-  if (others.length === 0) return null;
+  if (hidden || others.length === 0) return null;
   return (
-    <View className="mt-3 gap-2">
+    <View className="mt-2.5 gap-1.5">
       {others.map((c) => (
-        <View key={c.id} className="flex-row items-center gap-3 rounded-2xl border border-sky-200 bg-sky-50 p-3">
-          <View className="min-w-0 flex-1">
-            <Text className="text-xs font-bold text-sky-900">
-              {ar ? `لديك ${counts[c.id]} مريض في «${c.name}»` : `You have ${counts[c.id]} patient(s) in “${c.name}”`}
+        <View key={c.id} className="h-10 flex-row items-center gap-2 rounded-xl border bg-white pe-1.5 ps-3" style={{ borderColor: LINE }}>
+          <Users size={14} color={MUTED} />
+          <Text numberOfLines={1} className="min-w-0 flex-1 text-[12px]" style={{ color: MUTED }}>
+            {ar ? `${patientsCount(counts[c.id], true)} في «${c.name}»` : `${patientsCount(counts[c.id], false)} in “${c.name}”`}
+          </Text>
+          <Pressable onPress={() => setActiveClinic(c.id)} hitSlop={6} className="h-7 justify-center rounded-lg px-2.5" style={{ backgroundColor: '#E8F1FE' }}>
+            <Text className="text-[11px] font-extrabold" style={{ color: BLUE }}>
+              {ar ? 'عرض' : 'Show'}
             </Text>
-            <Text className="mt-0.5 text-[11px] text-sky-800">
-              {ar ? 'كل عيادة لها مرضاها. بدّل العيادة لعرضهم.' : 'Each clinic has its own patients. Switch to see them.'}
-            </Text>
-          </View>
-          <Pressable onPress={() => setActiveClinic(c.id)} className="rounded-xl bg-sky-600 px-3 py-2">
-            <Text className="text-xs font-bold text-white">{ar ? 'عرض مرضاها' : 'Show them'}</Text>
+          </Pressable>
+          <Pressable onPress={() => setHidden(true)} hitSlop={8} className="h-7 w-7 items-center justify-center" accessibilityLabel={ar ? 'إخفاء' : 'Hide'}>
+            <X size={14} color="#94A3B8" />
           </Pressable>
         </View>
       ))}

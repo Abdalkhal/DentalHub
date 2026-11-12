@@ -19,6 +19,7 @@ import { LanguageProvider, useI18n, type DictKey } from '@/lib/i18n';
 import { AnimatedSplashOverlay, SplashArt } from '@/components/animated-icon';
 import { ToastHost } from '@/components/ToastHost';
 import { CartHeaderButton } from '@/components/CartHeaderButton';
+import { AppHeader } from '@/components/AppHeader';
 import { isGuestRoute } from '@/lib/guestAccess';
 import { useSession } from '@/lib/useAuth';
 import { listenForNotificationTaps, registerPush } from '@/lib/push';
@@ -155,6 +156,8 @@ function RootStack() {
           name={name}
           options={{
             headerShown: true,
+            // Our own header: the native one doesn't mirror under RTL.
+            header: (props) => <AppHeader {...props} />,
             title: t(title),
             headerRight: cart ? () => <CartHeaderButton /> : undefined,
           }}

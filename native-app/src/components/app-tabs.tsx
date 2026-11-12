@@ -112,9 +112,20 @@ export default function AppTabs() {
       // See https://github.com/react-navigation/react-navigation/issues/11384
       detachInactiveScreens={false}
       screenOptions={{
-        tabBarActiveTintColor: '#3B82F6',
-        tabBarInactiveTintColor: '#64748B',
-        tabBarStyle: { borderTopColor: '#E2E8F0' },
+        // Same icons and order; the active tab is a stronger blue with a bold
+        // label, the others a quieter grey, so the current tab reads at a glance.
+        tabBarActiveTintColor: '#1D6FE8',
+        tabBarInactiveTintColor: '#7A8AA0',
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
+        tabBarStyle: {
+          backgroundColor: '#FFFFFF',
+          borderTopColor: '#DCE7F5',
+          shadowColor: '#1E3A8A',
+          shadowOpacity: 0.06,
+          shadowRadius: 10,
+          shadowOffset: { width: 0, height: -3 },
+          elevation: 8,
+        },
       }}
     >
       {ALL_NAMES.map((name) => {

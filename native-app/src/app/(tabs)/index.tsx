@@ -48,6 +48,21 @@ import { BRANDS } from '@/data/brands';
 
 const LOGO_MARK = require('../../../assets/images/logo-mark.png');
 
+// Home palette: one medical blue, navy text, soft blue borders and shadows.
+const BLUE = '#1D6FE8';
+const NAVY = '#0F2747';
+const MUTED = '#5B6B82';
+const LINE = '#DCE7F5';
+const softShadow = {
+  shadowColor: '#1E3A8A',
+  shadowOpacity: 0.07,
+  shadowRadius: 10,
+  shadowOffset: { width: 0, height: 4 },
+  elevation: 2,
+} as const;
+/** Ads are designed as 2:1 banners; the frame keeps that ratio on every phone. */
+const BANNER_RATIO = 2;
+
 type Role = 'supply' | 'lab' | 'implant';
 type Banner = { title: string; subtitle: string; price?: string; image?: string };
 
@@ -112,11 +127,20 @@ function BrandMark({ image, name }: { image?: string; name: string }) {
 // correctly. Taking `ar`/`title`/`seeAll` as props keeps this stable.
 function SectionHead({ title, seeAll, ar }: { title: string; seeAll?: Href; ar: boolean }) {
   return (
-    <View className="mb-2.5 flex-row items-center justify-between">
-      <Text className="text-base font-extrabold text-slate-800">{title}</Text>
+    <View className="mb-3 flex-row items-center justify-between">
+      <Text className="text-[17px] font-extrabold" style={{ color: NAVY }}>
+        {title}
+      </Text>
       {seeAll ? (
-        <Pressable onPress={() => router.push(seeAll)} hitSlop={10} className="py-1">
-          <Text className="text-xs font-bold text-primary">{ar ? 'عرض الكل ›' : 'See all ›'}</Text>
+        <Pressable
+          onPress={() => router.push(seeAll)}
+          hitSlop={10}
+          className="h-8 flex-row items-center rounded-full px-3"
+          style={{ backgroundColor: '#E8F1FE' }}
+        >
+          <Text className="text-xs font-extrabold" style={{ color: BLUE }}>
+            {ar ? 'عرض الكل ›' : 'See all ›'}
+          </Text>
         </Pressable>
       ) : null}
     </View>
@@ -306,43 +330,49 @@ export default function HomeScreen() {
       <View className="flex-row items-center justify-between">
         <Pressable onPress={() => router.push('/account')} className="items-center">
           {/* The account photo was never shown here — always the placeholder icon. */}
-          <View className="h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-slate-100">
+          <View
+            className="h-[42px] w-[42px] items-center justify-center overflow-hidden rounded-full bg-white"
+            style={{ borderWidth: 2, borderColor: '#BFD6F6', ...softShadow }}
+          >
             {role?.photoURL ? (
-              <Image source={{ uri: role.photoURL }} style={{ width: 40, height: 40 }} resizeMode="cover" />
+              <Image source={{ uri: role.photoURL }} style={{ width: 38, height: 38, borderRadius: 19 }} resizeMode="cover" />
             ) : (
-              <User size={18} color="#334155" />
+              <User size={18} color={NAVY} />
             )}
           </View>
-          <Text className="mt-0.5 text-[9px] font-bold text-slate-600">{ar ? 'حسابي' : 'Account'}</Text>
+          <Text className="mt-0.5 text-[9px] font-bold" style={{ color: MUTED }}>
+            {ar ? 'حسابي' : 'Account'}
+          </Text>
         </Pressable>
 
         {/* Brand: the app icon's "D" mark next to the wordmark, always laid out left-to-right. */}
         <View className="flex-row items-center gap-2" style={{ direction: 'ltr' }}>
           <View
-            className="h-9 w-9 overflow-hidden rounded-xl bg-white"
+            className="h-10 w-10 overflow-hidden rounded-xl bg-white"
             style={{ shadowColor: '#1D4ED8', shadowOpacity: 0.22, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 4 }}
           >
-            <Image source={LOGO_MARK} style={{ width: 36, height: 36 }} resizeMode="cover" />
+            <Image source={LOGO_MARK} style={{ width: 40, height: 40 }} resizeMode="cover" />
           </View>
           <View>
             <Text className="text-[18px] font-extrabold leading-[22px]" style={{ letterSpacing: -0.4 }}>
-              <Text style={{ color: '#1D6FE8' }}>Dent</Text>
-              <Text className="text-slate-900"> Hub</Text>
+              <Text style={{ color: BLUE }}>Dent</Text>
+              <Text style={{ color: NAVY }}> Hub</Text>
             </Text>
-            <Text className="text-[7.5px] font-bold text-slate-400" style={{ letterSpacing: 1.4 }}>
+            <Text className="text-[7.5px] font-bold" style={{ letterSpacing: 1.1, color: '#7C8DA6' }}>
               DENTAL MARKETPLACE
             </Text>
           </View>
         </View>
 
-        <View className="flex-row items-center gap-2">
-          {isDentist && <CartHeaderButton />}
+        <View className="flex-row items-center gap-1.5">
+          {isDentist && <CartHeaderButton className="h-[38px] w-[38px] border bg-white" style={{ borderColor: LINE, ...softShadow }} color={NAVY} />}
           {!isGuest && (
             <Pressable
               onPress={() => router.push('/notifications')}
-              className="relative h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm"
+              className="relative h-[38px] w-[38px] items-center justify-center rounded-full border bg-white"
+              style={{ borderColor: LINE, ...softShadow }}
             >
-              <Bell size={17} color="#334155" />
+              <Bell size={17} color={NAVY} />
               {unreadCount > 0 && (
                 <View className="absolute -end-1 -top-1 h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1">
                   <Text className="text-[9px] font-bold text-white">{unreadCount > 9 ? '9+' : unreadCount}</Text>
@@ -352,27 +382,30 @@ export default function HomeScreen() {
           )}
           <Pressable
             onPress={toggle}
-            className="h-9 flex-row items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 shadow-sm"
+            className="h-[38px] flex-row items-center gap-1 rounded-full border bg-white px-2.5"
+            style={{ borderColor: LINE, ...softShadow }}
           >
-            <Text className="text-xs font-bold text-slate-700">{lang === 'ar' ? 'EN' : 'AR'}</Text>
-            <Globe size={13} color="#94A3B8" />
+            <Text className="text-xs font-extrabold" style={{ color: NAVY }}>
+              {lang === 'ar' ? 'EN' : 'AR'}
+            </Text>
+            <Globe size={13} color={BLUE} />
           </Pressable>
         </View>
       </View>
 
       {/* 2 — Search */}
-      <View className="relative mt-3">
+      <View className="relative mt-4">
         <TextInput
           ref={searchInputRef}
           value={q}
           onChangeText={setQ}
           placeholder={ar ? 'ابحث...' : 'Search...'}
-          placeholderTextColor="#94A3B8"
-          style={{ writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }}
-          className="h-12 w-full rounded-2xl border border-slate-200 bg-white pl-9 pr-11 text-sm text-slate-700 shadow-sm"
+          placeholderTextColor="#8A9AB0"
+          style={{ writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left', borderColor: '#CFDDF0', color: NAVY, ...softShadow }}
+          className="h-[52px] w-full rounded-2xl border bg-white pl-10 pr-12 text-[14px]"
         />
         <View className="absolute bottom-0 right-4 top-0 justify-center">
-          <Search size={18} color="#94A3B8" />
+          <Search size={19} color={BLUE} />
         </View>
         {q.length > 0 && (
           <Pressable
@@ -472,12 +505,10 @@ export default function HomeScreen() {
       ) : isDentist ? (
         <>
           {/* 3 — Hero carousel */}
-          <View
-            className="mt-4 overflow-hidden rounded-3xl"
-            onLayout={(e) => setCarouselWidth(e.nativeEvent.layout.width)}
-          >
+          <View className="mt-4" onLayout={(e) => setCarouselWidth(e.nativeEvent.layout.width)}>
             {banners.length > 0 ? (
               <>
+                <View className="overflow-hidden rounded-3xl" style={softShadow}>
                 <ScrollView
                   ref={carouselRef}
                   horizontal
@@ -492,15 +523,24 @@ export default function HomeScreen() {
                         key={i}
                         disabled={!ad}
                         onPress={() => ad && setViewingAd(ad)}
-                        style={{ width: carouselWidth || undefined }}
-                        className="relative min-h-[170px] justify-center overflow-hidden bg-[#2563EB] p-6"
+                        style={{ width: carouselWidth || undefined, aspectRatio: BANNER_RATIO }}
+                        className="relative justify-center overflow-hidden rounded-3xl bg-[#2563EB] p-6"
                       >
                         {/* An ad image is a designed banner that carries its own
                             text, so it is shown as-is — overlaying the ad's title
                             (and a dark scrim) on top of it garbled the design.
                             The title is still shown in the ad's detail modal. */}
                         {b.image ? (
-                          <Image source={{ uri: b.image }} resizeMode="cover" style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }} />
+                          <>
+                            {/* A blurred copy fills the frame; the ad itself is shown whole on top, never cropped. */}
+                            <Image
+                              source={{ uri: b.image }}
+                              resizeMode="cover"
+                              blurRadius={18}
+                              style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}
+                            />
+                            <Image source={{ uri: b.image }} resizeMode="contain" style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }} />
+                          </>
                         ) : (
                           <>
                             <View className="absolute -right-14 -top-16 h-48 w-48 rounded-full bg-white/15" />
@@ -521,16 +561,21 @@ export default function HomeScreen() {
                     );
                   })}
                 </ScrollView>
+                </View>
                 {banners.length > 1 && (
-                  <View pointerEvents="none" className="absolute bottom-3 left-0 right-0 flex-row items-center justify-center gap-1.5">
+                  <View pointerEvents="none" className="mt-2.5 flex-row items-center justify-center gap-1.5">
                     {banners.map((_, i) => (
-                      <View key={i} className={cn('rounded-full', i === idx ? 'h-2 w-4 bg-white' : 'h-1.5 w-1.5 bg-white/50')} />
+                      <View
+                        key={i}
+                        className="rounded-full"
+                        style={i === idx ? { height: 6, width: 18, backgroundColor: BLUE } : { height: 6, width: 6, backgroundColor: '#BFD3EE' }}
+                      />
                     ))}
                   </View>
                 )}
               </>
             ) : (
-              <View className="relative min-h-[170px] justify-center overflow-hidden rounded-3xl bg-[#2563EB] p-6">
+              <View className="relative justify-center overflow-hidden rounded-3xl bg-[#2563EB] p-6" style={{ aspectRatio: BANNER_RATIO, ...softShadow }}>
                 <View className="absolute -right-14 -top-16 h-48 w-48 rounded-full bg-white/15" />
                 <View className="absolute -bottom-20 -left-12 h-44 w-44 rounded-full bg-white/10" />
                 <Megaphone
@@ -560,22 +605,27 @@ export default function HomeScreen() {
           {/* 4 — Category tiles (framed cards, matching web's src/routes/index.tsx) */}
           <View className="mt-6">
             <SectionHead title={ar ? 'تصفح حسب الفئة' : 'Browse by category'} ar={ar} />
-            <View className="flex-row items-stretch gap-2">
+            <View className="flex-row items-stretch gap-2.5">
               {CATEGORY_TILES.map((c) => (
                 <Pressable
                   key={c.en}
                   // Supplies is a directory of supplier accounts, which guests
                   // can't read — send them to the brand catalog instead.
                   onPress={() => router.push(isGuest && c.to === '/supplies' ? '/brands' : c.to)}
-                  style={{ minHeight: 100 }}
-                  className="flex-1 items-center justify-between rounded-2xl border border-slate-200 bg-white p-2.5 shadow-sm"
+                  style={{ height: 118, borderColor: LINE, ...softShadow }}
+                  className="flex-1 items-center rounded-[20px] border bg-white px-1.5 pb-2 pt-3"
                 >
-                  <View className={cn('h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 bg-slate-50', c.border)}>
+                  <View
+                    className="h-[60px] w-[60px] items-center justify-center overflow-hidden rounded-full"
+                    style={{ borderWidth: 2, borderColor: '#D3E3F8', backgroundColor: '#F3F8FF' }}
+                  >
                     <Image source={c.img} className="h-full w-full" resizeMode="cover" />
                   </View>
-                  <Text className="mt-1.5 text-center text-[11px] font-extrabold leading-tight text-slate-700">
-                    {ar ? c.ar : c.en}
-                  </Text>
+                  <View className="flex-1 justify-center">
+                    <Text numberOfLines={2} className="text-center text-[11.5px] font-extrabold leading-[15px]" style={{ color: NAVY }}>
+                      {ar ? c.ar : c.en}
+                    </Text>
+                  </View>
                 </Pressable>
               ))}
             </View>
@@ -585,18 +635,18 @@ export default function HomeScreen() {
           <View className="mt-6">
             <SectionHead title={ar ? 'البراندات' : 'Brands'} seeAll="/brands" ar={ar} />
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View className="flex-row gap-2.5 pb-1">
+              <View className="flex-row gap-2.5 pb-2 pt-0.5">
                 {BRANDS.slice(0, 8).map((b) => (
                   <Pressable
                     key={b.id}
                     onPress={() => router.push({ pathname: '/brand/[brandId]', params: { brandId: b.id } })}
-                    className="w-24"
+                    style={{ width: 108 }}
                   >
-                    <View className="items-center rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-                      <View className="mb-1.5 h-14 w-full items-center justify-center overflow-hidden rounded-xl bg-slate-50">
+                    <View className="items-center rounded-[20px] border bg-white p-2.5" style={{ borderColor: LINE, ...softShadow }}>
+                      <View className="mb-2 h-16 w-full items-center justify-center overflow-hidden rounded-2xl bg-white p-1.5" style={{ borderWidth: 1, borderColor: '#EEF3FA' }}>
                         <BrandMark image={b.image} name={b.name} />
                       </View>
-                      <Text numberOfLines={1} className="text-center text-[11px] font-bold text-slate-700">
+                      <Text numberOfLines={1} className="text-center text-[11.5px] font-extrabold" style={{ color: NAVY }}>
                         {ar ? b.ar : b.name}
                       </Text>
                     </View>
@@ -613,23 +663,26 @@ export default function HomeScreen() {
             <View className="mt-6">
               <Pressable
                 onPress={() => router.push('/track-cases')}
-                className="flex-row items-center gap-3 rounded-2xl border border-sky-100 bg-sky-50 p-3.5"
+                className="flex-row items-center gap-3 rounded-[20px] border bg-white p-3.5"
+                style={{ borderColor: LINE, ...softShadow }}
               >
-                <View className="h-11 w-11 items-center justify-center rounded-2xl bg-sky-100" style={{ borderWidth: 1, borderColor: '#BAE6FD' }}>
-                  <ClipboardList size={20} color="#0284C7" strokeWidth={2.2} />
+                <View className="h-12 w-12 items-center justify-center rounded-2xl" style={{ backgroundColor: '#E8F1FE' }}>
+                  <ClipboardList size={21} color={BLUE} strokeWidth={2.2} />
                 </View>
                 <View className="min-w-0 flex-1">
-                  <Text className="text-sm font-extrabold text-slate-800">{ar ? 'تتبع حالاتك' : 'Track your cases'}</Text>
-                  <Text className="text-[11px] text-slate-500">
+                  <Text className="text-[15px] font-extrabold" style={{ color: NAVY }}>
+                    {ar ? 'تتبع حالاتك' : 'Track your cases'}
+                  </Text>
+                  <Text className="mt-0.5 text-[11.5px]" style={{ color: MUTED }}>
                     {ar ? 'تابع حالة الطلبات من المختبر' : 'Follow your lab order status'}
                   </Text>
-                  <Text className="mt-0.5 text-[11px] font-bold text-primary">
+                  <Text className="mt-1 text-[11.5px] font-extrabold" style={{ color: BLUE }}>
                     {ar ? 'عرض جميع الحالات ›' : 'View all cases ›'}
                   </Text>
                 </View>
-                <View className="shrink-0 items-center rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
-                  <Text className="text-xl font-extrabold text-slate-800">{caseCount}</Text>
-                  <Text className="text-[10px] text-slate-500">{ar ? 'حالات' : 'cases'}</Text>
+                <View className="h-[60px] min-w-[60px] shrink-0 items-center justify-center rounded-2xl px-2.5" style={{ backgroundColor: BLUE }}>
+                  <Text className="text-[22px] font-extrabold leading-7 text-white">{caseCount}</Text>
+                  <Text className="text-[10px] font-bold text-white/85">{ar ? 'حالات' : 'cases'}</Text>
                 </View>
               </Pressable>
             </View>
@@ -640,7 +693,8 @@ export default function HomeScreen() {
             {!isGuest && (
               <Pressable
                 onPress={() => router.push('/quick-orders')}
-                className="flex-1 rounded-2xl bg-[#2563EB] p-4 shadow-lg"
+                className="flex-1 rounded-[20px] p-4"
+                style={{ backgroundColor: BLUE, ...softShadow }}
               >
                 <History size={24} color="#FFFFFF" />
                 <Text className="mt-2 text-sm font-extrabold text-white">
@@ -653,7 +707,8 @@ export default function HomeScreen() {
             )}
             <Pressable
               onPress={() => router.push('/offers')}
-              className="flex-1 rounded-2xl bg-indigo-500 p-4 shadow-lg"
+              className="flex-1 rounded-[20px] p-4"
+              style={{ backgroundColor: '#1E4FA8', ...softShadow }}
             >
               <Megaphone size={24} color="#FFFFFF" />
               <Text className="mt-2 text-sm font-extrabold text-white">
