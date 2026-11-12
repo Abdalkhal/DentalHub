@@ -37,6 +37,8 @@ export type UserRoleDoc = {
   notificationsEnabled?: boolean;
   // Set on sign-up since email verification became required (emailVerification.ts).
   mustVerifyEmail?: boolean;
+  // Office shows its prices only to doctors it approves (functions/hiddenPrices.js).
+  pricesHidden?: boolean;
   clinicName?: string;
   accountStatus?: "active" | "suspended" | "expired";
   subscriptionExpiry?: string;

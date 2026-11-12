@@ -14,9 +14,9 @@ import { Stat } from "./clinic.materials";
 export const Route = createFileRoute("/clinic/reports")({
   head: () => ({
     meta: [
-      { title: "التقارير والإحصائيات | DentalHub" },
+      { title: "التقارير والإحصائيات | Dent Hub" },
       { name: "description", content: "مؤشرات الأداء الشهري، ملخص العلاجات المنجزة، نمو المرضى وتصدير التقارير المالية." },
-      { property: "og:title", content: "التقارير والإحصائيات | DentalHub" },
+      { property: "og:title", content: "التقارير والإحصائيات | Dent Hub" },
       { property: "og:description", content: "مؤشرات أداء العيادة وتصدير التقارير." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

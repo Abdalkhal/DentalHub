@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { PriceLock } from "@/components/PriceLock";
 import { MobileShell } from "@/components/MobileShell";
 import { useI18n } from "@/lib/i18n";
 import { useEffect, useMemo, useState } from "react";
@@ -17,6 +18,7 @@ import clinicHero from "@/assets/clinic-hero.jpg";
 import { BRANDS } from "@/data/brands";
 import { BrandLogo } from "@/components/BrandLogo";
 import { AdDetailModal } from "@/components/AdDetailModal";
+import { DentistHomeDesktop } from "@/components/DentistHomeDesktop";
 import { useVendorAccounts } from "@/lib/search";
 import { useProductSearch, useSignedImageUrls } from "@/lib/products";
 import { useActiveAds, type Ad } from "@/lib/adsStore";
@@ -61,6 +63,15 @@ const VENDOR_HOME: Partial<Record<string, "/supplies" | "/implants" | "/labs/das
   implant: "/implants",
   lab: "/labs/dashboard",
 };
+
+// Desktop-only copy for the four category tiles, in the same order as
+// `categories` in DentistHome.
+const DESKTOP_CATEGORY_SUB = [
+  { ar: "أنظمة الزرع من أشهر الوكلاء", en: "Implant systems from top dealers", tint: "bg-amber-100/70" },
+  { ar: "مواد وأجهزة من مكاتب المستلزمات", en: "Materials and devices from supply offices", tint: "bg-emerald-100/70" },
+  { ar: "أرسل حالاتك وتابعها أولاً بأول", en: "Send your cases and follow them", tint: "bg-sky-100/70" },
+  { ar: "المرضى والمواعيد والمالية", en: "Patients, appointments and finance", tint: "bg-violet-100/70" },
+] as const;
 
 function Home() {
   const { role } = useUserRole();
@@ -185,6 +196,40 @@ function DentistHome() {
 
   return (
     <MobileShell wide>
+      {/* Laptop widths get their own dashboard layout; everything inside the
+          lg:hidden wrapper below is the phone/tablet home, untouched. */}
+      <DentistHomeDesktop
+        ar={lang === "ar"}
+        rtl={dir === "rtl"}
+        uid={user?.uid ?? ""}
+        dentistName={dentistName}
+        banners={banners.map((b) => ({
+          id: b.id,
+          title: b.title,
+          price: b.price,
+          image: b.image,
+          fallbackTitle: lang === "ar" ? ROLE_META[b.role].ar : ROLE_META[b.role].en,
+        }))}
+        bannerIdx={safeIdx}
+        bannerClickable={!!bannerAd}
+        onBannerOpen={() => bannerAd && setViewingAd(bannerAd)}
+        onBannerPrev={prev}
+        onBannerNext={next}
+        onBannerPick={setIdx}
+        categories={categories.map((c, i) => ({
+          to: c.to,
+          title: c.title,
+          img: c.img,
+          ring: c.ring,
+          sub: DESKTOP_CATEGORY_SUB[i][lang === "ar" ? "ar" : "en"],
+          tint: DESKTOP_CATEGORY_SUB[i].tint,
+        }))}
+        caseCount={caseCount}
+        quickItems={quickItems}
+        onReorder={reorder}
+        latestOffer={latestOffer}
+      />
+      <div className="lg:hidden">
       {/* Top Nav — phone: two stacked rows (identity row, then search).
           md:+ : one utility bar, with the search as its centrepiece and the
           actions pushed to the end edge. */}
@@ -216,7 +261,7 @@ function DentistHome() {
           {/* The fixed lg:+ header already carries the wordmark, so it only
               needs to appear here on phones and tablets. */}
           <Link className="flex items-center gap-1.5 font-display font-extrabold text-lg md:order-1 md:text-xl lg:hidden" to="/">
-            <span className="text-primary">Dental</span>
+            <span className="text-primary">Dent</span>
             <span className="text-slate-800">Hub</span>
           </Link>
 
@@ -300,9 +345,13 @@ function DentistHome() {
                         <p className="text-sm font-bold text-slate-800 truncate">{lang === "ar" ? p.ar || p.en : p.en || p.ar}</p>
                         <p className="text-[11px] text-slate-400 truncate">{p.brand || (lang === "ar" ? "المورد" : "Supplier")}</p>
                       </div>
-                      <span className="text-sm font-extrabold text-primary shrink-0">
-                        {p.currency === "IQD" ? `${p.price.toLocaleString()} د.ع` : `$${p.price.toFixed(2)}`}
-                      </span>
+                      {p.priceLocked ? (
+                        <PriceLock officeId={p.companyId} compact />
+                      ) : (
+                        <span className="text-sm font-extrabold text-primary shrink-0">
+                          {p.currency === "IQD" ? `${p.price.toLocaleString()} د.ع` : `$${p.price.toFixed(2)}`}
+                        </span>
+                      )}
                     </Link>
                   ))}
                 </>
@@ -512,6 +561,7 @@ function DentistHome() {
           </div>
         </div>
       </section>
+      </div>
       </div>
       {viewingAd && <AdDetailModal ad={viewingAd} ar={lang === "ar"} onClose={() => setViewingAd(null)} />}
     </MobileShell>

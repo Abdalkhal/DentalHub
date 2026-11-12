@@ -25,7 +25,9 @@ export function openNotificationTarget(n: NotificationTarget): void {
     // The doctor reads case chats from case tracking; the lab from its orders.
     if (n.forRole === 'doctor') router.push({ pathname: '/track-cases', params: n.orderId ? { open: n.orderId } : {} });
     else router.push('/orders' as never);
-  } else if (n.type === 'discount' && n.senderId) {
+  } else if (n.type === 'price_request') {
+    router.push('/price-access' as never);
+  } else if ((n.type === 'discount' || n.type === 'price_approved') && n.senderId) {
     router.push({ pathname: '/profile/[accountId]', params: { accountId: n.senderId } } as never);
   } else if (n.invoiceId) {
     router.push({ pathname: '/doctor-invoices/[invoiceId]', params: { invoiceId: n.invoiceId } });

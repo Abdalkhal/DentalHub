@@ -10,7 +10,17 @@ import {
   type SurgicalGuideCompany,
 } from "@/lib/surgicalGuides";
 import { useSignedImageUrls } from "@/lib/products";
-import { Plus, MapPin, Phone, X, Package, Loader2, Layers, MessageCircle } from "lucide-react";
+import {
+  Plus,
+  MapPin,
+  Phone,
+  X,
+  Package,
+  Loader2,
+  Layers,
+  MessageCircle,
+  ChevronLeft,
+} from "lucide-react";
 
 export const Route = createFileRoute("/surgical-guide/")({
   component: SurgicalGuideDirectory,
@@ -54,10 +64,29 @@ function SurgicalGuideDirectory() {
       <div className="px-4 pt-4 pb-6 space-y-4 md:px-6 md:pt-6 md:pb-14 md:space-y-6 lg:px-8 lg:max-w-6xl lg:mx-auto">
         <Link
           to="/surgical-guide/create"
-          className="w-full h-14 rounded-2xl bg-primary text-primary-foreground font-display font-bold flex items-center justify-center gap-2 hover:opacity-90 transition shadow-card"
+          className="group relative flex w-full items-center gap-3.5 overflow-hidden rounded-3xl bg-gradient-to-l from-indigo-600 via-blue-600 to-sky-500 p-4 text-white shadow-card transition hover:-translate-y-0.5 hover:shadow-lg md:gap-5 md:p-5"
         >
-          <Plus className="size-5" />
-          {ar ? "إضافة شركة دليل جراحي" : "Add Surgical Guide Company"}
+          <span className="pointer-events-none absolute -top-10 -start-10 size-36 rounded-full bg-white/10 blur-2xl" />
+          <span className="pointer-events-none absolute -bottom-12 end-24 size-28 rounded-full bg-sky-300/20 blur-2xl" />
+          <span className="relative flex size-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/25 md:size-14">
+            <Layers className="size-6 md:size-7" />
+            <span className="absolute -bottom-1 -end-1 flex size-5 items-center justify-center rounded-full bg-white text-blue-600 shadow">
+              <Plus className="size-3.5" strokeWidth={3} />
+            </span>
+          </span>
+          <span className="relative min-w-0 flex-1">
+            <span className="block font-display text-[15px] font-extrabold md:text-lg">
+              {ar ? "إضافة شركة دليل جراحي" : "Add Surgical Guide Company"}
+            </span>
+            <span className="mt-0.5 block text-[11px] text-white/80 md:text-sm">
+              {ar
+                ? "سجّل شركتك واعرض أعمالك لأطباء Dent Hub"
+                : "Register your company and show your work to Dent Hub doctors"}
+            </span>
+          </span>
+          <span className="relative flex size-9 shrink-0 items-center justify-center rounded-full bg-white/15 transition group-hover:bg-white/25">
+            <ChevronLeft className="size-5 ltr:rotate-180" />
+          </span>
         </Link>
 
         <p className="text-xs text-muted-foreground">
@@ -185,7 +214,10 @@ function SurgicalGuideDirectory() {
                     )}
                   </div>
                   {selected.phone && (
-                    <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-1" dir="ltr">
+                    <p
+                      className="text-[11px] text-slate-500 flex items-center gap-1 mt-1"
+                      dir="ltr"
+                    >
                       <Phone className="size-3" /> {selected.phone}
                     </p>
                   )}

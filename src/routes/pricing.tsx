@@ -9,11 +9,11 @@ export const Route = createFileRoute("/pricing")({
   component: Pricing,
   head: () => ({
     meta: [
-      { title: "خطط الاشتراك — DentalHub" },
+      { title: "خطط الاشتراك — Dent Hub" },
       {
         name: "description",
         content:
-          "خطط اشتراك DentalHub: مجاني للأطباء، 20$ شهرياً أو 120$ سنوياً لمكاتب المستلزمات والمختبرات، مع 3 أشهر تجربة مجانية.",
+          "خطط اشتراك Dent Hub: مجاني للأطباء، 20$ شهرياً أو 120$ سنوياً لمكاتب المستلزمات والمختبرات، مع 3 أشهر تجربة مجانية.",
       },
     ],
   }),

@@ -52,6 +52,8 @@ it("plan costs carry a chosen currency and comma formatting", () => {
   const root = createRoot(host);
   const Page = (Route as unknown as { component: React.ComponentType }).component;
   act(() => root.render(<LanguageProvider><Page /></LanguageProvider>));
+  // The page opens on the info tab; the plan is its own tab.
+  act(() => byText(host, "خطة العلاج").click());
 
   // Legacy step: no "$", shown in dinars with a comma.
   expect(host.textContent).toContain("25,000 د.ع");
@@ -79,6 +81,8 @@ it("rejects an invalid tooth number and edits an existing step", () => {
   const root = createRoot(host);
   const Page = (Route as unknown as { component: React.ComponentType }).component;
   act(() => root.render(<LanguageProvider><Page /></LanguageProvider>));
+  // The page opens on the info tab; the plan is its own tab.
+  act(() => byText(host, "خطة العلاج").click());
 
   // Open the legacy step for editing by clicking its title.
   const stepBtn = [...host.querySelectorAll("button")].find((b) => b.textContent?.includes("Composite")) as HTMLButtonElement;

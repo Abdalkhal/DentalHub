@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { alertUploadError } from '@/lib/uploadAlert';
 import { Image, Modal, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { KeyboardAwareScrollView } from '@/components/ui/KeyboardAwareScrollView';
-import { Bone, Check, DollarSign, ImageIcon, Layers, Maximize2, Package, Plus, Trash2, Upload, X } from 'lucide-react-native';
+import { Bone, Check, ImageIcon, Layers, Maximize2, Package, Plus, Trash2, Upload, X } from 'lucide-react-native';
 
 import { Select, Text } from '@/components/ui';
 import { useConfirmClose, useFormDirty } from '@/lib/confirmClose';
@@ -15,6 +15,7 @@ import {
   useUpsertProduct,
   MAX_PRODUCT_IMAGES,
   type Product,
+  membraneSizes,
 } from '@/lib/products';
 import { useUserRole } from '@/lib/useAuth';
 import { randomUUID } from '@/lib/randomId';
@@ -152,9 +153,19 @@ export function BoneGraftModal({ open, onClose, ar, product }: { open: boolean; 
   const savedMembrane = product?.boneGraft?.membrane;
   const [membraneNeeded, setMembraneNeeded] = useState(savedMembrane?.needed ?? false);
   const [membraneType, setMembraneType] = useState(savedMembrane?.type ?? '');
-  const [membraneSize, setMembraneSize] = useState(savedMembrane?.size ?? '');
-  const [membraneUsd, setMembraneUsd] = useState(savedMembrane?.priceUsd ? String(savedMembrane.priceUsd) : '');
-  const [membraneIqd, setMembraneIqd] = useState(savedMembrane?.priceIqd ? String(savedMembrane.priceIqd) : '');
+  const [membraneDesc, setMembraneDesc] = useState(savedMembrane?.description ?? '');
+  // Several sizes, each with its own price, like the pack sizes.
+  const [membraneRows, setMembraneRows] = useState<{ key: string; size: string; usd: string; iqd: string }[]>(() => {
+    const saved = membraneSizes(savedMembrane).map((m, i) => ({
+      key: `m${i}`,
+      size: m.size,
+      usd: m.priceUsd ? String(m.priceUsd) : '',
+      iqd: m.priceIqd ? String(m.priceIqd) : '',
+    }));
+    return saved.length ? saved : [{ key: 'm0', size: '', usd: '', iqd: '' }];
+  });
+  const setMembraneRow = (key: string, patch: Partial<{ size: string; usd: string; iqd: string }>) =>
+    setMembraneRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
   const [membraneImage, setMembraneImage] = useState(savedMembrane?.image ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -173,7 +184,7 @@ export function BoneGraftModal({ open, onClose, ar, product }: { open: boolean; 
   const updateRow = (key: string, patch: Partial<PackRow>) => setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
 
   // Closing by mistake (✕ / Android back) asks first when something was typed.
-  const dirty = useFormDirty([name, manufacturer, country, graftType, form, materialSource, composition, particleSize, sterilizationMethod, shelfLife, features, featureDraft, description, rows, images, clinicalImages, membraneNeeded, membraneType, membraneSize, membraneUsd, membraneIqd, membraneImage]);
+  const dirty = useFormDirty([name, manufacturer, country, graftType, form, materialSource, composition, particleSize, sterilizationMethod, shelfLife, features, featureDraft, description, rows, images, clinicalImages, membraneNeeded, membraneType, membraneDesc, membraneRows, membraneImage]);
   const requestClose = useConfirmClose(dirty, onClose, ar);
 
   const submit = async () => {
@@ -232,9 +243,14 @@ export function BoneGraftModal({ open, onClose, ar, product }: { open: boolean; 
             ? {
                 needed: true,
                 ...(membraneType.trim() ? { type: membraneType.trim() } : {}),
-                ...(membraneSize.trim() ? { size: membraneSize.trim() } : {}),
-                ...(parseFloat(membraneUsd) > 0 ? { priceUsd: parseFloat(membraneUsd) } : {}),
-                ...(parseFloat(membraneIqd) > 0 ? { priceIqd: parseFloat(membraneIqd) } : {}),
+                ...(membraneDesc.trim() ? { description: membraneDesc.trim() } : {}),
+                sizes: membraneRows
+                  .map((r) => ({
+                    size: r.size.trim(),
+                    ...(parseFloat(r.usd) > 0 ? { priceUsd: parseFloat(r.usd) } : {}),
+                    ...(parseFloat(r.iqd) > 0 ? { priceIqd: parseFloat(r.iqd) } : {}),
+                  }))
+                  .filter((r) => r.size || r.priceUsd || r.priceIqd),
                 ...(membraneImage ? { image: membraneImage } : {}),
               }
             : { needed: false },
@@ -358,44 +374,74 @@ export function BoneGraftModal({ open, onClose, ar, product }: { open: boolean; 
                       />
                     </View>
                   </Field>
-                  <Field label={ar ? 'حجم الممبرن' : 'Membrane size'}>
-                    <View className="flex-row items-center gap-2 rounded-2xl border border-emerald-100 bg-white px-3">
-                      <Maximize2 size={15} color="#10B981" />
-                      <TextInput
-                        value={membraneSize}
-                        onChangeText={setMembraneSize}
-                        placeholder="15 × 20 mm"
-                        placeholderTextColor="#94A3B8"
-                        className="h-12 flex-1 text-sm text-slate-800"
-                        // A measurement — kept ltr like the pack sizes.
-                        style={{ ...SINGLE_LINE_INPUT, writingDirection: 'ltr', textAlign: 'left' }}
-                      />
-                    </View>
+                  <Field label={ar ? 'وصف الممبرن' : 'Membrane description'}>
+                    <TextInput
+                      multiline
+                      value={membraneDesc}
+                      onChangeText={setMembraneDesc}
+                      placeholder={ar ? 'مثال: غشاء كولاجين يمتص خلال 4–6 أسابيع' : 'e.g. Collagen membrane, resorbs in 4–6 weeks'}
+                      placeholderTextColor="#94A3B8"
+                      className="min-h-[76px] rounded-2xl border border-emerald-100 bg-white px-3 py-2.5 text-sm text-slate-800"
+                      style={{ textAlignVertical: 'top', writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }}
+                    />
                   </Field>
-                  {/* Same two-currency pricing as the pack sizes: either or both. */}
-                  <Field label={ar ? 'سعر الممبرن' : 'Membrane price'}>
-                    <View className="flex-row items-center gap-2">
-                      <View className="h-10 w-10 items-center justify-center rounded-xl bg-white">
-                        <DollarSign size={16} color="#10B981" />
-                      </View>
-                      <TextInput
-                        value={membraneUsd}
-                        onChangeText={(v) => setMembraneUsd(v.replace(/[^0-9.]/g, ''))}
-                        keyboardType="decimal-pad"
-                        placeholder="USD"
-                        placeholderTextColor="#94A3B8"
-                        className="h-10 flex-1 rounded-xl border border-emerald-100 bg-white px-3 text-sm text-slate-800"
-                        style={{ ...SINGLE_LINE_INPUT, writingDirection: 'ltr', textAlign: 'left' }}
-                      />
-                      <TextInput
-                        value={membraneIqd}
-                        onChangeText={(v) => setMembraneIqd(v.replace(/[^0-9.]/g, ''))}
-                        keyboardType="decimal-pad"
-                        placeholder="IQD"
-                        placeholderTextColor="#94A3B8"
-                        className="h-10 flex-1 rounded-xl border border-emerald-100 bg-white px-3 text-sm text-slate-800"
-                        style={{ ...SINGLE_LINE_INPUT, writingDirection: 'ltr', textAlign: 'left' }}
-                      />
+                  {/* Each size with its own price, like the pack sizes below. */}
+                  <Field label={ar ? 'أحجام الممبرن والأسعار' : 'Membrane sizes & prices'}>
+                    <View className="gap-2">
+                      {membraneRows.map((r) => (
+                        <View key={r.key} className="gap-2 rounded-2xl border border-emerald-100 bg-white p-2.5">
+                          <View className="flex-row items-center gap-2">
+                            <View className="h-9 w-9 items-center justify-center rounded-xl bg-emerald-50">
+                              <Maximize2 size={15} color="#10B981" />
+                            </View>
+                            <TextInput
+                              value={r.size}
+                              onChangeText={(v) => setMembraneRow(r.key, { size: v })}
+                              placeholder="15 × 20 mm"
+                              placeholderTextColor="#94A3B8"
+                              className="h-10 flex-1 rounded-xl border border-emerald-100 bg-emerald-50/40 px-3 text-sm text-slate-800"
+                              style={{ ...SINGLE_LINE_INPUT, writingDirection: 'ltr', textAlign: 'left' }}
+                            />
+                            <Pressable
+                              onPress={() =>
+                                setMembraneRows((prev) => (prev.length > 1 ? prev.filter((x) => x.key !== r.key) : [{ ...prev[0], size: '', usd: '', iqd: '' }]))
+                              }
+                              className="h-9 w-9 items-center justify-center rounded-lg bg-rose-50"
+                            >
+                              <Trash2 size={14} color="#F43F5E" />
+                            </Pressable>
+                          </View>
+                          <View className="flex-row items-center gap-2">
+                            <TextInput
+                              value={r.usd}
+                              onChangeText={(v) => setMembraneRow(r.key, { usd: v.replace(/[^0-9.]/g, '') })}
+                              keyboardType="decimal-pad"
+                              placeholder="USD"
+                              placeholderTextColor="#94A3B8"
+                              className="h-10 flex-1 rounded-xl border border-emerald-100 bg-white px-3 text-sm text-slate-800"
+                              style={{ ...SINGLE_LINE_INPUT, writingDirection: 'ltr', textAlign: 'left' }}
+                            />
+                            <TextInput
+                              value={r.iqd}
+                              onChangeText={(v) => setMembraneRow(r.key, { iqd: v.replace(/[^0-9.]/g, '') })}
+                              keyboardType="decimal-pad"
+                              placeholder="IQD"
+                              placeholderTextColor="#94A3B8"
+                              className="h-10 flex-1 rounded-xl border border-emerald-100 bg-white px-3 text-sm text-slate-800"
+                              style={{ ...SINGLE_LINE_INPUT, writingDirection: 'ltr', textAlign: 'left' }}
+                            />
+                          </View>
+                        </View>
+                      ))}
+                      <Pressable
+                        onPress={() => setMembraneRows((prev) => [...prev, { key: `m${Date.now()}`, size: '', usd: '', iqd: '' }])}
+                        className="h-11 flex-row items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-emerald-200 bg-white"
+                      >
+                        <Plus size={15} color={ACCENT} />
+                        <Text className="text-sm font-bold" style={{ color: ACCENT }}>
+                          {ar ? 'إضافة حجم ممبرن' : 'Add membrane size'}
+                        </Text>
+                      </Pressable>
                     </View>
                   </Field>
                   <Field label={ar ? 'صورة الممبرن' : 'Membrane photo'}>

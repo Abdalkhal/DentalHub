@@ -7,7 +7,8 @@ import { ChevronLeft, ChevronRight, Package, Phone, X } from 'lucide-react-nativ
 
 import { Text } from '@/components/ui';
 import { ProductImage } from '@/components/ProductImage';
-import { useSignedImageUrls, type Product } from '@/lib/products';
+import { PriceLock } from '@/components/PriceLock';
+import { membraneSizes, useSignedImageUrls, type Product } from '@/lib/products';
 import { db } from '@/integrations/firebase/client';
 import { useUserRole } from '@/lib/useAuth';
 import { cn } from '@/lib/utils';
@@ -209,7 +210,11 @@ export function BoneGraftDetailsModal({
                   <Text className="text-[11px] font-bold text-emerald-700/70">
                     {ar ? 'سعر الوحدة الواحدة' : 'Unit Price'}
                   </Text>
-                  <Text className="text-lg font-extrabold text-emerald-700">{money(product.price)}</Text>
+                  {product.priceLocked ? (
+                    <PriceLock officeId={product.companyId} className="mt-1" />
+                  ) : (
+                    <Text className="text-lg font-extrabold text-emerald-700">{money(product.price)}</Text>
+                  )}
                 </View>
                 <View className="items-end">
                   <Text className="text-[11px] font-bold text-emerald-700/70">{ar ? 'الحالة' : 'Status'}</Text>
@@ -295,20 +300,25 @@ export function BoneGraftDetailsModal({
                           <Text className="text-[10px] font-bold text-emerald-700">{ar ? 'يحتاج ممبرن' : 'Needs a membrane'}</Text>
                         </View>
                         {!!membrane.type && <Text className="text-sm font-bold text-slate-800">{membrane.type}</Text>}
-                        {!!membrane.size && (
-                          <Text className="text-[12px] text-slate-500" style={{ writingDirection: 'ltr', textAlign: ar ? 'right' : 'left' }}>
-                            {membrane.size}
-                          </Text>
-                        )}
-                        {(!!membrane.priceUsd || !!membrane.priceIqd) && (
-                          <Text className="text-[12px] font-bold text-primary">
-                            {[
-                              membrane.priceUsd ? `$${membrane.priceUsd.toLocaleString('en-US')}` : '',
-                              membrane.priceIqd ? `${membrane.priceIqd.toLocaleString('en-US')} د.ع` : '',
-                            ]
-                              .filter(Boolean)
-                              .join(' · ')}
-                          </Text>
+                        {!!membrane.description && <Text className="text-[12px] leading-5 text-slate-600">{membrane.description}</Text>}
+                        {membraneSizes(membrane).length > 0 && (
+                          <View className="mt-1 overflow-hidden rounded-xl border border-slate-200 bg-white">
+                            {membraneSizes(membrane).map((m, i) => (
+                              <View key={i} className={cn('flex-row items-center justify-between gap-2 px-2.5 py-2', i > 0 && 'border-t border-slate-100')}>
+                                <Text className="text-[12px] font-semibold text-slate-700" style={{ writingDirection: 'ltr' }}>
+                                  {m.size || '—'}
+                                </Text>
+                                <Text className="text-[12px] font-bold text-primary">
+                                  {[
+                                    m.priceUsd ? `$${m.priceUsd.toLocaleString('en-US')}` : '',
+                                    m.priceIqd ? `${m.priceIqd.toLocaleString('en-US')} د.ع` : '',
+                                  ]
+                                    .filter(Boolean)
+                                    .join(' · ')}
+                                </Text>
+                              </View>
+                            ))}
+                          </View>
                         )}
                       </View>
                     </View>

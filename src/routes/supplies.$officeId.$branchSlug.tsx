@@ -11,6 +11,7 @@ import { SearchX, ArrowUpDown, ImageOff, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsFavorited, toggleFavorite } from "@/lib/favoritesStore";
 import { ProductAddToCart } from "@/components/ProductAddToCart";
+import { PriceLock } from "@/components/PriceLock";
 
 function FavoriteHeart({
   productId, title, vendor, price, currency, imageUrl, lang,
@@ -215,7 +216,11 @@ function BranchPage() {
                   <p className="font-display font-bold text-sm leading-snug line-clamp-2">{lang === "ar" ? p.ar : p.en}</p>
                   <p className="text-[11px] text-muted-foreground mt-0.5">{p.brand}</p>
                   <div className="flex items-center justify-between mt-2">
-                    <span className="font-display font-extrabold text-primary text-sm">${p.price}</span>
+                    {p.priceLocked ? (
+                      <PriceLock officeId={p.companyId} compact />
+                    ) : (
+                      <span className="font-display font-extrabold text-primary text-sm">${p.price}</span>
+                    )}
                     <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-semibold ${p.inStock ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive"}`}>{p.inStock ? t("in_stock") : t("out_of_stock")}</span>
                   </div>
                   <ProductAddToCart
@@ -224,6 +229,7 @@ function BranchPage() {
                     officeId={officeId} officeName={lang === "ar" ? office?.ar ?? "" : office?.en ?? ""}
                     brand={p.brand} category={p.branch} unitPrice={p.price}
                     currency={p.currency ?? "USD"} inStock={p.inStock ?? false} lang={lang}
+                    locked={p.priceLocked}
                   />
                 </div>
               );

@@ -3,6 +3,7 @@ import { doc, getDoc, serverTimestamp, updateDoc, writeBatch } from "firebase/fi
 import { db } from "@/integrations/firebase/client";
 import { ALL_COUNTRIES } from "@/data/countries";
 import { assertVerified } from "./emailVerification";
+import { resetPriceCache } from "./priceAccess";
 import { useCatalogOffers, type Currency, type Product } from "./products";
 
 // The shared product catalog: every product once, with no prices. An office
@@ -178,6 +179,11 @@ export async function fillMissingImages(mine: Product[], items: CatalogItem[]): 
 /** Publishes the office's selected products. Runs in batches of 400. */
 export async function publishListings(officeId: string, drafts: ListingDraft[]): Promise<void> {
   assertVerified();
+  // Prices for approved doctors only: hidden from the first write (see
+  // useUpsertProduct in products.ts).
+  const hidesPrices = await getDoc(doc(db, "user_roles", officeId))
+    .then((r) => r.data()?.pricesHidden === true)
+    .catch(() => false);
   for (let i = 0; i < drafts.length; i += 400) {
     const batch = writeBatch(db);
     for (const d of drafts.slice(i, i + 400)) {
@@ -187,6 +193,7 @@ export async function publishListings(officeId: string, drafts: ListingDraft[]):
       batch.set(
         doc(db, "products", id),
         {
+          ...(hidesPrices ? { priceHidden: true } : {}),
           id,
           catalogId: d.item.id,
           companyId: officeId,
@@ -212,4 +219,5 @@ export async function publishListings(officeId: string, drafts: ListingDraft[]):
     }
     await batch.commit();
   }
+  resetPriceCache();
 }

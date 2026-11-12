@@ -9,15 +9,14 @@ import { setClinicsStoreUser } from "@/lib/clinicsStore";
 import { useSession } from "@/lib/useAuth";
 import { Stethoscope, Plus, Trash2, Phone, Clock } from "lucide-react";
 import { ClinicTeamCard, JoinedClinicsCard } from "@/components/ClinicTeam";
-import { ClinicStaffCard } from "@/components/ClinicStaff";
 import { EmptyState, Field, Sheet, inputCls } from "./clinic.materials";
 
 export const Route = createFileRoute("/clinic/doctors")({
   head: () => ({
     meta: [
-      { title: "أطباء العيادة | DentalHub" },
+      { title: "أطباء العيادة | Dent Hub" },
       { name: "description", content: "دليل أطباء العيادة والاختصاصات وأوقات الدوام والحالات المسندة لكل طبيب." },
-      { property: "og:title", content: "أطباء العيادة | DentalHub" },
+      { property: "og:title", content: "أطباء العيادة | Dent Hub" },
       { property: "og:description", content: "دليل أطباء العيادة والاختصاصات والدوام." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -49,9 +48,6 @@ function DoctorsPage() {
         <div className="mb-4 grid gap-3 md:grid-cols-2 md:items-start">
           <ClinicTeamCard ar={ar} />
           <JoinedClinicsCard ar={ar} />
-        </div>
-        <div className="mb-4">
-          <ClinicStaffCard ar={ar} />
         </div>
         <p className="mb-2 px-1 text-[11px] font-bold text-muted-foreground">
           {ar ? "أطباء بدون حساب في التطبيق (سجل داخلي)" : "Doctors without an app account (internal list)"}

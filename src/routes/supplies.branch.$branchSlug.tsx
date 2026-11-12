@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { PriceLock } from "@/components/PriceLock";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { doc, getDoc } from "firebase/firestore";
@@ -231,9 +232,13 @@ function BranchAllPage() {
                       </p>
                       <p className="text-[11px] text-muted-foreground">{p.brand}</p>
                       <div className="flex items-center gap-2 mt-1">
-                        <span className="font-display font-extrabold text-primary text-sm">
-                          ${p.price}
-                        </span>
+                        {p.priceLocked ? (
+                          <PriceLock officeId={p.companyId} compact />
+                        ) : (
+                          <span className="font-display font-extrabold text-primary text-sm">
+                            ${p.price}
+                          </span>
+                        )}
                         <span
                           className={`text-[10px] px-1.5 py-0.5 rounded-md font-semibold ${p.inStock ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive"}`}
                         >

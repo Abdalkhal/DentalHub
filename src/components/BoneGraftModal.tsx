@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, Plus, Trash2, Upload, Image, Check, Loader2, Layers, Maximize2, DollarSign } from "lucide-react";
+import { X, Plus, Trash2, Upload, Image, Check, Loader2, Layers, Maximize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { useConfirmClose, useFormDirty } from "@/lib/confirmClose";
@@ -12,6 +12,7 @@ import {
   useSignedImageUrls,
   MAX_PRODUCT_IMAGES,
   type Product,
+  membraneSizes,
 } from "@/lib/products";
 import { auth } from "@/integrations/firebase/client";
 import { toast } from "sonner";
@@ -43,13 +44,7 @@ function newRow(): PackRow {
   return { key: crypto.randomUUID(), volume: "", priceUsd: "", priceIqd: "", available: true };
 }
 
-export function BoneGraftModal({
-  onClose,
-  product,
-}: {
-  onClose: () => void;
-  product?: Product;
-}) {
+export function BoneGraftModal({ onClose, product }: { onClose: () => void; product?: Product }) {
   const { lang } = useI18n();
   const ar = lang === "ar";
   const upsert = useUpsertProduct();
@@ -95,9 +90,23 @@ export function BoneGraftModal({
   const savedMembrane = product?.boneGraft?.membrane;
   const [membraneNeeded, setMembraneNeeded] = useState(savedMembrane?.needed ?? false);
   const [membraneType, setMembraneType] = useState(savedMembrane?.type ?? "");
-  const [membraneSize, setMembraneSize] = useState(savedMembrane?.size ?? "");
-  const [membraneUsd, setMembraneUsd] = useState(savedMembrane?.priceUsd ? String(savedMembrane.priceUsd) : "");
-  const [membraneIqd, setMembraneIqd] = useState(savedMembrane?.priceIqd ? String(savedMembrane.priceIqd) : "");
+  const [membraneDesc, setMembraneDesc] = useState(savedMembrane?.description ?? "");
+  // Several sizes, each with its own price, like the pack sizes.
+  const [membraneRows, setMembraneRows] = useState<
+    { key: string; size: string; usd: string; iqd: string }[]
+  >(() => {
+    const saved = membraneSizes(savedMembrane).map((m, i) => ({
+      key: `m${i}`,
+      size: m.size,
+      usd: m.priceUsd ? String(m.priceUsd) : "",
+      iqd: m.priceIqd ? String(m.priceIqd) : "",
+    }));
+    return saved.length ? saved : [{ key: "m0", size: "", usd: "", iqd: "" }];
+  });
+  const setMembraneRow = (
+    key: string,
+    patch: Partial<{ size: string; usd: string; iqd: string }>,
+  ) => setMembraneRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
   const [membraneImage, setMembraneImage] = useState(savedMembrane?.image ?? "");
   const [membraneFile, setMembraneFile] = useState<File | null>(null);
   const [membranePreview, setMembranePreview] = useState("");
@@ -170,7 +179,31 @@ export function BoneGraftModal({
   };
 
   // Closing by mistake (✕, a click outside, the tab) asks first when something was typed.
-  const dirty = useFormDirty([name, manufacturer, country, graftType, form, materialSource, composition, particleSize, sterilizationMethod, shelfLife, features, description, rows, imagePreviews, existingImages, clinicalPreviews, existingClinical, membraneNeeded, membraneType, membraneSize, membraneUsd, membraneIqd, membraneImage, membranePreview]);
+  const dirty = useFormDirty([
+    name,
+    manufacturer,
+    country,
+    graftType,
+    form,
+    materialSource,
+    composition,
+    particleSize,
+    sterilizationMethod,
+    shelfLife,
+    features,
+    description,
+    rows,
+    imagePreviews,
+    existingImages,
+    clinicalPreviews,
+    existingClinical,
+    membraneNeeded,
+    membraneType,
+    membraneDesc,
+    membraneRows,
+    membraneImage,
+    membranePreview,
+  ]);
   const requestClose = useConfirmClose(dirty, onClose, ar);
 
   const submit = async () => {
@@ -190,13 +223,16 @@ export function BoneGraftModal({
 
       // The membrane photo is dropped when replaced, removed, or no longer needed.
       const membraneRemoved =
-        savedMembrane?.image && (savedMembrane.image !== membraneImage || membraneFile || !membraneNeeded)
+        savedMembrane?.image &&
+        (savedMembrane.image !== membraneImage || membraneFile || !membraneNeeded)
           ? [savedMembrane.image]
           : [];
       for (const path of [...removedImages, ...removedClinical, ...membraneRemoved]) {
         try {
           await removeProductImage(path);
-        } catch { /* image already removed */ }
+        } catch {
+          /* image already removed */
+        }
       }
 
       const uploadedPaths: string[] = [];
@@ -209,7 +245,8 @@ export function BoneGraftModal({
       }
 
       let membranePath = membraneNeeded ? membraneImage : "";
-      if (membraneNeeded && membraneFile) membranePath = await uploadProductImage(productId, membraneFile);
+      if (membraneNeeded && membraneFile)
+        membranePath = await uploadProductImage(productId, membraneFile);
 
       const packSizes = rows
         .filter((r) => r.volume.trim())
@@ -256,9 +293,14 @@ export function BoneGraftModal({
             ? {
                 needed: true,
                 ...(membraneType.trim() ? { type: membraneType.trim() } : {}),
-                ...(membraneSize.trim() ? { size: membraneSize.trim() } : {}),
-                ...(parseFloat(membraneUsd) > 0 ? { priceUsd: parseFloat(membraneUsd) } : {}),
-                ...(parseFloat(membraneIqd) > 0 ? { priceIqd: parseFloat(membraneIqd) } : {}),
+                ...(membraneDesc.trim() ? { description: membraneDesc.trim() } : {}),
+                sizes: membraneRows
+                  .map((r) => ({
+                    size: r.size.trim(),
+                    ...(parseFloat(r.usd) > 0 ? { priceUsd: parseFloat(r.usd) } : {}),
+                    ...(parseFloat(r.iqd) > 0 ? { priceIqd: parseFloat(r.iqd) } : {}),
+                  }))
+                  .filter((r) => r.size || r.priceUsd || r.priceIqd),
                 ...(membranePath ? { image: membranePath } : {}),
               }
             : { needed: false },
@@ -283,7 +325,10 @@ export function BoneGraftModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-[#17324A]/40 backdrop-blur-sm md:items-center md:p-6" onClick={requestClose}>
+    <div
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-[#17324A]/40 backdrop-blur-sm md:items-center md:p-6"
+      onClick={requestClose}
+    >
       <div
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-[440px] max-h-[92vh] flex flex-col rounded-t-3xl overflow-hidden animate-in slide-in-from-bottom md:max-w-2xl md:max-h-[88vh] md:rounded-3xl md:shadow-2xl lg:max-w-3xl"
@@ -314,14 +359,29 @@ export function BoneGraftModal({
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0 md:px-6 md:py-6 md:items-start">
           {/* Section 1 */}
           <section className={sectionCls}>
-            <p className={sectionTitleCls}><span className="size-1.5 rounded-full bg-[#1C6FB5]" />{ar ? "المعلومات الأساسية والشركة المصنعة" : "Basic & Manufacturer Info"}</p>
+            <p className={sectionTitleCls}>
+              <span className="size-1.5 rounded-full bg-[#1C6FB5]" />
+              {ar ? "المعلومات الأساسية والشركة المصنعة" : "Basic & Manufacturer Info"}
+            </p>
             <div>
-              <label className={labelCls}>{ar ? "اسم المنتج التجاري" : "Commercial Product Name"}</label>
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder={ar ? "مثال: Bio-Oss" : "e.g. Bio-Oss"} className={inputCls} />
+              <label className={labelCls}>
+                {ar ? "اسم المنتج التجاري" : "Commercial Product Name"}
+              </label>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={ar ? "مثال: Bio-Oss" : "e.g. Bio-Oss"}
+                className={inputCls}
+              />
             </div>
             <div>
               <label className={labelCls}>{ar ? "الشركة المصنعة" : "Manufacturer Name"}</label>
-              <input value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} placeholder={ar ? "مثال: Geistlich" : "e.g. Geistlich"} className={inputCls} />
+              <input
+                value={manufacturer}
+                onChange={(e) => setManufacturer(e.target.value)}
+                placeholder={ar ? "مثال: Geistlich" : "e.g. Geistlich"}
+                className={inputCls}
+              />
             </div>
             <div>
               <label className={labelCls}>{ar ? "بلد المنشأ" : "Country of Origin"}</label>
@@ -331,52 +391,103 @@ export function BoneGraftModal({
 
           {/* Section 2 */}
           <section className={sectionCls}>
-            <p className={sectionTitleCls}><span className="size-1.5 rounded-full bg-[#1C6FB5]" />{ar ? "المواصفات الفنية والمادة" : "Technical & Material Specifications"}</p>
+            <p className={sectionTitleCls}>
+              <span className="size-1.5 rounded-full bg-[#1C6FB5]" />
+              {ar ? "المواصفات الفنية والمادة" : "Technical & Material Specifications"}
+            </p>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={labelCls}>{ar ? "نوع المصدر" : "Graft Type"}</label>
-                <select value={graftType} onChange={(e) => setGraftType(e.target.value)} className={cn(inputCls, "pe-8")}>
-                  {GRAFT_TYPES.map((t) => <option key={t.ar} value={t.ar}>{ar ? t.ar : t.en}</option>)}
+                <select
+                  value={graftType}
+                  onChange={(e) => setGraftType(e.target.value)}
+                  className={cn(inputCls, "pe-8")}
+                >
+                  {GRAFT_TYPES.map((t) => (
+                    <option key={t.ar} value={t.ar}>
+                      {ar ? t.ar : t.en}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
                 <label className={labelCls}>{ar ? "الشكل الفيزيائي" : "Form"}</label>
-                <select value={form} onChange={(e) => setForm(e.target.value)} className={cn(inputCls, "pe-8")}>
-                  {GRAFT_FORMS.map((f) => <option key={f.ar} value={f.ar}>{ar ? f.ar : f.en}</option>)}
+                <select
+                  value={form}
+                  onChange={(e) => setForm(e.target.value)}
+                  className={cn(inputCls, "pe-8")}
+                >
+                  {GRAFT_FORMS.map((f) => (
+                    <option key={f.ar} value={f.ar}>
+                      {ar ? f.ar : f.en}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
             <div>
               <label className={labelCls}>{ar ? "مصدر المادة التفصيلي" : "Material Source"}</label>
-              <input value={materialSource} onChange={(e) => setMaterialSource(e.target.value)} className={inputCls} />
+              <input
+                value={materialSource}
+                onChange={(e) => setMaterialSource(e.target.value)}
+                className={inputCls}
+              />
             </div>
             <div>
               <label className={labelCls}>{ar ? "التركيب المادي" : "Composition"}</label>
-              <input value={composition} onChange={(e) => setComposition(e.target.value)} className={inputCls} />
+              <input
+                value={composition}
+                onChange={(e) => setComposition(e.target.value)}
+                className={inputCls}
+              />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={labelCls}>{ar ? "حجم الحبيبات" : "Particle Size"}</label>
-                <input value={particleSize} onChange={(e) => setParticleSize(e.target.value)} placeholder="0.25 - 1 mm" dir="ltr" className={inputCls} />
+                <input
+                  value={particleSize}
+                  onChange={(e) => setParticleSize(e.target.value)}
+                  placeholder="0.25 - 1 mm"
+                  dir="ltr"
+                  className={inputCls}
+                />
               </div>
               <div>
                 <label className={labelCls}>{ar ? "طريقة التعقيم" : "Sterilization Method"}</label>
-                <input value={sterilizationMethod} onChange={(e) => setSterilizationMethod(e.target.value)} placeholder={ar ? "أشعة غاما" : "Gamma"} className={inputCls} />
+                <input
+                  value={sterilizationMethod}
+                  onChange={(e) => setSterilizationMethod(e.target.value)}
+                  placeholder={ar ? "أشعة غاما" : "Gamma"}
+                  className={inputCls}
+                />
               </div>
             </div>
             <div>
-              <label className={labelCls}>{ar ? "مدة الصلاحية والاستخدام" : "Shelf Life & Usage"}</label>
-              <input value={shelfLife} onChange={(e) => setShelfLife(e.target.value)} placeholder={ar ? "مثال: 3 سنوات" : "e.g. 3 years"} className={inputCls} />
+              <label className={labelCls}>
+                {ar ? "مدة الصلاحية والاستخدام" : "Shelf Life & Usage"}
+              </label>
+              <input
+                value={shelfLife}
+                onChange={(e) => setShelfLife(e.target.value)}
+                placeholder={ar ? "مثال: 3 سنوات" : "e.g. 3 years"}
+                className={inputCls}
+              />
             </div>
           </section>
 
           {/* Membrane */}
           <section className={sectionCls}>
-            <p className={sectionTitleCls}><span className="size-1.5 rounded-full bg-emerald-500" />{ar ? "الممبرن (الغشاء)" : "Membrane"}</p>
+            <p className={sectionTitleCls}>
+              <span className="size-1.5 rounded-full bg-emerald-500" />
+              {ar ? "الممبرن (الغشاء)" : "Membrane"}
+            </p>
             <div className="rounded-2xl bg-[#EEF6FD] border border-[#D3E8F7] p-3 space-y-3">
               <div className="flex items-center justify-between gap-3 px-1" role="radiogroup">
                 {([true, false] as const).map((needed) => (
-                  <label key={String(needed)} className="flex items-center gap-2 cursor-pointer text-sm font-bold text-[#17324A]">
+                  <label
+                    key={String(needed)}
+                    className="flex items-center gap-2 cursor-pointer text-sm font-bold text-[#17324A]"
+                  >
                     <input
                       type="radio"
                       name="membrane-needed"
@@ -384,7 +495,13 @@ export function BoneGraftModal({
                       onChange={() => setMembraneNeeded(needed)}
                       className="size-5 accent-[#2E93E0]"
                     />
-                    {needed ? (ar ? "يحتاج ممبرن" : "Needs membrane") : ar ? "لا يحتاج ممبرن" : "No membrane"}
+                    {needed
+                      ? ar
+                        ? "يحتاج ممبرن"
+                        : "Needs membrane"
+                      : ar
+                        ? "لا يحتاج ممبرن"
+                        : "No membrane"}
                   </label>
                 ))}
               </div>
@@ -394,70 +511,138 @@ export function BoneGraftModal({
                   <div className="flex items-center gap-3 rounded-xl bg-white border border-[#D3E8F7] px-3 py-2">
                     <Layers className="size-5 shrink-0 text-[#1C6FB5]" />
                     <div className="flex-1 min-w-0">
-                      <label className="text-[11px] font-bold text-[#17324A] block">{ar ? "نوع الممبرن" : "Membrane type"}</label>
+                      <label className="text-[11px] font-bold text-[#17324A] block">
+                        {ar ? "نوع الممبرن" : "Membrane type"}
+                      </label>
                       <input
                         value={membraneType}
                         onChange={(e) => setMembraneType(e.target.value)}
-                        placeholder={ar ? "مثال: Bio-Gide قابل للامتصاص" : "e.g. Bio-Gide resorbable"}
+                        placeholder={
+                          ar ? "مثال: Bio-Gide قابل للامتصاص" : "e.g. Bio-Gide resorbable"
+                        }
                         className="w-full bg-transparent text-sm text-[#17324A] placeholder:text-[#7A94A8] focus:outline-none"
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div className="flex items-center gap-3 rounded-xl bg-white border border-[#D3E8F7] px-3 py-2">
-                      <Maximize2 className="size-4 shrink-0 text-[#1C6FB5]" />
-                      <div className="flex-1 min-w-0">
-                        <label className="text-[11px] font-bold text-[#17324A] block">{ar ? "حجم الممبرن" : "Membrane size"}</label>
-                        <input
-                          value={membraneSize}
-                          onChange={(e) => setMembraneSize(e.target.value)}
-                          placeholder={ar ? "مثال: 15 × 20 mm" : "e.g. 15 × 20 mm"}
-                          className="w-full bg-transparent text-sm text-[#17324A] placeholder:text-[#7A94A8] focus:outline-none"
-                        />
-                      </div>
+                  <div className="flex items-center gap-3 rounded-xl bg-white border border-[#D3E8F7] px-3 py-2">
+                    <div className="flex-1 min-w-0">
+                      <label className="text-[11px] font-bold text-[#17324A] block">
+                        {ar ? "وصف الممبرن" : "Membrane description"}
+                      </label>
+                      <textarea
+                        value={membraneDesc}
+                        onChange={(e) => setMembraneDesc(e.target.value)}
+                        rows={2}
+                        placeholder={
+                          ar
+                            ? "مثال: غشاء كولاجين يمتص خلال 4–6 أسابيع"
+                            : "e.g. Collagen membrane, resorbs in 4–6 weeks"
+                        }
+                        className="mt-1 w-full resize-none bg-transparent text-sm text-[#17324A] placeholder:text-[#7A94A8] focus:outline-none"
+                      />
                     </div>
-                    {/* Same two-currency pricing as the pack sizes: either or both. */}
-                    <div className="flex items-center gap-3 rounded-xl bg-white border border-[#D3E8F7] px-3 py-2">
-                      <DollarSign className="size-4 shrink-0 text-[#1C6FB5]" />
-                      <div className="flex-1 min-w-0">
-                        <label className="text-[11px] font-bold text-[#17324A] block">{ar ? "سعر الممبرن" : "Membrane price"}</label>
-                        <div className="mt-1 flex gap-2">
-                          <div className="relative flex-1">
-                            <span className="absolute start-2 top-1/2 -translate-y-1/2 text-xs font-bold text-[#7A94A8]">$</span>
+                  </div>
+
+                  <div className="rounded-xl bg-white border border-[#D3E8F7] p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-[#17324A] flex items-center gap-1.5">
+                        <Maximize2 className="size-3.5 text-[#1C6FB5]" />
+                        {ar ? "أحجام الممبرن والأسعار" : "Membrane sizes & prices"}
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setMembraneRows((prev) => [
+                            ...prev,
+                            { key: `m${Date.now()}`, size: "", usd: "", iqd: "" },
+                          ])
+                        }
+                        className="flex items-center gap-1 text-xs font-bold text-[#1C6FB5] hover:opacity-80"
+                      >
+                        <Plus className="size-3.5" />
+                        {ar ? "إضافة حجم" : "Add size"}
+                      </button>
+                    </div>
+                    {membraneRows.map((r) => (
+                      <div
+                        key={r.key}
+                        className="grid grid-cols-[1fr_auto] gap-2 rounded-xl bg-[#F5FAFE] border border-[#D3E8F7] p-2 sm:grid-cols-[1.3fr_1fr_1fr_auto]"
+                      >
+                        <input
+                          value={r.size}
+                          onChange={(e) => setMembraneRow(r.key, { size: e.target.value })}
+                          placeholder={ar ? "مثال: 15 × 20 mm" : "e.g. 15 × 20 mm"}
+                          className="h-9 min-w-0 rounded-lg bg-white border border-[#D3E8F7] px-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2E93E0]/30"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setMembraneRows((prev) =>
+                              prev.length > 1
+                                ? prev.filter((x) => x.key !== r.key)
+                                : [{ ...prev[0], size: "", usd: "", iqd: "" }],
+                            )
+                          }
+                          className="size-9 rounded-lg bg-rose-50 text-rose-500 flex items-center justify-center sm:order-last"
+                          aria-label={ar ? "حذف الحجم" : "Remove size"}
+                        >
+                          <Trash2 className="size-4" />
+                        </button>
+                        <div className="relative col-span-2 grid grid-cols-2 gap-2 sm:col-span-2">
+                          <div className="relative">
+                            <span className="absolute start-2 top-1/2 -translate-y-1/2 text-xs font-bold text-[#7A94A8]">
+                              $
+                            </span>
                             <input
-                              value={membraneUsd}
-                              onChange={(e) => setMembraneUsd(e.target.value.replace(/[^0-9.]/g, ""))}
+                              value={r.usd}
+                              onChange={(e) =>
+                                setMembraneRow(r.key, {
+                                  usd: e.target.value.replace(/[^0-9.]/g, ""),
+                                })
+                              }
                               inputMode="decimal"
                               placeholder="USD"
                               dir="ltr"
-                              className="h-9 w-full rounded-lg bg-[#F5FAFE] border border-[#D3E8F7] ps-6 pe-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2E93E0]/30"
+                              className="h-9 w-full rounded-lg bg-white border border-[#D3E8F7] ps-6 pe-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2E93E0]/30"
                             />
                           </div>
-                          <div className="relative flex-1">
-                            <span className="absolute start-2 top-1/2 -translate-y-1/2 text-xs font-bold text-[#7A94A8]">د.ع</span>
+                          <div className="relative">
+                            <span className="absolute start-2 top-1/2 -translate-y-1/2 text-xs font-bold text-[#7A94A8]">
+                              د.ع
+                            </span>
                             <input
-                              value={membraneIqd}
-                              onChange={(e) => setMembraneIqd(e.target.value.replace(/[^0-9.]/g, ""))}
+                              value={r.iqd}
+                              onChange={(e) =>
+                                setMembraneRow(r.key, {
+                                  iqd: e.target.value.replace(/[^0-9.]/g, ""),
+                                })
+                              }
                               inputMode="decimal"
                               placeholder="IQD"
                               dir="ltr"
-                              className="h-9 w-full rounded-lg bg-[#F5FAFE] border border-[#D3E8F7] ps-8 pe-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2E93E0]/30"
+                              className="h-9 w-full rounded-lg bg-white border border-[#D3E8F7] ps-8 pe-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2E93E0]/30"
                             />
                           </div>
                         </div>
                       </div>
-                    </div>
+                    ))}
                   </div>
                   <div className="rounded-xl bg-white border border-dashed border-[#D3E8F7] p-3">
                     <div className="flex items-center justify-between">
-                      <label className="text-[11px] font-bold text-[#17324A]">{ar ? "صورة الممبرن" : "Membrane photo"}</label>
+                      <label className="text-[11px] font-bold text-[#17324A]">
+                        {ar ? "صورة الممبرن" : "Membrane photo"}
+                      </label>
                       <span className="size-9 rounded-lg bg-[#EEF6FD] flex items-center justify-center text-[#1C6FB5]">
                         <Image className="size-4" />
                       </span>
                     </div>
                     {membranePreview || (membraneImage && membraneUrlMap[membraneImage]) ? (
                       <div className="relative mt-2 size-24 overflow-hidden rounded-xl border border-[#D3E8F7]">
-                        <img src={membranePreview || membraneUrlMap[membraneImage]} alt="" className="size-full object-cover" />
+                        <img
+                          src={membranePreview || membraneUrlMap[membraneImage]}
+                          alt=""
+                          className="size-full object-cover"
+                        />
                         <button
                           type="button"
                           onClick={() => {
@@ -497,10 +682,17 @@ export function BoneGraftModal({
 
           {/* Section 3 */}
           <section className={sectionCls}>
-            <p className={sectionTitleCls}><span className="size-1.5 rounded-full bg-[#1C6FB5]" />{ar ? "المميزات والخصائص السريرية" : "Key Clinical Features"}</p>
+            <p className={sectionTitleCls}>
+              <span className="size-1.5 rounded-full bg-[#1C6FB5]" />
+              {ar ? "المميزات والخصائص السريرية" : "Key Clinical Features"}
+            </p>
             <div>
               <label className={labelCls}>{ar ? "المميزات" : "Features"}</label>
-              <TagInput value={features} onChange={setFeatures} placeholder={ar ? "اكتب ميزة واضغط Enter" : "Type a feature and press Enter"} />
+              <TagInput
+                value={features}
+                onChange={setFeatures}
+                placeholder={ar ? "اكتب ميزة واضغط Enter" : "Type a feature and press Enter"}
+              />
             </div>
             <div>
               <label className={labelCls}>{ar ? "وصف عام للمنتج" : "General Description"}</label>
@@ -516,7 +708,10 @@ export function BoneGraftModal({
           {/* Section 4 */}
           <section className={sectionCls}>
             <div className="flex items-center justify-between">
-              <p className={sectionTitleCls}><span className="size-1.5 rounded-full bg-[#1C6FB5]" />{ar ? "الأحجام والأسعار" : "Pack Sizes & Pricing"}</p>
+              <p className={sectionTitleCls}>
+                <span className="size-1.5 rounded-full bg-[#1C6FB5]" />
+                {ar ? "الأحجام والأسعار" : "Pack Sizes & Pricing"}
+              </p>
               <button
                 type="button"
                 onClick={() => setRows((prev) => [...prev, newRow()])}
@@ -546,7 +741,9 @@ export function BoneGraftModal({
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="relative flex-1">
-                    <span className="absolute start-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-[#7A94A8]">$</span>
+                    <span className="absolute start-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-[#7A94A8]">
+                      $
+                    </span>
                     <input
                       value={r.priceUsd}
                       onChange={(e) => updateRow(r.key, { priceUsd: e.target.value })}
@@ -557,7 +754,9 @@ export function BoneGraftModal({
                     />
                   </div>
                   <div className="relative flex-1">
-                    <span className="absolute start-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-[#7A94A8]">د.ع</span>
+                    <span className="absolute start-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-[#7A94A8]">
+                      د.ع
+                    </span>
                     <input
                       value={r.priceIqd}
                       onChange={(e) => updateRow(r.key, { priceIqd: e.target.value })}
@@ -572,11 +771,13 @@ export function BoneGraftModal({
                     onClick={() => updateRow(r.key, { available: !r.available })}
                     className={cn(
                       "h-10 px-2.5 rounded-xl text-[11px] font-bold flex items-center gap-1 transition shrink-0",
-                      r.available ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500",
+                      r.available
+                        ? "bg-emerald-50 text-emerald-700"
+                        : "bg-slate-100 text-slate-500",
                     )}
                   >
                     <Check className="size-3.5" />
-                    {r.available ? (ar ? "متوفر" : "Avail.") : (ar ? "نفد" : "Out")}
+                    {r.available ? (ar ? "متوفر" : "Avail.") : ar ? "نفد" : "Out"}
                   </button>
                 </div>
               </div>
@@ -585,7 +786,10 @@ export function BoneGraftModal({
 
           {/* Section 5 */}
           <section className={cn(sectionCls, "md:col-span-2")}>
-            <p className={sectionTitleCls}><span className="size-1.5 rounded-full bg-[#1C6FB5]" />{ar ? "الصور والمرفقات" : "Product Images"}</p>
+            <p className={sectionTitleCls}>
+              <span className="size-1.5 rounded-full bg-[#1C6FB5]" />
+              {ar ? "الصور والمرفقات" : "Product Images"}
+            </p>
             <div className="grid grid-cols-3 gap-2 md:grid-cols-6">
               {existingImages.map((path) => (
                 <div
@@ -609,7 +813,10 @@ export function BoneGraftModal({
                 </div>
               ))}
               {imagePreviews.map((src, i) => (
-                <div key={i} className="relative aspect-square rounded-xl overflow-hidden border border-[#D3E8F7]">
+                <div
+                  key={i}
+                  className="relative aspect-square rounded-xl overflow-hidden border border-[#D3E8F7]"
+                >
                   <img src={src} alt="" className="size-full object-cover" />
                   <button
                     type="button"
@@ -638,7 +845,10 @@ export function BoneGraftModal({
 
           {/* Section 6 - Clinical case images */}
           <section className={cn(sectionCls, "md:col-span-2")}>
-            <p className={sectionTitleCls}><span className="size-1.5 rounded-full bg-[#1C6FB5]" />{ar ? "رفع صور حالات العمل" : "Clinical Cases Images"}</p>
+            <p className={sectionTitleCls}>
+              <span className="size-1.5 rounded-full bg-[#1C6FB5]" />
+              {ar ? "رفع صور حالات العمل" : "Clinical Cases Images"}
+            </p>
             <div className="grid grid-cols-3 gap-2 md:grid-cols-6">
               {existingClinical.map((path) => (
                 <div
@@ -662,7 +872,10 @@ export function BoneGraftModal({
                 </div>
               ))}
               {clinicalPreviews.map((src, i) => (
-                <div key={i} className="relative aspect-square rounded-xl overflow-hidden border border-[#D3E8F7]">
+                <div
+                  key={i}
+                  className="relative aspect-square rounded-xl overflow-hidden border border-[#D3E8F7]"
+                >
                   <img src={src} alt="" className="size-full object-cover" />
                   <button
                     type="button"

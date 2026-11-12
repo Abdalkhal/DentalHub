@@ -8,6 +8,7 @@
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
+const hiddenPrices = require("./hiddenPrices");
 const {
   checkPromo,
   officeTotals,
@@ -42,6 +43,8 @@ const cleanIds = (v) =>
 module.exports = function discounts(admin) {
   const firestore = admin.firestore();
   const FV = admin.firestore.FieldValue;
+  // Prices of offices that show them to approved doctors only.
+  const prices = require("./hiddenPrices")(admin);
   const promoRef = (id) => firestore.collection("promo_codes").doc(id);
   const redemptionRef = (promoId, doctorId) =>
     firestore.collection("promo_redemptions").doc(`${promoId}_${doctorId}`);
@@ -62,6 +65,9 @@ module.exports = function discounts(admin) {
     snaps.forEach((s, i) => {
       if (s.exists) products.set(ids[i], s.data());
     });
+    // Hidden prices are filled in for a doctor the office approved; for anyone
+    // else those products drop out, like a product that doesn't exist.
+    await prices.revealPrices(doctorId, products);
 
     // A product split over several cart rows still earns its quantity's tier.
     const quantityOf = (raw) => Math.max(1, Math.floor(Number(raw && raw.quantity) || 1));
@@ -396,9 +402,12 @@ module.exports = function discounts(admin) {
    */
   async function belowCost(officeId, pct, scope) {
     const snap = await firestore.collection("products").where("companyId", "==", officeId).get();
+    const hidden = snap.docs.some((d) => d.data().priceHidden === true)
+      ? await prices.officePrices(officeId)
+      : {};
     const names = [];
     for (const d of snap.docs) {
-      const p = d.data();
+      const p = hiddenPrices.applyPrices(d.data(), hidden[d.id]);
       const cost = Number(p.purchasePrice) || 0;
       const price = Number(p.price) || 0;
       if (cost <= 0 || price <= 0) continue;

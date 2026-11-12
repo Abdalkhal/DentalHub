@@ -131,7 +131,7 @@ service cloud.firestore {
       allow update: if isAdmin() || (
         isAuthenticated() && request.auth.uid == userId
         && !request.resource.data.diff(resource.data).affectedKeys()
-             .hasAny(['role', 'accountType', 'accountStatus', 'subscriptionExpiry', 'createdAt', 'mustVerifyEmail'])
+             .hasAny(['role', 'accountType', 'accountStatus', 'subscriptionExpiry', 'createdAt', 'mustVerifyEmail', 'pricesHidden'])
       );
 
       // Self-delete is how "delete my account" works, but it also let a
@@ -281,6 +281,49 @@ service cloud.firestore {
     match /promo_codes/{codeId} {
       allow read: if isAdmin() || (isAuthenticated() && resource.data.officeId == request.auth.uid);
       allow write: if false;
+    }
+
+    // Prices for approved doctors only (functions/hiddenPrices.js). An office
+    // that hides its prices keeps them here instead of on its public products.
+    // pricesHidden on user_roles is set only by setPricesHidden, so the flag
+    // and the moved prices can't disagree.
+    match /office_prices/{officeId} {
+      allow read: if isAdmin() || (isAuthenticated() && (
+        request.auth.uid == officeId
+        || (exists(/databases/$(database)/documents/price_access/$(officeId + '_' + request.auth.uid))
+            && get(/databases/$(database)/documents/price_access/$(officeId + '_' + request.auth.uid)).data.status == 'approved')
+      ));
+      allow write: if false;
+    }
+
+    // Who may see an office's hidden prices: {officeId}_{doctorId}, status
+    // "pending" (the doctor asked), "approved" or "declined" (the office
+    // decided). The doctor sees a declined request as still pending.
+    match /price_access/{accessId} {
+      // A missing doc is readable so a doctor can check "have I asked?".
+      allow read: if isAuthenticated() && (resource == null
+        || resource.data.officeId == request.auth.uid
+        || resource.data.doctorId == request.auth.uid);
+      // A doctor asks for themselves; it starts pending.
+      allow create: if isDentist()
+        && request.resource.data.doctorId == request.auth.uid
+        && accessId == request.resource.data.officeId + '_' + request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.keys().hasOnly(['officeId', 'doctorId', 'status', 'doctorName', 'createdAt', 'updatedAt']);
+      // The office adds a doctor it knows, already approved.
+      allow create: if isAuthenticated()
+        && request.resource.data.officeId == request.auth.uid
+        && accessId == request.auth.uid + '_' + request.resource.data.doctorId
+        && request.resource.data.status == 'approved';
+      // Only the office decides, and can't move the doc to another pair.
+      allow update: if isAuthenticated() && resource.data.officeId == request.auth.uid
+        && request.resource.data.officeId == resource.data.officeId
+        && request.resource.data.doctorId == resource.data.doctorId
+        && request.resource.data.status in ['pending', 'approved', 'declined'];
+      // The office may revoke; a doctor may only withdraw a pending request
+      // (a declined one stays, so it can't be re-sent over and over).
+      allow delete: if isAuthenticated() && (resource.data.officeId == request.auth.uid
+        || (resource.data.doctorId == request.auth.uid && resource.data.status == 'pending'));
     }
 
     // A doctor's own discount: the office that gave it and that doctor, no one

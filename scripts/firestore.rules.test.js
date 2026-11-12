@@ -205,3 +205,56 @@ test("another account cannot read or write a dentist's patient records", async (
   const anon = env.unauthenticatedContext().firestore();
   await assertFails(anon.doc("dentist_records/dentist1/patients/p1").get());
 });
+
+// ---- hidden prices: office_prices + price_access ----
+
+async function seedHiddenPrices() {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await db.doc("user_roles/office1").set({ accountType: "supply" });
+    await db.doc("user_roles/docA").set({ accountType: "dentist" });
+    await db.doc("user_roles/docB").set({ accountType: "dentist" });
+    await db.doc("office_prices/office1").set({ officeId: "office1", products: { p1: [{ p: "price", v: 50 }] } });
+    await db.doc("price_access/office1_docA").set({ officeId: "office1", doctorId: "docA", status: "approved" });
+  });
+}
+
+test("only the office and its approved doctors can read hidden prices", async () => {
+  await seedHiddenPrices();
+  await assertSucceeds(env.authenticatedContext("office1").firestore().doc("office_prices/office1").get());
+  await assertSucceeds(env.authenticatedContext("docA").firestore().doc("office_prices/office1").get());
+  await assertFails(env.authenticatedContext("docB").firestore().doc("office_prices/office1").get());
+  await assertFails(env.unauthenticatedContext().firestore().doc("office_prices/office1").get());
+  await assertFails(env.authenticatedContext("office1").firestore().doc("office_prices/office1").set({ products: {} }));
+});
+
+test("a doctor can ask for prices but never approve themselves", async () => {
+  await seedHiddenPrices();
+  const b = env.authenticatedContext("docB").firestore();
+  await assertSucceeds(b.doc("price_access/office1_docB").get()); // not asked yet
+  await assertFails(b.doc("price_access/office1_docB").set({ officeId: "office1", doctorId: "docB", status: "approved" }));
+  await assertFails(b.doc("price_access/office1_docX").set({ officeId: "office1", doctorId: "docB", status: "pending" }));
+  await assertSucceeds(b.doc("price_access/office1_docB").set({ officeId: "office1", doctorId: "docB", status: "pending", doctorName: "B" }));
+  await assertFails(b.doc("price_access/office1_docB").update({ status: "approved" }));
+  await assertFails(b.doc("office_prices/office1").get());
+});
+
+test("the office approves, declines and revokes; a doctor can't re-send a declined request", async () => {
+  await seedHiddenPrices();
+  await env.withSecurityRulesDisabled((ctx) =>
+    ctx.firestore().doc("price_access/office1_docB").set({ officeId: "office1", doctorId: "docB", status: "pending" }),
+  );
+  const office = env.authenticatedContext("office1").firestore();
+  await assertSucceeds(office.doc("price_access/office1_docB").update({ status: "declined" }));
+  await assertFails(env.authenticatedContext("docB").firestore().doc("price_access/office1_docB").delete());
+  await assertSucceeds(office.doc("price_access/office1_docB").update({ status: "approved" }));
+  await assertSucceeds(env.authenticatedContext("docB").firestore().doc("office_prices/office1").get());
+  await assertSucceeds(office.doc("price_access/office1_docB").delete());
+  await assertSucceeds(office.doc("price_access/office1_docC").set({ officeId: "office1", doctorId: "docC", status: "approved" }));
+  await assertFails(office.doc("price_access/office2_docC").set({ officeId: "office2", doctorId: "docC", status: "approved" }));
+});
+
+test("an office can't flip pricesHidden itself", async () => {
+  await seedHiddenPrices();
+  await assertFails(env.authenticatedContext("office1").firestore().doc("user_roles/office1").update({ pricesHidden: true }));
+});

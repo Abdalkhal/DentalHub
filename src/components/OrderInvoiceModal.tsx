@@ -230,7 +230,7 @@ export function OrderInvoiceModal({ order, labName, labAddress, labPhone, onClos
         : SHADE_SYSTEMS[shadeTab].en
       : null;
 
-  const labTitle = labName || (ar ? "مختبر دنتال هب" : "Dental Hub Lab");
+  const labTitle = labName || (ar ? "مختبر دنت هب" : "Dent Hub Lab");
   const address = labAddress?.trim() || "";
   const phone = labPhone?.trim() || "";
 

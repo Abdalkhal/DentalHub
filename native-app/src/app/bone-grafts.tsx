@@ -9,6 +9,7 @@ import { ProductImage } from '@/components/ProductImage';
 import { BoneGraftDetailsModal } from '@/components/BoneGraftDetailsModal';
 import { db } from '@/integrations/firebase/client';
 import { useProductsWhere, useSignedImageUrls, type Product } from '@/lib/products';
+import { PriceLock } from '@/components/PriceLock';
 import { useI18n } from '@/lib/i18n';
 
 export default function BoneGraftsScreen() {
@@ -94,7 +95,11 @@ export default function BoneGraftsScreen() {
                       {p.boneGraft.particleSize ? ` · ${p.boneGraft.particleSize}` : ''}
                     </Text>
                   )}
-                  <Text className="mt-1 text-sm font-extrabold text-primary">{price}</Text>
+                  {p.priceLocked ? (
+                    <PriceLock officeId={p.companyId} compact className="mt-1" />
+                  ) : (
+                    <Text className="mt-1 text-sm font-extrabold text-primary">{price}</Text>
+                  )}
                 </View>
               </Pressable>
             );

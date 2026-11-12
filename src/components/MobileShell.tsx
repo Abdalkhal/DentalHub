@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { useUserRole, getAccountDashboard } from "@/lib/useAuth";
 import { useCart, onOpenCart } from "@/lib/cartStore";
 import { CartDrawer } from "@/components/CartDrawer";
+import { DesktopChrome } from "@/components/DesktopChrome";
 import { useDentistOrders, useOrders as useSupplierOrders } from "@/lib/orders";
 import { useSeenOrderIds } from "@/lib/orderSeen";
 
@@ -59,6 +60,9 @@ export function MobileShell({
     }
   }, [loading, user, isPublicRoute, navigate]);
   if (!isPublicRoute && !loading && !user) return null;
+  // Dentists get a side rail + top bar at lg:+ (see DesktopChrome) instead of
+  // the plain top strip, so the page column has to clear the rail.
+  const dentistDesktop = isWide && !noNav && role?.accountType === "dentist";
 
   return (
     <div className="min-h-screen w-full bg-slate-50 overflow-x-hidden flex justify-center">
@@ -71,6 +75,7 @@ export function MobileShell({
           // in an empty page. Scoped to explicit `wide` only, so lab pages
           // (which come in through `isLab`) keep their current tablet look.
           wide && "md:max-w-none",
+          dentistDesktop && "dh-rail lg:ps-60 lg:bg-[#F3F5FA]",
           className,
         )}
       >
@@ -231,7 +236,15 @@ function BottomTabBar({
           laptop widths, so wide pages get a fixed top strip instead, built
           from the exact same tabs/active-state used above. Hidden entirely
           unless `wide` is set, so non-converted pages are unaffected. */}
-      {wide && (
+      {wide && isDentist && (
+        <DesktopChrome
+          cartCount={cartCount}
+          unseenOrders={unseenOrders}
+          unreadMessages={unreadMessages}
+          onCartClick={onCartClick}
+        />
+      )}
+      {wide && !isDentist && (
         <nav className="hidden lg:block fixed top-0 inset-x-0 z-50 h-16 bg-white/85 backdrop-blur-xl border-b border-slate-200/80">
           <div className="mx-auto max-w-7xl h-full px-8 flex items-center gap-8">
             {/* Brand mark — a web header needs an anchor on the start edge;
@@ -246,7 +259,7 @@ function BottomTabBar({
                 D
               </span>
               <span className="font-display font-extrabold text-[15px] tracking-tight leading-none">
-                <span className="text-slate-900">Dental</span>
+                <span className="text-slate-900">Dent</span>{" "}
                 <span className={accent.text}>Hub</span>
               </span>
             </Link>

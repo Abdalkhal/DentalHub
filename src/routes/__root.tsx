@@ -93,14 +93,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, maximum-scale=1" },
-      { title: "DentalHub — مستلزمات ومختبرات وزرعات الأسنان" },
+      { title: "Dent Hub — مستلزمات ومختبرات وزرعات الأسنان" },
       {
         name: "description",
         content:
           "تطبيق يربط أطباء الأسنان بمكاتب المستلزمات والمختبرات ووكلاء زرعات الأسنان في الموصل والعراق.",
       },
-      { name: "author", content: "DentalHub" },
-      { property: "og:title", content: "DentalHub" },
+      { name: "author", content: "Dent Hub" },
+      { property: "og:title", content: "Dent Hub" },
       { property: "og:description", content: "مستلزمات • مختبرات • زرعات — لطبيب الأسنان." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

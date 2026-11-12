@@ -16,8 +16,7 @@ import { BookingLinkCard } from "@/components/booking/BookingLinkCard";
 import {
   ArrowRight, ArrowLeft, User, CreditCard, Users,
   Calendar, Plus, Package, ClipboardList, BarChart3, Stethoscope,
-  Building2, ChevronDown, Pencil, Check,
-} from "lucide-react";
+  Building2, ChevronDown, Pencil, Check, ShieldCheck } from "lucide-react";
 
 export const Route = createFileRoute("/clinic/")({
   component: ClinicHome,
@@ -84,9 +83,11 @@ function ClinicHome() {
           have to be lifted for the desktop layout to get any room. */}
       <div className="min-h-svh bg-slate-50 flex justify-center">
         <div className="w-full max-w-[440px] bg-[#E6F0FF] md:max-w-none md:bg-transparent md:px-6 lg:px-8 lg:max-w-7xl">
-          {/* Header */}
-          <header className="flex items-center justify-between px-4 pt-4 pb-2 md:px-0 md:pt-8 md:pb-6">
-            <div className="flex items-center gap-2 md:order-last">
+          {/* Header + clinic switcher: stacked on phones/tablets, one row at lg:+ */}
+          <div className="lg:flex lg:items-center lg:gap-5 lg:pt-7 lg:pb-5">
+          <header className="flex items-center justify-between px-4 pt-4 pb-2 md:px-0 md:pt-8 md:pb-6 lg:p-0">
+            {/* lg:+ : the shell top bar already has language + account */}
+            <div className="flex items-center gap-2 md:order-last lg:hidden">
               <button
                 onClick={toggle}
                 className="h-9 px-3 rounded-xl bg-slate-100 text-xs font-bold text-slate-600 hover:bg-sky-100 hover:text-sky-600 transition md:h-10 md:px-4 md:bg-white md:border md:border-slate-200"
@@ -101,12 +102,12 @@ function ClinicHome() {
               </button>
             </div>
             <div className="flex items-center gap-2 md:gap-4">
-              <h1 className="font-display font-extrabold text-lg text-slate-800 md:text-3xl">
+              <h1 className="font-display font-extrabold text-lg text-slate-800 md:text-3xl lg:text-[28px] lg:text-slate-900">
                 {ar ? "عيادتي" : "My Clinic"}
               </h1>
               <button
                 onClick={() => navigate({ to: "/" })}
-                className="size-9 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-500 transition md:order-first md:size-10 md:bg-white md:border md:border-slate-200"
+                className="size-9 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-500 transition md:order-first md:size-10 md:bg-white md:border md:border-slate-200 lg:hidden"
               >
                 <BackIcon className="size-5" />
               </button>
@@ -117,7 +118,7 @@ function ClinicHome() {
               which one is active here; every patient/appointment/finance/
               inventory store below re-keys to that clinic's own isolated
               storage the moment it changes (see clinicsStore.ts). */}
-          <div className="relative flex justify-center px-4 pb-3 md:px-0 md:justify-start">
+          <div className="relative flex justify-center px-4 pb-3 md:px-0 md:justify-start lg:pb-0">
             <button
               onClick={() => setMenuOpen((v) => !v)}
               className="flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white ps-4 pe-2 shadow-sm transition hover:shadow-md"
@@ -175,46 +176,47 @@ function ClinicHome() {
               </>
             )}
           </div>
+          </div>
 
           {/* Phone: one vertical stack. md:+ : the hero spans the full width
               and the three labelled groups become side-by-side columns, so
               all six destinations are visible without scrolling. */}
           <div className="px-4 space-y-4 pb-8 md:px-0 md:pb-12 md:grid md:grid-cols-2 md:gap-6 md:space-y-0 md:items-start lg:grid-cols-3">
             {/* Hero Banner */}
-            <div className="relative bg-gradient-to-r from-blue-500 to-blue-600 rounded-3xl overflow-hidden md:col-span-2 lg:col-span-3 lg:rounded-[32px]">
-              <div className="absolute -bottom-6 -end-6 size-32 rounded-full bg-white/10 md:size-72 md:-bottom-24" />
-              <div className="relative z-10 flex items-stretch">
+            <div className="relative bg-gradient-to-r from-blue-500 to-blue-600 rounded-3xl overflow-hidden md:col-span-2 lg:col-span-3 lg:rounded-[28px] lg:h-[232px] lg:bg-none lg:bg-[#0B1220] lg:shadow-xl lg:shadow-slate-900/10">
+              <div className="absolute -bottom-6 -end-6 size-32 rounded-full bg-white/10 md:size-72 md:-bottom-24 lg:-top-32 lg:bottom-auto lg:start-10 lg:end-auto lg:size-[24rem] lg:bg-[#2563EB]/45 lg:blur-3xl" />
+              <div className="relative z-10 flex items-stretch lg:h-full">
                 <div className="flex-1 p-4 flex flex-col justify-center md:p-10 lg:px-14">
-                  <h2 className="font-display font-extrabold text-lg text-white leading-tight md:text-4xl lg:text-[44px]">
+                  <h2 className="font-display font-extrabold text-lg text-white leading-tight md:text-4xl lg:text-[32px]">
                     {ar ? "إدارة العيادة والمرضى" : "Clinic & Patient Management"}
                   </h2>
-                  <p className="text-xs text-white/70 mt-1 md:text-lg md:mt-3 md:text-white/85 md:max-w-md">
+                  <p className="text-xs text-white/70 mt-1 md:text-lg md:mt-3 md:text-white/85 md:max-w-md lg:text-[15px] lg:mt-2 lg:text-slate-300">
                     {ar ? "كل ما يخص عيادتك في مكان واحد" : "Everything for your clinic in one place"}
                   </p>
-                  <div className="mt-3 flex flex-col gap-2 md:flex-row md:mt-8 md:gap-3">
+                  <div className="mt-3 flex flex-col gap-2 md:flex-row md:mt-8 md:gap-3 lg:mt-6">
                     <button
                       onClick={() => setShowAddAppointment(true)}
-                      className="w-full h-10 rounded-xl bg-white text-blue-600 text-xs font-bold shadow-sm hover:bg-blue-50 transition flex items-center justify-center gap-1.5 md:w-auto md:h-12 md:px-7 md:text-sm md:rounded-full"
+                      className="w-full h-10 rounded-xl bg-white text-blue-600 text-xs font-bold shadow-sm hover:bg-blue-50 transition flex items-center justify-center gap-1.5 md:w-auto md:h-12 md:px-7 md:text-sm md:rounded-full lg:h-11 lg:px-5 lg:rounded-xl lg:text-slate-900"
                     >
                       <Plus className="size-3.5 md:size-4" />
                       {ar ? "إضافة موعد" : "Add Appointment"}
                     </button>
                     <button
                       onClick={() => navigate({ to: "/clinic/appointments" })}
-                      className="w-full h-10 rounded-xl bg-blue-700/40 text-white text-xs font-bold hover:bg-blue-700/60 transition flex items-center justify-center gap-1.5 md:w-auto md:h-12 md:px-7 md:text-sm md:rounded-full md:bg-white/15 md:hover:bg-white/25"
+                      className="w-full h-10 rounded-xl bg-blue-700/40 text-white text-xs font-bold hover:bg-blue-700/60 transition flex items-center justify-center gap-1.5 md:w-auto md:h-12 md:px-7 md:text-sm md:rounded-full md:bg-white/15 md:hover:bg-white/25 lg:h-11 lg:px-5 lg:rounded-xl"
                     >
                       <Calendar className="size-3.5 md:size-4" />
                       {ar ? `مواعيد اليوم (${todayCount})` : `Today's Visits (${todayCount})`}
                     </button>
                   </div>
                 </div>
-                <div className="w-1/2 shrink-0 overflow-hidden md:w-[42%] lg:w-[46%]">
+                <div className="w-1/2 shrink-0 overflow-hidden md:w-[42%] lg:w-[38%]">
                   <img src={clinicHero} alt="" loading="lazy" className="size-full h-full object-cover" />
                 </div>
               </div>
             </div>
 
-            <BookingLinkCard className="md:col-span-2 lg:col-span-3" />
+            <BookingLinkCard className="md:col-span-2 lg:col-span-3 lg:order-last" />
 
             {/* Section 1: Daily Services & Patients */}
             <div>
@@ -257,21 +259,26 @@ function ClinicHome() {
               </div>
             </div>
 
-            {/* Section 3: Reports & Doctors */}
+            {/* Section 3: The team, then reports */}
             <div>
               <h3 className="font-display font-bold text-sm text-slate-500 mb-3 md:text-xs md:uppercase md:tracking-wider md:text-slate-400 md:mb-4">
-                {ar ? "التقارير والإدارة" : "Reports & Management"}
+                {ar ? "الفريق والإدارة" : "Team & Management"}
               </h3>
-              <div className="grid grid-cols-2 gap-3 md:gap-4">
-                <Link to="/clinic/reports" className="flex flex-col bg-white border border-slate-100 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-primary/20 transition md:p-5 md:shadow-none md:border-slate-200 md:hover:shadow-lg md:hover:-translate-y-0.5">
-                  <span className="size-11 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-3 md:size-14 md:mb-4"><BarChart3 className="size-5 md:size-6" /></span>
-                  <p className="font-display font-bold text-sm text-slate-800 md:text-base md:leading-snug">{ar ? "التقارير والإحصائيات" : "Reports & Statistics"}</p>
-                  <p className="mt-1 text-xs text-muted-foreground leading-snug md:text-sm">{ar ? "أداء شهري، ملخص العلاجات وتصدير التقارير" : "Monthly performance, treatment summary and report exports"}</p>
-                </Link>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
                 <Link to="/clinic/doctors" className="flex flex-col bg-white border border-slate-100 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-primary/20 transition md:p-5 md:shadow-none md:border-slate-200 md:hover:shadow-lg md:hover:-translate-y-0.5">
                   <span className="size-11 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mb-3 md:size-14 md:mb-4"><Stethoscope className="size-5 md:size-6" /></span>
                   <p className="font-display font-bold text-sm text-slate-800 md:text-base md:leading-snug">{ar ? "أطباء العيادة" : "Clinic Doctors"}</p>
                   <p className="mt-1 text-xs text-muted-foreground leading-snug md:text-sm">{ar ? "الأطباء، الاختصاصات والدوام والحالات" : "Doctors, specialties, shifts and cases"}</p>
+                </Link>
+                <Link to="/clinic/secretaries" className="flex flex-col bg-white border border-slate-100 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-primary/20 transition md:p-5 md:shadow-none md:border-slate-200 md:hover:shadow-lg md:hover:-translate-y-0.5">
+                  <span className="size-11 rounded-2xl bg-violet-50 text-violet-600 flex items-center justify-center mb-3 md:size-14 md:mb-4"><ShieldCheck className="size-5 md:size-6" /></span>
+                  <p className="font-display font-bold text-sm text-slate-800 md:text-base md:leading-snug">{ar ? "السكرتارية" : "Secretaries"}</p>
+                  <p className="mt-1 text-xs text-muted-foreground leading-snug md:text-sm">{ar ? "دعوة السكرتير وتحديد ما يراه" : "Invite secretaries and choose what they see"}</p>
+                </Link>
+                <Link to="/clinic/reports" className="col-span-2 md:col-span-1 flex flex-col bg-white border border-slate-100 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-primary/20 transition md:p-5 md:shadow-none md:border-slate-200 md:hover:shadow-lg md:hover:-translate-y-0.5">
+                  <span className="size-11 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-3 md:size-14 md:mb-4"><BarChart3 className="size-5 md:size-6" /></span>
+                  <p className="font-display font-bold text-sm text-slate-800 md:text-base md:leading-snug">{ar ? "التقارير والإحصائيات" : "Reports & Statistics"}</p>
+                  <p className="mt-1 text-xs text-muted-foreground leading-snug md:text-sm">{ar ? "أداء شهري، ملخص العلاجات وتصدير التقارير" : "Monthly performance, treatment summary and report exports"}</p>
                 </Link>
               </div>
             </div>

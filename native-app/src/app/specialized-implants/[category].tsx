@@ -9,6 +9,7 @@ import { Screen, Text, Spinner } from '@/components/ui';
 import { ProductImage } from '@/components/ProductImage';
 import { db } from '@/integrations/firebase/client';
 import { useProductsWhere, useSignedImageUrls } from '@/lib/products';
+import { PriceLock } from '@/components/PriceLock';
 import { SPECIALIZED_CATEGORIES, SPECIALIZED_FIELDS } from '@/data/specializedImplants';
 import { useI18n } from '@/lib/i18n';
 
@@ -131,9 +132,11 @@ export default function SpecializedCategoryScreen() {
                       ))}
                     </View>
                   )}
-                  <Text className="mt-1.5 text-xs font-extrabold text-primary">
-                    {fmtPrice(p)}
-                  </Text>
+                  {p.priceLocked ? (
+                    <PriceLock officeId={p.companyId} compact className="mt-1.5" />
+                  ) : (
+                    <Text className="mt-1.5 text-xs font-extrabold text-primary">{fmtPrice(p)}</Text>
+                  )}
                 </View>
               </Pressable>
             );

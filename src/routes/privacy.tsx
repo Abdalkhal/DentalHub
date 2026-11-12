@@ -8,11 +8,11 @@ export const Route = createFileRoute("/privacy")({
   component: PrivacyPage,
   head: () => ({
     meta: [
-      { title: "سياسة الخصوصية — DentalHub" },
+      { title: "سياسة الخصوصية — Dent Hub" },
       {
         name: "description",
         content:
-          "سياسة الخصوصية لتطبيق DentalHub: البيانات التي نجمعها، كيفية استخدامها، ومشاركتها، وحقوق المستخدم.",
+          "سياسة الخصوصية لتطبيق Dent Hub: البيانات التي نجمعها، كيفية استخدامها، ومشاركتها، وحقوق المستخدم.",
       },
     ],
   }),

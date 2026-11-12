@@ -15,6 +15,7 @@ import { Route as QuickOrdersRouteImport } from './routes/quick-orders'
 import { Route as ProductionRouteImport } from './routes/production'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PricingRouteImport } from './routes/pricing'
+import { Route as PriceAccessRouteImport } from './routes/price-access'
 import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as OfficeDiscountsRouteImport } from './routes/office-discounts'
 import { Route as OffersRouteImport } from './routes/offers'
@@ -64,6 +65,7 @@ import { Route as JoinCodeRouteImport } from './routes/join.$code'
 import { Route as ImplantsCountryRouteImport } from './routes/implants.$country'
 import { Route as DoctorInvoicesInvoiceIdRouteImport } from './routes/doctor-invoices.$invoiceId'
 import { Route as DesignerCaseIdRouteImport } from './routes/designer.$caseId'
+import { Route as ClinicSecretariesRouteImport } from './routes/clinic.secretaries'
 import { Route as ClinicReportsRouteImport } from './routes/clinic.reports'
 import { Route as ClinicOrdersRouteImport } from './routes/clinic.orders'
 import { Route as ClinicMaterialsRouteImport } from './routes/clinic.materials'
@@ -115,6 +117,11 @@ const PrivacyRoute = PrivacyRouteImport.update({
 const PricingRoute = PricingRouteImport.update({
   id: '/pricing',
   path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PriceAccessRoute = PriceAccessRouteImport.update({
+  id: '/price-access',
+  path: '/price-access',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OrdersRoute = OrdersRouteImport.update({
@@ -364,6 +371,11 @@ const DesignerCaseIdRoute = DesignerCaseIdRouteImport.update({
   path: '/designer/$caseId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ClinicSecretariesRoute = ClinicSecretariesRouteImport.update({
+  id: '/clinic/secretaries',
+  path: '/clinic/secretaries',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ClinicReportsRoute = ClinicReportsRouteImport.update({
   id: '/clinic/reports',
   path: '/clinic/reports',
@@ -497,6 +509,7 @@ export interface FileRoutesByFullPath {
   '/offers': typeof OffersRoute
   '/office-discounts': typeof OfficeDiscountsRoute
   '/orders': typeof OrdersRoute
+  '/price-access': typeof PriceAccessRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/production': typeof ProductionRoute
@@ -518,6 +531,7 @@ export interface FileRoutesByFullPath {
   '/clinic/materials': typeof ClinicMaterialsRoute
   '/clinic/orders': typeof ClinicOrdersRoute
   '/clinic/reports': typeof ClinicReportsRoute
+  '/clinic/secretaries': typeof ClinicSecretariesRoute
   '/designer/$caseId': typeof DesignerCaseIdRoute
   '/doctor-invoices/$invoiceId': typeof DoctorInvoicesInvoiceIdRoute
   '/implants/$country': typeof ImplantsCountryRoute
@@ -576,6 +590,7 @@ export interface FileRoutesByTo {
   '/offers': typeof OffersRoute
   '/office-discounts': typeof OfficeDiscountsRoute
   '/orders': typeof OrdersRoute
+  '/price-access': typeof PriceAccessRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/production': typeof ProductionRoute
@@ -597,6 +612,7 @@ export interface FileRoutesByTo {
   '/clinic/materials': typeof ClinicMaterialsRoute
   '/clinic/orders': typeof ClinicOrdersRoute
   '/clinic/reports': typeof ClinicReportsRoute
+  '/clinic/secretaries': typeof ClinicSecretariesRoute
   '/designer/$caseId': typeof DesignerCaseIdRoute
   '/doctor-invoices/$invoiceId': typeof DoctorInvoicesInvoiceIdRoute
   '/implants/$country': typeof ImplantsCountryRoute
@@ -656,6 +672,7 @@ export interface FileRoutesById {
   '/offers': typeof OffersRoute
   '/office-discounts': typeof OfficeDiscountsRoute
   '/orders': typeof OrdersRoute
+  '/price-access': typeof PriceAccessRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/production': typeof ProductionRoute
@@ -677,6 +694,7 @@ export interface FileRoutesById {
   '/clinic/materials': typeof ClinicMaterialsRoute
   '/clinic/orders': typeof ClinicOrdersRoute
   '/clinic/reports': typeof ClinicReportsRoute
+  '/clinic/secretaries': typeof ClinicSecretariesRoute
   '/designer/$caseId': typeof DesignerCaseIdRoute
   '/doctor-invoices/$invoiceId': typeof DoctorInvoicesInvoiceIdRoute
   '/implants/$country': typeof ImplantsCountryRoute
@@ -737,6 +755,7 @@ export interface FileRouteTypes {
     | '/offers'
     | '/office-discounts'
     | '/orders'
+    | '/price-access'
     | '/pricing'
     | '/privacy'
     | '/production'
@@ -758,6 +777,7 @@ export interface FileRouteTypes {
     | '/clinic/materials'
     | '/clinic/orders'
     | '/clinic/reports'
+    | '/clinic/secretaries'
     | '/designer/$caseId'
     | '/doctor-invoices/$invoiceId'
     | '/implants/$country'
@@ -816,6 +836,7 @@ export interface FileRouteTypes {
     | '/offers'
     | '/office-discounts'
     | '/orders'
+    | '/price-access'
     | '/pricing'
     | '/privacy'
     | '/production'
@@ -837,6 +858,7 @@ export interface FileRouteTypes {
     | '/clinic/materials'
     | '/clinic/orders'
     | '/clinic/reports'
+    | '/clinic/secretaries'
     | '/designer/$caseId'
     | '/doctor-invoices/$invoiceId'
     | '/implants/$country'
@@ -895,6 +917,7 @@ export interface FileRouteTypes {
     | '/offers'
     | '/office-discounts'
     | '/orders'
+    | '/price-access'
     | '/pricing'
     | '/privacy'
     | '/production'
@@ -916,6 +939,7 @@ export interface FileRouteTypes {
     | '/clinic/materials'
     | '/clinic/orders'
     | '/clinic/reports'
+    | '/clinic/secretaries'
     | '/designer/$caseId'
     | '/doctor-invoices/$invoiceId'
     | '/implants/$country'
@@ -975,6 +999,7 @@ export interface RootRouteChildren {
   OffersRoute: typeof OffersRoute
   OfficeDiscountsRoute: typeof OfficeDiscountsRoute
   OrdersRoute: typeof OrdersRoute
+  PriceAccessRoute: typeof PriceAccessRoute
   PricingRoute: typeof PricingRoute
   PrivacyRoute: typeof PrivacyRoute
   ProductionRoute: typeof ProductionRoute
@@ -992,6 +1017,7 @@ export interface RootRouteChildren {
   ClinicMaterialsRoute: typeof ClinicMaterialsRoute
   ClinicOrdersRoute: typeof ClinicOrdersRoute
   ClinicReportsRoute: typeof ClinicReportsRoute
+  ClinicSecretariesRoute: typeof ClinicSecretariesRoute
   DesignerCaseIdRoute: typeof DesignerCaseIdRoute
   DoctorInvoicesInvoiceIdRoute: typeof DoctorInvoicesInvoiceIdRoute
   ImplantsCountryRoute: typeof ImplantsCountryRoute
@@ -1071,6 +1097,13 @@ declare module '@tanstack/react-router' {
       path: '/pricing'
       fullPath: '/pricing'
       preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/price-access': {
+      id: '/price-access'
+      path: '/price-access'
+      fullPath: '/price-access'
+      preLoaderRoute: typeof PriceAccessRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/orders': {
@@ -1416,6 +1449,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DesignerCaseIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/clinic/secretaries': {
+      id: '/clinic/secretaries'
+      path: '/clinic/secretaries'
+      fullPath: '/clinic/secretaries'
+      preLoaderRoute: typeof ClinicSecretariesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/clinic/reports': {
       id: '/clinic/reports'
       path: '/clinic/reports'
@@ -1634,6 +1674,7 @@ const rootRouteChildren: RootRouteChildren = {
   OffersRoute: OffersRoute,
   OfficeDiscountsRoute: OfficeDiscountsRoute,
   OrdersRoute: OrdersRoute,
+  PriceAccessRoute: PriceAccessRoute,
   PricingRoute: PricingRoute,
   PrivacyRoute: PrivacyRoute,
   ProductionRoute: ProductionRoute,
@@ -1651,6 +1692,7 @@ const rootRouteChildren: RootRouteChildren = {
   ClinicMaterialsRoute: ClinicMaterialsRoute,
   ClinicOrdersRoute: ClinicOrdersRoute,
   ClinicReportsRoute: ClinicReportsRoute,
+  ClinicSecretariesRoute: ClinicSecretariesRoute,
   DesignerCaseIdRoute: DesignerCaseIdRoute,
   DoctorInvoicesInvoiceIdRoute: DoctorInvoicesInvoiceIdRoute,
   ImplantsCountryRoute: ImplantsCountryRoute,

@@ -17,6 +17,8 @@ type Props = {
   currency: "USD" | "IQD";
   inStock: boolean;
   lang: "ar" | "en";
+  /** The office hides this price from this account (PriceLock shows instead). */
+  locked?: boolean;
 };
 
 export function ProductAddToCart({
@@ -32,9 +34,12 @@ export function ProductAddToCart({
   currency,
   inStock,
   lang,
+  locked = false,
 }: Props) {
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
+
+  if (locked) return null;
 
   const decrement = (e: React.MouseEvent) => {
     e.stopPropagation();

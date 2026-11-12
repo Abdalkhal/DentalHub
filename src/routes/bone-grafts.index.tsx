@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { PriceLock } from "@/components/PriceLock";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { doc, getDoc } from "firebase/firestore";
@@ -117,9 +118,13 @@ function BoneGraftsPage() {
                   {p.brand && (
                     <p className="text-[11px] text-slate-400 mt-0.5 truncate">{p.brand}</p>
                   )}
-                  <p className="mt-1 font-display font-extrabold text-sm text-primary">
-                    {fmtPrice(p)}
-                  </p>
+                  {p.priceLocked ? (
+                    <PriceLock officeId={p.companyId} compact className="mt-1" />
+                  ) : (
+                    <p className="mt-1 font-display font-extrabold text-sm text-primary">
+                      {fmtPrice(p)}
+                    </p>
+                  )}
                   {p.boneGraft?.graftType && (
                     <p className="mt-1 text-[10px] text-slate-500 line-clamp-2">
                       {p.boneGraft.graftType}

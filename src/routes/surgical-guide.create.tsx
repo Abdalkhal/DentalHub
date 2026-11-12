@@ -53,9 +53,7 @@ function SurgicalGuideCreate() {
   const [logoPreview, setLogoPreview] = useState("");
   const [systems, setSystems] = useState<string[]>(["Conventional"]);
   const [material, setMaterial] = useState("Medical Grade Resin");
-  const [gallery, setGallery] = useState<
-    { file: File; preview: string; caption: string }[]
-  >([]);
+  const [gallery, setGallery] = useState<{ file: File; preview: string; caption: string }[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -93,9 +91,7 @@ function SurgicalGuideCreate() {
   };
 
   const toggleSystem = (en: string) => {
-    setSystems((prev) =>
-      prev.includes(en) ? prev.filter((x) => x !== en) : [...prev, en],
-    );
+    setSystems((prev) => (prev.includes(en) ? prev.filter((x) => x !== en) : [...prev, en]));
   };
 
   const submit = async () => {
@@ -105,7 +101,9 @@ function SurgicalGuideCreate() {
       return;
     }
     if (!nameEn.trim()) {
-      setError(ar ? "الرجاء إدخال اسم الشركة بالإنجليزية" : "Please enter the English company name");
+      setError(
+        ar ? "الرجاء إدخال اسم الشركة بالإنجليزية" : "Please enter the English company name",
+      );
       return;
     }
     if (!software) {
@@ -118,14 +116,17 @@ function SurgicalGuideCreate() {
       const id = crypto.randomUUID();
       const uid = auth.currentUser?.uid ?? "";
 
+      if (!uid) throw new Error(ar ? "سجّل الدخول أولاً" : "Please sign in first");
+      // Files go under the uploader's own folder: Storage only lets a user
+      // write there (the company id used to be passed, and every upload failed).
       let logoUrl: string | undefined;
       if (logoFile) {
-        logoUrl = await uploadGuideFile(id, logoFile);
+        logoUrl = await uploadGuideFile(uid, logoFile);
       }
 
       const galleryData: { url: string; caption: string }[] = [];
       for (const g of gallery) {
-        const url = await uploadGuideFile(id, g.file);
+        const url = await uploadGuideFile(uid, g.file);
         galleryData.push({ url, caption: g.caption.trim() });
       }
 
@@ -137,7 +138,8 @@ function SurgicalGuideCreate() {
         software,
         phone: phone.trim(),
         description: description.trim(),
-        logoUrl,
+        // Firestore rejects an undefined field, so the logo is only set when there is one.
+        ...(logoUrl ? { logoUrl } : {}),
         systems,
         printingMaterial: material,
         gallery: galleryData,
@@ -158,7 +160,12 @@ function SurgicalGuideCreate() {
 
   return (
     <MobileShell wide>
-      <TopBar title={ar ? "إضافة شركة دليل جراحي" : "Add Surgical Guide Company"} showBack wide maxW="3xl" />
+      <TopBar
+        title={ar ? "إضافة شركة دليل جراحي" : "Add Surgical Guide Company"}
+        showBack
+        wide
+        maxW="3xl"
+      />
       <div className="px-4 pt-4 pb-10 space-y-4 md:px-6 md:pt-8 md:pb-16 md:space-y-5 lg:px-8 lg:max-w-3xl lg:mx-auto">
         {/* Section 1: Basic Information */}
         <section className={cardCls}>
@@ -207,18 +214,34 @@ function SurgicalGuideCreate() {
                   {ar ? "اسم الشركة بالعربية" : "Arabic Company Name"}{" "}
                   <span className="text-rose-500">*</span>
                 </label>
-                <input value={nameAr} onChange={(e) => setNameAr(e.target.value)} placeholder={ar ? "مثال: شركة دليل المستقبل" : "e.g. Future Guide Co."} className={inputCls} />
+                <input
+                  value={nameAr}
+                  onChange={(e) => setNameAr(e.target.value)}
+                  placeholder={ar ? "مثال: شركة دليل المستقبل" : "e.g. Future Guide Co."}
+                  className={inputCls}
+                />
               </div>
               <div className="sm:col-span-2">
                 <label className={labelCls}>
                   {ar ? "اسم الشركة بالإنجليزية" : "English Company Name"}{" "}
                   <span className="text-rose-500">*</span>
                 </label>
-                <input value={nameEn} onChange={(e) => setNameEn(e.target.value)} placeholder="e.g. Future Guide Co." dir="ltr" className={inputCls} />
+                <input
+                  value={nameEn}
+                  onChange={(e) => setNameEn(e.target.value)}
+                  placeholder="e.g. Future Guide Co."
+                  dir="ltr"
+                  className={inputCls}
+                />
               </div>
               <div>
                 <label className={labelCls}>{ar ? "المدينة" : "City"}</label>
-                <input value={city} onChange={(e) => setCity(e.target.value)} placeholder={ar ? "مثال: الموصل" : "e.g. Mosul"} className={inputCls} />
+                <input
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  placeholder={ar ? "مثال: الموصل" : "e.g. Mosul"}
+                  className={inputCls}
+                />
               </div>
               <div>
                 <label className={labelCls}>
@@ -229,7 +252,9 @@ function SurgicalGuideCreate() {
                   value={software}
                   onChange={(e) => setSoftware(e.target.value)}
                   list="software-suggestions"
-                  placeholder={ar ? "مثال: exocad, 3Shape, RealGUIDE..." : "e.g. exocad, 3Shape, RealGUIDE..."}
+                  placeholder={
+                    ar ? "مثال: exocad, 3Shape, RealGUIDE..." : "e.g. exocad, 3Shape, RealGUIDE..."
+                  }
                   className={inputCls}
                 />
                 <datalist id="software-suggestions">
@@ -242,7 +267,13 @@ function SurgicalGuideCreate() {
                 <label className={labelCls}>{ar ? "رقم الهاتف" : "Phone Number"}</label>
                 <div className="relative">
                   <Phone className="absolute start-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400 pointer-events-none" />
-                  <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+964 7XX XXX XXXX" dir="ltr" className={cn(inputCls, "ps-10")} />
+                  <input
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="+964 7XX XXX XXXX"
+                    dir="ltr"
+                    className={cn(inputCls, "ps-10")}
+                  />
                 </div>
               </div>
               <div className="sm:col-span-2">
@@ -251,10 +282,16 @@ function SurgicalGuideCreate() {
                   value={description}
                   onChange={(e) => setDescription(e.target.value.slice(0, 1000))}
                   rows={4}
-                  placeholder={ar ? "اكتب نبذة عن الشركة وخدماتها..." : "Describe the company and its services..."}
+                  placeholder={
+                    ar
+                      ? "اكتب نبذة عن الشركة وخدماتها..."
+                      : "Describe the company and its services..."
+                  }
                   className={cn(inputCls, "h-auto py-3 resize-none")}
                 />
-                <p className="text-[10px] font-semibold text-slate-400 text-end">{descWords}/1000</p>
+                <p className="text-[10px] font-semibold text-slate-400 text-end">
+                  {descWords}/1000
+                </p>
               </div>
             </div>
           </div>
@@ -320,7 +357,12 @@ function SurgicalGuideCreate() {
                   onChange={() => setMaterial(m.en)}
                   className="accent-emerald-600 size-4"
                 />
-                <span className={cn("text-sm font-semibold", material === m.en ? "text-emerald-700" : "text-slate-700")}>
+                <span
+                  className={cn(
+                    "text-sm font-semibold",
+                    material === m.en ? "text-emerald-700" : "text-slate-700",
+                  )}
+                >
                   {ar ? m.ar : m.en}
                 </span>
               </label>

@@ -1,4 +1,5 @@
 import { createFileRoute, notFound, useNavigate, useRouterState } from "@tanstack/react-router";
+import { PriceLock } from "@/components/PriceLock";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { collection, getDocs } from "firebase/firestore";
@@ -150,6 +151,7 @@ function ImplantCard({
   const canAdd = variants.length > 0 ? variantTotal + accTotal > 0 : (p.inStock ?? true) || accTotal > 0;
 
   const handleAdd = () => {
+    if (p.priceLocked) return;
     const officeId = p.companyId || "";
     if (variants.length > 0) {
       for (const v of variants) {
@@ -448,6 +450,11 @@ function ImplantCard({
             </button>
           </div>
         )}
+        {p.priceLocked ? (
+          <div className="flex justify-center">
+            <PriceLock officeId={p.companyId} compact />
+          </div>
+        ) : (
         <button
           type="button"
           onClick={handleAdd}
@@ -464,6 +471,7 @@ function ImplantCard({
               : "Added"
             : `${ar ? "أضف للسلة" : "Add to cart"}${grandTotal > 1 ? ` (${grandTotal})` : ""}`}
         </button>
+        )}
       </div>
     </li>
   );

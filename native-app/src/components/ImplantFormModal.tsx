@@ -69,11 +69,9 @@ export const ACCESSORY_CATEGORIES: { id: string; ar: string; en: string; subType
     ar: 'براغي الالتئام والتغطية',
     en: 'Healing & Cover Screws',
     subTypes: [
-      { ar: 'برغي التئام GH 1mm - GH 7mm', en: 'Healing Abutment GH 1mm to GH 7mm' },
-      { ar: 'برغي التئام عريض Ø 4.5mm', en: 'Wide Healing Abutment Ø 4.5mm' },
-      { ar: 'برغي التئام عريض Ø 6.0mm', en: 'Wide Healing Abutment Ø 6.0mm' },
-      { ar: 'برغي تغطية جراحي قياسي', en: 'Surgical Cover Screw Standard' },
-      { ar: 'برغي تغطية جراحي ممتد +0.5mm', en: 'Surgical Cover Screw Extended +0.5mm' },
+      { ar: 'Slim من GH 2 إلى GH 7', en: 'Slim from GH 2 to GH 7' },
+      { ar: 'Medium من GH 2 إلى GH 7', en: 'Medium from GH 2 to GH 7' },
+      { ar: 'Wide من GH 2 إلى GH 7', en: 'Wide from GH 2 to GH 7' },
     ],
   },
   {

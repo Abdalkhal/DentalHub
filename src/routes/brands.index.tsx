@@ -11,12 +11,12 @@ export const Route = createFileRoute("/brands/")({
   component: BrandsIndex,
   head: () => ({
     meta: [
-      { title: "دليل البراندات | DentalHub" },
+      { title: "دليل البراندات | Dent Hub" },
       {
         name: "description",
         content: "دليل أبجدي لجميع براندات مواد وأجهزة الأسنان مع المكاتب الموفرة والأسعار.",
       },
-      { property: "og:title", content: "دليل البراندات | DentalHub" },
+      { property: "og:title", content: "دليل البراندات | Dent Hub" },
       {
         property: "og:description",
         content: "تصفح البراندات العالمية حسب الحروف واعرف أسعارها في المكاتب.",

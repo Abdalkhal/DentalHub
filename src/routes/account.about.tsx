@@ -17,8 +17,8 @@ const TERMS_SECTIONS: Section[] = [
   {
     title: { ar: "المقدمة", en: "Introduction" },
     body: {
-      ar: "مرحباً بك في DentalHub، المنصة التي تربط أطباء الأسنان بمكاتب المستلزمات والمختبرات ووكلاء الزراعة في العراق. باستخدامك التطبيق فإنك توافق على هذه الشروط.",
-      en: "Welcome to DentalHub, the platform connecting dentists with supply offices, labs, and implant dealers in Iraq. By using the app you agree to these terms.",
+      ar: "مرحباً بك في Dent Hub، المنصة التي تربط أطباء الأسنان بمكاتب المستلزمات والمختبرات ووكلاء الزراعة في العراق. باستخدامك التطبيق فإنك توافق على هذه الشروط.",
+      en: "Welcome to Dent Hub, the platform connecting dentists with supply offices, labs, and implant dealers in Iraq. By using the app you agree to these terms.",
     },
   },
   {
@@ -31,8 +31,8 @@ const TERMS_SECTIONS: Section[] = [
   {
     title: { ar: "الطلبات والمعاملات", en: "Orders & transactions" },
     body: {
-      ar: "يتيح التطبيق إنشاء الطلبات والتواصل بين الأطباء والموردين. الأسعار والتوفر يحددهما المورد، ولا تتحمل DentalHub مسؤولية الخلافات المتعلقة بالدفع أو التسليم بين الأطراف.",
-      en: "The app enables orders and communication between dentists and suppliers. Pricing and availability are set by the supplier, and DentalHub is not responsible for disputes regarding payment or delivery between parties.",
+      ar: "يتيح التطبيق إنشاء الطلبات والتواصل بين الأطباء والموردين. الأسعار والتوفر يحددهما المورد، ولا تتحمل Dent Hub مسؤولية الخلافات المتعلقة بالدفع أو التسليم بين الأطراف.",
+      en: "The app enables orders and communication between dentists and suppliers. Pricing and availability are set by the supplier, and Dent Hub is not responsible for disputes regarding payment or delivery between parties.",
     },
   },
   {
@@ -45,8 +45,8 @@ const TERMS_SECTIONS: Section[] = [
   {
     title: { ar: "حدود المسؤولية", en: "Limitation of liability" },
     body: {
-      ar: "تُقدَّم الخدمة «كما هي» دون ضمانات صريحة أو ضمنية. لا تتحمل DentalHub أي مسؤولية عن أي أضرار مباشرة أو غير مباشرة ناتجة عن استخدام التطبيق.",
-      en: "The service is provided \"as is\" without warranties of any kind. DentalHub is not liable for any direct or indirect damages arising from use of the app.",
+      ar: "تُقدَّم الخدمة «كما هي» دون ضمانات صريحة أو ضمنية. لا تتحمل Dent Hub أي مسؤولية عن أي أضرار مباشرة أو غير مباشرة ناتجة عن استخدام التطبيق.",
+      en: "The service is provided \"as is\" without warranties of any kind. Dent Hub is not liable for any direct or indirect damages arising from use of the app.",
     },
   },
   {
@@ -118,12 +118,12 @@ function AboutPage() {
   const handleShare = async () => {
     const url = "https://dentalhub.app";
     const text = ar
-      ? "DentalHub — منصة تربط أطباء الأسنان بمكاتب المستلزمات والمختبرات ووكلاء الزراعة في العراق. جرّبها الآن!"
-      : "DentalHub — the platform connecting dentists with supply offices, labs and implant dealers in Iraq. Try it now!";
+      ? "Dent Hub — منصة تربط أطباء الأسنان بمكاتب المستلزمات والمختبرات ووكلاء الزراعة في العراق. جرّبها الآن!"
+      : "Dent Hub — the platform connecting dentists with supply offices, labs and implant dealers in Iraq. Try it now!";
     const nav = navigator as Navigator & { share?: (data: ShareData) => Promise<void> };
     if (typeof nav.share === "function") {
       try {
-        await nav.share({ title: "DentalHub", text, url });
+        await nav.share({ title: "Dent Hub", text, url });
       } catch {
         /* user cancelled */
       }
@@ -161,7 +161,7 @@ function AboutPage() {
             DH
           </div>
           <p className="mt-3 font-display font-extrabold text-lg">
-            <span className="text-foreground">Dental</span>
+            <span className="text-foreground">Dent</span>{" "}
             <span className="text-primary">Hub</span>
           </p>
           <p className="text-xs text-muted-foreground mt-1">
@@ -192,7 +192,7 @@ function AboutPage() {
         </ul>
 
         <p className="text-center text-[11px] text-muted-foreground pt-2">
-          © 2026 DentalHub · {ar ? "صُنع في الموصل" : "Made in Mosul"}
+          © 2026 Dent Hub · {ar ? "صُنع في الموصل" : "Made in Mosul"}
         </p>
       </div>
 

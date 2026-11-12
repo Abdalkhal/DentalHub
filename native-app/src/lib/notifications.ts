@@ -7,7 +7,7 @@ export type Notification = {
   userId: string;
   title: string;
   body: string;
-  type: "order_new" | "order_status" | "message" | "case_message" | "booking_new" | "booking_cancelled" | "data_export" | "clinic_team";
+  type: "order_new" | "order_status" | "message" | "case_message" | "booking_new" | "booking_cancelled" | "data_export" | "clinic_team" | "price_request" | "price_approved";
   isRead: boolean;
   createdAt: number;
   orderId?: string;

@@ -134,7 +134,7 @@ function LabMyServices() {
         <div className="bg-gradient-to-br from-sky-500 to-indigo-600 rounded-b-[2.5rem] px-5 pt-6 pb-8 shadow-xl">
           <div className="flex items-center justify-between mb-6">
             <button onClick={() => navigate({ to: "/labs/dashboard" })} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/15 text-white text-xs font-bold hover:bg-white/25"><BackIcon className="size-4" />{ar ? "رجوع" : "Back"}</button>
-            <span className="text-[10px] font-bold text-white/80 tracking-widest">DentalHub</span>
+            <span className="text-[10px] font-bold text-white/80 tracking-widest">Dent Hub</span>
             <div className="size-10 rounded-full bg-white/15 flex items-center justify-center"><Stethoscope className="size-5 text-white" /></div>
           </div>
           <h1 className="font-display font-extrabold text-xl text-white">{ar ? "خدمات المختبر" : "Lab Services"}</h1>

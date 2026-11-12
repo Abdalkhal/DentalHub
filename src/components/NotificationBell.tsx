@@ -23,10 +23,14 @@ export function notificationTarget(n: Notification):
   | { to: "/clinic/booking" }
   | { to: "/account/settings" }
   | { to: "/clinic/doctors" }
+  | { to: "/price-access" }
+  | { to: "/profile/$accountId"; params: { accountId: string } }
   | null {
   if (n.type === "booking_new" || n.type === "booking_cancelled") return { to: "/clinic/booking" };
   if (n.type === "data_export") return { to: "/account/settings" };
   if (n.type === "clinic_team") return { to: "/clinic/doctors" };
+  if (n.type === "price_request") return { to: "/price-access" };
+  if (n.type === "price_approved" && n.senderId) return { to: "/profile/$accountId", params: { accountId: n.senderId } };
   if (n.type === "message" && n.chatWith) return { to: "/messages", search: { with: n.chatWith } };
   // The doctor reads case chats from case tracking; the lab from its orders.
   if (n.type === "case_message") return n.forRole === "doctor" ? { to: "/track-cases", search: { open: n.orderId } } : { to: "/orders" };

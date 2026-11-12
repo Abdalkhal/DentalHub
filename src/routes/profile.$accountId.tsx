@@ -1,4 +1,5 @@
 import { createFileRoute, Link, Navigate, useNavigate, useRouterState } from "@tanstack/react-router";
+import { PriceLock } from "@/components/PriceLock";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { MobileShell } from "@/components/MobileShell";
@@ -580,7 +581,11 @@ function ProfilePage() {
                     <div className="p-3">
                       <p className="font-display font-bold text-sm truncate text-slate-800">{ar ? p.ar : p.en}</p>
                       <p className="text-[11px] text-slate-400 truncate mt-0.5">{p.brand}</p>
-                      <p className="text-blue-600 font-bold mt-2">{fmtPrice(p)}</p>
+                      {p.priceLocked ? (
+                        <PriceLock officeId={p.companyId} compact className="mt-2" />
+                      ) : (
+                        <p className="text-blue-600 font-bold mt-2">{fmtPrice(p)}</p>
+                      )}
                     </div>
                   </div>
                 );
@@ -635,6 +640,7 @@ function ProductCard({
 
   const handleAdd = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (product.priceLocked) return;
     addToCart({
       productId: product.id,
       productName: title,
@@ -694,11 +700,16 @@ function ProductCard({
         {product.brand ? (
           <p className="text-[10px] text-slate-400 mt-0.5 truncate">{product.brand}</p>
         ) : null}
+        {product.priceLocked ? (
+          <div className="mt-1.5">
+            <PriceLock officeId={product.companyId || officeId} compact />
+          </div>
+        ) : (
         <div className="flex items-center justify-between mt-1.5">
           <p className="font-display font-extrabold text-xs text-blue-600">
             {product.currency === "IQD"
               ? `${product.price.toLocaleString()} د.ع`
-              : `$${product.price.toFixed(2)}`}
+              : `${product.price.toFixed(2)}`}
           </p>
           <button
             onClick={handleAdd}
@@ -711,6 +722,7 @@ function ProductCard({
             {added ? (ar ? "تمت الإضافة" : "Added") : ar ? "أضف للسلة" : "Add to cart"}
           </button>
         </div>
+        )}
       </div>
     </div>
   );

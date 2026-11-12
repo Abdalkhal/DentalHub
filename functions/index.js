@@ -671,6 +671,7 @@ Object.assign(exports, require("./adminConsole")(admin));
 Object.assign(exports, require("./productSearch")(firestore));
 const discounts = require("./discounts")(admin);
 Object.assign(exports, discounts.functions);
+Object.assign(exports, require("./hiddenPrices")(admin).functions);
 
 exports.placeVerifiedOrder = onCall({ region: "us-central1" }, async (request) => {
   if (!request.auth) {

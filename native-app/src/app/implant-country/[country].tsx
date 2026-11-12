@@ -14,6 +14,7 @@ import { useProductsByCountry, useSignedImageUrls, COUNTRY_SLUG_TO_CODE, type Im
 import { useImplantCompanyNames } from '@/lib/implantOffers';
 import { useIsFavorited, toggleFavorite } from '@/lib/favoritesStore';
 import { addToCart } from '@/lib/cartStore';
+import { PriceLock } from '@/components/PriceLock';
 import { requireSignIn } from '@/lib/guestAccess';
 import { addToPurchaseHistory } from '@/lib/quickOrders';
 import { useI18n } from '@/lib/i18n';
@@ -341,6 +342,7 @@ function ImplantDetailModal({
 
   const handleAdd = () => {
     if (requireSignIn()) return;
+    if (product.priceLocked) return;
     const officeId = product.companyId || '';
     if (variants.length > 0) {
       for (const v of variants) {
@@ -508,7 +510,11 @@ function ImplantDetailModal({
             {/* Price */}
             <View className="mt-4 flex-row items-center justify-between rounded-xl border border-emerald-100 bg-emerald-50 px-3.5 py-3">
               <Text className="text-[11px] font-bold text-emerald-700/70">{ar ? 'السعر الأساسي' : 'Base price'}</Text>
-              <Text className="text-base font-extrabold text-emerald-700">{money(product.price, product.currency)}</Text>
+              {product.priceLocked ? (
+                <PriceLock officeId={product.companyId} compact />
+              ) : (
+                <Text className="text-base font-extrabold text-emerald-700">{money(product.price, product.currency)}</Text>
+              )}
             </View>
 
             {/* Sizes — every diameter × length option the company added,
@@ -660,6 +666,11 @@ function ImplantDetailModal({
                 </View>
               )}
 
+              {product.priceLocked ? (
+                <Text className="text-center text-[11px] text-slate-400">
+                  {ar ? 'هذا المكتب يُظهر أسعاره للأطباء المعتمدين فقط' : 'This office shows prices to approved doctors only'}
+                </Text>
+              ) : (
               <Pressable
                 onPress={handleAdd}
                 disabled={!canAdd}
@@ -674,6 +685,7 @@ function ImplantDetailModal({
                       : `Add to cart${grandTotal > 1 ? ` (${grandTotal})` : ''}`}
                 </Text>
               </Pressable>
+              )}
             </View>
           </ScrollView>
         </View>

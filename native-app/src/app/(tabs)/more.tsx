@@ -24,6 +24,7 @@ import {
   Tag,
   Users,
   TicketPercent,
+  Lock,
 } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 
@@ -73,6 +74,7 @@ const ITEMS: Record<string, Item[]> = {
     { icon: Store, ar: 'لوحة المورد', en: 'Supplier Dashboard', to: '/supplies-office' },
     { icon: FileText, ar: 'فواتير الأطباء', en: 'Doctor Invoices', to: '/doctor-invoices' },
     { icon: TicketPercent, ar: 'الخصومات', en: 'Discounts', to: '/office-discounts' },
+    { icon: Lock, ar: 'إظهار الأسعار', en: 'Who sees prices', to: '/price-access' },
     { icon: Megaphone, ar: 'إعلاناتي', en: 'My Ads', to: '/my-ads' },
     { icon: MessageSquare, ar: 'الرسائل', en: 'Messages', to: '/messages' },
     { icon: Bell, ar: 'الإشعارات', en: 'Notifications', to: '/notifications' },
@@ -98,6 +100,7 @@ const ITEMS: Record<string, Item[]> = {
   implant: [
     { icon: FlaskConical, ar: 'لوحة الزرعات', en: 'Implant Dashboard', to: '/implants-office' },
     { icon: TicketPercent, ar: 'الخصومات', en: 'Discounts', to: '/office-discounts' },
+    { icon: Lock, ar: 'إظهار الأسعار', en: 'Who sees prices', to: '/price-access' },
     { icon: Megaphone, ar: 'إعلاناتي', en: 'My Ads', to: '/my-ads' },
     { icon: MessageSquare, ar: 'الرسائل', en: 'Messages', to: '/messages' },
     { icon: Bell, ar: 'الإشعارات', en: 'Notifications', to: '/notifications' },

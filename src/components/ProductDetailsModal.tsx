@@ -26,6 +26,7 @@ import { ALL_COUNTRIES, countryFlagUrl } from "@/data/countries";
 import { SPEC_FIELDS, type SpecFieldId } from "@/data/specs";
 import { SPECIALIZED_CATEGORIES, SPECIALIZED_FIELDS } from "@/data/specializedImplants";
 import { addToCart } from "@/lib/cartStore";
+import { PriceLock } from "@/components/PriceLock";
 import { addToPurchaseHistory } from "@/lib/quickOrders";
 import { SURGICAL_GUIDE_TOOLS } from "@/components/ImplantFormModal";
 import { db } from "@/integrations/firebase/client";
@@ -66,9 +67,13 @@ function OtherOffers({
                 </span>
               )}
             </span>
-            <span className="text-sm font-extrabold text-emerald-700" dir="ltr">
-              {p.currency === "IQD" ? `${p.price.toLocaleString()} د.ع` : `$${p.price.toFixed(2)}`}
-            </span>
+            {p.priceLocked ? (
+              <PriceLock officeId={p.companyId} compact />
+            ) : (
+              <span className="text-sm font-extrabold text-emerald-700" dir="ltr">
+                {p.currency === "IQD" ? `${p.price.toLocaleString()} د.ع` : `${p.price.toFixed(2)}`}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -216,7 +221,7 @@ export function ProductDetailsModal({
   }, [product.specs, product.technicalSpecifications, ar]);
 
   const handleAddToCart = () => {
-    if (!cart) return;
+    if (!cart || product.priceLocked) return;
     const name = ar ? product.ar || product.en : product.en || product.ar;
     addToCart({
       productId: product.id,
@@ -411,10 +416,14 @@ export function ProductDetailsModal({
                 <p className="text-[11px] font-bold text-emerald-700/70">
                   {ar ? "السعر" : "Price"}
                 </p>
-                <p className="font-display font-extrabold text-lg text-emerald-700">
-                  {money(product.price)}
-                </p>
-                {myDiscountPct > 0 && (
+                {product.priceLocked ? (
+                  <PriceLock officeId={product.companyId} className="mt-1" />
+                ) : (
+                  <p className="font-display font-extrabold text-lg text-emerald-700">
+                    {money(product.price)}
+                  </p>
+                )}
+                {myDiscountPct > 0 && !product.priceLocked && (
                   <p className="text-[11px] font-bold text-emerald-700 mt-0.5">
                     {ar ? "سعرك الخاص" : "Your price"}: {money(isIQD ? Math.round(product.price * (1 - myDiscountPct / 100)) : product.price * (1 - myDiscountPct / 100))} ({myDiscountPct}%)
                   </p>
@@ -612,7 +621,7 @@ export function ProductDetailsModal({
               }}
             />
 
-            {product.discountTiers && product.discountTiers.length > 0 && (
+            {product.discountTiers && product.discountTiers.length > 0 && !product.priceLocked && (
               <div>
                 <h4 className="text-sm font-bold text-slate-800 mb-2">
                   {ar ? "جدول الخصومات على الكمية" : "Volume Discounts"}
@@ -678,7 +687,15 @@ export function ProductDetailsModal({
         {/* Cart footer (doctor view only) */}
         {isDoctorView && cart && (
           <div className={cn("shrink-0 border-t border-slate-200 bg-white p-4 space-y-3", asPage && "sticky bottom-0 z-10")}>
-            {/* Quantity + Add to cart */}
+            {/* Hidden price: asking replaces ordering until the office approves. */}
+            {product.priceLocked ? (
+              <div className="flex flex-col items-center gap-1.5">
+                <PriceLock officeId={product.companyId} />
+                <p className="text-center text-[11px] text-slate-400">
+                  {ar ? "هذا المكتب يُظهر أسعاره للأطباء المعتمدين فقط" : "This office shows prices to approved doctors only"}
+                </p>
+              </div>
+            ) : (
             <div className="flex items-center gap-3">
               <div className="flex items-center justify-between rounded-2xl bg-slate-100 border border-slate-200 h-12 px-1 w-32 shrink-0">
                 <button
@@ -718,6 +735,7 @@ export function ProductDetailsModal({
                     : `Add to cart${qty > 1 ? ` (${qty})` : ""}`}
               </button>
             </div>
+            )}
           </div>
         )}
       </div>

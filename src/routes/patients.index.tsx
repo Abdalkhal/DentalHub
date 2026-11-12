@@ -24,10 +24,10 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/patients/")({
   head: () => ({
     meta: [
-      { title: "سجل المرضى | DentalHub" },
-      { name: "description", content: "إدارة ملفات ومعلومات المرضى، الحالة العلاجية، والزيارات داخل DentalHub." },
-      { property: "og:title", content: "سجل المرضى | DentalHub" },
-      { property: "og:description", content: "إدارة ملفات ومعلومات المرضى داخل DentalHub." },
+      { title: "سجل المرضى | Dent Hub" },
+      { name: "description", content: "إدارة ملفات ومعلومات المرضى، الحالة العلاجية، والزيارات داخل Dent Hub." },
+      { property: "og:title", content: "سجل المرضى | Dent Hub" },
+      { property: "og:description", content: "إدارة ملفات ومعلومات المرضى داخل Dent Hub." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],

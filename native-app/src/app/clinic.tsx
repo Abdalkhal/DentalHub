@@ -15,6 +15,7 @@ import {
   Plus,
   Stethoscope,
   Users,
+  ShieldCheck,
 } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 
@@ -45,6 +46,8 @@ type Item = {
   chip?: { label: string; cls: string };
   to: Href;
   badge?: number;
+  /** Spans the row, for an odd card at the end of a section. */
+  wide?: boolean;
 };
 
 export default function ClinicHomeScreen() {
@@ -152,14 +155,6 @@ export default function ClinicHomeScreen() {
 
   const manage: Item[] = [
     {
-      icon: BarChart3,
-      tone: 'bg-amber-50',
-      color: '#D97706',
-      title: ar ? 'التقارير والإحصائيات' : 'Reports & Statistics',
-      subtitle: ar ? 'أداء شهري، ملخص العلاجات وتصدير التقارير' : 'Monthly performance, treatment summary and report exports',
-      to: '/clinic-reports',
-    },
-    {
       icon: Stethoscope,
       tone: 'bg-rose-50',
       color: '#E11D48',
@@ -167,10 +162,27 @@ export default function ClinicHomeScreen() {
       subtitle: ar ? 'الأطباء، الاختصاصات والدوام والحالات' : 'Doctors, specialties, shifts and cases',
       to: '/clinic-doctors',
     },
+    {
+      icon: ShieldCheck,
+      tone: 'bg-violet-50',
+      color: '#7C3AED',
+      title: ar ? 'السكرتارية' : 'Secretaries',
+      subtitle: ar ? 'دعوة السكرتير وتحديد ما يراه' : 'Invite secretaries and choose what they see',
+      to: '/clinic-secretaries' as Href,
+    },
+    {
+      icon: BarChart3,
+      tone: 'bg-amber-50',
+      color: '#D97706',
+      title: ar ? 'التقارير والإحصائيات' : 'Reports & Statistics',
+      subtitle: ar ? 'أداء شهري، ملخص العلاجات وتصدير التقارير' : 'Monthly performance, treatment summary and report exports',
+      to: '/clinic-reports',
+      wide: true,
+    },
   ];
 
   const renderItem = (it: Item) => (
-    <Pressable key={it.title} onPress={() => router.push(it.to)} className="w-[48.5%]">
+    <Pressable key={it.title} onPress={() => router.push(it.to)} className={it.wide ? 'w-full' : 'w-[48.5%]'}>
       {!!it.badge && (
         <View className="absolute right-2 top-2 z-10 h-5 min-w-5 items-center justify-center rounded-full bg-rose-600 px-1" style={{ borderWidth: 2, borderColor: '#FFFFFF' }}>
           <Text className="text-[10px] font-extrabold text-white">{it.badge > 99 ? '99+' : it.badge}</Text>
@@ -180,7 +192,7 @@ export default function ClinicHomeScreen() {
           carries a bottom chip — the chip (when present) is pushed to the
           bottom via `mt-auto` instead of just following the subtitle text,
           so the title/subtitle block lines up the same across all cards. */}
-      <View className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" style={{ minHeight: 156 }}>
+      <View className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" style={{ minHeight: it.wide ? undefined : 156 }}>
         <View className={cn('mb-3 h-11 w-11 items-center justify-center rounded-2xl', it.tone)}>
           <it.icon size={it.iconSize ?? 20} color={it.color} strokeWidth={2.2} />
         </View>

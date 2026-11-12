@@ -3,6 +3,8 @@ import { db, storage } from "@/integrations/firebase/client";
 import { collection, getDocs, setDoc, doc } from "firebase/firestore";
 import { ref } from "firebase/storage";
 import { uploadData } from "./uploadData";
+import { uploadFileUri } from "./nativeUpload";
+import { randomUUID } from "./randomId";
 
 export type SurgicalGuideCompany = {
   id: string;
@@ -93,5 +95,19 @@ export async function uploadGuideFile(ownerId: string, file: File): Promise<stri
   const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
   const path = `surgical-guides/${ownerId}/${crypto.randomUUID()}.${ext || "jpg"}`;
   await uploadData(ref(storage, path), file, { contentType: file.type || "image/jpeg" });
+  return path;
+}
+
+/**
+ * Uploads a picked image (by local URI) for a surgical-guide company. Files go
+ * under the uploader's own folder — Storage only lets a user write there.
+ */
+export async function uploadGuideImage(
+  uid: string,
+  asset: { uri: string; name?: string | null; type?: string | null },
+): Promise<string> {
+  const ext = ((asset.name || asset.uri).split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 5);
+  const path = `surgical-guides/${uid}/${randomUUID()}.${ext || "jpg"}`;
+  await uploadFileUri(path, asset.uri, asset.type || "image/jpeg");
   return path;
 }

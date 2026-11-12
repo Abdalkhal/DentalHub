@@ -38,6 +38,12 @@ export default function QuickOrdersScreen() {
       toast.error(ar ? 'المنتج غير متوفر حالياً' : 'Product is currently unavailable');
       return;
     }
+    // The office now shows prices to approved doctors only: ask there first.
+    if (p.priceLocked) {
+      toast.info(ar ? 'هذا المكتب يُظهر أسعاره للمعتمدين فقط، اطلب السعر أولاً' : 'This office shows prices to approved doctors only. Request the price first');
+      router.push({ pathname: '/product-detail/[productId]', params: { productId: p.id } });
+      return;
+    }
     const imageUrl = p.images[0] ? urlMap[p.images[0]] : undefined;
     const productName = ar ? p.ar || p.en : p.en || p.ar;
     addToCart({

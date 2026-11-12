@@ -131,7 +131,7 @@ function StatementPage() {
         {/* Header banner */}
         <div className="rounded-2xl bg-gradient-to-l from-primary to-[oklch(0.45_0.18_256)] text-primary-foreground p-4 shadow-card">
           <p className="text-[11px] font-semibold opacity-80">
-            {lang === "ar" ? "DentalHub" : "DentalHub"}
+            {lang === "ar" ? "Dent Hub" : "Dent Hub"}
           </p>
           <h2 className="font-display font-extrabold text-base leading-tight mt-0.5">
             {lang === "ar" ? `كشف حساب — ${lab ? lab.ar : ""}` : `Statement — ${lab ? lab.en : ""}`}

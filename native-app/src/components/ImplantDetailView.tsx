@@ -3,6 +3,7 @@ import { Image, Modal, Pressable, ScrollView, View } from 'react-native';
 import { Check, ChevronLeft, ChevronRight, Package, Ruler, X } from 'lucide-react-native';
 
 import { Text } from '@/components/ui';
+import { PriceLock } from '@/components/PriceLock';
 import { ProductImage } from '@/components/ProductImage';
 import { ACCESSORY_CATEGORIES } from '@/components/ImplantFormModal';
 import { SPECIALIZED_FIELDS } from '@/data/specializedImplants';
@@ -225,7 +226,11 @@ export function ImplantDetailView({
                   {ar ? product.ar || product.en : product.en || product.ar}
                 </Text>
                 {!!product.brand && <Text className="mt-0.5 text-xs text-slate-500">{product.brand}</Text>}
-                <Text className="mt-2 text-xl font-extrabold text-primary">{money(product.price)}</Text>
+                {product.priceLocked ? (
+                  <PriceLock officeId={product.companyId} className="mt-2" />
+                ) : (
+                  <Text className="mt-2 text-xl font-extrabold text-primary">{money(product.price)}</Text>
+                )}
                 {!!product.description && (
                   <Text className="mt-2 text-sm leading-relaxed text-slate-600">{product.description}</Text>
                 )}

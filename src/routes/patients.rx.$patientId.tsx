@@ -29,13 +29,13 @@ import {
 export const Route = createFileRoute("/patients/rx/$patientId")({
   head: () => ({
     meta: [
-      { title: "الوصفة الطبية الإلكترونية (Rx) | DentalHub" },
+      { title: "الوصفة الطبية الإلكترونية (Rx) | Dent Hub" },
       {
         name: "description",
         content:
           "ورقة وصفة طبية إلكترونية قابلة للتعديل: ترويسة العيادة والطبيب، إضافة أدوية، طباعة أو إرسال عبر واتساب.",
       },
-      { property: "og:title", content: "الوصفة الطبية الإلكترونية (Rx) | DentalHub" },
+      { property: "og:title", content: "الوصفة الطبية الإلكترونية (Rx) | Dent Hub" },
       { property: "og:description", content: "ورقة وصفة طبية إلكترونية قابلة للتعديل وإرسالها للمريض." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

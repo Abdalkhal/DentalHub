@@ -1,4 +1,5 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { PriceLock } from "@/components/PriceLock";
 import { BadgeCheck, Check, MapPin, ShoppingCart, Package } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -21,6 +22,8 @@ type RealVendor = {
   price: number;
   inStock: boolean;
   gov: string | null;
+  companyId?: string;
+  priceLocked?: boolean;
 };
 
 type RealProduct = {
@@ -48,7 +51,9 @@ function matchesBrandName(p: Product, brandName: string, brandAr: string): boole
 }
 
 function minRealPrice(p: RealProduct): number {
-  return Math.min(...p.vendors.map((v) => v.price));
+  // A hidden price is unknown, not zero: it sorts last.
+  const known = p.vendors.filter((v) => !v.priceLocked).map((v) => v.price);
+  return known.length ? Math.min(...known) : Number.MAX_SAFE_INTEGER;
 }
 
 export const Route = createFileRoute("/brands/$brandId")({
@@ -62,17 +67,17 @@ export const Route = createFileRoute("/brands/$brandId")({
     const name = loaderData?.name;
     if (!name) {
       return {
-        meta: [{ title: "براند غير متوفر | DentalHub" }, { name: "robots", content: "noindex" }],
+        meta: [{ title: "براند غير متوفر | Dent Hub" }, { name: "robots", content: "noindex" }],
       };
     }
     return {
       meta: [
-        { title: `${name} — منتجات وأسعار المكاتب | DentalHub` },
+        { title: `${name} — منتجات وأسعار المكاتب | Dent Hub` },
         {
           name: "description",
           content: `تصفح منتجات ${name} والمكاتب الموفرة لها وأسعارها وحالة التوفر.`,
         },
-        { property: "og:title", content: `${name} | DentalHub` },
+        { property: "og:title", content: `${name} | Dent Hub` },
         {
           property: "og:description",
           content: `منتجات ${name} مع أسعار المكاتب وحالة التوفر.`,
@@ -156,6 +161,8 @@ function BrandDetail() {
             price: p.price,
             inStock: p.inStock,
             gov: cityToGov(supplier?.city),
+            companyId: p.companyId,
+            priceLocked: p.priceLocked,
           };
         }),
       });
@@ -378,9 +385,13 @@ function ProductCard({
                       : lang === "ar" ? "ينفذ قريباً" : "Low stock"}
                   </span>
                 </button>
-                <span className="font-display font-extrabold text-primary text-sm shrink-0">
-                  ${v.price}
-                </span>
+                {v.priceLocked ? (
+                  <PriceLock officeId={v.companyId} compact />
+                ) : (
+                  <span className="font-display font-extrabold text-primary text-sm shrink-0">
+                    ${v.price}
+                  </span>
+                )}
               </li>
             ))}
           </ul>
@@ -398,19 +409,19 @@ function ProductCard({
             >
               {filteredVendors.map((v, i) => (
                 <option key={`${v.vendorEn}-${i}`} value={i}>
-                  {(lang === "ar" ? v.vendorAr : v.vendorEn) + ` — $${v.price}`}
+                  {(lang === "ar" ? v.vendorAr : v.vendorEn) + (v.priceLocked ? " — 🔒" : ` — ${v.price}`)}
                 </option>
               ))}
             </select>
             <button
               onClick={() => setAdded(true)}
-              disabled={!vendor || !vendor.inStock}
+              disabled={!vendor || !vendor.inStock || vendor.priceLocked}
               className={cn(
                 "h-10 px-4 rounded-xl text-xs font-bold flex items-center gap-1.5 shrink-0 transition",
                 added
                   ? "bg-emerald-600 text-white"
                   : "bg-primary text-primary-foreground hover:opacity-90",
-                (!vendor || !vendor.inStock) && "opacity-50"
+                (!vendor || !vendor.inStock || vendor.priceLocked) && "opacity-50"
               )}
             >
               {added ? <Check className="size-4" /> : <ShoppingCart className="size-4" />}

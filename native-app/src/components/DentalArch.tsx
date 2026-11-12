@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Image, Pressable, View, type LayoutChangeEvent } from 'react-native';
+import Svg, { Circle, G, Line, Rect, Text as SvgText } from 'react-native-svg';
 
-import { Text } from '@/components/ui';
+import { ARCH_HITS, ARCH_LAYOUT, CANVAS_H, CANVAS_W, HIT_R, LABEL_FONT, PHOTO, PILL_H, pillLeft, pillWidth } from '@/lib/archLayout';
 import type { ToothStatus } from '@/lib/patientsStore';
 
 export const FDI_UPPER = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
@@ -31,18 +32,6 @@ export const TOOTH_META: Record<ToothStatus, { ar: string; en: string; dot: stri
   unerupted: { ar: 'غير بازغ', en: 'Unerupted', dot: '#D1D5DB' },
 };
 
-const STATUS_COLORS: Record<ToothStatus, { bg: string; border: string; text: string }> = {
-  healthy: { bg: '#D1FAE5', border: '#6EE7B7', text: '#047857' },
-  caries: { bg: '#FEE2E2', border: '#FCA5A5', text: '#B91C1C' },
-  filled: { bg: '#FEF3C7', border: '#FCD34D', text: '#B45309' },
-  crown: { bg: '#FEF9C3', border: '#FDE047', text: '#A16207' },
-  missing: { bg: '#E2E8F0', border: '#CBD5E1', text: '#64748B' },
-  implant: { bg: '#DBEAFE', border: '#93C5FD', text: '#1D4ED8' },
-  rct: { bg: '#FFEDD5', border: '#FDBA74', text: '#C2410C' },
-  bridge: { bg: '#F3E8FF', border: '#D8B4FE', text: '#7E22CE' },
-  unerupted: { bg: '#F9FAFB', border: '#E5E7EB', text: '#9CA3AF' },
-};
-
 export const UPPER_POS: Record<number, [number, number]> = {
   18: [12.5, 82], 17: [13.5, 67], 16: [15.5, 54], 15: [18.5, 42.5], 14: [21, 34],
   13: [25, 25], 12: [32.5, 15.5], 11: [42.5, 11],
@@ -57,8 +46,14 @@ export const LOWER_POS: Record<number, [number, number]> = {
   35: [78, 54], 36: [81, 41], 37: [82.5, 27], 38: [84, 14],
 };
 
-const TOOTH_SIZE = 26;
+const ARCH_UPPER = require('../../assets/home/arch-upper.png');
+const ARCH_LOWER = require('../../assets/home/arch-lower.png');
 
+/**
+ * The patient's tooth chart: tap a tooth on the photo and it gets a dot in the
+ * chosen colour, with a line out to a label showing the tooth number and the
+ * status in English (whatever the app language), like a dental chart printout.
+ */
 export function DentalArch({
   jaw,
   teeth,
@@ -68,61 +63,86 @@ export function DentalArch({
   teeth: Record<number, ToothStatus>;
   onTooth?: (n: number) => void;
 }) {
-  const [size, setSize] = useState({ width: 0, height: 0 });
+  const [width, setWidth] = useState(0);
+  const onLayout = (e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width);
 
-  const onLayout = (e: LayoutChangeEvent) => {
-    const { width, height } = e.nativeEvent.layout;
-    setSize({ width, height });
-  };
-
-  const fdiList = jaw === 'upper' ? FDI_UPPER : FDI_LOWER;
-  const posMap = jaw === 'upper' ? UPPER_POS : LOWER_POS;
-  const archSrc = jaw === 'upper' ? require('../../assets/home/arch-upper.png') : require('../../assets/home/arch-lower.png');
+  const layout = ARCH_LAYOUT[jaw];
+  const marked = layout.filter((t) => teeth[t.n] && TOOTH_META[teeth[t.n]]);
+  // Canvas px → screen px, for the tap targets.
+  const k = width / CANVAS_W;
+  const hit = HIT_R * k;
 
   return (
-    // `direction: 'ltr'` keeps this diagram's absolute-positioned tooth
-    // markers from being mirrored under forced Arabic RTL layout — Android
-    // flips `left`/`top` offsets for the whole subtree otherwise, which
-    // swaps every tooth onto the wrong (patient-left vs patient-right) side.
-    <View onLayout={onLayout} style={{ width: '100%', aspectRatio: 4 / 3, direction: 'ltr' }}>
-      <Image source={archSrc} style={{ position: 'absolute', width: '100%', height: '100%' }} resizeMode="contain" />
-      {size.width > 0 &&
-        fdiList.map((n) => {
-          const pos = posMap[n];
-          if (!pos) return null;
-          const lx = 50 + (pos[0] - 50) * 1.22;
-          const ly = 50 + (pos[1] - 50) * 1.18;
-          const cx = (lx / 100) * size.width;
-          const cy = (ly / 100) * size.height;
-          const status = teeth[n] || 'healthy';
-          const c = STATUS_COLORS[status];
+    // `direction: 'ltr'` keeps the absolute-positioned tap targets from being
+    // mirrored under forced Arabic RTL, which would swap patient left/right.
+    <View onLayout={onLayout} style={{ width: '100%', aspectRatio: CANVAS_W / CANVAS_H, direction: 'ltr' }}>
+      <Image
+        source={jaw === 'upper' ? ARCH_UPPER : ARCH_LOWER}
+        resizeMode="contain"
+        style={{
+          position: 'absolute',
+          left: `${(PHOTO.x / CANVAS_W) * 100}%`,
+          top: `${(PHOTO.y / CANVAS_H) * 100}%`,
+          width: `${(PHOTO.size / CANVAS_W) * 100}%`,
+          height: `${(PHOTO.size / CANVAS_H) * 100}%`,
+        }}
+      />
+      <Svg pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0 }} width="100%" height="100%" viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}>
+        {/* Leader lines under everything else. */}
+        {marked.map((t) => (
+          <Line key={`l${t.n}`} x1={t.x} y1={t.y} x2={t.labelX} y2={t.labelY} stroke="#64748B" strokeWidth={3} strokeLinecap="round" />
+        ))}
+
+        {/* Tooth numbers, always shown; a white outline keeps them readable over a line. */}
+        {layout.map((t) => (
+          <G key={`n${t.n}`}>
+            <SvgText x={t.numX} y={t.numY + 13} textAnchor="middle" fontSize={38} fontWeight="800" stroke="#FFFFFF" strokeWidth={10} strokeLinejoin="round" fill="#FFFFFF">
+              {String(t.n)}
+            </SvgText>
+            <SvgText x={t.numX} y={t.numY + 13} textAnchor="middle" fontSize={38} fontWeight="800" fill={teeth[t.n] ? '#334155' : '#94A3B8'}>
+              {String(t.n)}
+            </SvgText>
+          </G>
+        ))}
+
+        {/* Labels: tooth status in English. */}
+        {marked.map((t) => {
+          const word = TOOTH_META[teeth[t.n]].en;
+          const w = pillWidth(word);
+          const left = pillLeft(t, w);
           return (
-            <Pressable
-              key={n}
-              onPress={() => onTooth?.(n)}
-              style={{
-                position: 'absolute',
-                left: cx - TOOTH_SIZE / 2,
-                top: cy - TOOTH_SIZE / 2,
-                width: TOOTH_SIZE,
-                height: TOOTH_SIZE,
-                borderRadius: TOOTH_SIZE / 2,
-                borderWidth: 2,
-                borderColor: c.border,
-                backgroundColor: c.bg,
-                alignItems: 'center',
-                justifyContent: 'center',
-                shadowColor: '#0F172A',
-                shadowOpacity: 0.12,
-                shadowRadius: 2,
-                shadowOffset: { width: 0, height: 1 },
-                elevation: 2,
-              }}
-            >
-              <Text style={{ fontSize: 8, fontWeight: '700', color: c.text }}>{n}</Text>
-            </Pressable>
+            <G key={`p${t.n}`}>
+              <Rect x={left} y={t.labelY - PILL_H / 2 + 4} width={w} height={PILL_H} rx={PILL_H / 2} fill="#0F172A" opacity={0.08} />
+              <Rect x={left} y={t.labelY - PILL_H / 2} width={w} height={PILL_H} rx={PILL_H / 2} fill="#FFFFFF" stroke="#E2E8F0" strokeWidth={2} />
+              <SvgText x={left + w / 2} y={t.labelY + 14} textAnchor="middle" fontSize={LABEL_FONT} fontWeight="700" fill="#0F172A">
+                {word}
+              </SvgText>
+            </G>
           );
         })}
+
+        {/* Status dots on the teeth themselves. */}
+        {marked.map((t) => (
+          <G key={`d${t.n}`}>
+            <Circle cx={t.x} cy={t.y + 3} r={36} fill="#0F172A" opacity={0.15} />
+            <Circle cx={t.x} cy={t.y} r={30} fill={TOOTH_META[teeth[t.n]].dot} stroke="#FFFFFF" strokeWidth={7} />
+          </G>
+        ))}
+      </Svg>
+
+      {/* Tap targets over each tooth. */}
+      {onTooth &&
+        width > 0 &&
+        ARCH_HITS[jaw].map((h, i) => (
+          <Pressable
+            key={`h${i}`}
+            onPress={() => onTooth(h.n)}
+            hitSlop={2}
+            accessibilityRole="button"
+            accessibilityLabel={String(h.n)}
+            style={{ position: 'absolute', left: h.x * k - hit, top: h.y * k - hit, width: hit * 2, height: hit * 2, borderRadius: hit }}
+          />
+        ))}
     </View>
   );
 }

@@ -13,9 +13,9 @@ import { Stat } from "./clinic.materials";
 export const Route = createFileRoute("/clinic/orders")({
   head: () => ({
     meta: [
-      { title: "طلبيات العيادة | DentalHub" },
+      { title: "طلبيات العيادة | Dent Hub" },
       { name: "description", content: "متابعة طلبات المختبرات ومشتريات المستلزمات مع حالات التنفيذ والتسليم." },
-      { property: "og:title", content: "طلبيات العيادة | DentalHub" },
+      { property: "og:title", content: "طلبيات العيادة | Dent Hub" },
       { property: "og:description", content: "متابعة طلبات المختبرات ومشتريات المستلزمات." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

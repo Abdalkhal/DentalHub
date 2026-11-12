@@ -8,6 +8,7 @@ import { Calendar, Check, ChevronLeft, ChevronRight, Heart, MapPin, Minus, Packa
 import { Screen, Text, Spinner } from '@/components/ui';
 import { ProductImage } from '@/components/ProductImage';
 import { BoneGraftDetailsModal } from '@/components/BoneGraftDetailsModal';
+import { PriceLock } from '@/components/PriceLock';
 import { db } from '@/integrations/firebase/client';
 import { useProduct, useSignedImageUrls, type Product } from '@/lib/products';
 import { addToCart } from '@/lib/cartStore';
@@ -75,9 +76,13 @@ function OtherOffers({ catalogId, currentId, ar }: { catalogId?: string; current
               </Text>
             )}
           </View>
-          <Text className="text-sm font-extrabold text-emerald-700" style={{ writingDirection: 'ltr' }}>
-            {p.currency === 'IQD' ? `${p.price.toLocaleString()} د.ع` : `$${p.price.toFixed(2)}`}
-          </Text>
+          {p.priceLocked ? (
+            <PriceLock officeId={p.companyId} compact />
+          ) : (
+            <Text className="text-sm font-extrabold text-emerald-700" style={{ writingDirection: 'ltr' }}>
+              {p.currency === 'IQD' ? `${p.price.toLocaleString()} د.ع` : `${p.price.toFixed(2)}`}
+            </Text>
+          )}
         </Pressable>
       ))}
     </View>
@@ -253,6 +258,7 @@ export default function ProductDetailScreen() {
 
   const handleAdd = () => {
     if (requireSignIn()) return;
+    if (product.priceLocked) return;
     addToCart({
       productId: product.id,
       productName: name,
@@ -379,8 +385,14 @@ export default function ProductDetailScreen() {
           <View className="flex-row items-center justify-between rounded-2xl border border-emerald-100 bg-emerald-50 p-3">
             <View>
               <Text className="text-[11px] font-bold text-emerald-700/70">{ar ? 'السعر' : 'Price'}</Text>
-              <Text className="text-lg font-extrabold text-emerald-700">{money(product.price)}</Text>
-              <MyPriceLine product={product} doctorId={discountUser?.uid} money={money} ar={ar} />
+              {product.priceLocked ? (
+                <PriceLock officeId={product.companyId} className="mt-1" />
+              ) : (
+                <>
+                  <Text className="text-lg font-extrabold text-emerald-700">{money(product.price)}</Text>
+                  <MyPriceLine product={product} doctorId={discountUser?.uid} money={money} ar={ar} />
+                </>
+              )}
             </View>
             <View className="items-end">
               <Text className="text-[11px] font-bold text-emerald-700/70">{ar ? 'المخزون' : 'Stock'}</Text>
@@ -525,7 +537,7 @@ export default function ProductDetailScreen() {
           <OtherOffers catalogId={product.catalogId} currentId={product.id} ar={ar} />
 
           {/* Volume discounts table */}
-          {!!product.discountTiers?.length && (
+          {!!product.discountTiers?.length && !product.priceLocked && (
             <View>
               <Text className="mb-2 text-sm font-bold text-slate-800">{ar ? 'جدول الخصومات على الكمية' : 'Volume Discounts'}</Text>
               <View className="overflow-hidden rounded-2xl border border-slate-200">
@@ -566,7 +578,15 @@ export default function ProductDetailScreen() {
 
       {/* Cart footer */}
       <View className="gap-3 border-t border-slate-200 bg-white px-4 pb-4 pt-3">
-        {/* Quantity + Add to cart */}
+        {/* Hidden price: asking replaces ordering until the office approves. */}
+        {product.priceLocked ? (
+          <View className="items-center gap-1.5">
+            <PriceLock officeId={product.companyId} className="self-center" />
+            <Text className="text-center text-[11px] text-slate-400">
+              {ar ? 'هذا المكتب يُظهر أسعاره للأطباء المعتمدين فقط' : 'This office shows prices to approved doctors only'}
+            </Text>
+          </View>
+        ) : (
         <View className="flex-row items-center gap-3">
           <View className="h-12 w-32 shrink-0 flex-row items-center justify-between rounded-2xl border border-slate-200 bg-slate-100 px-1">
             <Pressable onPress={() => setQty((q) => Math.max(1, q - 1))} disabled={qty <= 1} className={cn('h-9 w-9 items-center justify-center', qty <= 1 && 'opacity-30')}>
@@ -599,6 +619,7 @@ export default function ProductDetailScreen() {
             </Text>
           </Pressable>
         </View>
+        )}
       </View>
     </Screen>
   );

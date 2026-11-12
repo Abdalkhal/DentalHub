@@ -10,6 +10,7 @@ import { db } from '@/integrations/firebase/client';
 import { getBrand } from '@/data/brands';
 import { BRANCHES, CITIES } from '@/data/offices';
 import { useProductsByBrand, type Product } from '@/lib/products';
+import { PriceLock } from '@/components/PriceLock';
 import { useIsFavorited, toggleFavorite } from '@/lib/favoritesStore';
 import { supportWhatsAppUrl } from '@/lib/support';
 import { useI18n } from '@/lib/i18n';
@@ -27,7 +28,15 @@ import { cn } from '@/lib/utils';
 // here since RN has no inline native <select> and it would add nothing a
 // mobile user can't already do by tapping a row.
 
-type RealVendor = { vendorAr: string; vendorEn: string; price: number; inStock: boolean; gov: string | null };
+type RealVendor = {
+  vendorAr: string;
+  vendorEn: string;
+  price: number;
+  inStock: boolean;
+  gov: string | null;
+  companyId?: string;
+  priceLocked?: boolean;
+};
 type RealProduct = { id: string; ar: string; en: string; branch: string; vendors: RealVendor[] };
 
 function cityToGov(city?: string | null): string | null {
@@ -45,7 +54,9 @@ function matchesBrandName(p: Product, brandName: string, brandAr: string): boole
 }
 
 function minRealPrice(p: RealProduct): number {
-  return Math.min(...p.vendors.map((v) => v.price));
+  // A hidden price is unknown, not zero: it sorts last.
+  const known = p.vendors.filter((v) => !v.priceLocked).map((v) => v.price);
+  return known.length ? Math.min(...known) : Number.MAX_SAFE_INTEGER;
 }
 
 type Sort = 'price' | 'vendor';
@@ -114,6 +125,8 @@ export default function BrandDetailScreen() {
             vendorEn: supplier?.name || 'Office',
             price: p.price,
             inStock: p.inStock,
+            companyId: p.companyId,
+            priceLocked: p.priceLocked,
             gov: cityToGov(supplier?.city),
           };
         }),
@@ -362,7 +375,11 @@ function ProductCard({
                     {v.inStock ? (ar ? 'متوفر' : 'In stock') : ar ? 'ينفذ قريباً' : 'Low stock'}
                   </Text>
                 </View>
-                <Text className="shrink-0 text-sm font-extrabold text-primary">${v.price}</Text>
+                {v.priceLocked ? (
+                  <PriceLock officeId={v.companyId} compact />
+                ) : (
+                  <Text className="shrink-0 text-sm font-extrabold text-primary">${v.price}</Text>
+                )}
               </Pressable>
             ))}
           </View>

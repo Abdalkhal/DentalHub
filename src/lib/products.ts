@@ -1,5 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { assertVerified } from "./emailVerification";
+import { resetPriceCache, revealPrices } from "./priceAccess";
 import { auth, db, storage } from "@/integrations/firebase/client";
 import {
   collection,
@@ -77,15 +78,33 @@ export type BoneGraftSpec = {
   membrane?: BoneGraftMembrane;
 };
 
+export type BoneGraftMembraneSize = {
+  size: string;
+  priceUsd?: number;
+  priceIqd?: number;
+};
+
 export type BoneGraftMembrane = {
   needed: boolean;
   type?: string;
+  description?: string;
+  /** Each size with its own price. */
+  sizes?: BoneGraftMembraneSize[];
+  /** Older products: a single size and price. Read through membraneSizes(). */
   size?: string;
   priceUsd?: number;
   priceIqd?: number;
   // Storage path, like the product images.
   image?: string;
 };
+
+/** A membrane's sizes, including the single size older products were saved with. */
+export function membraneSizes(m: BoneGraftMembrane | undefined): BoneGraftMembraneSize[] {
+  if (!m) return [];
+  if (m.sizes?.length) return m.sizes;
+  if (m.size || m.priceUsd || m.priceIqd) return [{ size: m.size ?? "", priceUsd: m.priceUsd, priceIqd: m.priceIqd }];
+  return [];
+}
 
 export type ProductDiscountTier = {
   fromQty: number;
@@ -152,6 +171,10 @@ export type Product = {
   specializedImplant?: SpecializedImplantSpec;
   /** The shared catalog product this office's listing is an offer on. */
   catalogId?: string;
+  /** The office shows prices to approved doctors only (see priceAccess.ts). */
+  priceHidden?: boolean;
+  /** Hidden from this account: its prices are zeros and it can't be ordered. */
+  priceLocked?: boolean;
 };
 
 const fromDoc = (id: string, data: Record<string, unknown>): Product => {
@@ -213,13 +236,19 @@ const fromDoc = (id: string, data: Record<string, unknown>): Product => {
     surgicalKit: (data.surgicalKit as SurgicalKitSpec | null) ?? undefined,
     specializedImplant: (data.specializedImplant as SpecializedImplantSpec | null) ?? undefined,
     catalogId: (data.catalogId as string) ?? undefined,
+    priceHidden: data.priceHidden === true,
   };
 };
 
 export const productsQueryKey = ["products"] as const;
 
-const liveProducts = (docs: { id: string; data: () => Record<string, unknown> }[]): Product[] =>
+const rawProducts = (docs: { id: string; data: () => Record<string, unknown> }[]): Product[] =>
   docs.filter((d) => d.data().suspended !== true).map((d) => fromDoc(d.id, d.data()));
+
+/** Every product read goes through here, so hidden prices are filled in (or
+ *  the product marked priceLocked) wherever products are shown. */
+const liveProducts = (docs: { id: string; data: () => Record<string, unknown> }[]): Promise<Product[]> =>
+  revealPrices(rawProducts(docs));
 
 const oldestFirst = (a: Product, b: Product) => (a.createdAt ?? "").localeCompare(b.createdAt ?? "");
 
@@ -246,7 +275,7 @@ export function useProductsWhere(field: string, value: string | undefined) {
     staleTime: 30_000,
     queryFn: async (): Promise<Product[]> => {
       const snap = await getDocs(query(collection(db, "products"), where(field, "==", value)));
-      return liveProducts(snap.docs).sort(oldestFirst);
+      return (await liveProducts(snap.docs)).sort(oldestFirst);
     },
   });
 }
@@ -264,7 +293,7 @@ export function useProduct(id: string | undefined) {
     queryFn: async (): Promise<Product | null> => {
       const snap = await getDoc(doc(db, "products", id!));
       if (!snap.exists() || snap.data().suspended === true) return null;
-      return fromDoc(snap.id, snap.data());
+      return (await revealPrices([fromDoc(snap.id, snap.data())]))[0];
     },
   });
 }
@@ -283,7 +312,7 @@ export function useProductsByIds(ids: string[]) {
       const snaps = await Promise.all(
         chunks.map((c) => getDocs(query(collection(db, "products"), where(documentId(), "in", c)))),
       );
-      return snaps.flatMap((s) => liveProducts(s.docs));
+      return revealPrices(snaps.flatMap((s) => rawProducts(s.docs)));
     },
   });
 }
@@ -299,7 +328,7 @@ export function useProductsByBrand(names: string[]) {
     staleTime: 30_000,
     queryFn: async (): Promise<Product[]> => {
       const snap = await getDocs(query(collection(db, "products"), where("brand", "in", spellings)));
-      return liveProducts(snap.docs).sort(oldestFirst);
+      return (await liveProducts(snap.docs)).sort(oldestFirst);
     },
   });
 }
@@ -345,7 +374,7 @@ async function searchProductsOnce(term: string, max: number): Promise<Product[]>
     where("searchWords", "array-contains", parts[0].slice(0, SEARCH_MAX_PREFIX)),
     limit(max),
   );
-  const products = liveProducts((await getDocs(q)).docs);
+  const products = await liveProducts((await getDocs(q)).docs);
   // Only one word can go to the server. The rest narrow what came back.
   return products.filter((p) => {
     const hay = [p.en, p.ar, p.brand].filter(Boolean).join(" ").toLowerCase();
@@ -370,11 +399,11 @@ export async function findProductByCode(code: string): Promise<Product | null> {
   if (!clean) return null;
   if (!clean.includes("/")) {
     const byId = await getDoc(doc(db, "products", clean));
-    if (byId.exists() && byId.data().suspended !== true) return fromDoc(byId.id, byId.data());
+    if (byId.exists() && byId.data().suspended !== true) return (await revealPrices([fromDoc(byId.id, byId.data())]))[0];
   }
   for (const field of ["barcode", "sku"]) {
     const snap = await getDocs(query(collection(db, "products"), where(field, "==", clean), limit(1)));
-    const [hit] = liveProducts(snap.docs);
+    const [hit] = await liveProducts(snap.docs);
     if (hit) return hit;
   }
   return (await searchProductsOnce(clean, 1))[0] ?? null;
@@ -398,7 +427,7 @@ export function useBranchProducts(branch: string | undefined, term: string) {
         : query(collection(db, "products"), ...base);
       const snap = await getDocs(q);
       return {
-        products: liveProducts(snap.docs),
+        products: await liveProducts(snap.docs),
         next: snap.docs.length === BRANCH_PAGE ? snap.docs[snap.docs.length - 1] : null,
       };
     },
@@ -462,9 +491,18 @@ export function useUpsertProduct() {
       const cleanSpecialized = p.specializedImplant
         ? (removeUndefined(p.specializedImplant) as SpecializedImplantSpec)
         : null;
+      // An office whose prices are for approved doctors only: the product is
+      // marked hidden from the first write, so nobody else sees the price in
+      // the moment before the server moves it (functions/hiddenPrices.js).
+      const hidesPrices =
+        !!p.companyId &&
+        (await getDoc(doc(db, "user_roles", p.companyId))
+          .then((r) => r.data()?.pricesHidden === true)
+          .catch(() => false));
       await setDoc(
         ref,
         {
+          ...(hidesPrices ? { priceHidden: true } : {}),
           id: p.id,
           branch: p.branch,
           subCategory: p.subCategory ?? null,
@@ -508,7 +546,15 @@ export function useUpsertProduct() {
         { merge: true },
       );
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: productsQueryKey }),
+    onSuccess: () => {
+      resetPriceCache();
+      // Read again once the server has moved a hidden price (a moment later).
+      setTimeout(() => {
+        resetPriceCache();
+        void qc.invalidateQueries({ queryKey: productsQueryKey });
+      }, 3_000);
+      return qc.invalidateQueries({ queryKey: productsQueryKey });
+    },
   });
 }
 
@@ -608,10 +654,7 @@ export function useProductsByCountry(countrySlug: string) {
       // works without a composite index; country is filtered client-side.
       const q = query(collection(db, "products"), where("category", "==", "implant"));
       const snap = await getDocs(q);
-      return snap.docs
-        .filter((d) => d.data().suspended !== true)
-        .map((d) => fromDoc(d.id, d.data()))
-        .filter(
+      return (await liveProducts(snap.docs)).filter(
           (p) =>
             p.branch !== "bone_graft" &&
             (p.country === countryCode || p.implantSpec?.country === countryCode),

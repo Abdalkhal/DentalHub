@@ -36,6 +36,7 @@ import { setFavoritesStoreUser } from '@/lib/favoritesStore';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import { useProductSearch, useSignedImageUrls } from '@/lib/products';
+import { PriceLock } from '@/components/PriceLock';
 import { useQuickOrders, setQuickOrdersStoreUser } from '@/lib/quickOrders';
 import { useImplantOffers } from '@/lib/implantOffers';
 import { useActiveAds, type Ad } from '@/lib/adsStore';
@@ -44,6 +45,8 @@ import { useOrders } from '@/lib/ordersStore';
 import { useDentistCases, filterLegacyOrders } from '@/lib/caseTracking';
 import { useVendorAccounts, type VendorAccount } from '@/lib/search';
 import { BRANDS } from '@/data/brands';
+
+const LOGO_MARK = require('../../../assets/images/logo-mark.png');
 
 type Role = 'supply' | 'lab' | 'implant';
 type Banner = { title: string; subtitle: string; price?: string; image?: string };
@@ -313,10 +316,24 @@ export default function HomeScreen() {
           <Text className="mt-0.5 text-[9px] font-bold text-slate-600">{ar ? 'حسابي' : 'Account'}</Text>
         </Pressable>
 
-        <Text className="text-xl font-extrabold tracking-tight">
-          <Text className="text-primary">Dent</Text>
-          <Text className="text-slate-900"> Hub</Text>
-        </Text>
+        {/* Brand: the app icon's "D" mark next to the wordmark, always laid out left-to-right. */}
+        <View className="flex-row items-center gap-2" style={{ direction: 'ltr' }}>
+          <View
+            className="h-9 w-9 overflow-hidden rounded-xl bg-white"
+            style={{ shadowColor: '#1D4ED8', shadowOpacity: 0.22, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 4 }}
+          >
+            <Image source={LOGO_MARK} style={{ width: 36, height: 36 }} resizeMode="cover" />
+          </View>
+          <View>
+            <Text className="text-[18px] font-extrabold leading-[22px]" style={{ letterSpacing: -0.4 }}>
+              <Text style={{ color: '#1D6FE8' }}>Dent</Text>
+              <Text className="text-slate-900"> Hub</Text>
+            </Text>
+            <Text className="text-[7.5px] font-bold text-slate-400" style={{ letterSpacing: 1.4 }}>
+              DENTAL MARKETPLACE
+            </Text>
+          </View>
+        </View>
 
         <View className="flex-row items-center gap-2">
           {isDentist && <CartHeaderButton />}
@@ -440,9 +457,13 @@ export default function HomeScreen() {
                       {p.brand || (ar ? 'المورد' : 'Supplier')}
                     </Text>
                   </View>
-                  <Text className="text-sm font-extrabold text-primary">
-                    {p.currency === 'IQD' ? `${p.price.toLocaleString()} د.ع` : `$${p.price.toFixed(2)}`}
-                  </Text>
+                  {p.priceLocked ? (
+                    <PriceLock officeId={p.companyId} compact />
+                  ) : (
+                    <Text className="text-sm font-extrabold text-primary">
+                      {p.currency === 'IQD' ? `${p.price.toLocaleString()} د.ع` : `$${p.price.toFixed(2)}`}
+                    </Text>
+                  )}
                 </Pressable>
               ))}
             </>

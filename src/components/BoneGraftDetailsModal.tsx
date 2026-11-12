@@ -5,8 +5,9 @@ import { doc, getDoc } from "firebase/firestore";
 import { X, ChevronLeft, ChevronRight, Package, Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
-import { useSignedImageUrls, type Product } from "@/lib/products";
+import { membraneSizes, useSignedImageUrls, type Product } from "@/lib/products";
 import { db } from "@/integrations/firebase/client";
+import { PriceLock } from "@/components/PriceLock";
 import type { UserRoleDoc } from "@/integrations/firebase/types";
 
 export function BoneGraftDetailsModal({
@@ -203,9 +204,13 @@ export function BoneGraftDetailsModal({
                 <p className="text-[11px] font-bold text-emerald-700/70">
                   {ar ? "سعر الوحدة الواحدة" : "Unit Price"}
                 </p>
-                <p className="font-display font-extrabold text-lg text-emerald-700">
-                  {money(product.price)}
-                </p>
+                {product.priceLocked ? (
+                  <PriceLock officeId={product.companyId} className="mt-1" />
+                ) : (
+                  <p className="font-display font-extrabold text-lg text-emerald-700">
+                    {money(product.price)}
+                  </p>
+                )}
               </div>
               <div className="text-end">
                 <p className="text-[11px] font-bold text-emerald-700/70">
@@ -267,13 +272,19 @@ export function BoneGraftDetailsModal({
 
             {membrane && (
               <div>
-                <h4 className="text-sm font-bold text-slate-800 mb-2">{ar ? "الممبرن (الغشاء)" : "Membrane"}</h4>
+                <h4 className="text-sm font-bold text-slate-800 mb-2">
+                  {ar ? "الممبرن (الغشاء)" : "Membrane"}
+                </h4>
                 {membrane.needed ? (
                   <div className="flex gap-3 rounded-2xl border border-slate-200 p-3">
                     {membrane.image && (
                       <div className="size-20 shrink-0 overflow-hidden rounded-xl bg-slate-100">
                         {membraneUrlMap[membrane.image] && (
-                          <img src={membraneUrlMap[membrane.image]} alt="" className="size-full object-cover" />
+                          <img
+                            src={membraneUrlMap[membrane.image]}
+                            alt=""
+                            className="size-full object-cover"
+                          />
                         )}
                       </div>
                     )}
@@ -281,22 +292,42 @@ export function BoneGraftDetailsModal({
                       <span className="inline-block rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
                         {ar ? "يحتاج ممبرن" : "Needs a membrane"}
                       </span>
-                      {membrane.type && <p className="text-sm font-bold text-slate-800">{membrane.type}</p>}
-                      {membrane.size && <p className="text-[12px] text-slate-500"><bdi>{membrane.size}</bdi></p>}
-                      {(membrane.priceUsd || membrane.priceIqd) && (
-                        <p className="text-[12px] font-bold text-primary">
-                          {[
-                            membrane.priceUsd ? `$${membrane.priceUsd.toLocaleString("en-US")}` : "",
-                            membrane.priceIqd ? `${membrane.priceIqd.toLocaleString("en-US")} د.ع` : "",
-                          ]
-                            .filter(Boolean)
-                            .join(" · ")}
+                      {membrane.type && (
+                        <p className="text-sm font-bold text-slate-800">{membrane.type}</p>
+                      )}
+                      {membrane.description && (
+                        <p className="text-[12px] leading-relaxed text-slate-600">
+                          {membrane.description}
                         </p>
+                      )}
+                      {membraneSizes(membrane).length > 0 && (
+                        <ul className="mt-1 divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
+                          {membraneSizes(membrane).map((m, i) => (
+                            <li
+                              key={i}
+                              className="flex items-center justify-between gap-3 px-3 py-2"
+                            >
+                              <span className="text-[12px] font-semibold text-slate-700">
+                                <bdi>{m.size || "—"}</bdi>
+                              </span>
+                              <span className="text-[12px] font-bold text-primary" dir="ltr">
+                                {[
+                                  m.priceUsd ? `$${m.priceUsd.toLocaleString("en-US")}` : "",
+                                  m.priceIqd ? `${m.priceIqd.toLocaleString("en-US")} د.ع` : "",
+                                ]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
                       )}
                     </div>
                   </div>
                 ) : (
-                  <p className="rounded-2xl bg-slate-50 px-3 py-2.5 text-xs text-slate-500">{ar ? "لا يحتاج ممبرن" : "No membrane needed"}</p>
+                  <p className="rounded-2xl bg-slate-50 px-3 py-2.5 text-xs text-slate-500">
+                    {ar ? "لا يحتاج ممبرن" : "No membrane needed"}
+                  </p>
                 )}
               </div>
             )}

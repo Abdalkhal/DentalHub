@@ -54,6 +54,10 @@ export function TopBar({
       className={cn(
         "sticky top-0 z-20 px-4 pt-5 pb-4",
         wide && "lg:top-16",
+        // Dentist desktop rail (MobileShell adds .dh-rail): the shell top bar
+        // already has search/language/cart, so this becomes a page heading.
+        wide &&
+          "lg:in-[.dh-rail]:static lg:in-[.dh-rail]:bg-transparent lg:in-[.dh-rail]:backdrop-blur-none lg:in-[.dh-rail]:border-0 lg:in-[.dh-rail]:px-0 lg:in-[.dh-rail]:pt-7 lg:in-[.dh-rail]:pb-1",
         variant === "home"
           ? "bg-gradient-to-b from-primary-soft/70 to-transparent"
           : "bg-background/90 backdrop-blur border-b border-border",
@@ -65,7 +69,7 @@ export function TopBar({
       <div
         className={cn(
           "flex items-center justify-between gap-3",
-          wide && cn(MAX_W[maxW], "md:mx-auto md:w-full"),
+          wide && cn(MAX_W[maxW], "md:mx-auto md:w-full lg:in-[.dh-rail]:px-8"),
         )}
       >
         <div className="flex items-center gap-2 min-w-0">
@@ -80,7 +84,7 @@ export function TopBar({
           )}
           {variant === "home" ? (
             <Link to="/" className="flex items-center gap-1 font-display font-extrabold text-lg">
-              <span className="text-foreground">Dental</span>
+              <span className="text-foreground">Dent</span>
               <span className="text-primary">Hub</span>
             </Link>
           ) : (
@@ -94,7 +98,10 @@ export function TopBar({
           {actions}
           <button
             onClick={toggle}
-            className="flex items-center gap-1.5 h-9 px-3 rounded-full bg-card border border-border text-xs font-semibold text-foreground hover:bg-accent"
+            className={cn(
+              "flex items-center gap-1.5 h-9 px-3 rounded-full bg-card border border-border text-xs font-semibold text-foreground hover:bg-accent",
+              wide && "lg:in-[.dh-rail]:hidden",
+            )}
           >
             <Globe className="size-3.5" />
             {lang === "ar" ? "AR/EN" : "EN/AR"}

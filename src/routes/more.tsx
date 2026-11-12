@@ -32,6 +32,7 @@ import {
   PenTool,
   Tag,
   TicketPercent,
+  Lock,
   Library,
 } from "lucide-react";
 import { openCart } from "@/lib/cartStore";
@@ -272,6 +273,7 @@ function More() {
     { to: "/doctor-invoices", icon: FileText, label: ar ? "فواتير الأطباء" : "Doctor Invoices", tone: "", roles: ["supply"] },
     { to: "/catalog-add", icon: Library, label: ar ? "إضافة من الدليل" : "Add from catalog", tone: "", roles: ["supply"] },
     { to: "/office-discounts", icon: TicketPercent, label: ar ? "الخصومات" : "Discounts", tone: "", roles: ["supply"] },
+    { to: "/price-access", icon: Lock, label: ar ? "إظهار الأسعار" : "Who sees prices", tone: "", roles: ["supply"] },
     { to: "/my-ads", icon: Megaphone, label: ar ? "إعلاناتي" : "My Ads", tone: "", roles: ["supply"] },
     { to: "/messages", icon: MessageSquare, label: ar ? "الرسائل" : "Messages", tone: "", roles: ["supply"] },
     { to: "/notifications", icon: Bell, label: ar ? "الإشعارات" : "Notifications", tone: "", roles: ["supply"] },
@@ -282,6 +284,7 @@ function More() {
   const implantLinks: MoreLink[] = [
     { to: "/implants", icon: FlaskConical, label: ar ? "لوحة الزرعات" : "Implant Dashboard", tone: "", roles: ["implant"] },
     { to: "/office-discounts", icon: TicketPercent, label: ar ? "الخصومات" : "Discounts", tone: "", roles: ["implant"] },
+    { to: "/price-access", icon: Lock, label: ar ? "إظهار الأسعار" : "Who sees prices", tone: "", roles: ["implant"] },
     { to: "/my-ads", icon: Megaphone, label: ar ? "إعلاناتي" : "My Ads", tone: "", roles: ["implant"] },
     { to: "/messages", icon: MessageSquare, label: ar ? "الرسائل" : "Messages", tone: "", roles: ["implant"] },
     { to: "/notifications", icon: Bell, label: ar ? "الإشعارات" : "Notifications", tone: "", roles: ["implant"] },

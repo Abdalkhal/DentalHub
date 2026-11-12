@@ -4,9 +4,10 @@ import { MobileShell } from "@/components/MobileShell";
 import { TopBar } from "@/components/TopBar";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { STATUS_META, HISTORY_LABELS, inputCls, Field } from "./patients.index";
+import { STATUS_META, inputCls, Field } from "./patients.index";
 import { DentalArch, LEGEND_ORDER, TOOTH_META } from "@/components/DentalArch";
 import { ArchViewer, ARCH_ZOOM_MIN, ARCH_ZOOM_MAX } from "@/components/ArchViewer";
+import { StepWorkActions, WorkSheet } from "@/components/TreatmentWork";
 
 import {
   addFile,
@@ -15,7 +16,6 @@ import {
   addPlanStep,
   addVisit,
   MAX_PLAN_PHOTOS,
-  cyclePlanStep,
   isGeneralFile,
   planPhotoTag,
   planPhotos,
@@ -80,7 +80,6 @@ import {
   Check,
   Cloud,
   FileImage,
-  Info,
   MessageCircle,
   Paperclip,
   Pencil,
@@ -105,10 +104,10 @@ import {
 export const Route = createFileRoute("/patients/$patientId")({
   head: () => ({
     meta: [
-      { title: "سجل المريض | DentalHub" },
+      { title: "سجل المريض | Dent Hub" },
       { name: "description", content: "ملف المريض التفصيلي: خريطة الأسنان التفاعلية، الخطة العلاجية، التاريخ المرضي، المرفقات والحسابات." },
-      { property: "og:title", content: "سجل المريض | DentalHub" },
-      { property: "og:description", content: "ملف المريض التفصيلي داخل DentalHub." },
+      { property: "og:title", content: "سجل المريض | Dent Hub" },
+      { property: "og:description", content: "ملف المريض التفصيلي داخل Dent Hub." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -116,7 +115,7 @@ export const Route = createFileRoute("/patients/$patientId")({
   component: PatientProfile,
 });
 
-type TabKey = "summary" | "history" | "meds" | "files" | "notes" | "visits" | "orders" | "billing";
+type TabKey = "info" | "visits" | "teeth" | "plan" | "fees";
 
 type Sub = { ar: string; en: string };
 
@@ -254,7 +253,7 @@ function PatientProfile() {
 
   const patients = usePatients();
   const p = patients.find((x) => x.id === patientId);
-  const [tab, setTab] = useState<TabKey>("summary");
+  const [tab, setTab] = useState<TabKey>("info");
 
   if (!p) {
     return (
@@ -270,22 +269,20 @@ function PatientProfile() {
   }
 
   const tabs: Array<{ key: TabKey; ar: string; en: string }> = [
-    { key: "summary", ar: "ملخص", en: "Summary" },
-    // "history" (incl. treatment status) and "orders" were fully built but
-    // missing from this list, so they could not be opened.
-    { key: "history", ar: "التاريخ المرضي", en: "History" },
-    { key: "meds", ar: "الأدوية والحساسيات", en: "Meds & allergies" },
+    // Same five tabs, names and order as the native patient screen.
+    { key: "info", ar: "المعلومات", en: "Info" },
     { key: "visits", ar: "الزيارات", en: "Visits" },
-    { key: "billing", ar: "المالية", en: "Billing" },
-    { key: "orders", ar: "طلبات المختبر", en: "Lab orders" },
+    { key: "teeth", ar: "الأسنان", en: "Teeth" },
+    { key: "plan", ar: "خطة العلاج", en: "Plan" },
+    { key: "fees", ar: "المالية", en: "Fees" },
   ];
 
   return (
     <MobileShell wide>
-      <TopBar title={p.name || (ar ? "سجل المريض" : "Patient record")} showBack wide maxW="6xl" />
+      <TopBar title={p.name || (ar ? "سجل المريض" : "Patient record")} showBack wide maxW="5xl" />
 
       {/* Quick actions */}
-      <div className="px-4 pt-3 flex items-center gap-1.5 md:px-6 md:pt-6 md:gap-2 md:flex-wrap lg:px-8 lg:max-w-6xl lg:mx-auto">
+      <div className="px-4 pt-3 flex items-center gap-1.5 md:px-6 md:pt-6 md:gap-2 md:flex-wrap lg:px-8 lg:max-w-5xl lg:mx-auto">
         <IconBtn onClick={() => exportPatientRecord(p, ar)} title={ar ? "تصدير ملف المريض (PDF)" : "Export patient record (PDF)"}>
           <Share2 className="size-4" />
         </IconBtn>
@@ -301,7 +298,7 @@ function PatientProfile() {
       </div>
 
       {/* Patient info card */}
-      <section className="px-4 mt-3 md:px-6 lg:px-8 lg:max-w-6xl lg:mx-auto">
+      <section className="px-4 mt-3 md:px-6 lg:px-8 lg:max-w-5xl lg:mx-auto">
         <div className="rounded-2xl bg-card border border-border p-4 shadow-sm">
           <PatientInfoCard p={p} ar={ar} />
         </div>
@@ -311,17 +308,16 @@ function PatientProfile() {
       </section>
 
       {/* Tabs */}
-      <nav className="mt-3 px-4 md:px-6 lg:px-8 lg:max-w-6xl lg:mx-auto">
-        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
+      <nav className="mt-3 px-4 md:px-6 lg:px-8 lg:max-w-5xl lg:mx-auto">
+        {/* Segmented control, as on native */}
+        <div className="flex rounded-2xl bg-slate-100 p-1.5 lg:bg-slate-200/70">
           {tabs.map((tb) => (
             <button
               key={tb.key}
               onClick={() => setTab(tb.key)}
               className={cn(
-                "rounded-full px-4 py-1.5 text-xs font-semibold whitespace-nowrap transition border",
-                tab === tb.key
-                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                  : "bg-card text-muted-foreground border-border"
+                "h-10 flex-1 min-w-0 rounded-xl text-xs font-bold truncate transition md:text-sm",
+                tab === tb.key ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
               )}
             >
               {ar ? tb.ar : tb.en}
@@ -330,30 +326,18 @@ function PatientProfile() {
         </div>
       </nav>
 
-      <section className="px-4 py-3 pb-8 grid gap-2.5 items-start md:px-6 md:py-6 md:pb-14 md:grid-cols-2 md:gap-5 xl:grid-cols-3 lg:px-8 lg:max-w-6xl lg:mx-auto">
-        <div className="space-y-2.5 min-w-0">
-          {tab === "summary" && <Summary p={p} ar={ar} onViewHistory={() => setTab("history")} />}
-          {tab === "history" && <HistoryTab p={p} ar={ar} />}
-          {tab === "meds" && <MedsTab p={p} ar={ar} />}
-          {tab === "files" && <FilesCard p={p} ar={ar} />}
-          {tab === "notes" && <NotesCard p={p} ar={ar} />}
-          {tab === "visits" && <Visits p={p} ar={ar} />}
-          {tab === "orders" && <LabOrders p={p} ar={ar} />}
-          {tab === "billing" && <Billing p={p} ar={ar} />}
-        </div>
-
-        {/* Quick info */}
-        <aside className="space-y-2.5 min-w-0">
-
-
-          <Card title={ar ? "معلومات سريعة" : "Quick info"} action={<Info className="size-4 text-primary" />}>
-            <dl className="text-[11px] divide-y divide-border">
-              <QuickRow k={ar ? "آخر زيارة" : "Last visit"} v={p.lastVisit} />
-              <QuickRow k={ar ? "الطبيب المعالج" : "Doctor"} v={p.doctorName || "—"} />
-              <QuickRow k={ar ? "رقم الجوال" : "Phone"} v={p.phone || "—"} />
-            </dl>
-          </Card>
-        </aside>
+      <section className="px-4 py-3 pb-8 md:px-6 md:py-6 md:pb-14 lg:px-8 lg:max-w-5xl lg:mx-auto">
+        {tab === "info" && <InfoTab p={p} ar={ar} />}
+        {tab === "visits" && (
+          <div className="space-y-2.5">
+            <Visits p={p} ar={ar} />
+            {/* Web-only: lab orders matched to this patient */}
+            <LabOrders p={p} ar={ar} />
+          </div>
+        )}
+        {tab === "teeth" && <ChartCard p={p} ar={ar} />}
+        {tab === "plan" && <PlanCard p={p} ar={ar} />}
+        {tab === "fees" && <Billing p={p} ar={ar} />}
       </section>
     </MobileShell>
   );
@@ -457,15 +441,6 @@ function Meta({ label, value, ltr, icon: Icon }: { label: string; value: string;
 
 
 
-function QuickRow({ k, v }: { k: string; v: string }) {
-  return (
-    <div className="flex items-center justify-between py-2 gap-2">
-      <span className="font-semibold truncate">{v}</span>
-      <span className="text-muted-foreground shrink-0">{k}</span>
-    </div>
-  );
-}
-
 function Card({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
   return (
     <div className="rounded-2xl bg-card border border-border p-3.5 shadow-soft">
@@ -478,15 +453,44 @@ function Card({ title, children, action }: { title: string; children: React.Reac
   );
 }
 
-/* ---------------- Summary ---------------- */
+/* ---------------- Info ---------------- */
 
-function Summary({ p, ar, onViewHistory }: { p: P; ar: boolean; onViewHistory: () => void }) {
+function InfoTab({ p, ar }: { p: P; ar: boolean }) {
   return (
     <div className="space-y-2.5">
-      <ChartCard p={p} ar={ar} />
-      <PlanCard p={p} ar={ar} />
-      <HistoryCard p={p} ar={ar} compact onViewAll={onViewHistory} />
+      <Card title={ar ? "الشكوى الرئيسية" : "Chief complaint"}>
+        <textarea
+          rows={3}
+          value={p.complaint}
+          onChange={(e) => updatePatient(p.id, { complaint: e.target.value })}
+          placeholder={ar ? "اكتب الشكوى..." : "Write complaint..."}
+          className={cn(inputCls, "h-auto py-2 resize-none")}
+        />
+      </Card>
       <NotesCard p={p} ar={ar} />
+      <HistoryCard p={p} ar={ar} />
+
+      {/* Web-only fields (not on native) */}
+      <div className="grid gap-2.5 md:grid-cols-2">
+        <Card title={ar ? "الحساسيات" : "Allergies"}>
+          <textarea
+            rows={3}
+            value={p.allergies ?? ""}
+            onChange={(e) => updatePatient(p.id, { allergies: e.target.value })}
+            placeholder={ar ? "مثال: حساسية من البنسلين…" : "e.g. penicillin allergy…"}
+            className={cn(inputCls, "h-auto py-2 resize-none")}
+          />
+        </Card>
+        <Card title={ar ? "الأدوية الحالية" : "Current medications"}>
+          <textarea
+            rows={3}
+            value={p.meds ?? ""}
+            onChange={(e) => updatePatient(p.id, { meds: e.target.value })}
+            placeholder={ar ? "اكتب الأدوية والجرعات…" : "Medications and dosage…"}
+            className={cn(inputCls, "h-auto py-2 resize-none")}
+          />
+        </Card>
+      </div>
       <FilesCard p={p} ar={ar} />
     </div>
   );
@@ -495,7 +499,7 @@ function Summary({ p, ar, onViewHistory }: { p: P; ar: boolean; onViewHistory: (
 function ChartCard({ p, ar }: { p: P; ar: boolean }) {
   const [jaw, setJaw] = useState<"upper" | "lower">("upper");
   const [brush, setBrush] = useState<ToothStatus>("caries");
-  const [zoom, setZoom] = useState(0.75);
+  const [zoom, setZoom] = useState(1);
   const [selecting, setSelecting] = useState(true);
   const [saved, setSaved] = useState(false);
 
@@ -520,7 +524,7 @@ function ChartCard({ p, ar }: { p: P; ar: boolean }) {
 
       <div className="space-y-2.5 min-w-0 overflow-hidden">
         <div className="rounded-2xl bg-card border border-border p-2 overflow-hidden">
-          <ArchViewer zoom={zoom} onZoomChange={setZoom} height={220} className="max-w-full">
+          <ArchViewer zoom={zoom} onZoomChange={setZoom} className="max-w-full lg:mx-auto">
             <div className="size-full transition-transform origin-center">
               <DentalArch
                 jaw={jaw}
@@ -528,15 +532,16 @@ function ChartCard({ p, ar }: { p: P; ar: boolean }) {
                 onTooth={(n) => {
                   if (!selecting) return;
                   setSaved(false);
-                  setTooth(p.id, n, p.teeth[n] === brush ? "healthy" : brush);
+                  // Tapping a tooth again with the same colour takes the mark off.
+                  setTooth(p.id, n, p.teeth[n] === brush ? null : brush);
                 }}
               />
             </div>
           </ArchViewer>
           <p className="text-center text-[10px] text-muted-foreground mt-1.5">
             {ar
-              ? "اختر لوناً من المفتاح ثم اضغط على السن · قرّب بالإصبعين واسحب للتنقل"
-              : "Pick a legend color then tap a tooth · pinch to zoom, drag to pan"}
+              ? "اختر الحالة من المفتاح ثم اضغط على السن نفسه · اضغط مرة ثانية لإزالتها"
+              : "Pick a status, then tap the tooth itself · tap again to remove it"}
           </p>
         </div>
 
@@ -632,6 +637,8 @@ function PlanCard({ p, ar }: { p: P; ar: boolean }) {
   // Set while the form edits an existing step instead of adding one.
   const [editingId, setEditingId] = useState<string | null>(null);
   const [toothError, setToothError] = useState(false);
+  // The procedure whose work sheet is open.
+  const [workId, setWorkId] = useState<string | null>(null);
 
   const closeForm = () => {
     setForm({ title: "", tooth: "", cost: "", note: "" });
@@ -819,7 +826,8 @@ function PlanCard({ p, ar }: { p: P; ar: boolean }) {
         ) : (
           <ul className="divide-y divide-border">
             {plan.map((s) => (
-              <li key={s.id} className="flex items-center gap-2.5 py-2">
+              <li key={s.id} className="py-2 space-y-1.5">
+              <div className="flex items-center gap-2.5">
                 <span className={cn("size-8 shrink-0 rounded-full text-[11px] font-display font-extrabold flex items-center justify-center", deptMeta.cls)}>
                   {s.tooth || "—"}
                 </span>
@@ -832,14 +840,6 @@ function PlanCard({ p, ar }: { p: P; ar: boolean }) {
                     {[s.note, s.cost ? formatMoney(Number(s.cost), planCurrency(p, s)) : ""].filter(Boolean).join(" · ") || (ar ? "بدون ملاحظات" : "No notes")}
                   </p>
                 </button>
-                {/* The one status control: planned → in progress → done. A
-                    separate "done" checkbox used to sit next to it. */}
-                <button
-                  onClick={() => cyclePlanStep(p.id, s.id)}
-                  className={cn("text-[10px] font-bold px-2.5 py-1 rounded-full shrink-0", PLAN_META[s.status].cls)}
-                >
-                  {ar ? PLAN_META[s.status].ar : PLAN_META[s.status].en}
-                </button>
                 <button onClick={() => startEdit(s)} className="text-muted-foreground hover:text-primary shrink-0" aria-label={ar ? "تعديل" : "Edit"}>
                   <Pencil className="size-3.5" />
                 </button>
@@ -850,6 +850,9 @@ function PlanCard({ p, ar }: { p: P; ar: boolean }) {
                 >
                   <Trash2 className="size-3.5" />
                 </button>
+              </div>
+              {/* Status now follows the treatment: proposed → patient agreed → in treatment → done. */}
+              <StepWorkActions p={p} step={s} ar={ar} onOpen={() => setWorkId(s.id)} />
               </li>
             ))}
           </ul>
@@ -857,6 +860,8 @@ function PlanCard({ p, ar }: { p: P; ar: boolean }) {
 
         {!isRadio && <PlanPhotos p={p} ar={ar} dept={dept} />}
       </Card>
+
+      {workId && <WorkSheet p={p} stepId={workId} ar={ar} onClose={() => setWorkId(null)} />}
 
       {picking && (
         <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal="true">
@@ -1237,77 +1242,6 @@ function HistoryCard({ p, ar, compact, onViewAll }: { p: P; ar: boolean; compact
         </div>
       )}
     </Card>
-  );
-}
-
-function HistoryTab({ p, ar }: { p: P; ar: boolean }) {
-  const active = HISTORY_LABELS.filter((h) => p.history[h.key]);
-  return (
-    <div className="space-y-2.5">
-      <Card title={ar ? "الملف الطبي" : "Medical profile"}>
-        {active.length === 0 ? (
-          <p className="text-[12px] text-muted-foreground">{ar ? "لا توجد أمراض مسجلة" : "No conditions recorded"}</p>
-        ) : (
-          <div className="flex flex-wrap gap-1.5">
-            {active.map((h) => (
-              <span key={h.key} className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-red-50 text-red-700 border border-red-200">
-                {ar ? h.ar : h.en}
-              </span>
-            ))}
-          </div>
-        )}
-      </Card>
-      <HistoryCard p={p} ar={ar} />
-      <Card title={ar ? "حالة العلاج" : "Treatment status"}>
-        <div className="flex gap-1.5">
-          {(Object.keys(STATUS_META) as Array<keyof typeof STATUS_META>).map((s) => (
-            <button
-              key={s}
-              onClick={() => updatePatient(p.id, { status: s })}
-              className={cn(
-                "flex-1 h-9 rounded-xl text-[11px] font-bold border transition",
-                p.status === s ? "bg-primary text-primary-foreground border-primary" : "bg-card border-border text-muted-foreground"
-              )}
-            >
-              {ar ? STATUS_META[s].ar : STATUS_META[s].en}
-            </button>
-          ))}
-        </div>
-      </Card>
-    </div>
-  );
-}
-
-function MedsTab({ p, ar }: { p: P; ar: boolean }) {
-  return (
-    <div className="space-y-2.5">
-      <Card title={ar ? "الحساسيات" : "Allergies"}>
-        <textarea
-          rows={3}
-          value={p.allergies ?? ""}
-          onChange={(e) => updatePatient(p.id, { allergies: e.target.value })}
-          placeholder={ar ? "مثال: حساسية من البنسلين…" : "e.g. penicillin allergy…"}
-          className={cn(inputCls, "h-auto py-2 resize-none")}
-        />
-      </Card>
-      <Card title={ar ? "الأدوية الحالية" : "Current medications"}>
-        <textarea
-          rows={3}
-          value={p.meds ?? ""}
-          onChange={(e) => updatePatient(p.id, { meds: e.target.value })}
-          placeholder={ar ? "اكتب الأدوية والجرعات…" : "Medications and dosage…"}
-          className={cn(inputCls, "h-auto py-2 resize-none")}
-        />
-      </Card>
-      <Card title={ar ? "الشكوى الرئيسية" : "Chief complaint"}>
-        <textarea
-          rows={3}
-          value={p.complaint}
-          onChange={(e) => updatePatient(p.id, { complaint: e.target.value })}
-          className={cn(inputCls, "h-auto py-2 resize-none")}
-        />
-      </Card>
-    </div>
   );
 }
 

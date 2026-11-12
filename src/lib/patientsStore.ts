@@ -35,6 +35,8 @@ export type ToothStatus =
   | "bridge"
   | "unerupted";
 
+import type { TreatmentWork } from "./treatmentWork";
+
 export type PlanStatus = "done" | "active" | "planned";
 
 export type PlanStep = {
@@ -47,6 +49,10 @@ export type PlanStep = {
   // Chosen per step; older steps have none — see planCurrency().
   currency?: "USD" | "IQD";
   note?: string;
+  /** The day the patient agreed to this procedure (YYYY-MM-DD). */
+  approvedAt?: string;
+  /** Treatment record: the sessions done so far. See lib/treatmentWork. */
+  work?: TreatmentWork;
 };
 
 export type HistoryEntry = {
@@ -378,11 +384,15 @@ export function removePatient(id: string) {
   if (gone) pushDelete(gone);
 }
 
-export function setTooth(id: string, tooth: number, status: ToothStatus) {
+/**
+ * Marks a tooth on the chart; `null` clears it. "healthy" is kept too, so a
+ * tooth the doctor checked shows green instead of looking untouched.
+ */
+export function setTooth(id: string, tooth: number, status: ToothStatus | null) {
   const p = getPatient(id);
   if (!p) return;
   const teeth = { ...p.teeth };
-  if (status === "healthy") delete teeth[tooth];
+  if (status === null) delete teeth[tooth];
   else teeth[tooth] = status;
   updatePatient(id, { teeth });
 }
@@ -612,7 +622,7 @@ export function getPlan(p: Patient): PlanStep[] {
 export function addPlanStep(id: string, title: string, extra?: Partial<Omit<PlanStep, "id" | "title" | "status">>) {
   const p = getPatient(id);
   if (!p || !title.trim()) return;
-  const step: PlanStep = { id: `pl_${Date.now().toString(36)}`, title: title.trim(), status: "planned", ...extra };
+  const step: PlanStep = { id: `pl_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, title: title.trim(), status: "planned", ...extra };
   updatePatient(id, { plan: [...getPlan(p), step] });
 }
 

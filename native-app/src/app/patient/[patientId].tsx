@@ -39,6 +39,7 @@ import { CalendarPickerModal } from '@/components/CalendarPickerModal';
 import { PlanPhotos, XrayGallery, useXrayUpload } from '@/components/PatientXrays';
 import { DentalArch, LEGEND_ORDER, TOOTH_META } from '@/components/DentalArch';
 import { ArchViewer, ARCH_ZOOM_MIN, ARCH_ZOOM_MAX } from '@/components/ArchViewer';
+import { StepWorkActions, WorkSheet } from '@/components/TreatmentWork';
 import {
   usePatients,
   updatePatient,
@@ -61,7 +62,6 @@ import {
   addPlanStep,
   updatePlanStep,
   removePlanStep,
-  cyclePlanStep,
   planCurrency,
   formatMoney,
   formatMoneyTotals,
@@ -1050,7 +1050,8 @@ function ChartCard({ p, ar }: { p: Patient; ar: boolean }) {
             onTooth={(n) => {
               if (!selecting) return;
               setSaved(false);
-              setTooth(p.id, n, p.teeth[n] === brush ? 'healthy' : brush);
+              // Tapping a tooth again with the same colour takes the mark off.
+              setTooth(p.id, n, p.teeth[n] === brush ? null : brush);
             }}
           />
         </ArchViewer>
@@ -1131,6 +1132,8 @@ function PlanCard({ p, ar }: { p: Patient; ar: boolean }) {
   // Chosen explicitly per procedure — the cost used to be shown as "$" no
   // matter what the doctor meant.
   const [cur, setCur] = useState<FeeCurrency>(() => planCurrency(p));
+  // The procedure whose work sheet is open.
+  const [workId, setWorkId] = useState<string | null>(null);
 
   const all = getPlan(p);
   const plan = all.filter((s) => (s.dept ?? 'general') === dept);
@@ -1372,7 +1375,8 @@ function PlanCard({ p, ar }: { p: Patient; ar: boolean }) {
         ) : (
           <View className="gap-2">
             {plan.map((s) => (
-              <View key={s.id} className="flex-row items-center gap-2.5 rounded-2xl bg-slate-50 p-2.5">
+              <View key={s.id} className="rounded-2xl bg-slate-50 p-2.5">
+              <View className="flex-row items-center gap-2.5">
                 <View className="h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white" style={shadowSm}>
                   <Text className="text-[11px] font-extrabold" style={{ color: deptMeta.fg }}>
                     {s.tooth || '—'}
@@ -1391,16 +1395,6 @@ function PlanCard({ p, ar }: { p: Patient; ar: boolean }) {
                       (ar ? 'بدون ملاحظات' : 'No notes')}
                   </Text>
                 </Pressable>
-                {/* The one status control: planned → in progress → done. A
-                    separate "done" checkbox used to sit next to it. */}
-                <Pressable
-                  onPress={() => cyclePlanStep(p.id, s.id)}
-                  style={{ flexShrink: 0, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: PLAN_META[s.status].bg }}
-                >
-                  <Text className="font-bold" style={{ fontSize: 10, color: PLAN_META[s.status].text }}>
-                    {ar ? PLAN_META[s.status].ar : PLAN_META[s.status].en}
-                  </Text>
-                </Pressable>
                 <Pressable onPress={() => startEdit(s)} className="shrink-0 p-1">
                   <Pencil size={14} color="#64748B" />
                 </Pressable>
@@ -1408,12 +1402,17 @@ function PlanCard({ p, ar }: { p: Patient; ar: boolean }) {
                   <Trash2 size={14} color="#94A3B8" />
                 </Pressable>
               </View>
+              {/* Status now follows the treatment: proposed → patient agreed → in treatment → done. */}
+              <StepWorkActions p={p} step={s} ar={ar} onOpen={() => setWorkId(s.id)} />
+              </View>
             ))}
           </View>
         )}
 
         {!isRadio && <PlanPhotos p={p} ar={ar} dept={dept} />}
       </View>
+
+      {workId && <WorkSheet p={p} stepId={workId} ar={ar} onClose={() => setWorkId(null)} />}
 
       {picking && (
         <ProcedurePicker

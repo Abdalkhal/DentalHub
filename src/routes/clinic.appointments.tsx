@@ -84,6 +84,23 @@ type Theme = {
   label: { ar: string; en: string };
 };
 
+const STRIPE: Record<string, { stripe: string; dot: string }> = {
+  "متابعة": { stripe: "border-s-purple-500", dot: "bg-purple-500" },
+  "مكتمل": { stripe: "border-s-emerald-500", dot: "bg-emerald-500" },
+  "انتظار": { stripe: "border-s-amber-500", dot: "bg-amber-500" },
+  "ملغي": { stripe: "border-s-rose-500", dot: "bg-rose-500" },
+  "مؤكد": { stripe: "border-s-blue-500", dot: "bg-blue-500" },
+};
+const stripeOf = (appt: Appointment) => STRIPE[statusTheme(appt).label.ar] ?? STRIPE["مؤكد"];
+
+const LEGEND = [
+  { key: "مؤكد", en: "Confirmed" },
+  { key: "انتظار", en: "Waiting" },
+  { key: "مكتمل", en: "Completed" },
+  { key: "متابعة", en: "Follow-up" },
+  { key: "ملغي", en: "Cancelled" },
+];
+
 function statusTheme(appt: Appointment): Theme {
   const status = appt.status ?? "confirmed";
   if (appt.appointmentType === "متابعة" && status === "confirmed") {
@@ -253,6 +270,11 @@ function AppointmentsPage() {
     return { year, month, cells };
   }, [calMonth]);
 
+  useEffect(() => {
+    const d = new Date(selectedDate + "T00:00:00");
+    setCalMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+  }, [selectedDate]);
+
   const changeCalMonth = (dir: -1 | 1) =>
     setCalMonth((m) => new Date(m.getFullYear(), m.getMonth() + dir, 1));
 
@@ -266,7 +288,23 @@ function AppointmentsPage() {
   return (
     <MobileShell wide>
       <TopBar title={ar ? "جدول المواعيد" : "Appointments"} showBack wide />
-
+      <AppointmentsDesktop
+        ar={ar}
+        appointments={appointments}
+        sorted={sorted}
+        selectedDate={selectedDate}
+        setSelectedDate={setSelectedDate}
+        todayStr={todayStr}
+        nowHour={nowHour}
+        stats={stats}
+        periodFilter={periodFilter}
+        setPeriod={setManualPeriod}
+        calDays={calDays}
+        changeCalMonth={changeCalMonth}
+        onAdd={() => setShowAdd(true)}
+        onOpen={setSelectedAppt}
+      />
+      <div className="lg:hidden">
       <div className="px-4 pt-3 pb-2 md:px-6 md:pt-6 lg:px-8 lg:max-w-5xl lg:mx-auto">
         {/* Month / Year header */}
         <div className="flex items-center justify-between mb-3">
@@ -403,6 +441,7 @@ function AppointmentsPage() {
           </div>
         )}
       </div>
+      </div>
 
       {/* Calendar Modal */}
       {showCalendar && (
@@ -462,7 +501,7 @@ function AppointmentsPage() {
       <button
         type="button"
         onClick={() => setShowAdd(true)}
-        className="fixed bottom-24 end-5 z-40 size-14 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:bg-primary/90 transition lg:bottom-8 lg:end-8"
+        className="lg:hidden fixed bottom-24 end-5 z-40 size-14 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:bg-primary/90 transition lg:bottom-8 lg:end-8"
         aria-label={ar ? "إضافة موعد" : "Add appointment"}
       >
         <Plus className="size-6" />
@@ -546,6 +585,381 @@ function StatCard({
       </span>
       <p className="font-display font-extrabold text-lg leading-none text-slate-800">{value}</p>
       <p className={cn("text-[10px] font-bold mt-0.5", active ? "text-primary" : "text-slate-400")}>{ar ? label.ar : label.en}</p>
+    </button>
+  );
+}
+
+/* ── Large screens ─────────────────────────────────── */
+
+type CalDays = { year: number; month: number; cells: (number | null)[] };
+
+function AppointmentsDesktop({
+  ar,
+  appointments,
+  sorted,
+  selectedDate,
+  setSelectedDate,
+  todayStr,
+  nowHour,
+  stats,
+  periodFilter,
+  setPeriod,
+  calDays,
+  changeCalMonth,
+  onAdd,
+  onOpen,
+}: {
+  ar: boolean;
+  appointments: Appointment[];
+  sorted: Appointment[];
+  selectedDate: string;
+  setSelectedDate: (d: string) => void;
+  todayStr: string;
+  nowHour: number;
+  stats: { total: number; morning: number; evening: number; reminders: number };
+  periodFilter: "AM" | "PM";
+  setPeriod: (p: "AM" | "PM") => void;
+  calDays: CalDays;
+  changeCalMonth: (dir: -1 | 1) => void;
+  onAdd: () => void;
+  onOpen: (a: Appointment) => void;
+}) {
+  const selected = new Date(selectedDate + "T00:00:00");
+  const months = ar ? MONTHS_AR : MONTHS_EN;
+  const dayName = ar ? DAY_LABELS[selected.getDay()].ar : DAY_LABELS[selected.getDay()].en;
+  const slots = periodFilter === "AM" ? MORNING_SLOTS : EVENING_SLOTS;
+  const isToday = selectedDate === todayStr;
+
+  const week = (() => {
+    const start = new Date(selected);
+    start.setDate(start.getDate() - start.getDay());
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(start);
+      d.setDate(d.getDate() + i);
+      return d;
+    });
+  })();
+  const countOn = (ds: string) => appointments.filter((a) => a.date === ds).length;
+  const shiftWeek = (dir: -1 | 1) => {
+    const d = new Date(selected);
+    d.setDate(d.getDate() + dir * 7);
+    setSelectedDate(toDateStr(d));
+  };
+
+  const statCards = [
+    { key: "total", label: ar ? "الإجمالي" : "Total", value: stats.total, icon: Users, tint: "from-sky-50 to-white", iconCls: "bg-sky-100 text-sky-600" },
+    { key: "AM", label: ar ? "صباحاً" : "Morning", value: stats.morning, icon: Sun, tint: "from-amber-50 to-white", iconCls: "bg-amber-100 text-amber-600" },
+    { key: "PM", label: ar ? "مساءً" : "Evening", value: stats.evening, icon: Moon, tint: "from-indigo-50 to-white", iconCls: "bg-indigo-100 text-indigo-600" },
+    { key: "rem", label: ar ? "التذكيرات" : "Reminders", value: stats.reminders, icon: Bell, tint: "from-rose-50 to-white", iconCls: "bg-rose-100 text-rose-600" },
+  ] as const;
+
+  return (
+    <div className="hidden lg:block px-8 pt-6 pb-12 max-w-[1400px] mx-auto">
+      <div className="grid grid-cols-[minmax(0,1fr)_340px] gap-6 items-start">
+        {/* ── Main column ── */}
+        <div className="space-y-6 min-w-0">
+          {/* Day header + week */}
+          <section className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-primary">{isToday ? (ar ? "اليوم" : "Today") : dayName}</p>
+                <h2 className="mt-1 font-display text-2xl font-extrabold text-slate-900">
+                  {isToday && `${dayName} · `}
+                  {selected.getDate()} {months[selected.getMonth()]} {selected.getFullYear()}
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  {stats.total === 0
+                    ? ar ? "لا مواعيد في هذا اليوم" : "No appointments this day"
+                    : ar ? `${stats.total} مواعيد في هذا اليوم` : `${stats.total} appointments this day`}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                {!isToday && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDate(todayStr)}
+                    className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 transition"
+                  >
+                    {ar ? "اليوم" : "Today"}
+                  </button>
+                )}
+                <div className="flex h-10 overflow-hidden rounded-xl border border-slate-200">
+                  <button type="button" aria-label={ar ? "الأسبوع السابق" : "Previous week"} onClick={() => shiftWeek(-1)} className="w-10 flex items-center justify-center text-slate-600 hover:bg-slate-50">
+                    {ar ? <ChevronRight className="size-4" /> : <ChevronLeft className="size-4" />}
+                  </button>
+                  <span className="w-px bg-slate-200" />
+                  <button type="button" aria-label={ar ? "الأسبوع التالي" : "Next week"} onClick={() => shiftWeek(1)} className="w-10 flex items-center justify-center text-slate-600 hover:bg-slate-50">
+                    {ar ? <ChevronLeft className="size-4" /> : <ChevronRight className="size-4" />}
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={onAdd}
+                  className="h-10 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground shadow-sm hover:opacity-90 transition flex items-center gap-1.5"
+                >
+                  <Plus className="size-4" />
+                  {ar ? "موعد جديد" : "New appointment"}
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-5 grid grid-cols-7 gap-3">
+              {week.map((d) => {
+                const ds = toDateStr(d);
+                const sel = ds === selectedDate;
+                const today = ds === todayStr;
+                const count = countOn(ds);
+                const label = DAY_LABELS[d.getDay()];
+                return (
+                  <button
+                    key={ds}
+                    type="button"
+                    onClick={() => setSelectedDate(ds)}
+                    className={cn(
+                      "rounded-2xl border px-2 py-3 text-center transition",
+                      sel
+                        ? "border-transparent bg-gradient-to-b from-blue-600 to-blue-500 text-white shadow-md shadow-blue-200"
+                        : today
+                          ? "border-blue-200 bg-blue-50/60 text-slate-800 hover:border-blue-300"
+                          : "border-slate-200 bg-white text-slate-800 hover:border-slate-300 hover:bg-slate-50",
+                    )}
+                  >
+                    <span className={cn("block text-[11px] font-bold", sel ? "text-white/80" : "text-slate-400")}>{ar ? label.ar : label.en}</span>
+                    <span className="mt-1 block font-display text-xl font-extrabold leading-none">{d.getDate()}</span>
+                    <span
+                      className={cn(
+                        "mt-2 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold",
+                        count === 0 ? (sel ? "text-white/60" : "text-slate-300") : sel ? "bg-white/20 text-white" : "bg-blue-50 text-blue-600",
+                      )}
+                    >
+                      {count === 0 ? "—" : ar ? `${count} موعد` : `${count}`}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* Stats */}
+          <div className="grid grid-cols-4 gap-4">
+            {statCards.map((c) => {
+              const period = c.key === "AM" || c.key === "PM" ? c.key : null;
+              const active = period !== null && periodFilter === period;
+              const Icon = c.icon;
+              return (
+                <button
+                  key={c.key}
+                  type="button"
+                  disabled={!period}
+                  onClick={() => period && setPeriod(period)}
+                  className={cn(
+                    "flex items-center gap-3 rounded-2xl border bg-gradient-to-br p-4 text-start shadow-sm transition",
+                    c.tint,
+                    active ? "border-primary ring-2 ring-primary/15" : "border-slate-200/80",
+                    period && !active && "hover:border-slate-300",
+                  )}
+                >
+                  <span className={cn("flex size-11 shrink-0 items-center justify-center rounded-xl", c.iconCls)}>
+                    <Icon className="size-5" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block font-display text-2xl font-extrabold leading-none text-slate-900">{c.value}</span>
+                    <span className="mt-1 block text-xs font-bold text-slate-500">{c.label}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Timeline */}
+          <section className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-sm">
+            <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-6 py-4">
+              <h3 className="flex items-center gap-2 font-display text-lg font-extrabold text-slate-900">
+                <span className="flex size-8 items-center justify-center rounded-lg bg-blue-50 text-primary">
+                  <Clock className="size-4" />
+                </span>
+                {ar ? "الجدول الزمني" : "Timeline"}
+              </h3>
+              <div className="flex rounded-xl bg-slate-100 p-1">
+                {(["AM", "PM"] as const).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPeriod(p)}
+                    className={cn(
+                      "flex h-8 items-center gap-1.5 rounded-lg px-4 text-xs font-bold transition",
+                      periodFilter === p ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700",
+                    )}
+                  >
+                    {p === "AM" ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
+                    {p === "AM" ? (ar ? "صباحاً" : "Morning") : ar ? "مساءً" : "Evening"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              {slots.map((slot) => {
+                const inSlot = sorted.filter((a) => hourSlot(a.time) === slot);
+                const current = isToday && parseInt(slot.split(":")[0], 10) === nowHour;
+                return (
+                  <div key={slot} className={cn("group grid grid-cols-[104px_1fr] border-b border-slate-100 last:border-b-0", current && "bg-blue-50/40")}>
+                    <div className={cn("relative border-e border-slate-100 px-4 py-4 text-center", current ? "bg-blue-50/70" : "bg-slate-50/50")}>
+                      {current && <span className="absolute inset-y-0 start-0 w-1 bg-primary" />}
+                      <span className={cn("block text-sm font-bold", current ? "text-primary" : "text-slate-500")}>
+                        {format12h(slot, ar)}
+                      </span>
+                      {current && <span className="mt-1 inline-block rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-white">{ar ? "الآن" : "Now"}</span>}
+                    </div>
+                    <div className="min-h-[76px] px-4 py-3">
+                      {inSlot.length === 0 ? (
+                        <button
+                          type="button"
+                          onClick={onAdd}
+                          className="flex h-full min-h-[52px] w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-transparent text-xs font-bold text-transparent transition group-hover:border-slate-200 group-hover:text-slate-400 hover:!border-primary/40 hover:!text-primary"
+                        >
+                          <Plus className="size-3.5" />
+                          {ar ? "إضافة موعد" : "Add appointment"}
+                        </button>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-3 xl:grid-cols-3">
+                          {inSlot.map((a) => (
+                            <DesktopAppointmentCard key={a.id} appt={a} ar={ar} onClick={() => onOpen(a)} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        </div>
+
+        {/* ── Side column ── */}
+        <aside className="space-y-5">
+          <section className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <button type="button" onClick={() => changeCalMonth(-1)} className="flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">
+                {ar ? <ChevronRight className="size-4" /> : <ChevronLeft className="size-4" />}
+              </button>
+              <p className="font-display text-sm font-extrabold text-slate-900">
+                {months[calDays.month]} {calDays.year}
+              </p>
+              <button type="button" onClick={() => changeCalMonth(1)} className="flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">
+                {ar ? <ChevronLeft className="size-4" /> : <ChevronRight className="size-4" />}
+              </button>
+            </div>
+            <div className="mb-1 grid grid-cols-7 gap-1">
+              {(ar ? WEEKDAYS_AR : WEEKDAYS_EN).map((d) => (
+                <span key={d} className="py-1 text-center text-[10px] font-bold text-slate-400">{d}</span>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {calDays.cells.map((d, i) => {
+                if (d === null) return <span key={`e-${i}`} />;
+                const ds = toDateStr(new Date(calDays.year, calDays.month, d));
+                const sel = ds === selectedDate;
+                const today = ds === todayStr;
+                const has = appointments.some((a) => a.date === ds);
+                return (
+                  <button
+                    key={ds}
+                    type="button"
+                    onClick={() => setSelectedDate(ds)}
+                    className={cn(
+                      "relative flex h-9 items-center justify-center rounded-lg text-sm font-semibold transition",
+                      sel ? "bg-primary text-primary-foreground shadow-sm" : today ? "bg-blue-50 text-primary" : "text-slate-700 hover:bg-slate-100",
+                    )}
+                  >
+                    {d}
+                    {has && <span className={cn("absolute bottom-1 size-1 rounded-full", sel ? "bg-white" : "bg-primary")} />}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="font-display text-sm font-extrabold text-slate-900">{ar ? "مواعيد اليوم المختار" : "This day"}</h3>
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500">{sorted.length}</span>
+            </div>
+            {sorted.length === 0 ? (
+              <div className="py-6 text-center">
+                <CalendarCheck className="mx-auto mb-2 size-8 text-slate-300" />
+                <p className="text-xs font-bold text-slate-400">{ar ? "لا توجد مواعيد" : "Nothing booked"}</p>
+                <button type="button" onClick={onAdd} className="mt-3 text-xs font-bold text-primary hover:underline">
+                  {ar ? "+ إضافة موعد" : "+ Add one"}
+                </button>
+              </div>
+            ) : (
+              <ul className="space-y-1.5">
+                {sorted.map((a) => (
+                  <li key={a.id}>
+                    <button type="button" onClick={() => onOpen(a)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-start hover:bg-slate-50 transition">
+                      <span className={cn("size-2 shrink-0 rounded-full", stripeOf(a).dot)} />
+                      <span className="w-[68px] shrink-0 text-xs font-bold text-slate-500">{format12h(hourSlot(a.time).replace(":00", ":" + ((a.time || "00:00").split(":")[1] ?? "00")), ar)}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-slate-800">{a.patientName}</span>
+                        <span className="block truncate text-[11px] text-slate-400">{a.treatment}</span>
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm">
+            <h3 className="mb-3 font-display text-sm font-extrabold text-slate-900">{ar ? "دليل الألوان" : "Status colours"}</h3>
+            <div className="grid grid-cols-2 gap-2">
+              {LEGEND.map((l) => (
+                <span key={l.key} className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+                  <span className={cn("size-2.5 rounded-full", STRIPE[l.key].dot)} />
+                  {ar ? l.key : l.en}
+                </span>
+              ))}
+            </div>
+          </section>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+function DesktopAppointmentCard({ appt, ar, onClick }: { appt: Appointment; ar: boolean; onClick: () => void }) {
+  const theme = statusTheme(appt);
+  const StatusIcon = theme.icon;
+  const TreatmentIcon = treatmentIcon(appt.treatment);
+  const initial = appt.patientName.trim().charAt(0) || "؟";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex w-full items-center gap-3 rounded-2xl border border-s-4 bg-white p-3 text-start shadow-sm transition hover:-translate-y-0.5 hover:shadow-md",
+        "border-slate-200/80",
+        stripeOf(appt).stripe,
+      )}
+    >
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-slate-100 to-slate-200 text-sm font-bold text-slate-700">
+        {initial}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-bold text-slate-900">{appt.patientName}</span>
+        <span className="mt-0.5 flex items-center gap-1 truncate text-xs text-slate-500">
+          <TreatmentIcon className="size-3.5 shrink-0 text-blue-500" />
+          <span className="truncate">{appt.treatment}</span>
+        </span>
+      </span>
+      <span className="flex shrink-0 flex-col items-end gap-1">
+        <span className="text-[11px] font-bold text-slate-400" dir="ltr">{appt.time}</span>
+        <span className={cn("flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold", theme.badge)}>
+          <StatusIcon className="size-3" />
+          {ar ? theme.label.ar : theme.label.en}
+        </span>
+      </span>
     </button>
   );
 }

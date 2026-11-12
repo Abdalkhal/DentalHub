@@ -34,6 +34,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useIsFavorited, toggleFavorite } from "@/lib/favoritesStore";
 import { ProductAddToCart } from "@/components/ProductAddToCart";
+import { PriceLock } from "@/components/PriceLock";
 
 const BRANCH_BACK_ICON: Record<string, typeof ArrowRight> = {
   rtl: ArrowRight,
@@ -370,7 +371,11 @@ function OfficePage() {
                       )}
                       <p className="font-display font-bold text-sm leading-snug line-clamp-2">{lang === "ar" ? p.ar : p.en}</p>
                       <p className="text-[11px] text-muted-foreground mt-1">{p.brand}</p>
-                      <p className="mt-1.5 font-display font-extrabold text-primary">${p.price}</p>
+                      {p.priceLocked ? (
+                        <PriceLock officeId={p.companyId} compact className="mt-1.5 self-start" />
+                      ) : (
+                        <p className="mt-1.5 font-display font-extrabold text-primary">${p.price}</p>
+                      )}
                       <ProductAddToCart
                         productId={p.id}
                         productName={lang === "ar" ? p.ar : p.en}
@@ -382,6 +387,7 @@ function OfficePage() {
                         currency={p.currency ?? "USD"}
                         inStock={p.inStock ?? true}
                         lang={lang}
+                        locked={p.priceLocked}
                       />
                     </div>
                   );

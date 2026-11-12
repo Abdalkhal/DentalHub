@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Image, Linking, Pressable, View } from 'react-native';
+import { router, type Href } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { collection, getDocs } from 'firebase/firestore';
-import { Layers, MapPin, MessageCircle, Phone } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, Layers, MapPin, MessageCircle, Phone, Plus } from 'lucide-react-native';
 
 import { Screen, Text, Spinner } from '@/components/ui';
 import { db } from '@/integrations/firebase/client';
@@ -15,6 +16,7 @@ import {
 import { useSignedImageUrls } from '@/lib/products';
 import { SurgicalGuideDetailsModal } from '@/components/SurgicalGuideDetailsModal';
 import { useI18n } from '@/lib/i18n';
+import { GradientFill } from '@/components/appointmentTheme';
 
 function systemLabel(en: string, ar: boolean): string {
   const m = SURGICAL_GUIDE_SYSTEMS.find((x) => x.en === en);
@@ -61,6 +63,33 @@ export default function SurgicalGuideScreen() {
       <Text className="mt-0.5 text-xs text-slate-500">
         {ar ? 'شركات القوالب الرقمية للزراعة' : 'Digital guide companies for implant placement'}
       </Text>
+
+      {/* Same action as the website: a guide company registers itself here. */}
+      <Pressable
+        onPress={() => router.push('/surgical-guide-create' as Href)}
+        className="mt-4 overflow-hidden rounded-3xl active:opacity-90"
+        style={{ shadowColor: '#1D4ED8', shadowOpacity: 0.25, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 5 }}
+      >
+        <GradientFill colors={['#0EA5E9', '#4338CA']} />
+        <View pointerEvents="none" style={{ position: 'absolute', top: -40, left: -30, width: 130, height: 130, borderRadius: 65, backgroundColor: 'rgba(255,255,255,0.10)' }} />
+        <View className="flex-row items-center gap-3.5 p-4">
+          <View className="h-12 w-12 items-center justify-center rounded-2xl border border-white/25 bg-white/15">
+            <Layers size={24} color="#FFFFFF" />
+            <View className="absolute -bottom-1 -right-1 h-5 w-5 items-center justify-center rounded-full bg-white">
+              <Plus size={13} color="#2563EB" strokeWidth={3} />
+            </View>
+          </View>
+          <View className="min-w-0 flex-1">
+            <Text className="text-[15px] font-extrabold text-white">{ar ? 'إضافة شركة دليل جراحي' : 'Add Surgical Guide Company'}</Text>
+            <Text className="mt-0.5 text-[11px] text-white/80">
+              {ar ? 'سجّل شركتك واعرض أعمالك لأطباء Dent Hub' : 'Register your company and show your work to Dent Hub doctors'}
+            </Text>
+          </View>
+          <View className="h-9 w-9 items-center justify-center rounded-full bg-white/15">
+            {ar ? <ChevronLeft size={20} color="#FFFFFF" /> : <ChevronRight size={20} color="#FFFFFF" />}
+          </View>
+        </View>
+      </Pressable>
 
       {isLoading ? (
         <Spinner size="small" />

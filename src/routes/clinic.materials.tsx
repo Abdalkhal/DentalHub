@@ -12,9 +12,9 @@ import { ClinicMaterials } from "@/components/ClinicMaterials";
 export const Route = createFileRoute("/clinic/materials")({
   head: () => ({
     meta: [
-      { title: "مواد العيادة | DentalHub" },
+      { title: "مواد العيادة | Dent Hub" },
       { name: "description", content: "تتبع مخزون مواد العيادة: الكمبوزيت، المخدر الموضعي، مواد الطبعة والمستهلكات." },
-      { property: "og:title", content: "مواد العيادة | DentalHub" },
+      { property: "og:title", content: "مواد العيادة | Dent Hub" },
       { property: "og:description", content: "تتبع مخزون مواد ومستهلكات العيادة." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

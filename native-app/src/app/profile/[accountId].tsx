@@ -7,6 +7,7 @@ import { Heart, MapPin, Megaphone, MessageCircle, MessageSquare, Package, Phone,
 
 import { Screen, Text, Spinner } from '@/components/ui';
 import { ProductImage } from '@/components/ProductImage';
+import { PriceLock } from '@/components/PriceLock';
 import { SendCaseModal } from '@/components/SendCaseModal';
 import { ImplantDetailView } from '@/components/ImplantDetailView';
 import { BoneGraftDetailsModal } from '@/components/BoneGraftDetailsModal';
@@ -327,9 +328,13 @@ export default function ProfileScreen() {
                           <Text className="text-xs font-bold text-slate-800" numberOfLines={2}>
                             {ar ? p.ar || p.en : p.en || p.ar}
                           </Text>
-                          <Text className="mt-1 text-xs font-extrabold text-primary">
-                            {money(p.price, p.currency)}
-                          </Text>
+                          {p.priceLocked ? (
+                            <PriceLock officeId={p.companyId} compact />
+                          ) : (
+                            <Text className="mt-1 text-xs font-extrabold text-primary">
+                              {money(p.price, p.currency)}
+                            </Text>
+                          )}
                         </View>
                       </View>
                     </Pressable>
@@ -415,9 +420,13 @@ export default function ProfileScreen() {
                     <Text className="text-xs font-bold text-slate-800" numberOfLines={2}>
                       {ar ? p.ar || p.en : p.en || p.ar}
                     </Text>
-                    <Text className="mt-1 text-xs font-extrabold text-primary">
-                      {money(p.price, p.currency)}
-                    </Text>
+                    {p.priceLocked ? (
+                      <PriceLock officeId={p.companyId} compact />
+                    ) : (
+                      <Text className="mt-1 text-xs font-extrabold text-primary">
+                        {money(p.price, p.currency)}
+                      </Text>
+                    )}
                   </View>
                 </View>
               </Pressable>

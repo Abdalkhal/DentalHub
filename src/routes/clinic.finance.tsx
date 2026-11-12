@@ -23,9 +23,9 @@ import { EmptyState, Field, Sheet, Stat, inputCls } from "./clinic.materials";
 export const Route = createFileRoute("/clinic/finance")({
   head: () => ({
     meta: [
-      { title: "المالية والحسابات | DentalHub" },
+      { title: "المالية والحسابات | Dent Hub" },
       { name: "description", content: "تتبع إيرادات العيادة والمصاريف وفواتير المختبر ومدفوعات المرضى والمتبقي." },
-      { property: "og:title", content: "المالية والحسابات | DentalHub" },
+      { property: "og:title", content: "المالية والحسابات | Dent Hub" },
       { property: "og:description", content: "إيرادات ومصاريف وفواتير العيادة." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

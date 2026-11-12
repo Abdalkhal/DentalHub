@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Image, Linking, Pressable, View } from 'react-native';
 import { collection, doc, onSnapshot, query, updateDoc, where, writeBatch } from 'firebase/firestore';
-import { Bell, BellRing, CalendarCheck2, CalendarX2, CheckCheck, MessageCircle, Package, TicketPercent, Truck } from 'lucide-react-native';
+import { Bell, BellRing, CalendarCheck2, CalendarX2, CheckCheck, Lock, LockOpen, MessageCircle, Package, TicketPercent, Truck } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 
 import { Screen, Text, Button } from '@/components/ui';
@@ -13,7 +13,7 @@ import { useI18n } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 
-type NotifType = 'order_new' | 'order_status' | 'message' | 'case_message' | 'booking_new' | 'booking_cancelled' | 'data_export' | 'clinic_team' | 'discount';
+type NotifType = 'order_new' | 'order_status' | 'message' | 'case_message' | 'booking_new' | 'booking_cancelled' | 'data_export' | 'clinic_team' | 'discount' | 'price_request' | 'price_approved';
 
 type Notif = {
   id: string;
@@ -41,6 +41,8 @@ const TYPE_META: Record<NotifType, { icon: LucideIcon; tone: string; color: stri
   data_export: { icon: Package, tone: 'bg-blue-100', color: '#2563EB' },
   clinic_team: { icon: MessageCircle, tone: 'bg-blue-100', color: '#2563EB' },
   discount: { icon: TicketPercent, tone: 'bg-emerald-100', color: '#0E6E66' },
+  price_request: { icon: Lock, tone: 'bg-amber-100', color: '#D97706' },
+  price_approved: { icon: LockOpen, tone: 'bg-emerald-100', color: '#0E6E66' },
 };
 
 // The server adds notification types as features grow. An app that doesn't
