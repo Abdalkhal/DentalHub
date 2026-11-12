@@ -38,7 +38,7 @@ export function TopBar({ title, showSearch = false, showBack = false, variant = 
             </button>
           )}
           {variant === "home" ? (
-            <Link to="/" className="flex items-center gap-1 font-display font-extrabold text-lg">
+            <Link to="/" dir="ltr" className="flex items-center gap-1 font-display font-extrabold text-lg">
               <span className="text-foreground">Dent</span>
               <span className="text-primary">Hub</span>
             </Link>

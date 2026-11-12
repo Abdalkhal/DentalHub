@@ -1,7 +1,9 @@
+import { useContext } from "react";
 import { View, type ViewProps } from "react-native";
 import { KeyboardAwareScrollView } from "./KeyboardAwareScrollView";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { cn } from "@/lib/utils";
+import { HasHeaderContext } from "./headerContext";
 
 type ScreenProps = ViewProps & {
   scroll?: boolean;
@@ -23,9 +25,11 @@ type ScreenProps = ViewProps & {
 // the keyboard on every page built on Screen.
 export function Screen({ scroll = true, padded = true, className, children, ...props }: ScreenProps) {
   const inner = padded ? "px-4 pt-4 pb-8" : "flex-1";
+  // Under a header the top inset is already taken care of (see headerContext).
+  const edges = useContext(HasHeaderContext) ? (["left", "right", "bottom"] as const) : undefined;
   if (!scroll) {
     return (
-      <SafeAreaView className="flex-1 bg-background" style={{ flex: 1 }}>
+      <SafeAreaView className="flex-1 bg-background" style={{ flex: 1 }} edges={edges}>
         <View className={cn(inner, "flex-1", className)} {...props}>
           {children}
         </View>
@@ -33,7 +37,7 @@ export function Screen({ scroll = true, padded = true, className, children, ...p
     );
   }
   return (
-    <SafeAreaView className="flex-1 bg-background" style={{ flex: 1 }}>
+    <SafeAreaView className="flex-1 bg-background" style={{ flex: 1 }} edges={edges}>
       <KeyboardAwareScrollView
         bottomOffset={24}
         keyboardShouldPersistTaps="handled"

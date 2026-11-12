@@ -137,7 +137,7 @@ export function DashboardHome() {
           {/* ==================== TOP HEADER ==================== */}
           <header className="sticky top-0 z-20 bg-background/90 backdrop-blur border-b border-border px-4 pt-4 pb-3">
             <div className="flex items-center justify-between gap-3 mb-3">
-              <div className="flex items-center gap-2 font-display font-extrabold text-lg">
+              <div dir="ltr" className="flex items-center gap-2 font-display font-extrabold text-lg">
                 <span className="text-foreground">Dent</span>
                 <span className="text-primary">Hub</span>
               </div>

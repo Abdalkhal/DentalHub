@@ -86,7 +86,14 @@ function Select({
   );
 }
 
-export function AddAppointmentModal({ onClose }: { onClose: () => void }) {
+/** `patient`: opened from a patient's page — the name and phone are filled in and the visit is linked to them. */
+export function AddAppointmentModal({
+  onClose,
+  patient,
+}: {
+  onClose: () => void;
+  patient?: { id: string; name: string; phone?: string };
+}) {
   const { lang } = useI18n();
   const ar = lang === "ar";
   const { role } = useUserRole();
@@ -103,8 +110,8 @@ export function AddAppointmentModal({ onClose }: { onClose: () => void }) {
     return list;
   }, [doctors, mainDoctor, team.active]);
 
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
+  const [name, setName] = useState(patient?.name ?? "");
+  const [phone, setPhone] = useState(patient?.phone ?? "");
   const [date, setDate] = useState(toDateStr(new Date()));
   const [showCalendar, setShowCalendar] = useState(false);
   const [calMonth, setCalMonth] = useState(() => {
@@ -165,6 +172,7 @@ export function AddAppointmentModal({ onClose }: { onClose: () => void }) {
       notes: notes.trim(),
       reminder,
       status: "confirmed",
+      ...(patient && name.trim() === patient.name.trim() ? { patientId: patient.id } : {}),
     });
     toast.success(ar ? "تم إضافة الموعد بنجاح" : "Appointment added successfully");
     onClose();

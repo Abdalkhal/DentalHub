@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { KeyboardAwareScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -105,7 +105,16 @@ function FieldLabel({ children }: { children: string }) {
   return <Text className="mb-1.5 text-[11px] font-bold text-slate-500">{children}</Text>;
 }
 
-export function AddAppointmentModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+/** `patient`: opened from a patient's page — the name and phone are filled in and the visit is linked to them. */
+export function AddAppointmentModal({
+  open,
+  onClose,
+  patient,
+}: {
+  open: boolean;
+  onClose: () => void;
+  patient?: { id: string; name: string; phone?: string };
+}) {
   const { lang } = useI18n();
   const ar = lang === 'ar';
   const { role } = useUserRole();
@@ -135,6 +144,12 @@ export function AddAppointmentModal({ open, onClose }: { open: boolean; onClose:
   const [treatment, setTreatment] = useState(TREATMENTS[0]);
   const [notes, setNotes] = useState('');
   const [reminder, setReminder] = useState(true);
+  useEffect(() => {
+    if (open && patient) {
+      setName(patient.name);
+      setPhone(patient.phone ?? '');
+    }
+  }, [open, patient?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const formatFullTime = (): string => {
     const digits = time.replace(/\D/g, '');
@@ -177,6 +192,7 @@ export function AddAppointmentModal({ open, onClose }: { open: boolean; onClose:
       notes: notes.trim(),
       reminder,
       status: 'confirmed',
+      ...(patient && name.trim() === patient.name.trim() ? { patientId: patient.id } : {}),
     });
     toast.success(ar ? 'تم إضافة الموعد بنجاح' : 'Appointment added successfully');
     reset();

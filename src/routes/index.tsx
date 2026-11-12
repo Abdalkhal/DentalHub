@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import logoMark from "@/assets/logo-mark.png";
 import { PriceLock } from "@/components/PriceLock";
 import { MobileShell } from "@/components/MobileShell";
 import { useI18n } from "@/lib/i18n";
@@ -23,9 +24,8 @@ import { useVendorAccounts } from "@/lib/search";
 import { useProductSearch, useSignedImageUrls } from "@/lib/products";
 import { useActiveAds, type Ad } from "@/lib/adsStore";
 import { useQuickOrderActions } from "@/lib/quickOrders";
-import { useCart, openCart } from "@/lib/cartStore";
 import {
-  Globe, Search, ChevronLeft, ChevronRight, X, MapPin, FlaskConical, ShoppingCart,
+  Globe, Search, ChevronLeft, ChevronRight, X, MapPin, FlaskConical,
   ClipboardList, Sparkles, Stethoscope, User, Package, Megaphone,
 } from "lucide-react";
 
@@ -181,7 +181,6 @@ function DentistHome() {
 
   const quickItems = useQuickOrders();
   const { reorder } = useQuickOrderActions(quickItems, lang === "ar");
-  const cartCount = useCart().length;
   const { offers: implantOffers = [] } = useImplantOffers();
   const latestOffer = implantOffers[0];
   const quickPages = quickItems.length > 0 ? Array.from({ length: Math.ceil(quickItems.length / 3) }, (_, i) => quickItems.slice(i * 3, i * 3 + 3)) : [];
@@ -234,24 +233,11 @@ function DentistHome() {
           md:+ : one utility bar, with the search as its centrepiece and the
           actions pushed to the end edge. */}
       <header className="px-3 pt-4 pb-2 bg-gradient-to-b from-sky-50 to-transparent md:px-6 md:pt-6 md:pb-5 md:flex md:items-center md:gap-5 lg:px-8 lg:max-w-7xl lg:mx-auto lg:w-full">
-        <div className="flex items-center justify-between gap-2 md:contents">
-          <div className="flex items-center gap-2 md:order-3">
-            {role?.accountType === "dentist" && (
-              <button
-                type="button"
-                onClick={openCart}
-                className="relative size-10 rounded-xl border border-slate-200 bg-white shadow-sm hover:bg-slate-100 text-slate-600 flex items-center justify-center"
-                aria-label={lang === "ar" ? "السلة" : "Cart"}
-              >
-                <ShoppingCart className="size-[18px]" />
-                {cartCount > 0 && (
-                  <span className="absolute -top-1 -end-1 h-5 min-w-5 px-1 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center">
-                    {cartCount > 9 ? "9+" : cartCount}
-                  </span>
-                )}
-              </button>
-            )}
-            <button onClick={toggle} className="h-9 px-2.5 rounded-full bg-white border border-slate-200 flex items-center gap-1 text-xs font-bold text-slate-700 shadow-sm md:h-10 md:px-3.5">
+        {/* Phones: three columns, the outer two equal, so the logo sits in the
+            exact middle whatever the side buttons measure. */}
+        <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 pb-3 md:contents">
+          <div className="flex items-center gap-1.5 justify-self-start md:order-3 md:gap-2">
+            <button onClick={toggle} className="h-9 px-2 rounded-full bg-white border border-slate-200 flex items-center gap-1 text-xs font-bold text-slate-700 shadow-sm md:h-10 md:px-3.5">
               <span>{lang === "ar" ? "EN" : "AR"}</span>
               <Globe className="size-3.5 text-slate-400" />
             </button>
@@ -260,12 +246,19 @@ function DentistHome() {
 
           {/* The fixed lg:+ header already carries the wordmark, so it only
               needs to appear here on phones and tablets. */}
-          <Link className="flex items-center gap-1.5 font-display font-extrabold text-lg md:order-1 md:text-xl lg:hidden" to="/">
-            <span className="text-primary">Dent</span>
-            <span className="text-slate-800">Hub</span>
+          {/* The brand logo: the "D" mark with the wordmark, as in the app. */}
+          <Link dir="ltr" className="flex items-center gap-2 md:order-1 lg:hidden" to="/" aria-label="Dent Hub">
+            {/* Same size as the account circle (44px). */}
+            <img src={logoMark} alt="" className="size-11 rounded-xl shadow-[0_3px_8px_rgba(29,78,216,0.22)]" />
+            <span className="flex flex-col leading-none">
+              <span className="font-display text-[19px] font-extrabold tracking-tight">
+                <span className="text-[#1D6FE8]">Dent</span> <span className="text-[#0F2747]">Hub</span>
+              </span>
+              <span className="mt-1 text-[7.5px] font-bold tracking-[0.14em] text-[#0F2747]/70">DENTAL MARKETPLACE</span>
+            </span>
           </Link>
 
-          <Link to="/account" className="flex flex-col items-center gap-0.5 shrink-0 md:order-4 md:flex-row md:gap-2.5 md:bg-white md:border md:border-slate-200 md:rounded-full md:ps-1 md:pe-4 md:py-1 md:shadow-sm md:hover:bg-slate-50 md:transition">
+          <Link to="/account" className="relative justify-self-end flex flex-col items-center gap-0.5 shrink-0 md:order-4 md:flex-row md:gap-2.5 md:bg-white md:border md:border-slate-200 md:rounded-full md:ps-1 md:pe-4 md:py-1 md:shadow-sm md:hover:bg-slate-50 md:transition">
             <span className="size-11 rounded-full overflow-hidden ring-2 ring-primary shadow-sm bg-primary/10 flex items-center justify-center md:size-9 md:ring-1">
               {/* The account photo was never shown here — always the placeholder icon. */}
               {role?.photoURL ? (
@@ -274,7 +267,8 @@ function DentistHome() {
                 <User className="size-5 text-primary md:size-4" />
               )}
             </span>
-            <span className="text-[10px] font-bold text-slate-700 md:text-[13px]">{lang === "ar" ? "حسابي" : "Account"}</span>
+            {/* Phones: the label hangs under the circle, so the circle (not circle + label) lines up with the logo. */}
+            <span className="absolute top-full mt-0.5 whitespace-nowrap text-[10px] font-bold text-slate-700 md:static md:mt-0 md:text-[13px]">{lang === "ar" ? "حسابي" : "Account"}</span>
           </Link>
         </div>
 

@@ -34,7 +34,12 @@ import {
   TicketPercent,
   Lock,
   Library,
+  BadgeCheck,
+  Package,
+  ChevronLeft,
+  User,
 } from "lucide-react";
+import { groupMenu, MENU_GROUPS } from "@/lib/menuGroups";
 import { openCart } from "@/lib/cartStore";
 
 export const Route = createFileRoute("/more")({
@@ -259,8 +264,8 @@ function More() {
     { to: "/track-cases", icon: ListChecks, label: ar ? "تتبع الحالات" : "Track Cases", tone: "", roles: ["dentist"] },
     { to: "/favorites", icon: Heart, label: ar ? "المفضلة" : "Favorites", tone: "", roles: ["dentist"] },
     { to: "/offers", icon: Tag, label: ar ? "العروض" : "Offers", tone: "", roles: ["dentist"] },
-    { to: "/brands", icon: Crown, label: ar ? "البراندات" : "Brands", tone: "", roles: ["dentist"] },
-    { to: "/supplies", icon: ShoppingBag, label: ar ? "المستلزمات" : "Supplies", tone: "", roles: ["dentist"] },
+    { to: "/brands", icon: BadgeCheck, label: ar ? "البراندات" : "Brands", tone: "", roles: ["dentist"] },
+    { to: "/supplies", icon: Package, label: ar ? "المستلزمات" : "Supplies", tone: "", roles: ["dentist"] },
     { to: "/my-ads", icon: Megaphone, label: ar ? "إعلاناتي" : "My Ads", tone: "", roles: ["dentist"] },
     { to: "/messages", icon: MessageSquare, label: ar ? "الرسائل" : "Messages", tone: "", roles: ["dentist"] },
     { to: "/notifications", icon: Bell, label: ar ? "الإشعارات" : "Notifications", tone: "", roles: ["dentist"] },
@@ -332,70 +337,93 @@ function More() {
       : nativeLinks
     : allLinks.filter((l) => l.roles.some((r) => isRole(r)));
 
+  // The cart opens the drawer instead of a page; it sits in the shopping group.
+  const withCart: MoreLink[] =
+    isDentist && !labStaff
+      ? [...links, { to: "/cart", icon: ShoppingCart, label: ar ? "السلة" : "Cart", tone: "", roles: ["dentist"] }]
+      : links;
+  const groupType = labStaff ? "lab" : accountType;
+  const groups = groupMenu(withCart, groupType);
+  const name = [role?.name, role?.surname].filter(Boolean).join(" ").trim();
+  const roleLabel = isAdmin
+    ? ar ? "مدير النظام" : "Admin"
+    : accountType === "dentist" ? (ar ? "طبيب أسنان" : "Dentist")
+    : accountType === "supply" ? (ar ? "مكتب مستلزمات" : "Supply Office")
+    : accountType === "lab" ? (ar ? "مختبر" : "Lab")
+    : accountType === "implant" ? (ar ? "شركة زرعات" : "Implant Company")
+    : accountType;
+  const Chevron = ar ? ChevronLeft : ChevronRight;
+  const rowCls = "w-full flex items-center gap-3 px-3.5 py-3 text-start transition-colors hover:bg-[#F5F9FF]";
+
   return (
     <MobileShell wide>
       <TopBar title={t("tab_more")} wide />
-      <div className="px-4 pt-4 pb-4 space-y-4 md:px-6 md:pt-8 lg:px-0 lg:max-w-5xl lg:mx-auto lg:pt-10">
-        {/* Role badge */}
-        <div className="flex items-center gap-2 px-1">
-          <span className="text-xs font-bold text-slate-500 lg:text-sm">
-            {ar ? "الحساب:" : "Account:"}
+      <div className="px-4 pt-4 pb-6 space-y-5 md:px-6 md:pt-8 lg:px-0 lg:max-w-5xl lg:mx-auto lg:pt-10">
+        {/* Who is signed in: photo in the blue circle (as on Home), name and account type. */}
+        <Link
+          to="/account"
+          className="flex items-center gap-3 rounded-[20px] border border-[#DCE7F5] bg-white p-3.5 shadow-[0_4px_14px_-8px_rgba(30,58,138,0.25)] transition hover:border-[#1D6FE8]/40 md:max-w-md"
+        >
+          <span className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-[#1D6FE8] text-white shadow-[0_4px_10px_-4px_rgba(29,78,216,0.6)]">
+            {role?.photoURL ? <img src={role.photoURL} alt="" className="size-full object-cover" /> : <User className="size-6" strokeWidth={2.3} />}
           </span>
-          <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-sky-50 text-sky-700 lg:text-sm">
-            {isAdmin
-              ? ar ? "مدير النظام" : "Admin"
-              : accountType === "dentist" ? (ar ? "طبيب أسنان" : "Dentist")
-              : accountType === "supply" ? (ar ? "مكتب مستلزمات" : "Supply Office")
-              : accountType === "lab" ? (ar ? "مختبر" : "Lab")
-              : accountType === "implant" ? (ar ? "شركة زرعات" : "Implant Company")
-              : accountType}
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-display text-[16px] font-extrabold text-[#0F2747]">{name || (ar ? "حسابي" : "My account")}</span>
+            <span className="mt-1 inline-block rounded-full bg-[#E8F1FE] px-2.5 py-0.5 text-[11px] font-bold text-[#1D6FE8]">{roleLabel}</span>
           </span>
-        </div>
+          <Chevron className="size-5 shrink-0 text-slate-500" />
+        </Link>
 
-        <ul className="bg-card border border-border rounded-2xl divide-y divide-border overflow-hidden shadow-soft md:bg-transparent md:border-0 md:divide-y-0 md:shadow-none md:grid md:grid-cols-3 md:gap-3 lg:grid-cols-4">
-          {links.map((l) => (
-            <li key={l.to} className="md:bg-card md:border md:border-border md:rounded-2xl md:shadow-soft md:overflow-hidden">
-              <Link
-                to={l.to}
-                className="flex items-center gap-3 px-4 py-3.5 hover:bg-accent transition-colors md:flex-col md:justify-center md:gap-2.5 md:py-6 md:text-center"
-              >
-                <span className="relative size-10 rounded-2xl ring-1 shadow-sm flex items-center justify-center shrink-0 md:size-12" style={{ backgroundColor: "oklch(0.98 0.01 240)" }}>
-                  <l.icon className="size-5 drop-shadow-sm md:size-6" strokeWidth={2} />
-                  {l.to === "/clinic" && materialsBadge > 0 && <span className="absolute -end-0.5 -top-0.5 size-2.5 rounded-full bg-rose-600 ring-2 ring-white" />}
-                </span>
-                <span className="flex-1 text-sm font-semibold text-slate-700 md:flex-none md:text-base">{l.label}</span>
-                <ChevronRight className="size-4 text-slate-300 md:hidden" />
-              </Link>
-            </li>
-          ))}
-          {isDentist && !labStaff && (
-            <li className="md:bg-card md:border md:border-border md:rounded-2xl md:shadow-soft md:overflow-hidden">
-              <button
-                type="button"
-                onClick={openCart}
-                className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-accent transition-colors text-start md:flex-col md:justify-center md:gap-2.5 md:py-6 md:text-center"
-              >
-                <span className="size-10 rounded-2xl ring-1 shadow-sm flex items-center justify-center shrink-0 md:size-12" style={{ backgroundColor: "oklch(0.98 0.01 240)" }}>
-                  <ShoppingCart className="size-5 drop-shadow-sm md:size-6" strokeWidth={2} />
-                </span>
-                <span className="flex-1 text-sm font-semibold text-slate-700 md:flex-none md:text-base">{ar ? "السلة" : "Cart"}</span>
-                <ChevronRight className="size-4 text-slate-300 md:hidden" />
-              </button>
-            </li>
-          )}
-        </ul>
+        {/* The menu in groups, each with a heading and one icon colour. */}
+        <div className="space-y-5 md:grid md:grid-cols-2 md:gap-5 md:space-y-0 lg:grid-cols-3">
+          {groups.map((g) => {
+            const meta = MENU_GROUPS[g.key];
+            return (
+              <section key={g.key}>
+                <h3 className="mb-2 px-1 text-[12px] font-extrabold text-[#5B6B82]">{ar ? meta.ar : meta.en}</h3>
+                <ul className="overflow-hidden rounded-[20px] border border-[#DCE7F5] bg-white shadow-[0_4px_14px_-8px_rgba(30,58,138,0.2)] divide-y divide-[#EEF3FA]">
+                  {g.items.map((l) => {
+                    const inner = (
+                      <>
+                        <span className="relative flex size-11 shrink-0 items-center justify-center rounded-2xl" style={{ backgroundColor: meta.bg, color: meta.fg }}>
+                          <l.icon className="size-[22px]" strokeWidth={2.3} />
+                          {l.to === "/clinic" && materialsBadge > 0 && <span className="absolute -end-0.5 -top-0.5 size-3 rounded-full bg-rose-600 ring-2 ring-white" />}
+                        </span>
+                        <span className="flex-1 text-[14.5px] font-bold text-[#0F2747]">{l.label}</span>
+                        <Chevron className="size-[18px] shrink-0 text-slate-400" />
+                      </>
+                    );
+                    return (
+                      <li key={l.to}>
+                        {l.to === "/cart" ? (
+                          <button type="button" onClick={openCart} className={rowCls}>
+                            {inner}
+                          </button>
+                        ) : (
+                          <Link to={l.to} className={rowCls}>
+                            {inner}
+                          </Link>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            );
+          })}
+        </div>
 
         <button
           onClick={toggle}
-          className="w-full flex items-center gap-3 bg-card border border-border rounded-2xl px-4 py-3.5 shadow-soft hover:bg-accent transition-colors md:max-w-sm"
+          className="w-full flex items-center gap-3 rounded-[20px] border border-[#DCE7F5] bg-white px-3.5 py-3 transition-colors hover:bg-[#F5F9FF] md:max-w-sm"
         >
-          <span className="size-10 rounded-2xl ring-1 shadow-sm flex items-center justify-center bg-emerald-50 ring-emerald-200 text-emerald-600">
-            <Globe className="size-5 drop-shadow-sm" strokeWidth={2} />
+          <span className="flex size-11 items-center justify-center rounded-2xl bg-[#E8F1FE] text-[#1D6FE8]">
+            <Globe className="size-[22px]" strokeWidth={2.3} />
           </span>
-          <span className="flex-1 text-sm font-semibold text-start">
+          <span className="flex-1 text-[14.5px] font-bold text-start text-[#0F2747]">
             {t("language")} · {lang === "ar" ? "العربية" : "English"}
           </span>
-          <span className="text-xs font-bold text-primary">{lang === "ar" ? "EN" : "AR"}</span>
+          <span className="rounded-full bg-[#E8F1FE] px-2.5 py-1 text-xs font-extrabold text-[#1D6FE8]">{lang === "ar" ? "EN" : "AR"}</span>
         </button>
       </div>
     </MobileShell>

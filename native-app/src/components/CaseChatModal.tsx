@@ -17,6 +17,7 @@ import {
   Pause,
   Play,
   Send,
+  SendHorizontal,
   X,
 } from 'lucide-react-native';
 
@@ -581,7 +582,7 @@ export function CaseChatModal({
             )}
             {canSend ? (
               <Pressable onPress={() => send()} disabled={sending} className="h-11 w-11 items-center justify-center rounded-2xl" style={{ backgroundColor: BLUE }}>
-                {sending ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Send size={17} color="#FFFFFF" style={{ transform: [{ scaleX: ar ? -1 : 1 }] }} />}
+                {sending ? <ActivityIndicator size="small" color="#FFFFFF" /> : <SendHorizontal size={21} strokeWidth={2.4} color="#FFFFFF" style={{ transform: [{ scaleX: ar ? -1 : 1 }] }} />}
               </Pressable>
             ) : VoiceRecorder ? (
               <VoiceRecorder

@@ -10,7 +10,12 @@ module.exports = {
   expo: {
     name: "Dent Hub",
     slug: "native-app",
-    version: "1.0.2",
+    // OTA_APP_VERSION publishes an update for an older store build: the
+    // runtime follows the app version (runtimeVersion policy "appVersion"), so
+    // phones still on 1.0.1 only get updates published as 1.0.1, e.g.
+    //   OTA_APP_VERSION=1.0.1 npx eas-cli update --skip-bundler ...
+    // Builds always use the version below.
+    version: process.env.OTA_APP_VERSION || "1.0.2",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
     scheme: "dentalhub",

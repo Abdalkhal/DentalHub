@@ -25,7 +25,6 @@ import {
 } from 'lucide-react-native';
 
 import { Screen, Card, Button, Spinner, Text } from '@/components/ui';
-import { CartHeaderButton } from '@/components/CartHeaderButton';
 import { useUnreadNotificationsCount } from '@/lib/notifications';
 import { useLabStaffClaim, useUserRole, useSession } from '@/lib/useAuth';
 import SuppliesOfficeScreen from './supplies-office';
@@ -326,32 +325,50 @@ export default function HomeScreen() {
   return (
     <>
     <Screen>
-      {/* 1 — Header */}
-      <View className="flex-row items-center justify-between">
-        <Pressable onPress={() => router.push('/account')} className="items-center">
-          {/* The account photo was never shown here — always the placeholder icon. */}
-          <View
-            className="h-[42px] w-[42px] items-center justify-center overflow-hidden rounded-full bg-white"
-            style={{ borderWidth: 2, borderColor: '#BFD6F6', ...softShadow }}
-          >
-            {role?.photoURL ? (
-              <Image source={{ uri: role.photoURL }} style={{ width: 38, height: 38, borderRadius: 19 }} resizeMode="cover" />
-            ) : (
-              <User size={18} color={NAVY} />
-            )}
-          </View>
-          <Text className="mt-0.5 text-[9px] font-bold" style={{ color: MUTED }}>
-            {ar ? 'حسابي' : 'Account'}
-          </Text>
-        </Pressable>
+      {/* 1 — Header: account on one side, the logo in the exact centre (both
+          sides take equal room), language and notifications on the other.
+          The cart is a floating button that appears once something is in it. */}
+      <View className="flex-row items-center pb-2.5">
+        <View className="flex-1 items-start">
+          <Pressable onPress={() => router.push('/account')} className="items-center" accessibilityLabel={ar ? 'حسابي' : 'Account'} hitSlop={{ bottom: 14 }}>
+            <View
+              className="h-11 w-11 items-center justify-center overflow-hidden rounded-full"
+              style={{
+                backgroundColor: BLUE,
+                borderWidth: 2,
+                borderColor: '#FFFFFF',
+                shadowColor: '#1D4ED8',
+                shadowOpacity: 0.3,
+                shadowRadius: 8,
+                shadowOffset: { width: 0, height: 3 },
+                elevation: 4,
+              }}
+            >
+              {role?.photoURL ? (
+                <Image source={{ uri: role.photoURL }} style={{ width: 40, height: 40, borderRadius: 20 }} resizeMode="cover" />
+              ) : (
+                <User size={20} color="#FFFFFF" strokeWidth={2.4} />
+              )}
+            </View>
+            {/* The label hangs under the circle, so the circle (not circle + label) lines up with the logo. */}
+            <Text
+              numberOfLines={1}
+              className="text-[9px] font-bold"
+              style={{ color: MUTED, position: 'absolute', top: 46, left: -10, right: -10, textAlign: 'center' }}
+            >
+              {ar ? 'حسابي' : 'Account'}
+            </Text>
+          </Pressable>
+        </View>
 
         {/* Brand: the app icon's "D" mark next to the wordmark, always laid out left-to-right. */}
         <View className="flex-row items-center gap-2" style={{ direction: 'ltr' }}>
+          {/* Same size as the account circle (44). */}
           <View
-            className="h-10 w-10 overflow-hidden rounded-xl bg-white"
+            className="h-11 w-11 overflow-hidden rounded-xl bg-white"
             style={{ shadowColor: '#1D4ED8', shadowOpacity: 0.22, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 4 }}
           >
-            <Image source={LOGO_MARK} style={{ width: 40, height: 40 }} resizeMode="cover" />
+            <Image source={LOGO_MARK} style={{ width: 44, height: 44 }} resizeMode="cover" />
           </View>
           <View>
             <Text className="text-[18px] font-extrabold leading-[22px]" style={{ letterSpacing: -0.4 }}>
@@ -364,13 +381,13 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        <View className="flex-row items-center gap-1.5">
-          {isDentist && <CartHeaderButton className="h-[38px] w-[38px] border bg-white" style={{ borderColor: LINE, ...softShadow }} color={NAVY} />}
+        <View className="flex-1 flex-row items-center justify-end gap-1.5">
           {!isGuest && (
             <Pressable
               onPress={() => router.push('/notifications')}
               className="relative h-[38px] w-[38px] items-center justify-center rounded-full border bg-white"
               style={{ borderColor: LINE, ...softShadow }}
+              accessibilityLabel={ar ? 'الإشعارات' : 'Notifications'}
             >
               <Bell size={17} color={NAVY} />
               {unreadCount > 0 && (

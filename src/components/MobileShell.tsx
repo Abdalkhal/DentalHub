@@ -65,7 +65,7 @@ export function MobileShell({
   const dentistDesktop = isWide && !noNav && role?.accountType === "dentist";
 
   return (
-    <div className="min-h-screen w-full bg-slate-50 overflow-x-hidden flex justify-center">
+    <div className="min-h-screen w-full bg-slate-50 overflow-x-clip flex justify-center">
       <div
         className={cn(
           "relative w-full min-h-screen flex flex-col bg-[#E6F0FF]",
@@ -219,14 +219,18 @@ function BottomTabBar({
           })}
         </ul>
 
+        {/* The cart: a floating blue button once something is in it; it goes
+            away when the cart empties (order placed, or items removed). */}
         {cartCount > 0 && (
           <button
+            key="cart-fab"
             onClick={onCartClick}
-            className="absolute -top-5 right-4 size-12 rounded-2xl bg-[#0E6E66] text-white shadow-lg flex items-center justify-center hover:bg-[#0B5952] transition active:scale-95"
+            aria-label={`Cart, ${cartCount}`}
+            className="absolute -top-[74px] end-4 size-14 rounded-full border-[3px] border-white bg-[#1D6FE8] text-white shadow-[0_10px_24px_-8px_rgba(29,78,216,0.75)] flex items-center justify-center transition hover:brightness-110 active:scale-95 animate-in zoom-in-50 fade-in duration-300"
           >
-            <ShoppingCart className="size-5" />
-            <span className="absolute -top-1 -right-1 size-5 rounded-full bg-white text-[#0E6E66] text-[10px] font-extrabold flex items-center justify-center ring-2 ring-[#0E6E66]">
-              {cartCount > 9 ? "9+" : cartCount}
+            <ShoppingCart key={cartCount} className="size-6 animate-in zoom-in-75 duration-200" />
+            <span className="absolute -top-1.5 -end-1.5 h-6 min-w-6 px-1 rounded-full bg-white text-[#1D6FE8] text-[11px] font-extrabold flex items-center justify-center ring-2 ring-[#1D6FE8]">
+              {cartCount > 99 ? "99+" : cartCount}
             </span>
           </button>
         )}

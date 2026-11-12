@@ -1,10 +1,11 @@
-import { Pressable, View } from 'react-native';
+import { Image, Pressable, View } from 'react-native';
 import { router } from 'expo-router';
 import {
   Bell,
+  BadgeCheck,
   ChevronLeft,
+  ChevronRight,
   Cog,
-  Crown,
   FileText,
   FlaskConical,
   Globe,
@@ -17,11 +18,12 @@ import {
   PenTool,
   Shield,
   ShieldCheck,
-  ShoppingBag,
+  Package,
   ShoppingCart,
   Store,
   Stethoscope,
   Tag,
+  User,
   Users,
   TicketPercent,
   Lock,
@@ -32,7 +34,7 @@ import { Screen, Text } from '@/components/ui';
 import { useIsAdmin, useLabStaffClaim, useUserRole } from '@/lib/useAuth';
 import { useMaterialsBadge } from '@/lib/materialsStore';
 import { useI18n } from '@/lib/i18n';
-import { cn } from '@/lib/utils';
+import { groupMenu, MENU_GROUPS } from '@/lib/menuGroups';
 
 const ROLE_AR: Record<string, string> = {
   dentist: 'طبيب أسنان',
@@ -60,8 +62,8 @@ const ITEMS: Record<string, Item[]> = {
     { icon: ListChecks, ar: 'تتبع الحالات', en: 'Track Cases', to: '/track-cases' },
     { icon: Heart, ar: 'المفضلة', en: 'Favorites', to: '/favorites' },
     { icon: Tag, ar: 'العروض', en: 'Offers', to: '/offers' },
-    { icon: Crown, ar: 'البراندات', en: 'Brands', to: '/brands' },
-    { icon: ShoppingBag, ar: 'المستلزمات', en: 'Supplies', to: '/supplies' },
+    { icon: BadgeCheck, ar: 'البراندات', en: 'Brands', to: '/brands' },
+    { icon: Package, ar: 'المستلزمات', en: 'Supplies', to: '/supplies' },
     { icon: Megaphone, ar: 'إعلاناتي', en: 'My Ads', to: '/my-ads' },
     { icon: MessageSquare, ar: 'الرسائل', en: 'Messages', to: '/messages' },
     { icon: Bell, ar: 'الإشعارات', en: 'Notifications', to: '/notifications' },
@@ -119,7 +121,7 @@ const ITEMS: Record<string, Item[]> = {
   // Signed-out visitors: only the catalog screens they can open without an
   // account (see lib/guestAccess.ts).
   guest: [
-    { icon: Crown, ar: 'البراندات', en: 'Brands', to: '/brands' },
+    { icon: BadgeCheck, ar: 'البراندات', en: 'Brands', to: '/brands' },
     { icon: FlaskConical, ar: 'زراعة الأسنان', en: 'Implants', to: '/implants' },
     { icon: Megaphone, ar: 'العروض', en: 'Offers', to: '/offers' },
     { icon: LifeBuoy, ar: 'المساعدة', en: 'Help', to: '/help' },
@@ -159,14 +161,40 @@ export default function MoreScreen() {
   const items = isAdmin ? [ITEMS.admin[0], ...(ITEMS[type] ?? ITEMS.dentist)] : ITEMS[type] ?? ITEMS.dentist;
   const roleLabel = (ar ? (ROLE_AR[type] ?? type) : (ROLE_EN[type] ?? type)) + (isAdmin ? (ar ? ' · مدير' : ' · Admin') : '');
 
+  const groups = groupMenu(items, type);
+  const name = [role?.name, role?.surname].filter(Boolean).join(' ').trim();
+  const Chevron = ar ? ChevronLeft : ChevronRight;
+
   return (
     <Screen>
-      <View className={cn('flex-row items-center gap-2 px-1', ar && 'flex-row-reverse')}>
-        <Text className="text-xs font-bold text-slate-500">{ar ? 'الحساب:' : 'Account:'}</Text>
-        <View className="rounded-full bg-sky-50 px-2.5 py-1">
-          <Text className="text-xs font-bold text-sky-700">{roleLabel}</Text>
+      {/* Who is signed in: photo in the blue circle (as on Home), name and account type. */}
+      <Pressable
+        onPress={() => (type === 'guest' ? router.push('/login') : router.push('/account'))}
+        className="flex-row items-center gap-3 rounded-[20px] border bg-white p-3.5"
+        style={{ borderColor: '#DCE7F5', shadowColor: '#1E3A8A', shadowOpacity: 0.07, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 2 }}
+      >
+        <View
+          className="h-14 w-14 items-center justify-center overflow-hidden rounded-full"
+          style={{ backgroundColor: '#1D6FE8', borderWidth: 2, borderColor: '#FFFFFF', shadowColor: '#1D4ED8', shadowOpacity: 0.3, shadowRadius: 6, shadowOffset: { width: 0, height: 3 }, elevation: 3 }}
+        >
+          {role?.photoURL ? (
+            <Image source={{ uri: role.photoURL }} style={{ width: 52, height: 52, borderRadius: 26 }} resizeMode="cover" />
+          ) : (
+            <User size={24} color="#FFFFFF" strokeWidth={2.3} />
+          )}
         </View>
-      </View>
+        <View className="min-w-0 flex-1">
+          <Text numberOfLines={1} className="text-[16px] font-extrabold" style={{ color: '#0F2747' }}>
+            {name || (type === 'guest' ? (ar ? 'زائر' : 'Guest') : ar ? 'حسابي' : 'My account')}
+          </Text>
+          <View className="mt-1 self-start rounded-full px-2.5 py-0.5" style={{ backgroundColor: '#E8F1FE' }}>
+            <Text className="text-[11px] font-bold" style={{ color: '#1D6FE8' }}>
+              {roleLabel}
+            </Text>
+          </View>
+        </View>
+        <Chevron size={20} color="#64748B" />
+      </Pressable>
 
       {type === 'guest' && (
         <Pressable
@@ -178,41 +206,61 @@ export default function MoreScreen() {
         </Pressable>
       )}
 
-      <View className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-card shadow-sm">
-        {items.map((it, i) => {
-          const Icon = it.icon;
-          return (
-            <View key={it.en}>
-              <Pressable
-                onPress={() => router.push(it.to as never)}
-                className="flex-row items-center gap-3 px-4 py-3.5"
-              >
-                <View className="h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50">
-                  <Icon size={19} color="#334155" strokeWidth={2} />
-                  {it.to === '/clinic' && materialsBadge > 0 && (
-                    <View className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-rose-600" style={{ borderWidth: 1.5, borderColor: '#FFFFFF' }} />
-                  )}
-                </View>
-                <Text className="flex-1 text-sm font-bold text-slate-700">{ar ? it.ar : it.en}</Text>
-                <ChevronLeft size={16} color="#CBD5E1" />
-              </Pressable>
-              {i < items.length - 1 && <View className="ml-16 mr-4 h-px bg-slate-100" />}
+      {/* The menu in groups, each with a heading and one icon colour. */}
+      {groups.map((g) => {
+        const meta = MENU_GROUPS[g.key];
+        return (
+          <View key={g.key} className="mt-5">
+            <Text className="mb-2 px-1 text-[12px] font-extrabold" style={{ color: '#5B6B82' }}>
+              {ar ? meta.ar : meta.en}
+            </Text>
+            <View
+              className="overflow-hidden rounded-[20px] border bg-white"
+              style={{ borderColor: '#DCE7F5', shadowColor: '#1E3A8A', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 2 }}
+            >
+              {g.items.map((it, i) => {
+                const Icon = it.icon;
+                return (
+                  <Pressable
+                    key={it.en}
+                    onPress={() => router.push(it.to as never)}
+                    className="flex-row items-center gap-3 px-3.5 py-3"
+                    style={i > 0 ? { borderTopWidth: 1, borderTopColor: '#EEF3FA' } : undefined}
+                  >
+                    <View className="h-11 w-11 items-center justify-center rounded-2xl" style={{ backgroundColor: meta.bg }}>
+                      <Icon size={22} color={meta.fg} strokeWidth={2.3} />
+                      {it.to === '/clinic' && materialsBadge > 0 && (
+                        <View className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full bg-rose-600" style={{ borderWidth: 2, borderColor: '#FFFFFF' }} />
+                      )}
+                    </View>
+                    <Text className="flex-1 text-[14.5px] font-bold" style={{ color: '#0F2747' }}>
+                      {ar ? it.ar : it.en}
+                    </Text>
+                    <Chevron size={18} color="#94A3B8" />
+                  </Pressable>
+                );
+              })}
             </View>
-          );
-        })}
-      </View>
+          </View>
+        );
+      })}
 
       <Pressable
         onPress={toggle}
-        className="mt-4 flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-card px-4 py-3.5 shadow-sm"
+        className="mt-5 flex-row items-center gap-3 rounded-[20px] border bg-white px-3.5 py-3"
+        style={{ borderColor: '#DCE7F5' }}
       >
-        <View className="h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50">
-          <Globe size={19} color="#334155" strokeWidth={2} />
+        <View className="h-11 w-11 items-center justify-center rounded-2xl" style={{ backgroundColor: '#E8F1FE' }}>
+          <Globe size={22} color="#1D6FE8" strokeWidth={2.3} />
         </View>
-        <Text className="flex-1 text-sm font-bold text-slate-700">
+        <Text className="flex-1 text-[14.5px] font-bold" style={{ color: '#0F2747' }}>
           {ar ? 'اللغة' : 'Language'} · {lang === 'ar' ? 'العربية' : 'English'}
         </Text>
-        <Text className="text-xs font-bold text-primary">{lang === 'ar' ? 'EN' : 'AR'}</Text>
+        <View className="rounded-full px-2.5 py-1" style={{ backgroundColor: '#E8F1FE' }}>
+          <Text className="text-xs font-extrabold" style={{ color: '#1D6FE8' }}>
+            {lang === 'ar' ? 'EN' : 'AR'}
+          </Text>
+        </View>
       </Pressable>
     </Screen>
   );

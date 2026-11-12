@@ -18,8 +18,9 @@ import { hydrateStorage } from '@/lib/storage';
 import { LanguageProvider, useI18n, type DictKey } from '@/lib/i18n';
 import { AnimatedSplashOverlay, SplashArt } from '@/components/animated-icon';
 import { ToastHost } from '@/components/ToastHost';
-import { CartHeaderButton } from '@/components/CartHeaderButton';
+import { FloatingCart } from '@/components/FloatingCart';
 import { AppHeader } from '@/components/AppHeader';
+import { HasHeaderContext } from '@/components/ui/headerContext';
 import { isGuestRoute } from '@/lib/guestAccess';
 import { useSession } from '@/lib/useAuth';
 import { listenForNotificationTaps, registerPush } from '@/lib/push';
@@ -142,7 +143,13 @@ function RootStack() {
 
   return (
     <>
-    <Stack screenOptions={{ headerShown: false }}>
+    <Stack
+      screenOptions={{ headerShown: false }}
+      // Tells each screen whether it sits under a header (see headerContext).
+      screenLayout={({ children, options }) => (
+        <HasHeaderContext.Provider value={options.headerShown === true}>{children}</HasHeaderContext.Provider>
+      )}
+    >
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="login" />
       <Stack.Screen name="scan" options={{ headerShown: false }} />
@@ -150,7 +157,7 @@ function RootStack() {
           (tabs) group so vendor roles keep the bottom tab bar on their own
           dashboard. Their URLs are unchanged — route groups do not appear in
           the path. */}
-      {TITLED_SCREENS.map(({ name, title, cart }) => (
+      {TITLED_SCREENS.map(({ name, title }) => (
         <Stack.Screen
           key={name}
           name={name}
@@ -159,11 +166,12 @@ function RootStack() {
             // Our own header: the native one doesn't mirror under RTL.
             header: (props) => <AppHeader {...props} />,
             title: t(title),
-            headerRight: cart ? () => <CartHeaderButton /> : undefined,
           }}
         />
       ))}
     </Stack>
+    {/* The cart: a floating button once something is in it (replaces the header cart icons). */}
+    <FloatingCart />
     <VerifyEmailGate />
     <SuspendedGate />
     </>

@@ -1,8 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Linking, Alert, Modal, Pressable, ScrollView, TextInput, View } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
+import { useLocalSearchParams, useNavigation, router } from 'expo-router';
 import {
   Activity,
+  AlertTriangle,
+  CalendarClock,
+  CalendarPlus,
   Baby,
   Brush,
   CalendarDays,
@@ -35,6 +38,7 @@ import {
 import type { LucideIcon } from 'lucide-react-native';
 
 import { Screen, Card, Button, Input, Text } from '@/components/ui';
+import { KeyboardAwareScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import { CalendarPickerModal } from '@/components/CalendarPickerModal';
 import { PlanPhotos, XrayGallery, useXrayUpload } from '@/components/PatientXrays';
 import { DentalArch, LEGEND_ORDER, TOOTH_META } from '@/components/DentalArch';
@@ -84,6 +88,73 @@ import { whatsappLink } from '@/lib/booking';
 import { PatientDoctorsCard } from '@/components/ClinicTeamFinance';
 import { useClinics } from '@/lib/clinicsStore';
 import { toast } from '@/lib/toast';
+import { AddAppointmentModal } from '@/components/AddAppointmentModal';
+import { useAppointments, type Appointment } from '@/lib/appointmentsStore';
+import { avatarColor, initial, nextVisits, shortDate } from '@/lib/patientList';
+
+// The clinic's blue, navy text and soft lines (same as the patients list).
+const BLUE = '#1D6FE8';
+const NAVY = '#0F2747';
+const MUTED = '#5B6B82';
+const LINE = '#DCE7F5';
+
+/** Conditions shown as a warning at the top of the patient's page. */
+const ALERT_LABELS: Array<{ key: 'diabetes' | 'hypertension' | 'heart' | 'allergy' | 'bleeding'; ar: string; en: string }> = [
+  { key: 'allergy', ar: 'حساسية أدوية', en: 'Drug allergy' },
+  { key: 'bleeding', ar: 'ميل للنزف', en: 'Bleeding tendency' },
+  { key: 'heart', ar: 'أمراض القلب', en: 'Heart condition' },
+  { key: 'diabetes', ar: 'سكري', en: 'Diabetes' },
+  { key: 'hypertension', ar: 'ضغط الدم', en: 'Hypertension' },
+];
+
+/** The header's buttons: share the record, and Rx in a blue circle. */
+function HeaderActions({ ar, onShare, onRx }: { ar: boolean; onShare: () => void; onRx: () => void }) {
+  return (
+    <View className="flex-row items-center gap-2">
+      <Pressable
+        onPress={onShare}
+        hitSlop={6}
+        accessibilityLabel={ar ? 'مشاركة السجل' : 'Share record'}
+        className="h-9 w-9 items-center justify-center rounded-full border bg-white"
+        style={{ borderColor: LINE }}
+      >
+        <Share2 size={16} color={NAVY} />
+      </Pressable>
+      <Pressable
+        onPress={onRx}
+        hitSlop={6}
+        accessibilityLabel={ar ? 'وصفة طبية' : 'Prescription'}
+        className="h-10 w-10 items-center justify-center rounded-full"
+        style={{ backgroundColor: BLUE, shadowColor: '#1D4ED8', shadowOpacity: 0.3, shadowRadius: 6, shadowOffset: { width: 0, height: 3 }, elevation: 4 }}
+      >
+        <Text className="text-[14px] font-black text-white">Rx</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+/** Red/amber strip with the patient's conditions; nothing when there are none. */
+function MedicalAlert({ p, ar }: { p: Patient; ar: boolean }) {
+  const items = ALERT_LABELS.filter((h) => p.history?.[h.key]).map((h) => (ar ? h.ar : h.en));
+  const allergy = (p.allergies ?? '').trim();
+  if (!items.length && !allergy) return null;
+  return (
+    <View className="mt-2.5 flex-row items-start gap-2 rounded-2xl border px-3 py-2.5" style={{ backgroundColor: '#FFF1F2', borderColor: '#FECDD3' }}>
+      <AlertTriangle size={16} color="#E11D48" />
+      <View className="min-w-0 flex-1">
+        <Text className="text-[12.5px] font-extrabold" style={{ color: '#9F1239' }}>
+          {items.join(' · ') || (ar ? 'حساسية' : 'Allergy')}
+        </Text>
+        {!!allergy && (
+          <Text numberOfLines={2} className="mt-0.5 text-[11.5px]" style={{ color: '#BE123C' }}>
+            {ar ? 'الحساسية: ' : 'Allergies: '}
+            {allergy}
+          </Text>
+        )}
+      </View>
+    </View>
+  );
+}
 
 type Sub = { ar: string; en: string };
 
@@ -240,6 +311,33 @@ export default function PatientDetailScreen() {
   // replaced a note the doctor could not see.
   const [note, setNote] = useState(() => p?.doctorNote ?? '');
   const noteDirty = note !== (p?.doctorNote ?? '');
+  // Saved on its own shortly after the doctor stops typing.
+  useEffect(() => {
+    if (!p || !noteDirty) return;
+    const t = setTimeout(() => updatePatient(p.id, { doctorNote: note, doctorNoteDate: new Date().toISOString().slice(0, 10) }), 800);
+    return () => clearTimeout(t);
+  }, [note, noteDirty, p?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const appointments = useAppointments();
+  const next = p ? nextVisits([p], appointments).get(p.id) : undefined;
+  const [showAppt, setShowAppt] = useState(false);
+
+  // The patient's name is the screen title; share and Rx sit in the header.
+  const navigation = useNavigation();
+  const shareRef = useRef<() => void>(() => {});
+  useLayoutEffect(() => {
+    if (!p) return;
+    navigation.setOptions({
+      title: p.name,
+      headerRight: () => (
+        <HeaderActions
+          ar={ar}
+          onShare={() => shareRef.current()}
+          onRx={() => router.push({ pathname: '/rx/[patientId]', params: { patientId: p.id } })}
+        />
+      ),
+    });
+  }, [navigation, p?.name, p?.id, ar]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!p) {
     return (
@@ -296,6 +394,7 @@ export default function PatientDetailScreen() {
     );
     if (!ok) toast.error(ar ? 'تعذر إنشاء ملف PDF' : 'Could not create PDF');
   };
+  shareRef.current = sharePatientRecord;
 
   const TABS = [
     { id: 'info', ar: 'المعلومات', en: 'Info' },
@@ -305,61 +404,46 @@ export default function PatientDetailScreen() {
     { id: 'fees', ar: 'المالية', en: 'Fees' },
   ] as const;
 
+  const column = { width: '100%' as const, maxWidth: 820, alignSelf: 'center' as const };
+
   return (
-    <Screen>
-      {/* Centred column on tablets — fields used to stretch the full iPad width. */}
-      <View style={{ width: '100%', maxWidth: 820, alignSelf: 'center' }}>
-      {/* Quick actions */}
-      <View className="flex-row items-center gap-1.5">
-        <Pressable
-          onPress={sharePatientRecord}
-          className="h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm"
-        >
-          <Share2 size={15} color="#64748B" />
-        </Pressable>
-        <Pressable
-          onPress={() => router.push({ pathname: '/rx/[patientId]', params: { patientId: p.id } })}
-          className="h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm"
-        >
-          <Text className="text-[13px] font-black text-primary">Rx</Text>
-        </Pressable>
-        <View className="flex-1" />
-        <View style={{ borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: STATUS_META[p.status].bg }}>
-          <Text className="font-bold" style={{ fontSize: 11, color: STATUS_META[p.status].text }}>
-            {ar ? STATUS_META[p.status].ar : STATUS_META[p.status].en}
-          </Text>
+    <Screen scroll={false} padded={false}>
+      {/* The tabs stay at the top while the page scrolls (sticky child 1). */}
+      <KeyboardAwareScrollView
+        bottomOffset={24}
+        keyboardShouldPersistTaps="handled"
+        stickyHeaderIndices={[1]}
+        showsVerticalScrollIndicator={false}
+        contentContainerClassName="pb-10"
+      >
+        <View className="px-4 pt-3" style={column}>
+          <PatientInfoCard p={p} ar={ar} next={next} onNewAppointment={() => setShowAppt(true)} />
+          <MedicalAlert p={p} ar={ar} />
+          <PatientDoctorsCard p={p} ar={ar} />
         </View>
-      </View>
 
-      {/* Patient info card */}
-      <View className="mt-3">
-        <PatientInfoCard p={p} ar={ar} />
-        <PatientDoctorsCard p={p} ar={ar} />
-      </View>
+        {/* Tabs: the open one is blue. */}
+        <View className="bg-background px-4 pb-2 pt-3">
+          <View className="flex-row rounded-2xl border bg-white p-1" style={[column, { borderColor: LINE }]}>
+            {TABS.map((t) => {
+              const activeTab = tab === t.id;
+              return (
+                <Pressable
+                  key={t.id}
+                  onPress={() => setTab(t.id)}
+                  className="h-10 flex-1 items-center justify-center rounded-xl"
+                  style={activeTab ? { backgroundColor: BLUE, shadowColor: '#1D4ED8', shadowOpacity: 0.25, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 3 } : undefined}
+                >
+                  <Text numberOfLines={1} className="text-[11.5px] font-extrabold" style={{ color: activeTab ? '#FFFFFF' : MUTED }}>
+                    {ar ? t.ar : t.en}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
 
-      {/* Tabs */}
-      <View className="mt-4 flex-row rounded-2xl bg-slate-100 p-1.5">
-        {TABS.map((t) => {
-          const activeTab = tab === t.id;
-          return (
-            <Pressable
-              key={t.id}
-              onPress={() => setTab(t.id)}
-              className={cn('h-10 flex-1 items-center justify-center rounded-xl', activeTab && 'bg-white')}
-              style={activeTab ? shadowSm : undefined}
-            >
-              <Text className={cn('text-xs font-bold', activeTab ? 'text-slate-900' : 'text-slate-500')}>
-                {ar ? t.ar : t.en}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      {/* Plain container: Screen already scrolls and keeps the focused input
-          above the keyboard. A second, nested keyboard-aware scroll view here
-          fought it, which let the keyboard cover the form on tablets. */}
-      <View className="mt-4 pb-6">
+      <View className="px-4 pt-2" style={column}>
         {tab === 'info' && (
           <View className="gap-3">
             <Card>
@@ -375,19 +459,20 @@ export default function PatientDetailScreen() {
             <Card>
               <View className="mb-2 flex-row items-center justify-between">
                 <Text className="text-xs font-bold text-slate-500">{ar ? 'ملاحظات الطبيب' : 'Doctor note'}</Text>
-                {!!p.doctorNoteDate && (
-                  <Text className="text-[10px] text-slate-400" style={{ writingDirection: 'ltr' }}>
-                    {ar ? `آخر حفظ: ${p.doctorNoteDate}` : `Last saved: ${p.doctorNoteDate}`}
+                {/* Saved automatically — a small status instead of a button that looked disabled. */}
+                <View className="flex-row items-center gap-1">
+                  {!noteDirty && <Check size={11} color="#059669" strokeWidth={3} />}
+                  <Text className="text-[10.5px] font-bold" style={{ color: noteDirty ? MUTED : '#059669' }}>
+                    {noteDirty ? (ar ? 'جارٍ الحفظ…' : 'Saving…') : ar ? 'تم الحفظ تلقائياً' : 'Saved automatically'}
                   </Text>
-                )}
+                </View>
               </View>
               <Input value={note} onChangeText={setNote} placeholder={ar ? 'اكتب ملاحظة...' : 'Write a note...'} multiline />
-              <Button
-                title={noteDirty ? (ar ? 'حفظ الملاحظة' : 'Save note') : ar ? 'محفوظة ✓' : 'Saved ✓'}
-                disabled={!noteDirty}
-                onPress={() => updatePatient(p.id, { doctorNote: note, doctorNoteDate: new Date().toISOString().slice(0, 10) })}
-                className="mt-2"
-              />
+              {!!p.doctorNoteDate && (
+                <Text className="mt-1.5 text-[10px] text-slate-400">
+                  {ar ? 'آخر تعديل' : 'Last edited'} {shortDate(p.doctorNoteDate, ar)}
+                </Text>
+              )}
             </Card>
             <Card>
               <Text className="mb-2 text-xs font-bold text-slate-500">{ar ? 'السجل المرضي' : 'History log'}</Text>
@@ -413,7 +498,9 @@ export default function PatientDetailScreen() {
 
         {tab === 'fees' && <BillingTab p={p} ar={ar} />}
       </View>
-      </View>
+      </KeyboardAwareScrollView>
+
+      <AddAppointmentModal open={showAppt} onClose={() => setShowAppt(false)} patient={{ id: p.id, name: p.name, phone: p.phone }} />
     </Screen>
   );
 }
@@ -865,7 +952,23 @@ function MetaField({
   );
 }
 
-function PatientInfoCard({ p, ar }: { p: Patient; ar: boolean }) {
+function PatientInfoCard({
+  p,
+  ar,
+  next,
+  onNewAppointment,
+}: {
+  p: Patient;
+  ar: boolean;
+  next?: Appointment;
+  onNewAppointment: () => void;
+}) {
+  const av = avatarColor(p.name);
+  const facts = [
+    p.age ? `${p.age} ${ar ? 'سنة' : 'yrs'}` : '',
+    p.gender === 'male' ? (ar ? 'ذكر' : 'Male') : ar ? 'أنثى' : 'Female',
+    p.lastVisit ? `${ar ? 'آخر زيارة' : 'Last visit'} ${shortDate(p.lastVisit, ar)}` : '',
+  ].filter(Boolean);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
     name: p.name,
@@ -897,10 +1000,12 @@ function PatientInfoCard({ p, ar }: { p: Patient; ar: boolean }) {
   };
 
   return (
-    <View className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <View className="rounded-[20px] border bg-white p-4" style={{ borderColor: LINE, ...shadowSm }}>
       <View className="flex-row items-center gap-3">
-        <View className={cn('h-12 w-12 shrink-0 items-center justify-center rounded-full', p.gender === 'female' ? 'bg-pink-100' : 'bg-sky-100')}>
-          <Text className="text-lg font-extrabold text-slate-700">{p.name.trim().charAt(0) || '؟'}</Text>
+        <View className="h-14 w-14 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: av.bg }}>
+          <Text className="text-xl font-extrabold" style={{ color: av.fg }}>
+            {initial(p.name)}
+          </Text>
         </View>
         <View className="min-w-0 flex-1">
           {editing ? (
@@ -911,20 +1016,25 @@ function PatientInfoCard({ p, ar }: { p: Patient; ar: boolean }) {
               style={{ writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }}
             />
           ) : (
-            <Text numberOfLines={1} className="text-[15px] font-extrabold text-slate-900">
-              {p.name}
-            </Text>
+            <View className="flex-row items-center gap-1.5">
+              <Text numberOfLines={1} className="flex-shrink text-[17px] font-extrabold" style={{ color: NAVY }}>
+                {p.name}
+              </Text>
+              <View style={{ flexShrink: 0, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, backgroundColor: STATUS_META[p.status].bg }}>
+                <Text className="font-bold" style={{ fontSize: 10, color: STATUS_META[p.status].text }}>
+                  {ar ? STATUS_META[p.status].ar : STATUS_META[p.status].en}
+                </Text>
+              </View>
+            </View>
           )}
-          <View className="mt-1 flex-row items-center gap-1.5">
-            <CalendarDays size={11} color="#94A3B8" />
-            <Text className="text-[11px] text-slate-400">
-              {p.dob
-                ? `${ar ? 'تاريخ الميلاد' : 'Born'}: ${p.dob}`
-                : p.lastVisit
-                  ? `${ar ? 'آخر زيارة' : 'Last visit'}: ${p.lastVisit}`
-                  : '—'}
-            </Text>
-          </View>
+          {!editing && (
+            <>
+              <Text numberOfLines={1} className="mt-1 text-[12px]" style={{ color: MUTED }}>
+                {facts.join(' · ')}
+              </Text>
+              <Text className="mt-0.5 text-[10px] text-slate-400">{p.fileNo}</Text>
+            </>
+          )}
         </View>
         {!editing && (
           <Pressable onPress={startEdit} className="shrink-0 p-1">
@@ -933,7 +1043,7 @@ function PatientInfoCard({ p, ar }: { p: Patient; ar: boolean }) {
         )}
       </View>
 
-      <View className="mt-3 flex-row flex-wrap justify-between gap-y-2">
+      <View className="mt-3 flex-row flex-wrap justify-between gap-2">
         {editing ? (
           <>
             <MetaField label={ar ? 'العمر' : 'Age'} value={form.age} onChange={(v) => setForm((f) => ({ ...f, age: v }))} keyboardType="number-pad" ltr />
@@ -961,15 +1071,47 @@ function PatientInfoCard({ p, ar }: { p: Patient; ar: boolean }) {
           </>
         ) : (
           <>
-            <MetaChip label={ar ? 'العمر' : 'Age'} value={`${p.age || '—'}${p.age ? (ar ? ' سنة' : 'y') : ''}`} />
-            <MetaChip label={ar ? 'الجنس' : 'Gender'} value={p.gender === 'male' ? (ar ? 'ذكر' : 'Male') : ar ? 'أنثى' : 'Female'} />
-            <MetaChip label={ar ? 'رقم الملف' : 'File #'} value={p.fileNo} />
-            <MetaChip
-              label={ar ? 'الهاتف' : 'Phone'}
-              value={p.phone || '—'}
-              icon={Phone}
-              onPress={p.phone ? () => Linking.openURL(`tel:${p.phone}`) : undefined}
-            />
+            {next && (
+              <View className="w-full flex-row items-center gap-1.5 rounded-xl px-3 py-2" style={{ backgroundColor: '#E8F1FE' }}>
+                <CalendarClock size={14} color={BLUE} />
+                <Text numberOfLines={1} className="flex-shrink text-[12px] font-extrabold" style={{ color: BLUE }}>
+                  {ar ? 'الموعد القادم' : 'Next visit'} {shortDate(next.date, ar)}
+                  {next.time ? ` · ${'\u2066' + next.time + '\u2069'}` : ''}
+                  {next.treatment ? ` · ${next.treatment}` : ''}
+                </Text>
+              </View>
+            )}
+            {/* Quick actions: call and WhatsApp when there is a phone, and a new appointment. */}
+            <View className="w-full flex-row gap-2">
+              {!!p.phone && (
+                <Pressable
+                  onPress={() => Linking.openURL(`tel:${p.phone}`)}
+                  className="h-10 flex-1 flex-row items-center justify-center gap-1.5 rounded-xl"
+                  style={{ backgroundColor: '#E8F1FE' }}
+                >
+                  <Phone size={15} color={BLUE} />
+                  <Text className="text-[12px] font-extrabold" style={{ color: BLUE }}>
+                    {ar ? 'اتصال' : 'Call'}
+                  </Text>
+                </Pressable>
+              )}
+              {!!p.phone && (
+                <Pressable
+                  onPress={() => Linking.openURL(whatsappLink(p.phone, ''))}
+                  className="h-10 flex-1 flex-row items-center justify-center gap-1.5 rounded-xl"
+                  style={{ backgroundColor: '#E3F7EC' }}
+                >
+                  <MessageCircle size={15} color="#15803D" />
+                  <Text className="text-[12px] font-extrabold" style={{ color: '#15803D' }}>
+                    {ar ? 'واتساب' : 'WhatsApp'}
+                  </Text>
+                </Pressable>
+              )}
+              <Pressable onPress={onNewAppointment} className="h-10 flex-1 flex-row items-center justify-center gap-1.5 rounded-xl" style={{ backgroundColor: BLUE }}>
+                <CalendarPlus size={15} color="#FFFFFF" />
+                <Text className="text-[12px] font-extrabold text-white">{ar ? 'موعد جديد' : 'New visit'}</Text>
+              </Pressable>
+            </View>
           </>
         )}
       </View>

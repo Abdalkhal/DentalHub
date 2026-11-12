@@ -29,7 +29,7 @@ import {
   MessageCircle,
   MoreVertical,
   Search,
-  Send,
+  SendHorizontal,
   X,
 } from 'lucide-react-native';
 
@@ -621,13 +621,26 @@ function ChatView({
               className="max-h-32 min-h-11 flex-1 rounded-3xl bg-slate-50 px-4 py-2.5 text-[15px] text-slate-800"
               style={{ textAlign: ar ? 'right' : 'left', textAlignVertical: 'center' }}
             />
+            {/* A clear send arrow: blue on light blue until there is text, then
+                white on solid blue. It points the way the text reads. */}
             <Pressable
               onPress={sendText}
               disabled={!text.trim()}
-              className="h-11 w-11 items-center justify-center rounded-full"
-              style={{ backgroundColor: text.trim() ? BLUE : '#CBD5E1' }}
+              accessibilityRole="button"
+              accessibilityLabel={ar ? 'إرسال' : 'Send'}
+              className="h-12 w-12 items-center justify-center rounded-full"
+              style={
+                text.trim()
+                  ? { backgroundColor: BLUE, shadowColor: '#1D4ED8', shadowOpacity: 0.35, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 4 }
+                  : { backgroundColor: '#E8F1FE' }
+              }
             >
-              <Send size={19} color="#FFFFFF" style={{ transform: [{ scaleX: ar ? -1 : 1 }] }} />
+              <SendHorizontal
+                size={23}
+                strokeWidth={2.4}
+                color={text.trim() ? '#FFFFFF' : BLUE}
+                style={{ transform: [{ scaleX: ar ? -1 : 1 }] }}
+              />
             </Pressable>
           </View>
         )}

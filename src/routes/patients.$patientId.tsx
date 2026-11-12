@@ -99,7 +99,22 @@ import {
   Download,
   ChevronLeft,
   ChevronRight,
+  AlertTriangle,
+  CalendarClock,
+  CalendarPlus,
 } from "lucide-react";
+import { AddAppointmentModal } from "@/components/AddAppointmentModal";
+import { useAppointments, type Appointment } from "@/lib/appointmentsStore";
+import { avatarColor, initial, nextVisits, shortDate } from "@/lib/patientList";
+
+/** Conditions shown as a warning at the top of the patient's page. */
+const ALERT_LABELS: Array<{ key: "diabetes" | "hypertension" | "heart" | "allergy" | "bleeding"; ar: string; en: string }> = [
+  { key: "allergy", ar: "حساسية أدوية", en: "Drug allergy" },
+  { key: "bleeding", ar: "ميل للنزف", en: "Bleeding tendency" },
+  { key: "heart", ar: "أمراض القلب", en: "Heart condition" },
+  { key: "diabetes", ar: "سكري", en: "Diabetes" },
+  { key: "hypertension", ar: "ضغط الدم", en: "Hypertension" },
+];
 
 export const Route = createFileRoute("/patients/$patientId")({
   head: () => ({
@@ -254,6 +269,9 @@ function PatientProfile() {
   const patients = usePatients();
   const p = patients.find((x) => x.id === patientId);
   const [tab, setTab] = useState<TabKey>("info");
+  const appointments = useAppointments();
+  const next = p ? nextVisits([p], appointments).get(p.id) : undefined;
+  const [showAppt, setShowAppt] = useState(false);
 
   if (!p) {
     return (
@@ -279,45 +297,57 @@ function PatientProfile() {
 
   return (
     <MobileShell wide>
-      <TopBar title={p.name || (ar ? "سجل المريض" : "Patient record")} showBack wide maxW="5xl" />
+      <TopBar
+        title={p.name || (ar ? "سجل المريض" : "Patient record")}
+        showBack
+        wide
+        maxW="5xl"
+        actions={
+          // Share the record, and Rx in a blue circle so it stands out.
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => exportPatientRecord(p, ar)}
+              title={ar ? "تصدير ملف المريض (PDF)" : "Export patient record (PDF)"}
+              aria-label={ar ? "تصدير ملف المريض (PDF)" : "Export patient record (PDF)"}
+              className="flex size-9 items-center justify-center rounded-full border border-[#DCE7F5] bg-white text-[#0F2747] hover:bg-slate-50"
+            >
+              <Share2 className="size-4" />
+            </button>
+            <Link
+              to="/patients/rx/$patientId"
+              params={{ patientId: p.id }}
+              title={ar ? "وصفة طبية" : "Prescription"}
+              className="flex size-10 items-center justify-center rounded-full bg-[#1D6FE8] font-display text-[14px] font-black text-white shadow-[0_6px_14px_-6px_rgba(29,78,216,0.7)] transition hover:brightness-110"
+            >
+              Rx
+            </Link>
+          </div>
+        }
+      />
 
-      {/* Quick actions */}
-      <div className="px-4 pt-3 flex items-center gap-1.5 md:px-6 md:pt-6 md:gap-2 md:flex-wrap lg:px-8 lg:max-w-5xl lg:mx-auto">
-        <IconBtn onClick={() => exportPatientRecord(p, ar)} title={ar ? "تصدير ملف المريض (PDF)" : "Export patient record (PDF)"}>
-          <Share2 className="size-4" />
-        </IconBtn>
-        <Link to="/patients/rx/$patientId" params={{ patientId: p.id }}>
-          <IconBtn>
-            <span className="text-[13px] font-black tracking-tighter text-primary leading-none">Rx</span>
-          </IconBtn>
-        </Link>
-        <div className="flex-1" />
-        <span className={cn("text-[11px] font-bold px-2.5 py-1 rounded-full", STATUS_META[p.status]?.cls)}>
-          {ar ? STATUS_META[p.status]?.ar : STATUS_META[p.status]?.en}
-        </span>
-      </div>
-
-      {/* Patient info card */}
-      <section className="px-4 mt-3 md:px-6 lg:px-8 lg:max-w-5xl lg:mx-auto">
-        <div className="rounded-2xl bg-card border border-border p-4 shadow-sm">
-          <PatientInfoCard p={p} ar={ar} />
+      {/* Patient card, then any medical warning */}
+      <section className="px-4 mt-3 md:px-6 md:mt-5 lg:px-8 lg:max-w-5xl lg:mx-auto">
+        <div className="rounded-[20px] bg-white border border-[#DCE7F5] p-4 shadow-[0_4px_14px_-8px_rgba(30,58,138,0.25)] md:p-5">
+          <PatientInfoCard p={p} ar={ar} next={next} onNewAppointment={() => setShowAppt(true)} />
         </div>
+        <MedicalAlert p={p} ar={ar} />
         <div className="mt-3">
           <PatientDoctorsCard p={p} ar={ar} />
         </div>
       </section>
 
-      {/* Tabs */}
-      <nav className="mt-3 px-4 md:px-6 lg:px-8 lg:max-w-5xl lg:mx-auto">
-        {/* Segmented control, as on native */}
-        <div className="flex rounded-2xl bg-slate-100 p-1.5 lg:bg-slate-200/70">
+      {/* Tabs: stay in view while scrolling (under the page bar); the open one is blue. */}
+      <nav className="sticky top-[76px] z-10 mt-3 bg-[#E6F0FF]/95 px-4 py-2 backdrop-blur md:px-6 lg:top-16 lg:max-w-5xl lg:mx-auto lg:bg-slate-50/95 lg:px-8">
+        <div className="flex rounded-2xl border border-[#DCE7F5] bg-white p-1">
           {tabs.map((tb) => (
             <button
               key={tb.key}
               onClick={() => setTab(tb.key)}
               className={cn(
-                "h-10 flex-1 min-w-0 rounded-xl text-xs font-bold truncate transition md:text-sm",
-                tab === tb.key ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                "h-10 flex-1 min-w-0 rounded-xl text-xs font-extrabold truncate transition md:text-sm",
+                tab === tb.key
+                  ? "bg-[#1D6FE8] text-white shadow-[0_4px_10px_-4px_rgba(29,78,216,0.6)]"
+                  : "text-[#5B6B82] hover:bg-[#E8F1FE] hover:text-[#1D6FE8]"
               )}
             >
               {ar ? tb.ar : tb.en}
@@ -339,7 +369,30 @@ function PatientProfile() {
         {tab === "plan" && <PlanCard p={p} ar={ar} />}
         {tab === "fees" && <Billing p={p} ar={ar} />}
       </section>
+
+      {showAppt && <AddAppointmentModal onClose={() => setShowAppt(false)} patient={{ id: p.id, name: p.name, phone: p.phone }} />}
     </MobileShell>
+  );
+}
+
+/** Red strip with the patient's conditions and allergies; nothing when there are none. */
+function MedicalAlert({ p, ar }: { p: P; ar: boolean }) {
+  const items = ALERT_LABELS.filter((h) => p.history?.[h.key]).map((h) => (ar ? h.ar : h.en));
+  const allergy = (p.allergies ?? "").trim();
+  if (!items.length && !allergy) return null;
+  return (
+    <div className="mt-2.5 flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2.5">
+      <AlertTriangle className="mt-0.5 size-4 shrink-0 text-rose-600" />
+      <div className="min-w-0 flex-1">
+        <p className="text-[12.5px] font-extrabold text-rose-800">{items.join(" · ") || (ar ? "حساسية" : "Allergy")}</p>
+        {allergy && (
+          <p className="mt-0.5 line-clamp-2 text-[11.5px] text-rose-700">
+            {ar ? "الحساسية: " : "Allergies: "}
+            {allergy}
+          </p>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -412,32 +465,7 @@ function exportPatientRecord(p: P, ar: boolean) {
   );
 }
 
-function IconBtn({ children, onClick, title }: { children: React.ReactNode; onClick?: () => void; title?: string }) {
-  return (
-    <button
-      onClick={onClick}
-      title={title}
-      aria-label={title}
-      className="size-9 rounded-full bg-card border border-border flex items-center justify-center text-muted-foreground shadow-sm"
-    >
-      {children}
-    </button>
-  );
-}
 
-function Meta({ label, value, ltr, icon: Icon }: { label: string; value: string; ltr?: boolean; icon?: typeof Phone }) {
-  return (
-    <div className="rounded-xl bg-background border border-border px-3 py-2 min-w-0">
-      <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-        {Icon && <Icon className="size-3 shrink-0" />}
-        {label}
-      </p>
-      <p className="text-[12px] font-display font-extrabold mt-0.5 truncate" dir={ltr ? "ltr" : undefined}>
-        {value}
-      </p>
-    </div>
-  );
-}
 
 
 
@@ -1248,7 +1276,15 @@ function HistoryCard({ p, ar, compact, onViewAll }: { p: P; ar: boolean; compact
 function NotesCard({ p, ar }: { p: P; ar: boolean }) {
   const { doctors } = useClinic();
   return (
-    <Card title={ar ? "ملاحظات الطبيب" : "Doctor notes"} action={<Pencil className="size-3.5 text-primary" />}>
+    <Card
+      title={ar ? "ملاحظات الطبيب" : "Doctor notes"}
+      action={
+        <span className="flex items-center gap-1 text-[10.5px] font-bold text-emerald-600">
+          <Check className="size-3" strokeWidth={3} />
+          {ar ? "تُحفظ تلقائياً" : "Saves automatically"}
+        </span>
+      }
+    >
       <textarea
         rows={5}
         value={p.doctorNote ?? ""}
@@ -1715,7 +1751,13 @@ function Stat({ label, value, cls }: { label: string; value: string; cls: string
   );
 }
 
-function PatientInfoCard({ p, ar }: { p: P; ar: boolean }) {
+function PatientInfoCard({ p, ar, next, onNewAppointment }: { p: P; ar: boolean; next?: Appointment; onNewAppointment: () => void }) {
+  const av = avatarColor(p.name);
+  const facts = [
+    p.age ? `${p.age} ${ar ? "سنة" : "yrs"}` : "",
+    p.gender === "male" ? (ar ? "ذكر" : "Male") : ar ? "أنثى" : "Female",
+    p.lastVisit ? `${ar ? "آخر زيارة" : "Last visit"} ${shortDate(p.lastVisit, ar)}` : "",
+  ].filter(Boolean);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ name: p.name, age: String(p.age || ""), gender: p.gender, phone: p.phone || "" });
   const inp = "w-full h-8 rounded-lg bg-slate-50 border px-2 text-xs outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary";
@@ -1733,25 +1775,29 @@ function PatientInfoCard({ p, ar }: { p: P; ar: boolean }) {
   return (
     <div>
       <div className="flex items-center gap-3">
-        <span className="size-12 shrink-0 rounded-full overflow-hidden bg-[oklch(0.95_0.04_250)] text-[oklch(0.45_0.18_256)] font-display font-extrabold text-lg flex items-center justify-center">
-          {p.avatar ? <img src={p.avatar} alt={p.name} className="size-full object-cover" /> : p.name.trim().charAt(0) || "?"}
+        <span
+          className="size-14 shrink-0 rounded-full overflow-hidden font-display font-extrabold text-xl flex items-center justify-center"
+          style={{ backgroundColor: av.bg, color: av.fg }}
+        >
+          {p.avatar ? <img src={p.avatar} alt={p.name} className="size-full object-cover" /> : initial(p.name)}
         </span>
         <div className="flex-1 min-w-0">
           {editing ? (
             <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={cn(inp, "font-bold text-[15px]")} />
           ) : (
-            <p className="font-display font-extrabold text-[15px] truncate">{p.name}</p>
+            <div className="flex items-center gap-1.5">
+              <p className="font-display font-extrabold text-[17px] text-[#0F2747] truncate">{p.name}</p>
+              <span className={cn("shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full", STATUS_META[p.status]?.cls)}>
+                {ar ? STATUS_META[p.status]?.ar : STATUS_META[p.status]?.en}
+              </span>
+            </div>
           )}
-          <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1.5">
-            <CalendarDays className="size-3 shrink-0" />
-            {p.dob ? (
-              <span>{ar ? "تاريخ الميلاد" : "Born"}: <span dir="ltr">{p.dob}</span></span>
-            ) : p.lastVisit ? (
-              <span>{ar ? "آخر زيارة" : "Last visit"}: <span dir="ltr">{p.lastVisit}</span></span>
-            ) : (
-              "—"
-            )}
-          </p>
+          {!editing && (
+            <>
+              <p className="mt-1 truncate text-[12px] text-[#5B6B82]">{facts.join(" · ")}</p>
+              <p className="mt-0.5 text-[10px] text-slate-400" dir="ltr">{p.fileNo}</p>
+            </>
+          )}
         </div>
         <button onClick={() => setEditing(!editing)} className="text-primary shrink-0" aria-label={ar ? "تعديل" : "Edit"}>
           <Pencil className="size-3.5" />
@@ -1774,10 +1820,50 @@ function PatientInfoCard({ p, ar }: { p: P; ar: boolean }) {
           </>
         ) : (
           <>
-            <Meta label={ar ? "العمر" : "Age"} value={`${p.age || "—"}${p.age ? (ar ? " سنة" : "y") : ""}`} />
-            <Meta label={ar ? "الجنس" : "Gender"} value={p.gender === "male" ? (ar ? "ذكر" : "Male") : ar ? "أنثى" : "Female"} />
-            <Meta label={ar ? "رقم الملف" : "File #"} value={`#${p.fileNo.replace(/\D/g, "") || p.fileNo}`} />
-            <Meta label={ar ? "الهاتف" : "Phone"} value={p.phone || "—"} ltr icon={Phone} />
+            {next && (
+              <p className="col-span-2 flex items-center gap-1.5 truncate rounded-xl bg-[#E8F1FE] px-3 py-2 text-[12px] font-extrabold text-[#1D6FE8]">
+                <CalendarClock className="size-4 shrink-0" />
+                {ar ? "الموعد القادم" : "Next visit"} {shortDate(next.date, ar)}
+                {next.time && (
+                  <>
+                    {" · "}
+                    <bdi dir="ltr">{next.time}</bdi>
+                  </>
+                )}
+                {next.treatment ? ` · ${next.treatment}` : ""}
+              </p>
+            )}
+            {/* Quick actions: call and WhatsApp when there is a phone, and a new appointment. */}
+            <div className="col-span-2 flex gap-2">
+              {p.phone && (
+                <a
+                  href={`tel:${p.phone}`}
+                  title={p.phone}
+                  className="flex h-10 flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#E8F1FE] text-[12px] font-extrabold text-[#1D6FE8] hover:bg-[#d8e8fe]"
+                >
+                  <Phone className="size-4" />
+                  {ar ? "اتصال" : "Call"}
+                </a>
+              )}
+              {p.phone && (
+                <a
+                  href={whatsappLink(p.phone, "")}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex h-10 flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#E3F7EC] text-[12px] font-extrabold text-[#15803D] hover:bg-[#d2f2df]"
+                >
+                  <MessageCircle className="size-4" />
+                  {ar ? "واتساب" : "WhatsApp"}
+                </a>
+              )}
+              <button
+                onClick={onNewAppointment}
+                className="flex h-10 flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#1D6FE8] text-[12px] font-extrabold text-white hover:brightness-110"
+              >
+                <CalendarPlus className="size-4" />
+                {ar ? "موعد جديد" : "New visit"}
+              </button>
+            </div>
           </>
         )}
       </div>

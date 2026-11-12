@@ -1,4 +1,5 @@
 import { Pressable } from 'react-native';
+import { HasHeaderContext } from '@/components/ui/headerContext';
 import { Tabs, router } from 'expo-router';
 import { ArrowLeft, ArrowRight, Home, Heart, Menu, MessageCircle, Search, ShoppingBag, Tag, User } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
@@ -111,6 +112,10 @@ export default function AppTabs() {
       // screens attached (just hidden) sidesteps that native race entirely.
       // See https://github.com/react-navigation/react-navigation/issues/11384
       detachInactiveScreens={false}
+      // Tells each tab whether it sits under a header (see headerContext).
+      screenLayout={({ children, options }) => (
+        <HasHeaderContext.Provider value={options.headerShown !== false}>{children}</HasHeaderContext.Provider>
+      )}
       screenOptions={{
         // Same icons and order; the active tab is a stronger blue with a bold
         // label, the others a quieter grey, so the current tab reads at a glance.
