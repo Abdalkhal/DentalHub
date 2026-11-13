@@ -20,7 +20,6 @@ import {
 } from "@/lib/products";
 import { auth, db } from "@/integrations/firebase/client";
 import { CountryCombobox } from "@/components/CountryCombobox";
-import { TagInput } from "@/components/TagInput";
 import { countryCodeToFlag } from "@/data/countries";
 import { IMPLANTS } from "@/data/implants";
 
@@ -162,7 +161,7 @@ export function ImplantFormModal({
   const [placementType, setPlacementType] = useState(
     product?.surgicalKit?.placementType ?? "فورية (Immediate Placement)",
   );
-  const [compatibility, setCompatibility] = useState<string[]>(
+  const [compatibility] = useState<string[]>(
     product?.surgicalKit?.compatibility ?? [],
   );
   const [toolsCount, setToolsCount] = useState(
@@ -825,24 +824,12 @@ export function ImplantFormModal({
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="flex flex-col gap-1.5 min-w-0">
-                      <label className="text-xs font-semibold text-[#17324A] whitespace-nowrap">
-                        {ar ? "بلد المنشأ" : "Country of Origin"}
-                      </label>
-                      <CountryCombobox value={country} onChange={setCountry} lang={lang} />
-                    </div>
-                    <div className="flex flex-col gap-1.5 min-w-0">
-                      <label className="text-xs font-semibold text-[#17324A] whitespace-nowrap">
-                        {ar ? "خط المنتج" : "Product Line"}
-                      </label>
-                      <input
-                        value={line}
-                        onChange={(e) => setLine(e.target.value)}
-                        placeholder={ar ? "مثال: GuideSystem" : "e.g. GuideSystem"}
-                        className="w-full min-h-[42px] h-12 rounded-xl bg-[#F5FAFE] border-[#D3E8F7] px-4 text-sm outline-none focus:ring-2 focus:ring-[#2E93E0]/30 focus:border-[#2E93E0] transition"
-                      />
-                    </div>
+                  {/* The kit's "product line" field was removed; an existing value is kept on save. */}
+                  <div className="flex flex-col gap-1.5 min-w-0">
+                    <label className="text-xs font-semibold text-[#17324A] whitespace-nowrap">
+                      {ar ? "بلد المنشأ" : "Country of Origin"}
+                    </label>
+                    <CountryCombobox value={country} onChange={setCountry} lang={lang} />
                   </div>
                 </div>
               </div>
@@ -884,17 +871,7 @@ export function ImplantFormModal({
                   </select>
                 </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-[#17324A] whitespace-nowrap">
-                    {ar ? "التوافق" : "Compatibility"}
-                  </label>
-                  <TagInput
-                    value={compatibility}
-                    onChange={setCompatibility}
-                    placeholder={ar ? "اكتب قيمة واضغط Enter" : "Type a value and press Enter"}
-                  />
-                </div>
-
+                {/* The "compatibility" field was removed; existing values are kept on save. */}
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-semibold text-[#17324A] whitespace-nowrap">
                     {ar ? "عدد الأدوات" : "Tools Count"}

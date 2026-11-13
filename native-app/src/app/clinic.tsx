@@ -348,8 +348,9 @@ export default function ClinicHomeScreen() {
 
       <Modal visible={formMode !== 'closed'} transparent animationType="fade" onRequestClose={() => setFormMode('closed')}>
         <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
-        <View className="flex-1 justify-end bg-black/40">
-          <View className="gap-3 rounded-t-3xl bg-white p-5">
+        {/* A centred box: as a bottom sheet its buttons sat behind the phone's navigation bar. */}
+        <View className="flex-1 justify-center bg-black/40 px-5">
+          <View className="gap-3 rounded-3xl bg-white p-5" style={{ shadowColor: '#0F172A', shadowOpacity: 0.2, shadowRadius: 20, shadowOffset: { width: 0, height: 8 }, elevation: 10 }}>
             <Text className="text-lg font-extrabold text-slate-800">
               {formMode === 'add' ? (ar ? 'عيادة جديدة' : 'New clinic') : ar ? 'تعديل العيادة' : 'Edit clinic'}
             </Text>

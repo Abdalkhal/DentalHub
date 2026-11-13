@@ -1,6 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import logoMark from "@/assets/logo-mark.png";
-import { PriceLock } from "@/components/PriceLock";
 import { MobileShell } from "@/components/MobileShell";
 import { useI18n } from "@/lib/i18n";
 import { useEffect, useMemo, useState } from "react";
@@ -22,6 +21,7 @@ import { AdDetailModal } from "@/components/AdDetailModal";
 import { DentistHomeDesktop } from "@/components/DentistHomeDesktop";
 import { useVendorAccounts } from "@/lib/search";
 import { useProductSearch, useSignedImageUrls } from "@/lib/products";
+import { cityName, groupByOffice, productsCount, type OfficeHit } from "@/lib/officeSearch";
 import { useActiveAds, type Ad } from "@/lib/adsStore";
 import { useQuickOrderActions } from "@/lib/quickOrders";
 import {
@@ -158,9 +158,14 @@ function DentistHome() {
       .filter((a) => [a.name, a.location].filter(Boolean).some((v) => v.toLowerCase().includes(searchTerm)))
       .slice(0, 5);
   }, [searchTerm, vendorAccounts]);
-  const { data: foundProducts = [] } = useProductSearch(searchTerm.length >= 2 ? searchTerm : "");
-  const productResults = useMemo(() => foundProducts.slice(0, 8), [foundProducts]);
+  // More results than before, so each office's count of matching products is right.
+  const { data: foundProducts = [] } = useProductSearch(searchTerm.length >= 2 ? searchTerm : "", 200);
   const { role } = useUserRole();
+  // Found products by office: the doctor's governorate first, the rest behind a button.
+  const offices = useMemo(() => groupByOffice(foundProducts, vendorAccounts, role?.city), [foundProducts, vendorAccounts, role?.city]);
+  const [showOtherCities, setShowOtherCities] = useState(false);
+  useEffect(() => setShowOtherCities(false), [searchTerm]);
+  const officeCount = offices.local.length + offices.others.length;
   const dentistName =
     role?.accountType === "dentist"
       ? [role.name, role.surname].filter(Boolean).join(" ").trim()
@@ -237,11 +242,16 @@ function DentistHome() {
             exact middle whatever the side buttons measure. */}
         <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 pb-3 md:contents">
           <div className="flex items-center gap-1.5 justify-self-start md:order-3 md:gap-2">
-            <button onClick={toggle} className="h-9 px-2 rounded-full bg-white border border-slate-200 flex items-center gap-1 text-xs font-bold text-slate-700 shadow-sm md:h-10 md:px-3.5">
+            {/* Language: a circle the size of the bell (phones), so both fit beside the centred logo. */}
+            <button
+              onClick={toggle}
+              aria-label={lang === "ar" ? "English" : "العربية"}
+              className="size-[34px] rounded-full bg-white border border-slate-200 flex items-center justify-center text-[11px] font-extrabold text-[#1D6FE8] shadow-sm md:size-auto md:h-10 md:px-3.5 md:gap-1 md:text-xs md:text-slate-700"
+            >
               <span>{lang === "ar" ? "EN" : "AR"}</span>
-              <Globe className="size-3.5 text-slate-400" />
+              <Globe className="hidden size-3.5 text-slate-400 md:block" />
             </button>
-            <NotificationBell userId={user?.uid || ""} />
+            <NotificationBell userId={user?.uid || ""} className="size-[34px] rounded-full md:size-10 md:rounded-xl [&>svg]:size-4 md:[&>svg]:size-5" />
           </div>
 
           {/* The fixed lg:+ header already carries the wordmark, so it only
@@ -279,7 +289,7 @@ function DentistHome() {
             value={searchQ}
             onChange={(e) => setSearchQ(e.target.value)}
             placeholder={lang === "ar" ? "ابحث عن زراعة، مادة، مختبر..." : "Search implants, materials, labs..."}
-            className="w-full h-12 rounded-2xl bg-white border border-slate-200 ps-4 pe-11 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-sm md:h-11 md:rounded-full md:text-[15px]"
+            className="w-full h-11 rounded-2xl bg-white border border-slate-200 ps-4 pe-10 text-[13.5px] [&::-webkit-search-cancel-button]:appearance-none text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-sm md:h-11 md:rounded-full md:text-[15px]"
           />
           {searchQ.length > 0 ? (
             <button
@@ -291,12 +301,12 @@ function DentistHome() {
               <X className="size-3 text-slate-600" />
             </button>
           ) : (
-            <Search className="size-4 absolute top-1/2 -translate-y-1/2 end-4 text-slate-400 pointer-events-none" />
+            <Search className="size-4 absolute top-1/2 -translate-y-1/2 end-3.5 text-slate-400 pointer-events-none" />
           )}
 
           {searchTerm.length >= 2 && (
             <div className="absolute top-full start-0 end-0 mt-1 bg-white rounded-2xl border border-slate-200 shadow-xl z-40 max-h-96 overflow-y-auto">
-              {accountResults.length === 0 && productResults.length === 0 ? (
+              {accountResults.length === 0 && officeCount === 0 ? (
                 <div className="p-4 text-center text-xs text-slate-400">
                   {lang === "ar" ? "لا توجد نتائج" : "No results found"}
                 </div>
@@ -324,30 +334,16 @@ function DentistHome() {
                       </div>
                     </Link>
                   ))}
-                  {productResults.map((p) => (
-                    <Link
-                      key={`prod-${p.id}`}
-                      to="/products/$productId"
-                      params={{ productId: p.id }}
-                      onClick={() => setSearchQ("")}
-                      className="flex items-center gap-3 px-4 py-3 hover:bg-sky-50/50 transition border-b border-slate-50 last:border-0"
-                    >
-                      <span className="size-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
-                        <Package className="size-[18px] text-slate-500" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold text-slate-800 truncate">{lang === "ar" ? p.ar || p.en : p.en || p.ar}</p>
-                        <p className="text-[11px] text-slate-400 truncate">{p.brand || (lang === "ar" ? "المورد" : "Supplier")}</p>
-                      </div>
-                      {p.priceLocked ? (
-                        <PriceLock officeId={p.companyId} compact />
-                      ) : (
-                        <span className="text-sm font-extrabold text-primary shrink-0">
-                          {p.currency === "IQD" ? `${p.price.toLocaleString()} د.ع` : `$${p.price.toFixed(2)}`}
-                        </span>
-                      )}
-                    </Link>
-                  ))}
+                  {officeCount > 0 && (
+                    <OfficeResults
+                      offices={offices}
+                      showOthers={showOtherCities || !offices.doctorCity || offices.local.length === 0}
+                      onShowOthers={() => setShowOtherCities(true)}
+                      term={searchQ.trim()}
+                      ar={lang === "ar"}
+                      onPick={() => setSearchQ("")}
+                    />
+                  )}
                 </>
               )}
             </div>
@@ -584,5 +580,92 @@ function BrandsStrip({ lang }: { lang: "ar" | "en" }) {
         ))}
       </div>
     </>
+  );
+}
+
+/**
+ * Search results by office: each office once with how many of its products
+ * match. The doctor's governorate comes first; other governorates open with a
+ * button (or show straight away when the doctor has none set, or none match nearby).
+ */
+function OfficeResults({
+  offices,
+  showOthers,
+  onShowOthers,
+  term,
+  ar,
+  onPick,
+}: {
+  offices: { local: OfficeHit[]; others: OfficeHit[]; doctorCity: string };
+  showOthers: boolean;
+  onShowOthers: () => void;
+  term: string;
+  ar: boolean;
+  onPick: () => void;
+}) {
+  const city = cityName(offices.doctorCity, ar);
+  const row = (o: OfficeHit) => (
+    <Link
+      key={`office-${o.id}`}
+      to="/profile/$accountId"
+      params={{ accountId: o.id }}
+      search={{ q: term }}
+      onClick={onPick}
+      className="flex items-center gap-3 px-4 py-2.5 hover:bg-sky-50/60 transition"
+    >
+      <span className="size-10 shrink-0 overflow-hidden rounded-xl bg-[#E8F1FE] text-[#1D6FE8] flex items-center justify-center">
+        {o.photoURL ? <img src={o.photoURL} alt="" className="size-full object-cover" /> : <Package className="size-[18px]" />}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-bold text-[#0F2747]">{o.name}</span>
+        {o.city && (
+          <span className="flex items-center gap-1 text-[11px] text-slate-400">
+            <MapPin className="size-2.5 shrink-0" />
+            {cityName(o.city, ar)}
+          </span>
+        )}
+      </span>
+      <span className="shrink-0 rounded-full bg-[#E8F1FE] px-2.5 py-1 text-[11px] font-extrabold text-[#1D6FE8]">{productsCount(o.count, ar)}</span>
+    </Link>
+  );
+  return (
+    <div className="py-1">
+      {offices.doctorCity ? (
+        <>
+          <p className="flex items-center gap-1 px-4 pt-2 pb-1 text-[11px] font-extrabold text-[#5B6B82]">
+            <MapPin className="size-3" />
+            {ar ? `مكاتب في ${city}` : `Offices in ${city}`}
+          </p>
+          {offices.local.length > 0 ? (
+            offices.local.map(row)
+          ) : (
+            <p className="px-4 pb-2 text-[11.5px] text-slate-400">
+              {ar ? `لا توجد مكاتب في ${city} لهذا المنتج` : `No offices in ${city} have this`}
+            </p>
+          )}
+        </>
+      ) : (
+        <p className="px-4 pt-2 pb-1 text-[11px] text-slate-400">
+          {ar ? "حدّد محافظتك من الإعدادات لترى مكاتب منطقتك أولاً" : "Set your governorate in Settings to see nearby offices first"}
+        </p>
+      )}
+      {offices.others.length > 0 &&
+        (showOthers ? (
+          <>
+            {offices.doctorCity && (
+              <p className="px-4 pt-2 pb-1 text-[11px] font-extrabold text-[#5B6B82]">{ar ? "المحافظات الأخرى" : "Other governorates"}</p>
+            )}
+            {offices.others.map(row)}
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={onShowOthers}
+            className="mx-4 my-2 flex h-9 w-[calc(100%-2rem)] items-center justify-center rounded-xl bg-[#E8F1FE] text-[12px] font-extrabold text-[#1D6FE8] hover:bg-[#d8e8fe]"
+          >
+            {ar ? `عرض المكاتب في المحافظات الأخرى (${offices.others.length})` : `Show offices in other governorates (${offices.others.length})`}
+          </button>
+        ))}
+    </div>
   );
 }

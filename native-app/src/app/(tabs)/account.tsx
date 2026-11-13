@@ -86,6 +86,17 @@ export default function AccountScreen() {
         <ChevronRight size={18} color="#CBD5E1" />
       </Pressable>
 
+      {/* Sign out sits right under the profile, above the menu (as on the website). */}
+      <Pressable
+        onPress={() => signOutDevice()}
+        className="mt-3 h-11 flex-row items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50"
+      >
+        <LogOut size={17} color="#E11D48" />
+        <Text className="text-sm font-bold text-rose-600">
+          {ar ? 'تسجيل الخروج' : 'Sign out'}
+        </Text>
+      </Pressable>
+
       {/* Menu */}
       <View className="mt-5 gap-2.5">
         <Row
@@ -153,15 +164,6 @@ export default function AccountScreen() {
         />
       </View>
 
-      <Pressable
-        onPress={() => signOutDevice()}
-        className="mt-6 h-12 flex-row items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50"
-      >
-        <LogOut size={17} color="#E11D48" />
-        <Text className="text-sm font-bold text-rose-600">
-          {ar ? 'تسجيل الخروج' : 'Sign out'}
-        </Text>
-      </Pressable>
     </Screen>
   );
 }

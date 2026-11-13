@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Loader2, Megaphone, Trash2, X } from "lucide-react";
+import { Loader2, Megaphone, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { useOffers, useUpsertOffer, useDeleteOffer, type Offer } from "@/lib/offers";
 import { useSignedImageUrls } from "@/lib/products";
@@ -37,7 +37,7 @@ export function OfficeOffers({ supplierId }: { supplierId: string }) {
   const ar = lang === "ar";
   const { data: offers = [], isLoading } = useOffers(supplierId);
   const deleteOffer = useDeleteOffer();
-  const [editing, setEditing] = useState<Offer | null>(null);
+  const [editing, setEditing] = useState<Offer | "new" | null>(null);
 
   const allPaths = offers.filter((o) => o.imageUrl).map((o) => o.imageUrl);
   const { data: urlMap = {} } = useSignedImageUrls(allPaths);
@@ -50,9 +50,20 @@ export function OfficeOffers({ supplierId }: { supplierId: string }) {
 
   return (
     <div className="space-y-3">
-      <p className="text-sm font-bold text-slate-600 md:text-base md:text-slate-800">
-        {ar ? "عروضك" : "Your offers"} ({offers.length})
-      </p>
+      {/* Offices could only edit offers; there was no way to add one. */}
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-bold text-slate-600 md:text-base md:text-slate-800">
+          {ar ? "عروضك" : "Your offers"} ({offers.length})
+        </p>
+        <button
+          type="button"
+          onClick={() => setEditing("new")}
+          className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[#1D6FE8] px-3.5 text-[12px] font-extrabold text-white shadow-sm transition hover:brightness-110"
+        >
+          <Plus className="size-4" strokeWidth={2.8} />
+          {ar ? "إضافة عرض" : "Add offer"}
+        </button>
+      </div>
 
       {isLoading ? (
         <div className="flex items-center justify-center py-20">
@@ -62,6 +73,9 @@ export function OfficeOffers({ supplierId }: { supplierId: string }) {
         <div className="py-16 flex flex-col items-center text-center text-muted-foreground">
           <Megaphone className="size-12 mb-3 opacity-20" />
           <p className="text-sm text-slate-400">{ar ? "لا توجد عروض بعد" : "No offers yet"}</p>
+          <p className="mt-1 text-xs text-slate-400">
+            {ar ? "أضف عرضك الأول، ويظهر للأطباء بعد مراجعة الإدارة" : "Add your first offer; doctors see it once it is reviewed"}
+          </p>
         </div>
       ) : (
         <div className="space-y-2.5 md:space-y-0 md:grid md:grid-cols-2 md:gap-4 lg:grid-cols-3">
@@ -136,7 +150,7 @@ export function OfficeOffers({ supplierId }: { supplierId: string }) {
         <OfferEditModal
           ar={ar}
           supplierId={supplierId}
-          offer={editing}
+          offer={editing === "new" ? null : editing}
           onClose={() => setEditing(null)}
         />
       )}
@@ -152,15 +166,16 @@ function OfferEditModal({
 }: {
   ar: boolean;
   supplierId: string;
-  offer: Offer;
+  /** null: a new offer. */
+  offer: Offer | null;
   onClose: () => void;
 }) {
   const upsert = useUpsertOffer();
-  const [title, setTitle] = useState(offer.title ?? "");
-  const [description, setDescription] = useState(offer.description ?? "");
-  const [price, setPrice] = useState(offer.price != null ? String(offer.price) : "");
-  const [currency, setCurrency] = useState<"USD" | "IQD">(offer.currency === "IQD" ? "IQD" : "USD");
-  const [expiryDate, setExpiryDate] = useState(offer.expiryDate ?? "");
+  const [title, setTitle] = useState(offer?.title ?? "");
+  const [description, setDescription] = useState(offer?.description ?? "");
+  const [price, setPrice] = useState(offer?.price != null ? String(offer.price) : "");
+  const [currency, setCurrency] = useState<"USD" | "IQD">(offer?.currency === "IQD" ? "IQD" : "USD");
+  const [expiryDate, setExpiryDate] = useState(offer?.expiryDate ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -173,22 +188,24 @@ function OfferEditModal({
     setError("");
     try {
       await upsert.mutateAsync({
-        id: offer.id,
+        id: offer?.id ?? crypto.randomUUID(),
         supplierId,
         title: title.trim(),
         description: description.trim(),
-        imageUrl: offer.imageUrl ?? "",
+        imageUrl: offer?.imageUrl ?? "",
         expiryDate: expiryDate.trim(),
         price: price.trim() ? Number(price) : undefined,
         currency: price.trim() ? currency : undefined,
-        discountPct: offer.discountPct,
-        // Editing keeps the offer's current review status; only an admin
-        // moves it between pending/active/rejected.
-        status: offer.status ?? "pending",
-        rejectReason: offer.rejectReason,
-        createdAt: offer.createdAt,
+        discountPct: offer?.discountPct,
+        // A new offer starts "pending" (admin review); editing keeps the
+        // offer's current status — only an admin moves it.
+        status: offer?.status ?? "pending",
+        rejectReason: offer?.rejectReason,
+        createdAt: offer?.createdAt,
       });
-      toast.success(ar ? "تم حفظ العرض" : "Offer saved");
+      toast.success(
+        offer ? (ar ? "تم حفظ العرض" : "Offer saved") : ar ? "تم إرسال العرض للمراجعة" : "Offer submitted for review",
+      );
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -206,7 +223,7 @@ function OfferEditModal({
       <div className="relative w-full max-w-md max-h-[85vh] overflow-y-auto rounded-t-3xl bg-white p-5 pb-8 space-y-3 shadow-2xl animate-in slide-in-from-bottom md:rounded-3xl md:max-w-lg md:pb-5">
         <div className="flex items-center justify-between">
           <h3 className="font-display font-extrabold text-lg text-slate-900">
-            {ar ? "تعديل العرض" : "Edit offer"}
+            {offer ? (ar ? "تعديل العرض" : "Edit offer") : ar ? "إضافة عرض" : "Add offer"}
           </h3>
           <button
             type="button"

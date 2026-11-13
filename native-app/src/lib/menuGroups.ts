@@ -19,7 +19,7 @@ const ORDER: MenuGroupKey[] = ["work", "clinic", "shop", "account", "help"];
 
 const CLINIC = ["/clinic", "/patients", "/track-cases"];
 const SHOP = ["/supplies", "/brands", "/offers", "/favorites", "/cart", "/implants", "/labs", "/explore"];
-const ACCOUNT = ["/my-ads", "/messages", "/notifications", "/settings", "/account/settings", "/orders", "/reports", "/pricing"];
+const ACCOUNT = ["/my-ads", "/my-offers", "/messages", "/notifications", "/settings", "/account/settings", "/orders", "/reports", "/pricing"];
 const HELP = ["/help", "/account/help", "/privacy", "/account/about"];
 
 /** Which group a link belongs to. An office's own dashboard pages are "work". */

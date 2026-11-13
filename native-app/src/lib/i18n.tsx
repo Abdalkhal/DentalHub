@@ -248,6 +248,7 @@ export const dict = {
   screen_lab_reports: { ar: "التقارير", en: "Reports" },
   screen_lab_services: { ar: "خدمات المختبر", en: "Lab Services" },
   screen_my_ads: { ar: "إعلاناتي", en: "My Ads" },
+  screen_my_offers: { ar: "عروضي", en: "My Offers" },
   screen_privacy: { ar: "سياسة الخصوصية", en: "Privacy Policy" },
 } satisfies Dict;
 

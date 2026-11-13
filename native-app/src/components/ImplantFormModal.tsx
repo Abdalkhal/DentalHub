@@ -602,18 +602,10 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
                   <Field label={ar ? 'الشركة المصنعة' : 'Manufacturer'} required>
                     <TextInput value={brand} onChangeText={setBrand} placeholder={ar ? 'اكتب اسم الشركة' : 'Type manufacturer'} placeholderTextColor="#94A3B8" className={inputCls} style={{ ...SINGLE_LINE_INPUT, writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }} />
                   </Field>
-                  <View className="flex-row gap-2.5">
-                    <View className="flex-1">
-                      <Field label={ar ? 'بلد المنشأ' : 'Country of origin'}>
-                        <CountrySelect value={country} onChange={setCountry} ar={ar} />
-                      </Field>
-                    </View>
-                    <View className="flex-1">
-                      <Field label={ar ? 'خط المنتج' : 'Product line'}>
-                        <TextInput value={line} onChangeText={setLine} placeholder={ar ? 'مثال: GuideSystem' : 'e.g. GuideSystem'} placeholderTextColor="#94A3B8" className={inputCls} style={{ ...SINGLE_LINE_INPUT, writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }} />
-                      </Field>
-                    </View>
-                  </View>
+                  {/* The kit's "product line" field was removed; an existing value is kept on save. */}
+                  <Field label={ar ? 'بلد المنشأ' : 'Country of origin'}>
+                    <CountrySelect value={country} onChange={setCountry} ar={ar} />
+                  </Field>
                 </SectionCard>
 
                 <SectionCard title={ar ? 'إعدادات الكت الجراحي' : 'Surgical Kit Configuration'}>
@@ -623,32 +615,7 @@ export function ImplantFormModal({ open, onClose, ar, product }: { open: boolean
                   <Field label={ar ? 'بروتوكول الزرع' : 'Implant placement protocol'}>
                     <Select value={placementType} onChange={setPlacementType} options={placementOptions} />
                   </Field>
-                  <Field label={ar ? 'التوافق' : 'Compatibility'}>
-                    <View className="flex-row gap-2">
-                      <TextInput
-                        value={compatDraft}
-                        onChangeText={setCompatDraft}
-                        onSubmitEditing={addCompat}
-                        placeholder={ar ? 'اكتب قيمة واضغط +' : 'Type a value, tap +'}
-                        placeholderTextColor="#94A3B8"
-                        className={cn(inputCls, 'flex-1')}
-                        style={{ ...SINGLE_LINE_INPUT, writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left' }}
-                      />
-                      <Pressable onPress={addCompat} className="h-12 w-12 items-center justify-center rounded-2xl" style={{ backgroundColor: ACCENT }}>
-                        <Plus size={18} color="#FFFFFF" />
-                      </Pressable>
-                    </View>
-                    {compatibility.length > 0 && (
-                      <View className="mt-2 flex-row flex-wrap gap-1.5">
-                        {compatibility.map((c, i) => (
-                          <Pressable key={`${c}-${i}`} onPress={() => setCompatibility((prev) => prev.filter((_, idx) => idx !== i))} className="flex-row items-center gap-1 rounded-full bg-sky-100 px-3 py-1.5">
-                            <Text className="text-[11px] font-bold text-sky-700">{c}</Text>
-                            <X size={10} color="#0369A1" />
-                          </Pressable>
-                        ))}
-                      </View>
-                    )}
-                  </Field>
+                  {/* The "compatibility" field was removed; existing values are kept on save. */}
                   <Field label={ar ? 'عدد الأدوات' : 'Tools count'}>
                     <TextInput value={toolsCount} onChangeText={(v) => setToolsCount(v.replace(/[^0-9]/g, ''))} keyboardType="number-pad" placeholder="0" placeholderTextColor="#94A3B8" className={inputCls} style={{ ...SINGLE_LINE_INPUT, writingDirection: 'ltr', textAlign: 'left' }} />
                   </Field>

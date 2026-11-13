@@ -13,7 +13,6 @@ import {
   Bell,
   ClipboardList,
   FlaskConical,
-  Globe,
   History,
   MapPin,
   Megaphone,
@@ -35,7 +34,6 @@ import { setFavoritesStoreUser } from '@/lib/favoritesStore';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import { useProductSearch, useSignedImageUrls } from '@/lib/products';
-import { PriceLock } from '@/components/PriceLock';
 import { useQuickOrders, setQuickOrdersStoreUser } from '@/lib/quickOrders';
 import { useImplantOffers } from '@/lib/implantOffers';
 import { useActiveAds, type Ad } from '@/lib/adsStore';
@@ -43,6 +41,7 @@ import { AdDetailModal } from '@/components/AdDetailModal';
 import { useOrders } from '@/lib/ordersStore';
 import { useDentistCases, filterLegacyOrders } from '@/lib/caseTracking';
 import { useVendorAccounts, type VendorAccount } from '@/lib/search';
+import { cityName, groupByOffice, productsCount, type OfficeHit } from '@/lib/officeSearch';
 import { BRANDS } from '@/data/brands';
 
 const LOGO_MARK = require('../../../assets/images/logo-mark.png');
@@ -61,6 +60,8 @@ const softShadow = {
 } as const;
 /** Ads are designed as 2:1 banners; the frame keeps that ratio on every phone. */
 const BANNER_RATIO = 2;
+/** The header's two sides: equal, and never wider than their share (minWidth 0), so the logo stays in the middle. */
+const SIDE = { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 } as const;
 
 type Role = 'supply' | 'lab' | 'implant';
 type Banner = { title: string; subtitle: string; price?: string; image?: string };
@@ -164,7 +165,8 @@ export default function HomeScreen() {
   useSession();
 
   const [productTerm, setProductTerm] = useState('');
-  const { data: foundProducts = [] } = useProductSearch(productTerm);
+  // More results than before, so each office's count of matching products is right.
+  const { data: foundProducts = [] } = useProductSearch(productTerm, 200);
   const quickItems = useQuickOrders();
   const { offers: implantOffers = [] } = useImplantOffers();
 
@@ -253,7 +255,11 @@ export default function HomeScreen() {
   useEffect(() => {
     setProductTerm(q.trim().length >= 2 ? q : '');
   }, [q]);
-  const searchResults = useMemo(() => foundProducts.slice(0, 8), [foundProducts]);
+  // Found products by office: the doctor's governorate first, the rest behind a button.
+  const offices = useMemo(() => groupByOffice(foundProducts, vendorAccounts, role?.city), [foundProducts, vendorAccounts, role?.city]);
+  const [showOtherCities, setShowOtherCities] = useState(false);
+  useEffect(() => setShowOtherCities(false), [productTerm]);
+  const officeCount = offices.local.length + offices.others.length;
 
   // Case tracking, ported from the web home ("Track Cases" banner + count):
   // a case reaches the dentist either because they sent it themselves
@@ -329,7 +335,7 @@ export default function HomeScreen() {
           sides take equal room), language and notifications on the other.
           The cart is a floating button that appears once something is in it. */}
       <View className="flex-row items-center pb-2.5">
-        <View className="flex-1 items-start">
+        <View className="items-start" style={SIDE}>
           <Pressable onPress={() => router.push('/account')} className="items-center" accessibilityLabel={ar ? 'حسابي' : 'Account'} hitSlop={{ bottom: 14 }}>
             <View
               className="h-11 w-11 items-center justify-center overflow-hidden rounded-full"
@@ -371,25 +377,25 @@ export default function HomeScreen() {
             <Image source={LOGO_MARK} style={{ width: 44, height: 44 }} resizeMode="cover" />
           </View>
           <View>
-            <Text className="text-[18px] font-extrabold leading-[22px]" style={{ letterSpacing: -0.4 }}>
+            <Text className="text-[17px] font-extrabold leading-[21px]" style={{ letterSpacing: -0.4 }}>
               <Text style={{ color: BLUE }}>Dent</Text>
               <Text style={{ color: NAVY }}> Hub</Text>
             </Text>
-            <Text className="text-[7.5px] font-bold" style={{ letterSpacing: 1.1, color: '#7C8DA6' }}>
+            <Text className="text-[7.5px] font-bold" style={{ letterSpacing: 0.7, color: '#7C8DA6' }}>
               DENTAL MARKETPLACE
             </Text>
           </View>
         </View>
 
-        <View className="flex-1 flex-row items-center justify-end gap-1.5">
+        <View className="flex-row items-center justify-end gap-1.5" style={SIDE}>
           {!isGuest && (
             <Pressable
               onPress={() => router.push('/notifications')}
-              className="relative h-[38px] w-[38px] items-center justify-center rounded-full border bg-white"
+              className="relative h-[34px] w-[34px] items-center justify-center rounded-full border bg-white"
               style={{ borderColor: LINE, ...softShadow }}
               accessibilityLabel={ar ? 'الإشعارات' : 'Notifications'}
             >
-              <Bell size={17} color={NAVY} />
+              <Bell size={16} color={NAVY} />
               {unreadCount > 0 && (
                 <View className="absolute -end-1 -top-1 h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1">
                   <Text className="text-[9px] font-bold text-white">{unreadCount > 9 ? '9+' : unreadCount}</Text>
@@ -397,15 +403,16 @@ export default function HomeScreen() {
               )}
             </Pressable>
           )}
+          {/* Language: a circle the size of the bell, so both fit beside the centred logo. */}
           <Pressable
             onPress={toggle}
-            className="h-[38px] flex-row items-center gap-1 rounded-full border bg-white px-2.5"
+            className="h-[34px] w-[34px] items-center justify-center rounded-full border bg-white"
             style={{ borderColor: LINE, ...softShadow }}
+            accessibilityLabel={ar ? 'English' : 'العربية'}
           >
-            <Text className="text-xs font-extrabold" style={{ color: NAVY }}>
+            <Text className="text-[11px] font-extrabold" style={{ color: BLUE }}>
               {lang === 'ar' ? 'EN' : 'AR'}
             </Text>
-            <Globe size={13} color={BLUE} />
           </Pressable>
         </View>
       </View>
@@ -419,10 +426,10 @@ export default function HomeScreen() {
           placeholder={ar ? 'ابحث...' : 'Search...'}
           placeholderTextColor="#8A9AB0"
           style={{ writingDirection: ar ? 'rtl' : 'ltr', textAlign: ar ? 'right' : 'left', borderColor: '#CFDDF0', color: NAVY, ...softShadow }}
-          className="h-[52px] w-full rounded-2xl border bg-white pl-10 pr-12 text-[14px]"
+          className="h-11 w-full rounded-2xl border bg-white pl-10 pr-11 text-[13.5px]"
         />
         <View className="absolute bottom-0 right-4 top-0 justify-center">
-          <Search size={19} color={BLUE} />
+          <Search size={17} color={BLUE} />
         </View>
         {q.length > 0 && (
           <Pressable
@@ -448,7 +455,7 @@ export default function HomeScreen() {
       {/* Search results (replaces content while typing) */}
       {q.trim().length >= 2 ? (
         <View className="mt-2 gap-2 pb-10">
-          {accountResults.length === 0 && searchResults.length === 0 ? (
+          {accountResults.length === 0 && officeCount === 0 ? (
             <Text className="py-10 text-center text-slate-400">
               {ar ? 'لا توجد نتائج' : 'No results found'}
             </Text>
@@ -487,35 +494,19 @@ export default function HomeScreen() {
                   </View>
                 </Pressable>
               ))}
-              {searchResults.map((p) => (
-                <Pressable
-                  key={p.id}
-                  onPress={() => {
+              {officeCount > 0 && (
+                <OfficeResults
+                  offices={offices}
+                  showOthers={showOtherCities || !offices.doctorCity || offices.local.length === 0}
+                  onShowOthers={() => setShowOtherCities(true)}
+                  ar={ar}
+                  onPick={(id) => {
+                    const term = q.trim();
                     setQ('');
-                    openProduct(p.id);
+                    router.push({ pathname: '/profile/[accountId]', params: { accountId: id, q: term } });
                   }}
-                  className="flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-card p-3 shadow-sm"
-                >
-                  <View className="h-10 w-10 items-center justify-center rounded-xl bg-slate-100">
-                    <Package size={18} color="#64748B" />
-                  </View>
-                  <View className="min-w-0 flex-1">
-                    <Text className="text-sm font-bold text-slate-800" numberOfLines={1}>
-                      {ar ? p.ar || p.en : p.en || p.ar}
-                    </Text>
-                    <Text className="text-[11px] text-slate-400" numberOfLines={1}>
-                      {p.brand || (ar ? 'المورد' : 'Supplier')}
-                    </Text>
-                  </View>
-                  {p.priceLocked ? (
-                    <PriceLock officeId={p.companyId} compact />
-                  ) : (
-                    <Text className="text-sm font-extrabold text-primary">
-                      {p.currency === 'IQD' ? `${p.price.toLocaleString()} د.ع` : `$${p.price.toFixed(2)}`}
-                    </Text>
-                  )}
-                </Pressable>
-              ))}
+                />
+              )}
             </>
           )}
         </View>
@@ -803,5 +794,96 @@ export default function HomeScreen() {
     </Screen>
     {!!viewingAd && <AdDetailModal ad={viewingAd} ar={ar} onClose={() => setViewingAd(null)} />}
     </>
+  );
+}
+
+/**
+ * Search results by office: each office once with how many of its products
+ * match. The doctor's governorate comes first; other governorates open with a
+ * button (or show straight away when the doctor has none set, or none match nearby).
+ */
+function OfficeResults({
+  offices,
+  showOthers,
+  onShowOthers,
+  ar,
+  onPick,
+}: {
+  offices: { local: OfficeHit[]; others: OfficeHit[]; doctorCity: string };
+  showOthers: boolean;
+  onShowOthers: () => void;
+  ar: boolean;
+  onPick: (officeId: string) => void;
+}) {
+  const city = cityName(offices.doctorCity, ar);
+  const row = (o: OfficeHit) => (
+    <Pressable
+      key={o.id}
+      onPress={() => onPick(o.id)}
+      className="flex-row items-center gap-3 rounded-[18px] border bg-white p-3"
+      style={{ borderColor: LINE, ...softShadow }}
+    >
+      <View className="h-10 w-10 items-center justify-center overflow-hidden rounded-xl" style={{ backgroundColor: '#E8F1FE' }}>
+        {o.photoURL ? <Image source={{ uri: o.photoURL }} style={{ width: 40, height: 40 }} resizeMode="cover" /> : <Package size={18} color={BLUE} />}
+      </View>
+      <View className="min-w-0 flex-1">
+        <Text numberOfLines={1} className="text-sm font-bold" style={{ color: NAVY }}>
+          {o.name}
+        </Text>
+        {!!o.city && (
+          <View className="mt-0.5 flex-row items-center gap-1">
+            <MapPin size={10} color="#94A3B8" />
+            <Text className="text-[11px] text-slate-400">{cityName(o.city, ar)}</Text>
+          </View>
+        )}
+      </View>
+      <View className="rounded-full px-2.5 py-1" style={{ backgroundColor: '#E8F1FE' }}>
+        <Text className="text-[11px] font-extrabold" style={{ color: BLUE }}>
+          {productsCount(o.count, ar)}
+        </Text>
+      </View>
+    </Pressable>
+  );
+  return (
+    <View className="gap-2">
+      {offices.doctorCity ? (
+        <>
+          <View className="mt-1 flex-row items-center gap-1 px-1">
+            <MapPin size={12} color={MUTED} />
+            <Text className="text-[12px] font-extrabold" style={{ color: MUTED }}>
+              {ar ? `مكاتب في ${city}` : `Offices in ${city}`}
+            </Text>
+          </View>
+          {offices.local.length > 0 ? (
+            offices.local.map(row)
+          ) : (
+            <Text className="px-1 text-[12px] text-slate-400">
+              {ar ? `لا توجد مكاتب في ${city} لهذا المنتج` : `No offices in ${city} have this`}
+            </Text>
+          )}
+        </>
+      ) : (
+        <Text className="px-1 text-[11.5px] text-slate-400">
+          {ar ? 'حدّد محافظتك من الإعدادات لترى مكاتب منطقتك أولاً' : 'Set your governorate in Settings to see nearby offices first'}
+        </Text>
+      )}
+      {offices.others.length > 0 &&
+        (showOthers ? (
+          <>
+            {!!offices.doctorCity && (
+              <Text className="mt-1 px-1 text-[12px] font-extrabold" style={{ color: MUTED }}>
+                {ar ? 'المحافظات الأخرى' : 'Other governorates'}
+              </Text>
+            )}
+            {offices.others.map(row)}
+          </>
+        ) : (
+          <Pressable onPress={onShowOthers} className="h-10 items-center justify-center rounded-xl" style={{ backgroundColor: '#E8F1FE' }}>
+            <Text className="text-[12.5px] font-extrabold" style={{ color: BLUE }}>
+              {ar ? `عرض المكاتب في المحافظات الأخرى (${offices.others.length})` : `Show offices in other governorates (${offices.others.length})`}
+            </Text>
+          </Pressable>
+        ))}
+    </View>
   );
 }

@@ -9,6 +9,8 @@ export type VendorAccount = {
   name: string;
   category: VendorCategory;
   location: string;
+  /** The governorate as saved on the profile (an id like "nineveh", or older Arabic names). */
+  city: string;
   photoURL: string;
 };
 
@@ -39,6 +41,7 @@ export function useVendorAccounts() {
           name,
           category,
           location: String(u.city || u.address || ""),
+          city: String(u.city || ""),
           photoURL: typeof u.photoURL === "string" ? u.photoURL : "",
         });
       }

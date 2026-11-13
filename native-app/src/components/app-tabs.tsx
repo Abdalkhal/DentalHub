@@ -158,7 +158,10 @@ export default function AppTabs() {
                           : undefined,
                     tabBarBadgeStyle: { backgroundColor: '#EF4444', color: '#FFFFFF', fontSize: 10 },
                   }
-                : { href: null }
+                : // Hidden from the bar but still reachable (e.g. Account from the
+                  // home avatar): keep its translated title — it showed the raw
+                  // route name ("account").
+                  { href: null, title: ar ? label.ar : label.en, headerShown: name !== 'index' }
             }
             // The messages screen is a full-screen stack screen (no tab bar
             // under an open chat); the tab only opens it.

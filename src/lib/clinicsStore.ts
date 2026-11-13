@@ -3,6 +3,7 @@ import { setClinicStoreUser } from "./clinicStore";
 import { onSnapshot, setDoc } from "firebase/firestore";
 import { setPatientStoreUser, setPatientSyncReady } from "./patientsStore";
 import { clinicsDoc } from "./dentistRecords";
+import { emptyDuplicateClinics } from "./clinicDedupe";
 import { setAppointmentSyncReady, setAppointmentsStoreUser } from "./appointmentsStore";
 import { setMaterialsStoreUser, setMaterialsSyncReady } from "./materialsStore";
 
@@ -144,6 +145,19 @@ function copyLocalClinicData(uid: string, fromId: string, toId: string) {
   }
 }
 
+/** Once per account per session: removes empty same-name duplicates from the list (see clinicDedupe). */
+let dedupeCheckedFor = "";
+async function dropEmptyDuplicates(uid: string) {
+  if (dedupeCheckedFor === uid) return;
+  dedupeCheckedFor = uid;
+  const drop = await emptyDuplicateClinics(uid, state.clinics, state.activeClinicId);
+  if (!drop.length || uid !== currentUserId) return;
+  state = { ...state, clinics: state.clinics.filter((c) => !drop.includes(c.id)) };
+  save();
+  emit();
+  pushClinics();
+}
+
 function watchClinics(uid: string) {
   unsubscribeClinics?.();
   unsubscribeClinics = null;
@@ -182,6 +196,7 @@ function watchClinics(uid: string) {
         setPatientSyncReady(true);
         setAppointmentSyncReady(true);
         setMaterialsSyncReady(true);
+        void dropEmptyDuplicates(uid);
       },
       (err) => console.warn("Clinic list sync error:", err),
     );

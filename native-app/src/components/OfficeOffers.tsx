@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Alert, Modal, Pressable, View } from 'react-native';
 import { KeyboardAwareScrollView } from '@/components/ui/KeyboardAwareScrollView';
-import { Trash2 } from 'lucide-react-native';
+import { Plus, Trash2 } from 'lucide-react-native';
 
 import { Button, Input, Text } from '@/components/ui';
 import { useOffers, useUpsertOffer, useDeleteOffer, type Offer } from '@/lib/offers';
@@ -61,16 +61,24 @@ export function OfficeOffers({ supplierId }: { supplierId: string }) {
 
   return (
     <View className="mt-6 pb-4">
+      {/* The add-offer form existed but nothing opened it — offices could not add offers. */}
       <View className="flex-row items-center justify-between">
         <Text className="text-sm font-bold text-slate-600">
           {ar ? 'عروضك' : 'Your offers'} ({offers.length})
         </Text>
+        <Pressable onPress={() => setEditing('new')} className="h-9 flex-row items-center gap-1.5 rounded-full px-3.5" style={{ backgroundColor: '#1D6FE8' }}>
+          <Plus size={15} color="#FFFFFF" strokeWidth={2.8} />
+          <Text className="text-[12px] font-extrabold text-white">{ar ? 'إضافة عرض' : 'Add offer'}</Text>
+        </Pressable>
       </View>
 
       {offers.length === 0 ? (
-        <Text className="mt-4 text-center text-xs text-slate-400">
-          {ar ? 'لا توجد عروض بعد' : 'No offers yet'}
-        </Text>
+        <View className="mt-6 items-center">
+          <Text className="text-center text-xs text-slate-400">{ar ? 'لا توجد عروض بعد' : 'No offers yet'}</Text>
+          <Text className="mt-1 text-center text-[11px] text-slate-400">
+            {ar ? 'أضف عرضك الأول، ويظهر للأطباء بعد مراجعة الإدارة' : 'Add your first offer; doctors see it once it is reviewed'}
+          </Text>
+        </View>
       ) : (
         <View className="mt-3 gap-2.5">
           {offers.map((o) => {

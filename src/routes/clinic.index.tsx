@@ -332,9 +332,9 @@ function ClinicHome() {
       {showAddAppointment && <AddAppointmentModal onClose={() => setShowAddAppointment(false)} />}
 
       {formMode !== "closed" && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
           <div className="fixed inset-0 bg-black/40" onClick={() => setFormMode("closed")} />
-          <div className="relative w-full max-w-md space-y-4 rounded-t-3xl bg-[#EBF3FA] p-5 sm:rounded-3xl">
+          <div className="relative w-full max-w-md space-y-4 rounded-3xl bg-[#EBF3FA] p-5 shadow-2xl">
             <h3 className="font-display text-lg font-extrabold text-slate-800">
               {formMode === "add" ? (ar ? "عيادة جديدة" : "New clinic") : ar ? "تعديل العيادة" : "Edit clinic"}
             </h3>

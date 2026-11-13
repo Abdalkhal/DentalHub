@@ -49,7 +49,14 @@ function money(price: number, cur: string): string {
 }
 
 export default function ProfileScreen() {
-  const { accountId } = useLocalSearchParams<{ accountId: string }>();
+  const { accountId, q } = useLocalSearchParams<{ accountId: string; q?: string }>();
+  // Opened from the home search: only the products matching it are shown, until cleared.
+  const [searchText, setSearchText] = useState(() => (typeof q === 'string' ? q.trim() : ''));
+  const searchWords = useMemo(
+    () => searchText.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 2),
+    [searchText],
+  );
+  const searching = searchWords.length > 0;
   const { lang } = useI18n();
   const ar = lang === 'ar';
   const { user, role } = useUserRole();
@@ -98,10 +105,16 @@ export default function ProfileScreen() {
   const activeBranch = branchFilter !== 'all' ? BRANCH_OPTIONS.find((b) => b.value === branchFilter) : null;
 
   const filteredProducts = useMemo(() => {
+    if (searching) {
+      return products.filter((p) => {
+        const hay = [p.en, p.ar, p.brand].filter(Boolean).join(' ').toLowerCase();
+        return searchWords.every((w) => hay.includes(w));
+      });
+    }
     if (!isSupply) return products;
     if (branchFilter === 'all') return [];
     return products.filter((p) => p.branch === branchFilter);
-  }, [products, branchFilter, isSupply]);
+  }, [products, branchFilter, isSupply, searching, searchWords]);
 
   const { data: urlMap = {} } = useSignedImageUrls(
     useMemo(() => filteredProducts.map((p) => p.images?.[0]).filter(Boolean) as string[], [filteredProducts]),
@@ -293,21 +306,30 @@ export default function ProfileScreen() {
       {/* Supply: branch categories, then that branch's products */}
       {isSupply && (
         <View className="mt-5 pb-4">
-          {activeBranch ? (
+          {activeBranch || searching ? (
             <>
-              <Pressable onPress={() => setBranchFilter('all')} className="mb-3 flex-row items-center gap-1.5">
+              <Pressable
+                onPress={() => (searching ? setSearchText('') : setBranchFilter('all'))}
+                className="mb-3 flex-row items-center gap-1.5"
+              >
                 <Package size={15} color="#2563EB" />
-                <Text className="text-sm font-bold text-primary">{ar ? 'كل الفئات' : 'All Categories'}</Text>
+                <Text className="text-sm font-bold text-primary">
+                  {searching ? (ar ? 'عرض كل منتجات المكتب' : "Show all of this office's products") : ar ? 'كل الفئات' : 'All Categories'}
+                </Text>
               </Pressable>
               <View className="mb-3 flex-row items-center gap-3 rounded-2xl bg-primary/5 p-3">
                 <View className="h-10 w-10 items-center justify-center rounded-xl bg-primary/15">
                   {(() => {
-                    const Badge = BRANCH_BADGE[activeBranch.value] ?? Package;
+                    const Badge = (activeBranch && !searching && BRANCH_BADGE[activeBranch.value]) || Package;
                     return <Badge size={18} color="#2563EB" />;
                   })()}
                 </View>
-                <View>
-                  <Text className="text-sm font-extrabold text-slate-800">{ar ? activeBranch.ar : activeBranch.en}</Text>
+                <View className="min-w-0 flex-1">
+                  <Text numberOfLines={1} className="text-sm font-extrabold text-slate-800">
+                    {searching
+                      ? ar ? `نتائج «${searchText}»` : `Results for “${searchText}”`
+                      : activeBranch ? (ar ? activeBranch.ar : activeBranch.en) : ''}
+                  </Text>
                   <Text className="text-[11px] text-slate-500">
                     {filteredProducts.length} {ar ? 'منتج' : 'products'}
                   </Text>
@@ -344,7 +366,9 @@ export default function ProfileScreen() {
                 <View className="items-center py-10">
                   <Package size={32} color="#CBD5E1" />
                   <Text className="mt-2 text-sm text-slate-400">
-                    {ar ? `لا توجد منتجات في ${activeBranch.ar}` : `No products in ${activeBranch.en}`}
+                    {searching || !activeBranch
+                      ? ar ? 'لا توجد منتجات مطابقة لدى هذا المكتب' : 'No matching products here'
+                      : ar ? `لا توجد منتجات في ${activeBranch.ar}` : `No products in ${activeBranch.en}`}
                   </Text>
                 </View>
               )}
@@ -401,14 +425,20 @@ export default function ProfileScreen() {
         <View className="mt-5 pb-4">
           <View className="mb-3 flex-row items-center justify-between">
             <Text className="text-sm font-extrabold text-slate-800">
-              {ar ? 'المنتجات' : 'Products'}
+              {searching ? (ar ? `نتائج «${searchText}»` : `Results for “${searchText}”`) : ar ? 'المنتجات' : 'Products'}
             </Text>
-            <Text className="text-xs text-slate-400">
-              {products.length} {ar ? 'منتج' : 'items'}
-            </Text>
+            {searching ? (
+              <Pressable onPress={() => setSearchText('')} hitSlop={8}>
+                <Text className="text-xs font-bold text-primary">{ar ? 'عرض الكل' : 'Show all'}</Text>
+              </Pressable>
+            ) : (
+              <Text className="text-xs text-slate-400">
+                {products.length} {ar ? 'منتج' : 'items'}
+              </Text>
+            )}
           </View>
           <View className="flex-row flex-wrap justify-between gap-y-3">
-            {products.map((p) => (
+            {(searching ? filteredProducts : products).map((p) => (
               <Pressable key={p.id} onPress={() => openProduct(p)} className="w-[48.5%]">
                 <View className="overflow-hidden rounded-2xl border border-slate-200 bg-card shadow-sm">
                   <ProductImage

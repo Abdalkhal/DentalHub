@@ -112,8 +112,10 @@ const branchOptions = [
 export const Route = createFileRoute("/profile/$accountId")({
   // The open product category lives in the URL so back (header or browser)
   // returns to the category list instead of leaving the profile.
-  validateSearch: (s: Record<string, unknown>): { branch?: string } => ({
+  // `q`: opened from the home search — only the products matching it are shown.
+  validateSearch: (s: Record<string, unknown>): { branch?: string; q?: string } => ({
     branch: typeof s.branch === "string" ? s.branch : undefined,
+    q: typeof s.q === "string" && s.q.trim() ? s.q : undefined,
   }),
   component: ProfilePage,
 });
@@ -190,7 +192,13 @@ function ProfilePage() {
 
   const isSupply = account?.accountType === "supply";
 
-  const { branch } = Route.useSearch();
+  const { branch, q } = Route.useSearch();
+  // Words of the search this page was opened with (from the home search).
+  const searchWords = useMemo(
+    () => (q ?? "").trim().toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 2),
+    [q],
+  );
+  const searching = searchWords.length > 0;
   const navigate = useNavigate();
   const branchFilter = branch ?? "all";
   // Opening a category pushes a history entry; closing it replaces, so back
@@ -208,10 +216,16 @@ function ProfilePage() {
     : null;
 
   const filteredProducts = useMemo(() => {
+    if (searching) {
+      return products.filter((p) => {
+        const hay = [p.en, p.ar, p.brand].filter(Boolean).join(" ").toLowerCase();
+        return searchWords.every((w) => hay.includes(w));
+      });
+    }
     if (!isSupply) return products;
     if (branchFilter === "all") return [];
     return products.filter((p) => p.branch === branchFilter);
-  }, [products, branchFilter, isSupply]);
+  }, [products, branchFilter, isSupply, searching, searchWords]);
 
   const filterImagePaths = useMemo(
     () => filteredProducts.flatMap((p) => p.images),
@@ -445,26 +459,28 @@ function ProfilePage() {
         {/* ── Supply: Branch Categories + Products ─ */}
         {isSupply && (
           <>
-            {activeBranchName ? (
+            {activeBranchName || searching ? (
               <>
                 {/* Active filter header */}
                 <button
-                  onClick={() => setBranchFilter("all")}
+                  onClick={() => (searching ? navigate({ to: "/profile/$accountId", params: { accountId }, search: {}, replace: true }) : setBranchFilter("all"))}
                   className="flex items-center gap-2 text-sm font-bold text-primary hover:text-primary/80 transition"
                 >
                   <Package className="size-4" />
-                  {ar ? "كل الفئات" : "All Categories"}
+                  {searching ? (ar ? "عرض كل منتجات المكتب" : "Show all of this office's products") : ar ? "كل الفئات" : "All Categories"}
                 </button>
                 <div className="flex items-center gap-3 bg-primary/5 border border-primary/15 rounded-2xl p-3">
                   <span className="size-10 rounded-xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
                     {(() => {
-                      const Badge = BRANCH_BADGE[activeBranchName.value] ?? Package;
+                      const Badge = (activeBranchName && !searching && BRANCH_BADGE[activeBranchName.value]) || Package;
                       return <Badge className="size-5" />;
                     })()}
                   </span>
                   <div>
                     <p className="font-display font-bold text-sm">
-                      {ar ? activeBranchName.ar : activeBranchName.en}
+                      {searching
+                        ? ar ? `نتائج «${q?.trim()}»` : `Results for “${q?.trim()}”`
+                        : activeBranchName ? (ar ? activeBranchName.ar : activeBranchName.en) : ""}
                     </p>
                     <p className="text-[11px] text-muted-foreground">
                       {filteredProducts.length} {ar ? "منتج" : "products"}
@@ -494,9 +510,9 @@ function ProfilePage() {
                   <div className="py-10 text-center text-sm text-muted-foreground">
                     <Package className="size-8 mx-auto mb-2 text-muted-foreground/50" />
                     <p>
-                      {ar
-                        ? `لا توجد منتجات في ${activeBranchName.ar}`
-                        : `No products in ${activeBranchName.en}`}
+                      {searching || !activeBranchName
+                        ? ar ? "لا توجد منتجات مطابقة لدى هذا المكتب" : "No matching products here"
+                        : ar ? `لا توجد منتجات في ${activeBranchName.ar}` : `No products in ${activeBranchName.en}`}
                     </p>
                   </div>
                 )}
@@ -550,6 +566,15 @@ function ProfilePage() {
         )}
 
         {/* ── Non-supply: Simple products ────────── */}
+        {!isSupply && searching && (
+          <button
+            onClick={() => navigate({ to: "/profile/$accountId", params: { accountId }, search: {}, replace: true })}
+            className="flex items-center gap-2 text-sm font-bold text-primary hover:text-primary/80 transition"
+          >
+            <Package className="size-4" />
+            {ar ? `نتائج «${q?.trim()}» · عرض كل المنتجات` : `Results for “${q?.trim()}” · show all products`}
+          </button>
+        )}
         {!isSupply && products.length > 0 && (
           <div>
             <h2 className="font-display font-bold text-base flex items-center gap-1.5 mb-3">
@@ -557,7 +582,7 @@ function ProfilePage() {
               {ar ? "المنتجات" : "Products"}
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4">
-              {products.map((p) => {
+              {(searching ? filteredProducts : products).map((p) => {
                 const urls = p.images.map((path) => filterUrls[path]).filter(Boolean);
                 return (
                   <div
